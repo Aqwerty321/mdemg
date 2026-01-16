@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -226,3 +227,49 @@ func CreateTestEmbedding(dims int, seed float32) []float32 {
 // DefaultEmbeddingDims is the default embedding dimension for tests.
 // Using 768 to match Ollama nomic-embed-text model.
 const DefaultEmbeddingDims = 768
+
+// CreateQueryEmbedding creates a standard query embedding [1, 0, 0, ...].
+// This is used with CreateControlledEmbedding to achieve specific cosine similarities.
+func CreateQueryEmbedding(dims int) []float32 {
+	embedding := make([]float32, dims)
+	embedding[0] = 1.0
+	return embedding
+}
+
+// CreateControlledEmbedding creates an embedding that will have a specific cosine similarity
+// with the query embedding created by CreateQueryEmbedding.
+//
+// The math: For unit vectors Q and N, cosine_similarity(Q, N) = dot(Q, N).
+// With Q = [1, 0, 0, ...], we create N = [similarity, sqrt(1-sim^2), 0, ...].
+//
+// Parameters:
+//   - dims: embedding dimensions (768 for default)
+//   - similarity: target cosine similarity (0.0 to 1.0)
+//   - perpIndex: which dimension to use for the perpendicular component (1 to dims-1)
+//
+// Different perpIndex values create embeddings that are orthogonal to each other
+// in the perpendicular component, while maintaining the same similarity to the query.
+func CreateControlledEmbedding(dims int, similarity float64, perpIndex int) []float32 {
+	if similarity < 0 {
+		similarity = 0
+	}
+	if similarity > 1 {
+		similarity = 1
+	}
+	if perpIndex < 1 || perpIndex >= dims {
+		perpIndex = 1
+	}
+
+	embedding := make([]float32, dims)
+
+	// Parallel component (determines cosine similarity with query)
+	embedding[0] = float32(similarity)
+
+	// Perpendicular component (makes it a unit vector)
+	perpComponent := 1.0 - similarity*similarity
+	if perpComponent > 0 {
+		embedding[perpIndex] = float32(math.Sqrt(perpComponent))
+	}
+
+	return embedding
+}

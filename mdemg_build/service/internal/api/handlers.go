@@ -603,3 +603,84 @@ RETURN n.node_id AS node_id,
 
 	writeJSON(w, http.StatusOK, result)
 }
+
+// handleUnarchiveNode handles POST /v1/memory/nodes/{node_id}/unarchive
+// Restores an archived memory node by clearing is_archived, archived_at, and archive_reason
+func (s *Server) handleUnarchiveNode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract node_id from URL path: /v1/memory/nodes/{node_id}/unarchive
+	path := strings.TrimPrefix(r.URL.Path, "/v1/memory/nodes/")
+	nodeID := strings.TrimSuffix(path, "/unarchive")
+	if nodeID == "" || nodeID == path {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid node_id in path"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"nodeId": nodeID,
+	}
+
+	// Execute unarchive operation
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode {node_id: $nodeId})
+REMOVE n.is_archived, n.archived_at, n.archive_reason
+WITH n, datetime() AS unarchiveTime
+RETURN n.node_id AS node_id,
+       coalesce(n.name, n.node_id) AS name,
+       unarchiveTime AS unarchived_at`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			nodeIDVal, _ := rec.Get("node_id")
+			nameVal, _ := rec.Get("name")
+			unarchivedAtVal, _ := rec.Get("unarchived_at")
+
+			// Convert unarchived_at to ISO string
+			var unarchivedAtStr string
+			if at, ok := unarchivedAtVal.(neo4j.LocalDateTime); ok {
+				unarchivedAtStr = at.Time().Format(time.RFC3339)
+			} else if at, ok := unarchivedAtVal.(time.Time); ok {
+				unarchivedAtStr = at.Format(time.RFC3339)
+			} else {
+				unarchivedAtStr = fmt.Sprint(unarchivedAtVal)
+			}
+
+			return &models.UnarchiveResponse{
+				NodeID:       fmt.Sprint(nodeIDVal),
+				Name:         fmt.Sprint(nameVal),
+				UnarchivedAt: unarchivedAtStr,
+			}, nil
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		// Node not found
+		return nil, nil
+	})
+
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	if result == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": fmt.Sprintf("node not found: %s", nodeID)})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}

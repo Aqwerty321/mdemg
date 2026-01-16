@@ -204,9 +204,111 @@ func (s *Service) Reflect(ctx context.Context, req models.ReflectRequest) (model
 	resp.GraphContext.NodesExplored = len(visited)
 	resp.GraphContext.EdgesTraversed = totalEdgesTraversed
 
-	// TODO (subtask-2-4): Stage 3 - ABSTRACT: Upward traversal
-	// - Follow ABSTRACTS_TO edges from core+related nodes
-	// - Track max layer encountered
+	// Stage 3: ABSTRACT - Upward traversal via ABSTRACTS_TO edges
+	// Collect all explored node IDs for abstraction traversal
+	exploredNodeIDs := make([]string, 0, len(visited))
+	for id := range visited {
+		exploredNodeIDs = append(exploredNodeIDs, id)
+	}
+
+	// Track abstractions separately from visited (abstractions can be re-discovered via different paths)
+	abstractionIDs := make(map[string]struct{})
+	abstractionDistance := make(map[string]int)
+	maxLayerReached := 0
+
+	// BFS upward traversal via ABSTRACTS_TO edges
+	abstractionFrontier := exploredNodeIDs
+	for depth := 1; depth <= maxDepth && len(abstractionFrontier) > 0; depth++ {
+		// Check if we've hit maxNodes limit (counting visited + abstractions)
+		if len(visited)+len(abstractionIDs) >= maxNodes {
+			break
+		}
+
+		// Fetch upward ABSTRACTS_TO edges for frontier nodes
+		abstractionEdges, err := s.fetchAbstractionEdges(ctx, req.SpaceID, abstractionFrontier)
+		if err != nil {
+			return models.ReflectResponse{}, err
+		}
+		totalEdgesTraversed += len(abstractionEdges)
+
+		// Collect new abstraction nodes discovered at this depth
+		nextAbstractionFrontier := make([]string, 0)
+		for _, e := range abstractionEdges {
+			// ABSTRACTS_TO edges point from concrete (src) to abstract (dst)
+			// We're traversing upward, so we want the destination
+			targetID := e.Dst
+
+			// Skip if already found as an abstraction
+			if _, ok := abstractionIDs[targetID]; ok {
+				continue
+			}
+
+			// Skip if already in visited set (core memories or related concepts)
+			if _, ok := visited[targetID]; ok {
+				continue
+			}
+
+			// Check maxNodes limit
+			if len(visited)+len(abstractionIDs) >= maxNodes {
+				break
+			}
+
+			// Mark as discovered abstraction and record distance
+			abstractionIDs[targetID] = struct{}{}
+			abstractionDistance[targetID] = depth
+			nextAbstractionFrontier = append(nextAbstractionFrontier, targetID)
+		}
+
+		abstractionFrontier = nextAbstractionFrontier
+	}
+
+	// Fetch metadata for all abstraction nodes
+	if len(abstractionIDs) > 0 {
+		absIDs := make([]string, 0, len(abstractionIDs))
+		for id := range abstractionIDs {
+			absIDs = append(absIDs, id)
+		}
+
+		absMetadata, err := s.fetchNodeMetadata(ctx, req.SpaceID, absIDs)
+		if err != nil {
+			return models.ReflectResponse{}, err
+		}
+
+		// Convert to ScoredNode and add to Abstractions
+		for _, meta := range absMetadata {
+			dist := abstractionDistance[meta.NodeID]
+			// Score decays with distance, but abstractions get a boost based on layer
+			// Higher layer = more abstract = potentially more valuable for context
+			layerBoost := 1.0 + float64(meta.Layer)*0.1
+			score := layerBoost / float64(1+dist)
+			resp.Abstractions = append(resp.Abstractions, models.ScoredNode{
+				NodeID:   meta.NodeID,
+				Name:     meta.Name,
+				Path:     meta.Path,
+				Summary:  meta.Summary,
+				Layer:    meta.Layer,
+				Score:    score,
+				Distance: dist,
+			})
+
+			// Track max layer reached
+			if meta.Layer > maxLayerReached {
+				maxLayerReached = meta.Layer
+			}
+		}
+	}
+
+	// Also check layer of related concepts for max layer
+	for _, rc := range resp.RelatedConcepts {
+		if rc.Layer > maxLayerReached {
+			maxLayerReached = rc.Layer
+		}
+	}
+
+	// Update final graph context
+	resp.GraphContext.NodesExplored = len(visited) + len(abstractionIDs)
+	resp.GraphContext.EdgesTraversed = totalEdgesTraversed
+	resp.GraphContext.MaxLayerReached = maxLayerReached
 
 	// TODO (subtask-2-5): Stage 4 - INSIGHT GENERATION
 	// - Cluster detection: find groups of 3+ nodes with mutual edges
@@ -339,4 +441,67 @@ RETURN n.node_id AS node_id,
 		return nil, err
 	}
 	return outAny.([]NodeMetadata), nil
+}
+
+// AbstractionEdge represents an ABSTRACTS_TO edge for upward traversal
+type AbstractionEdge struct {
+	Src     string
+	Dst     string
+	Weight  float64
+}
+
+// fetchAbstractionEdges fetches ABSTRACTS_TO edges for upward traversal from the given node IDs
+// ABSTRACTS_TO edges point from concrete nodes (src) to abstract nodes (dst)
+func (s *Service) fetchAbstractionEdges(ctx context.Context, spaceID string, nodeIDs []string) ([]AbstractionEdge, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"spaceId": spaceID,
+		"nodeIds": nodeIDs,
+		"maxNbr":  s.cfg.MaxNeighborsPerNode,
+	}
+
+	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Query for ABSTRACTS_TO edges (upward traversal to higher layers)
+		// We follow outgoing ABSTRACTS_TO edges from concrete to abstract
+		cypher := `UNWIND $nodeIds AS sid
+MATCH (src:MemoryNode {space_id:$spaceId, node_id:sid})
+CALL {
+  WITH src
+  MATCH (src)-[r:ABSTRACTS_TO]->(dst:MemoryNode {space_id:$spaceId})
+  WHERE coalesce(r.status,'active')='active'
+  RETURN src.node_id AS s, dst.node_id AS d,
+         coalesce(r.weight,0.0) AS w
+  ORDER BY w DESC
+  LIMIT $maxNbr
+}
+RETURN DISTINCT s, d, w`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		edges := make([]AbstractionEdge, 0, 128)
+		for res.Next(ctx) {
+			rec := res.Record()
+			s, _ := rec.Get("s")
+			d, _ := rec.Get("d")
+			w, _ := rec.Get("w")
+
+			e := AbstractionEdge{
+				Src:    fmt.Sprint(s),
+				Dst:    fmt.Sprint(d),
+				Weight: toFloat64(w, 0),
+			}
+			edges = append(edges, e)
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return edges, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return outAny.([]AbstractionEdge), nil
 }

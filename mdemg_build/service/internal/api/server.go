@@ -77,7 +77,13 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/reflect", s.handleReflect)
 	mux.HandleFunc("/v1/memory/stats", s.handleStats)
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
-	return mux
+
+	// Wrap mux with logging middleware
+	logCfg := LogConfig{
+		Format:     s.cfg.LogFormat,
+		SkipHealth: s.cfg.LogSkipHealth,
+	}
+	return LoggingMiddleware(mux, logCfg)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

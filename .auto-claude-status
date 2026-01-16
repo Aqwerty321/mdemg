@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "019-013-configurable-scoring",
-  "state": "complete",
+  "spec": "023-017-graph-pruning",
+  "state": "building",
   "subtasks": {
-    "completed": 8,
-    "total": 8,
-    "in_progress": 0,
+    "completed": 0,
+    "total": 21,
+    "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Verification",
+    "current": "CLI Foundation & Config",
     "id": null,
-    "total": 2
+    "total": 3
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 8,
-    "started_at": "2026-01-16T17:59:38.978983"
+    "number": 1,
+    "started_at": "2026-01-16T18:30:08.977241"
   },
-  "last_update": "2026-01-16T18:11:27.846768"
+  "last_update": "2026-01-16T18:30:09.031860"
 }

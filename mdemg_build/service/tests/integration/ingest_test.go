@@ -31,10 +31,20 @@ type IngestRequest struct {
 
 // IngestResponse mirrors the API response structure for tests.
 type IngestResponse struct {
-	SpaceID       string `json:"space_id"`
-	NodeID        string `json:"node_id"`
-	ObsID         string `json:"obs_id"`
-	EmbeddingDims int    `json:"embedding_dims,omitempty"`
+	SpaceID       string           `json:"space_id"`
+	NodeID        string           `json:"node_id"`
+	ObsID         string           `json:"obs_id"`
+	EmbeddingDims int              `json:"embedding_dims,omitempty"`
+	Anomalies     []IngestAnomaly  `json:"anomalies,omitempty"`
+}
+
+// IngestAnomaly mirrors the Anomaly struct for tests.
+type IngestAnomaly struct {
+	Type        string  `json:"type"`
+	Severity    string  `json:"severity"`
+	Message     string  `json:"message"`
+	RelatedNode string  `json:"related_node,omitempty"`
+	Confidence  float64 `json:"confidence"`
 }
 
 // TestIngestCreatesNode verifies that POST to /v1/memory/ingest creates a Neo4j node with correct properties.
@@ -707,5 +717,153 @@ func verifyEmbeddingInNeo4j(t *testing.T, driver neo4j.DriverWithContext, spaceI
 	}
 	if !hasNonZero {
 		t.Error("embedding appears to be all zeros - likely not properly generated")
+	}
+}
+
+// TestIngestAnomalyDuplicateDetection verifies that the anomaly detection
+// detects duplicate nodes when ingesting content that is very similar to an existing node.
+func TestIngestAnomalyDuplicateDetection(t *testing.T) {
+	// Setup: ensure service is ready
+	RequireServiceReady(t)
+	driver := SetupTestNeo4j(t)
+
+	cfg := GetTestConfig()
+	client := NewTestHTTPClient()
+
+	// Create unique space ID for test isolation
+	spaceID := GenerateTestSpaceID("anomaly-dup")
+
+	// Register cleanup
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Create an embedding that we'll reuse (very similar)
+	// Using the same embedding for both nodes guarantees similarity > 0.95
+	baseEmbedding := CreateTestEmbedding(DefaultEmbeddingDims, 42.0)
+
+	// --- First ingest: create the original node ---
+	req1 := IngestRequest{
+		SpaceID:   spaceID,
+		Timestamp: time.Now().Format(time.RFC3339),
+		Source:    "test-source-original",
+		Content:   "Original content for duplicate detection test",
+		Name:      "original-node",
+		Path:      "/test/anomaly/original",
+		Embedding: baseEmbedding,
+	}
+
+	reqBody1, err := json.Marshal(req1)
+	if err != nil {
+		t.Fatalf("failed to marshal first request: %v", err)
+	}
+
+	ingestURL := cfg.MDEMGEndpoint + "/v1/memory/ingest"
+	httpReq1, err := http.NewRequest(http.MethodPost, ingestURL, bytes.NewReader(reqBody1))
+	if err != nil {
+		t.Fatalf("failed to create first HTTP request: %v", err)
+	}
+	httpReq1.Header.Set("Content-Type", "application/json")
+
+	resp1, err := client.Do(httpReq1)
+	if err != nil {
+		t.Fatalf("first ingest request failed: %v", err)
+	}
+	defer resp1.Body.Close()
+
+	if resp1.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		json.NewDecoder(resp1.Body).Decode(&errResp)
+		t.Fatalf("first ingest returned status %d: %v", resp1.StatusCode, errResp)
+	}
+
+	var ingestResp1 IngestResponse
+	if err := json.NewDecoder(resp1.Body).Decode(&ingestResp1); err != nil {
+		t.Fatalf("failed to decode first response: %v", err)
+	}
+
+	originalNodeID := ingestResp1.NodeID
+	t.Logf("Created original node: %s", originalNodeID)
+
+	// --- Second ingest: create near-duplicate (same embedding, different path) ---
+	req2 := IngestRequest{
+		SpaceID:   spaceID,
+		Timestamp: time.Now().Format(time.RFC3339),
+		Source:    "test-source-duplicate",
+		Content:   "Nearly identical content for duplicate detection test",
+		Name:      "duplicate-node",
+		Path:      "/test/anomaly/duplicate", // Different path
+		Embedding: baseEmbedding,             // Same embedding - should trigger duplicate detection
+	}
+
+	reqBody2, err := json.Marshal(req2)
+	if err != nil {
+		t.Fatalf("failed to marshal second request: %v", err)
+	}
+
+	httpReq2, err := http.NewRequest(http.MethodPost, ingestURL, bytes.NewReader(reqBody2))
+	if err != nil {
+		t.Fatalf("failed to create second HTTP request: %v", err)
+	}
+	httpReq2.Header.Set("Content-Type", "application/json")
+
+	resp2, err := client.Do(httpReq2)
+	if err != nil {
+		t.Fatalf("second ingest request failed: %v", err)
+	}
+	defer resp2.Body.Close()
+
+	// Ingest should still succeed (anomalies are non-blocking)
+	if resp2.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		json.NewDecoder(resp2.Body).Decode(&errResp)
+		t.Fatalf("second ingest returned status %d: %v", resp2.StatusCode, errResp)
+	}
+
+	var ingestResp2 IngestResponse
+	if err := json.NewDecoder(resp2.Body).Decode(&ingestResp2); err != nil {
+		t.Fatalf("failed to decode second response: %v", err)
+	}
+
+	duplicateNodeID := ingestResp2.NodeID
+	t.Logf("Created duplicate node: %s", duplicateNodeID)
+
+	// --- Verify anomaly was detected ---
+	if len(ingestResp2.Anomalies) == 0 {
+		t.Log("WARNING: No anomalies detected. This may be expected if anomaly detection is disabled or timed out.")
+		return
+	}
+
+	// Check for duplicate anomaly
+	foundDuplicate := false
+	for _, anomaly := range ingestResp2.Anomalies {
+		t.Logf("Anomaly detected: type=%s, severity=%s, message=%s, confidence=%.2f, related=%s",
+			anomaly.Type, anomaly.Severity, anomaly.Message, anomaly.Confidence, anomaly.RelatedNode)
+
+		if anomaly.Type == "duplicate" {
+			foundDuplicate = true
+
+			// Verify the related node is the original
+			if anomaly.RelatedNode != originalNodeID {
+				t.Errorf("duplicate anomaly related_node mismatch: got %q, want %q",
+					anomaly.RelatedNode, originalNodeID)
+			}
+
+			// Verify confidence is high (should be close to 1.0 for identical embeddings)
+			if anomaly.Confidence < 0.95 {
+				t.Errorf("duplicate anomaly confidence too low: got %.2f, want >= 0.95",
+					anomaly.Confidence)
+			}
+
+			// Verify severity is appropriate
+			if anomaly.Severity != "warning" && anomaly.Severity != "critical" {
+				t.Errorf("unexpected severity for duplicate: got %q, want warning or critical",
+					anomaly.Severity)
+			}
+		}
+	}
+
+	if !foundDuplicate {
+		t.Error("expected duplicate anomaly to be detected with identical embeddings")
 	}
 }

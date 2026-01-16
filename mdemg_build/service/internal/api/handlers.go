@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/anomaly"
 	"mdemg/internal/db"
 	"mdemg/internal/models"
 )
@@ -114,6 +115,19 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	// Include embedding dimensions in response if generated
 	if len(req.Embedding) > 0 {
 		out.EmbeddingDims = len(req.Embedding)
+	}
+
+	// Run anomaly detection (non-blocking - errors are logged, not returned)
+	if s.anomalyDetector != nil {
+		dctx := anomaly.DetectionContext{
+			SpaceID:   req.SpaceID,
+			NodeID:    out.NodeID,
+			Content:   contentToText(req.Content),
+			Embedding: req.Embedding,
+			Tags:      req.Tags,
+			IsUpdate:  req.NodeID != "", // If node_id was provided, this is an update
+		}
+		out.Anomalies = s.anomalyDetector.Detect(r.Context(), dctx)
 	}
 
 	writeJSON(w, http.StatusOK, out)

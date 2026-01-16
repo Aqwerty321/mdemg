@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/anomaly"
 	"mdemg/internal/config"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/learning"
@@ -13,11 +14,12 @@ import (
 )
 
 type Server struct {
-	cfg       config.Config
-	driver    neo4j.DriverWithContext
-	retriever *retrieval.Service
-	learner   *learning.Service
-	embedder  embeddings.Embedder
+	cfg             config.Config
+	driver          neo4j.DriverWithContext
+	retriever       *retrieval.Service
+	learner         *learning.Service
+	embedder        embeddings.Embedder
+	anomalyDetector *anomaly.Service
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext) *Server {
@@ -46,7 +48,21 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext) *Server {
 		log.Printf("No embedding provider configured (set EMBEDDING_PROVIDER=openai or ollama)")
 	}
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb}
+	// Initialize anomaly detector
+	anomalyCfg := anomaly.Config{
+		Enabled:            cfg.AnomalyDetectionEnabled,
+		DuplicateThreshold: cfg.AnomalyDuplicateThreshold,
+		OutlierStdDevs:     cfg.AnomalyOutlierStdDevs,
+		StaleDays:          cfg.AnomalyStaleDays,
+		MaxCheckMs:         cfg.AnomalyMaxCheckMs,
+		VectorIndexName:    cfg.VectorIndexName,
+	}
+	anom := anomaly.NewService(driver, anomalyCfg)
+	if anomalyCfg.Enabled {
+		log.Printf("Anomaly detection enabled (duplicate threshold: %.2f, timeout: %dms)", anomalyCfg.DuplicateThreshold, anomalyCfg.MaxCheckMs)
+	}
+
+	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom}
 }
 
 func (s *Server) Routes() http.Handler {

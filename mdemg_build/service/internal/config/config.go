@@ -47,6 +47,13 @@ type Config struct {
 
 	// Batch ingest settings
 	BatchIngestMaxItems int // Maximum items per batch request (default: 100)
+
+	// Anomaly detection settings
+	AnomalyDetectionEnabled bool    // Feature toggle (default: true)
+	AnomalyDuplicateThreshold float64 // Vector similarity threshold for duplicates (default: 0.95)
+	AnomalyOutlierStdDevs   float64 // Standard deviations for outlier detection (default: 2.0)
+	AnomalyStaleDays        int     // Days after which an update is considered stale (default: 30)
+	AnomalyMaxCheckMs       int     // Maximum time for anomaly checks in ms (default: 100)
 }
 
 func FromEnv() (Config, error) {
@@ -219,6 +226,37 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("BATCH_INGEST_MAX_ITEMS must be in range [1, 1000]")
 	}
 
+	// Anomaly detection settings
+	anomalyEnabled := getBool("ANOMALY_DETECTION_ENABLED", true)
+	anomalyDupThreshold, err := atof("ANOMALY_DUPLICATE_THRESHOLD", 0.95)
+	if err != nil {
+		return Config{}, err
+	}
+	if anomalyDupThreshold < 0 || anomalyDupThreshold > 1 {
+		return Config{}, errors.New("ANOMALY_DUPLICATE_THRESHOLD must be in range [0, 1]")
+	}
+	anomalyOutlierStdDevs, err := atof("ANOMALY_OUTLIER_STDDEVS", 2.0)
+	if err != nil {
+		return Config{}, err
+	}
+	if anomalyOutlierStdDevs <= 0 {
+		return Config{}, errors.New("ANOMALY_OUTLIER_STDDEVS must be > 0")
+	}
+	anomalyStaleDays, err := atoi("ANOMALY_STALE_DAYS", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	if anomalyStaleDays < 0 {
+		return Config{}, errors.New("ANOMALY_STALE_DAYS must be >= 0")
+	}
+	anomalyMaxCheckMs, err := atoi("ANOMALY_MAX_CHECK_MS", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	if anomalyMaxCheckMs < 1 {
+		return Config{}, errors.New("ANOMALY_MAX_CHECK_MS must be >= 1")
+	}
+
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "")
 	openaiKey := get("OPENAI_API_KEY", "")
@@ -257,5 +295,10 @@ func FromEnv() (Config, error) {
 		SemanticEdgeMinSimilarity: semEdgeMinSim,
 		SemanticEdgeInitialWeight: semEdgeInitWeight,
 		BatchIngestMaxItems:       batchMaxItems,
+		AnomalyDetectionEnabled:   anomalyEnabled,
+		AnomalyDuplicateThreshold: anomalyDupThreshold,
+		AnomalyOutlierStdDevs:     anomalyOutlierStdDevs,
+		AnomalyStaleDays:          anomalyStaleDays,
+		AnomalyMaxCheckMs:         anomalyMaxCheckMs,
 	}, nil
 }

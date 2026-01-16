@@ -44,10 +44,30 @@ type IngestRequest struct {
 }
 
 type IngestResponse struct {
-	SpaceID       string `json:"space_id"`
-	NodeID        string `json:"node_id"`
-	ObsID         string `json:"obs_id"`
-	EmbeddingDims int    `json:"embedding_dims,omitempty"` // Dimensions of generated embedding
+	SpaceID       string    `json:"space_id"`
+	NodeID        string    `json:"node_id"`
+	ObsID         string    `json:"obs_id"`
+	EmbeddingDims int       `json:"embedding_dims,omitempty"` // Dimensions of generated embedding
+	Anomalies     []Anomaly `json:"anomalies,omitempty"`      // Detected anomalies (non-blocking)
+}
+
+// AnomalyType represents the type of anomaly detected during ingest
+type AnomalyType string
+
+const (
+	AnomalyContradiction AnomalyType = "contradiction" // Conflicts with existing node
+	AnomalyDuplicate     AnomalyType = "duplicate"     // Very similar node exists
+	AnomalyOutlier       AnomalyType = "outlier"       // Unusual for this space
+	AnomalyStaleUpdate   AnomalyType = "stale_update"  // Updating old node
+)
+
+// Anomaly represents a detected anomaly during ingest
+type Anomaly struct {
+	Type        AnomalyType `json:"type"`
+	Severity    string      `json:"severity"`               // "info", "warning", "critical"
+	Message     string      `json:"message"`
+	RelatedNode string      `json:"related_node,omitempty"` // Node ID of related node
+	Confidence  float64     `json:"confidence"`             // 0.0 - 1.0
 }
 
 // MetricsResponse - main response structure for GET /v1/metrics

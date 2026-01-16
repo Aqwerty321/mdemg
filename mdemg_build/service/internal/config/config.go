@@ -25,6 +25,7 @@ type Config struct {
 	AllowedRelationshipTypes []string
 
 	LearningEdgeCapPerRequest int
+	LearningMinActivation     float64
 
 	// Embedding provider settings
 	EmbeddingProvider   string // "openai", "ollama", or "" (disabled)
@@ -96,6 +97,16 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// Learning minimum activation threshold (0.0-1.0)
+	learnMinActStr := get("LEARNING_MIN_ACTIVATION", "0.20")
+	learnMinAct, err := strconv.ParseFloat(learnMinActStr, 64)
+	if err != nil {
+		return Config{}, fmt.Errorf("LEARNING_MIN_ACTIVATION must be float: %w", err)
+	}
+	if learnMinAct < 0 || learnMinAct > 1 {
+		return Config{}, errors.New("LEARNING_MIN_ACTIVATION must be in range [0, 1]")
+	}
+
 	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES")
 	parts := strings.Split(allowed, ",")
 	out := make([]string, 0, len(parts))
@@ -128,9 +139,10 @@ func FromEnv() (Config, error) {
 		DefaultHopDepth: hops,
 		MaxNeighborsPerNode: maxNbr,
 		MaxTotalEdgesFetched: maxEdges,
-		AllowedRelationshipTypes: out,
+		AllowedRelationshipTypes:  out,
 		LearningEdgeCapPerRequest: learnCap,
-		EmbeddingProvider: embProvider,
+		LearningMinActivation:     learnMinAct,
+		EmbeddingProvider:         embProvider,
 		OpenAIAPIKey: openaiKey,
 		OpenAIModel: openaiModel,
 		OpenAIEndpoint: openaiEndpoint,

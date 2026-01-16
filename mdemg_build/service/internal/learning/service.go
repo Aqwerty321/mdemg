@@ -31,8 +31,12 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 		return nil
 	}
 
-	// Filter nodes by activation threshold
-	minAct := 0.20
+	// Filter nodes by activation threshold (configurable, default 0.20)
+	// This prevents clique spam by only considering significantly activated nodes
+	minAct := s.cfg.LearningMinActivation
+	if minAct <= 0 {
+		minAct = 0.20 // fallback default
+	}
 	nodes := make([]models.RetrieveResult, 0, len(resp.Results))
 	for _, r := range resp.Results {
 		if r.Activation >= minAct {
@@ -40,7 +44,7 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 		}
 	}
 	if len(nodes) < 2 {
-		return nil
+		return nil // need at least 2 nodes to form a pair
 	}
 
 	// Build pair updates (cap to config)

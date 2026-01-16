@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "007-implement-deep-context-exploration-endpoint",
+  "spec": "019-013-configurable-scoring",
   "state": "building",
   "subtasks": {
-    "completed": 3,
-    "total": 11,
+    "completed": 1,
+    "total": 8,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Core Reflection Algorithm",
+    "current": "Configuration Implementation",
     "id": null,
-    "total": 5
+    "total": 3
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 4,
-    "started_at": "2026-01-16T13:55:16.861148"
+    "number": 2,
+    "started_at": "2026-01-16T17:59:38.978983"
   },
-  "last_update": "2026-01-16T13:59:43.976991"
+  "last_update": "2026-01-16T18:00:55.879807"
 }

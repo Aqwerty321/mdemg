@@ -270,6 +270,57 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("ANOMALY_MAX_CHECK_MS must be >= 1")
 	}
 
+	// Scoring hyperparameters for retrieval ranking
+	scoringAlpha, err := atof("SCORING_ALPHA", 0.55)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringAlpha < 0 {
+		return Config{}, errors.New("SCORING_ALPHA must be >= 0")
+	}
+	scoringBeta, err := atof("SCORING_BETA", 0.30)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringBeta < 0 {
+		return Config{}, errors.New("SCORING_BETA must be >= 0")
+	}
+	scoringGamma, err := atof("SCORING_GAMMA", 0.10)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringGamma < 0 {
+		return Config{}, errors.New("SCORING_GAMMA must be >= 0")
+	}
+	scoringDelta, err := atof("SCORING_DELTA", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringDelta < 0 {
+		return Config{}, errors.New("SCORING_DELTA must be >= 0")
+	}
+	scoringPhi, err := atof("SCORING_PHI", 0.08)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringPhi < 0 {
+		return Config{}, errors.New("SCORING_PHI must be >= 0")
+	}
+	scoringKappa, err := atof("SCORING_KAPPA", 0.12)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringKappa < 0 {
+		return Config{}, errors.New("SCORING_KAPPA must be >= 0")
+	}
+	scoringRho, err := atof("SCORING_RHO", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRho < 0 {
+		return Config{}, errors.New("SCORING_RHO must be >= 0")
+	}
+
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "")
 	openaiKey := get("OPENAI_API_KEY", "")
@@ -325,5 +376,12 @@ func FromEnv() (Config, error) {
 		AnomalyOutlierStdDevs:     anomalyOutlierStdDevs,
 		AnomalyStaleDays:          anomalyStaleDays,
 		AnomalyMaxCheckMs:         anomalyMaxCheckMs,
+		ScoringAlpha:              scoringAlpha,
+		ScoringBeta:               scoringBeta,
+		ScoringGamma:              scoringGamma,
+		ScoringDelta:              scoringDelta,
+		ScoringPhi:                scoringPhi,
+		ScoringKappa:              scoringKappa,
+		ScoringRho:                scoringRho,
 	}, nil
 }

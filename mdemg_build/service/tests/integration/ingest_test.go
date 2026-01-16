@@ -297,3 +297,153 @@ func assertEqual(t *testing.T, field string, expected, actual any) {
 		t.Errorf("%s mismatch: got %v (%T), want %v (%T)", field, actual, actual, expected, expected)
 	}
 }
+
+// TestIngestGeneratesEmbedding verifies that when no embedding is provided in the ingest request,
+// the service auto-generates one using Ollama (nomic-embed-text model, 768 dimensions).
+func TestIngestGeneratesEmbedding(t *testing.T) {
+	// Setup: ensure service is ready
+	RequireServiceReady(t)
+
+	// Check if embedding provider (Ollama) is available
+	if !RequireEmbeddingProvider(t) {
+		t.Skip("Skipping test: embedding provider (Ollama) not available")
+	}
+
+	driver := SetupTestNeo4j(t)
+
+	cfg := GetTestConfig()
+	client := NewTestHTTPClient()
+
+	// Create unique space ID for test isolation
+	spaceID := GenerateTestSpaceID("ingest-autoembed")
+
+	// Register cleanup
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Prepare ingest request WITHOUT embedding - service should auto-generate
+	req := IngestRequest{
+		SpaceID:   spaceID,
+		Timestamp: time.Now().Format(time.RFC3339),
+		Source:    "test-source-autoembed",
+		Content:   "This is test content that will be auto-embedded by Ollama",
+		Tags:      []string{"autoembed", "integration"},
+		Name:      "auto-embed-test-node",
+		Path:      "/test/path/autoembed",
+		// Embedding intentionally omitted to trigger auto-generation
+	}
+
+	// Make ingest request
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("failed to marshal request: %v", err)
+	}
+
+	ingestURL := cfg.MDEMGEndpoint + "/v1/memory/ingest"
+	httpReq, err := http.NewRequest(http.MethodPost, ingestURL, bytes.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("failed to create HTTP request: %v", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		t.Fatalf("ingest request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Verify HTTP response status
+	if resp.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		json.NewDecoder(resp.Body).Decode(&errResp)
+		t.Fatalf("ingest returned status %d: %v", resp.StatusCode, errResp)
+	}
+
+	// Parse response
+	var ingestResp IngestResponse
+	if err := json.NewDecoder(resp.Body).Decode(&ingestResp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify response fields
+	if ingestResp.SpaceID != spaceID {
+		t.Errorf("response space_id mismatch: got %q, want %q", ingestResp.SpaceID, spaceID)
+	}
+	if ingestResp.NodeID == "" {
+		t.Error("response node_id is empty")
+	}
+	if ingestResp.ObsID == "" {
+		t.Error("response obs_id is empty")
+	}
+
+	// Verify embedding dimensions - Ollama nomic-embed-text produces 768 dimensions
+	expectedDims := 768
+	if ingestResp.EmbeddingDims != expectedDims {
+		t.Errorf("response embedding_dims mismatch: got %d, want %d (Ollama nomic-embed-text)", ingestResp.EmbeddingDims, expectedDims)
+	}
+
+	// Verify embedding was stored in Neo4j with correct dimensions
+	verifyEmbeddingInNeo4j(t, driver, spaceID, ingestResp.NodeID, expectedDims)
+}
+
+// verifyEmbeddingInNeo4j checks that the MemoryNode has an embedding of the expected dimension.
+func verifyEmbeddingInNeo4j(t *testing.T, driver neo4j.DriverWithContext, spaceID, nodeID string, expectedDims int) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode {space_id: $spaceId, node_id: $nodeId})
+			RETURN n.embedding AS embedding
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+			"nodeId":  nodeID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if !res.Next(ctx) {
+			return nil, fmt.Errorf("node not found: space_id=%s, node_id=%s", spaceID, nodeID)
+		}
+
+		return res.Record().AsMap(), res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to query node embedding from Neo4j: %v", err)
+	}
+
+	nodeProps := result.(map[string]any)
+
+	// Verify embedding exists and has correct dimensions
+	embedding, ok := nodeProps["embedding"].([]any)
+	if !ok {
+		if nodeProps["embedding"] == nil {
+			t.Fatal("embedding is nil - auto-generation did not occur")
+		}
+		t.Fatalf("embedding has unexpected type: %T", nodeProps["embedding"])
+	}
+
+	if len(embedding) != expectedDims {
+		t.Errorf("embedding dimension mismatch: got %d, want %d", len(embedding), expectedDims)
+	}
+
+	// Verify embedding contains non-zero values (sanity check)
+	hasNonZero := false
+	for _, v := range embedding {
+		if val, ok := v.(float64); ok && val != 0.0 {
+			hasNonZero = true
+			break
+		}
+	}
+	if !hasNonZero {
+		t.Error("embedding appears to be all zeros - likely not properly generated")
+	}
+}

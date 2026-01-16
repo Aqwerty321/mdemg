@@ -4,10 +4,14 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 // RetrieveRequest mirrors the API request structure for tests.
@@ -212,6 +216,303 @@ func TestIngestAndRetrieve(t *testing.T) {
 	}
 
 	t.Logf("Successfully retrieved ingested node with score=%f, vector_sim=%f", foundNode.Score, foundNode.VectorSim)
+}
+
+// TestGraphExpansion verifies that graph traversal retrieves related nodes via ASSOCIATED_WITH edges.
+// This test validates the bounded expansion phase of the retrieval pipeline:
+// 1. Vector recall finds the seed node
+// 2. Graph expansion traverses ASSOCIATED_WITH edges to find related nodes
+// 3. Related nodes appear in results even if they have low vector similarity to the query
+func TestGraphExpansion(t *testing.T) {
+	// Setup: ensure service is ready and create Neo4j driver for verification
+	RequireServiceReady(t)
+	driver := SetupTestNeo4j(t)
+
+	cfg := GetTestConfig()
+	client := NewTestHTTPClient()
+
+	// Create unique space ID for test isolation
+	spaceID := GenerateTestSpaceID("graph-expansion")
+
+	// Register cleanup
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// --- Step 1: Ingest a "seed" node with a known embedding ---
+	// This node will be found via vector recall and serve as the expansion starting point
+	seedEmbedding := CreateTestEmbedding(DefaultEmbeddingDims, 1.0)
+	seedConfidence := 0.9
+
+	seedIngestReq := IngestRequest{
+		SpaceID:     spaceID,
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Source:      "test-source-graph-expansion",
+		Content:     "This is the seed node for graph expansion testing",
+		Tags:        []string{"graph", "expansion", "seed"},
+		Name:        "seed-node",
+		Path:        "/test/graph-expansion/seed",
+		Sensitivity: "internal",
+		Confidence:  &seedConfidence,
+		Embedding:   seedEmbedding,
+	}
+
+	seedIngestBody, err := json.Marshal(seedIngestReq)
+	if err != nil {
+		t.Fatalf("failed to marshal seed ingest request: %v", err)
+	}
+
+	ingestURL := cfg.MDEMGEndpoint + "/v1/memory/ingest"
+	httpSeedIngestReq, err := http.NewRequest(http.MethodPost, ingestURL, bytes.NewReader(seedIngestBody))
+	if err != nil {
+		t.Fatalf("failed to create seed ingest HTTP request: %v", err)
+	}
+	httpSeedIngestReq.Header.Set("Content-Type", "application/json")
+
+	seedIngestResp, err := client.Do(httpSeedIngestReq)
+	if err != nil {
+		t.Fatalf("seed ingest request failed: %v", err)
+	}
+	defer seedIngestResp.Body.Close()
+
+	if seedIngestResp.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		json.NewDecoder(seedIngestResp.Body).Decode(&errResp)
+		t.Fatalf("seed ingest returned status %d: %v", seedIngestResp.StatusCode, errResp)
+	}
+
+	var seedResponse IngestResponse
+	if err := json.NewDecoder(seedIngestResp.Body).Decode(&seedResponse); err != nil {
+		t.Fatalf("failed to decode seed ingest response: %v", err)
+	}
+
+	seedNodeID := seedResponse.NodeID
+	t.Logf("Ingested seed node with ID: %s", seedNodeID)
+
+	// --- Step 2: Ingest "related" nodes with DIFFERENT embeddings ---
+	// These nodes have embeddings that are dissimilar to the query,
+	// so they should only be found via graph expansion, not vector recall
+	type relatedNode struct {
+		name     string
+		path     string
+		seed     float32 // Different seed values produce dissimilar embeddings
+		nodeID   string
+	}
+
+	relatedNodes := []relatedNode{
+		{name: "related-node-1", path: "/test/graph-expansion/related1", seed: 100.0},
+		{name: "related-node-2", path: "/test/graph-expansion/related2", seed: 200.0},
+	}
+
+	for i := range relatedNodes {
+		rn := &relatedNodes[i]
+		relatedEmbedding := CreateTestEmbedding(DefaultEmbeddingDims, rn.seed)
+		confidence := 0.7
+
+		relatedIngestReq := IngestRequest{
+			SpaceID:     spaceID,
+			Timestamp:   time.Now().Format(time.RFC3339),
+			Source:      "test-source-graph-expansion",
+			Content:     "Related content for " + rn.name,
+			Tags:        []string{"graph", "expansion", "related"},
+			Name:        rn.name,
+			Path:        rn.path,
+			Sensitivity: "internal",
+			Confidence:  &confidence,
+			Embedding:   relatedEmbedding,
+		}
+
+		relatedIngestBody, err := json.Marshal(relatedIngestReq)
+		if err != nil {
+			t.Fatalf("failed to marshal %s ingest request: %v", rn.name, err)
+		}
+
+		httpRelatedReq, err := http.NewRequest(http.MethodPost, ingestURL, bytes.NewReader(relatedIngestBody))
+		if err != nil {
+			t.Fatalf("failed to create %s ingest HTTP request: %v", rn.name, err)
+		}
+		httpRelatedReq.Header.Set("Content-Type", "application/json")
+
+		relatedResp, err := client.Do(httpRelatedReq)
+		if err != nil {
+			t.Fatalf("%s ingest request failed: %v", rn.name, err)
+		}
+		defer relatedResp.Body.Close()
+
+		if relatedResp.StatusCode != http.StatusOK {
+			var errResp map[string]any
+			json.NewDecoder(relatedResp.Body).Decode(&errResp)
+			t.Fatalf("%s ingest returned status %d: %v", rn.name, relatedResp.StatusCode, errResp)
+		}
+
+		var relatedResponse IngestResponse
+		if err := json.NewDecoder(relatedResp.Body).Decode(&relatedResponse); err != nil {
+			t.Fatalf("failed to decode %s ingest response: %v", rn.name, err)
+		}
+
+		rn.nodeID = relatedResponse.NodeID
+		t.Logf("Ingested %s with ID: %s", rn.name, rn.nodeID)
+	}
+
+	// --- Step 3: Create ASSOCIATED_WITH edges from seed to related nodes ---
+	// This must be done directly in Neo4j since the ingest API doesn't create edges
+	createAssociatedWithEdges(t, driver, spaceID, seedNodeID, []string{relatedNodes[0].nodeID, relatedNodes[1].nodeID})
+
+	// Small delay to ensure data is committed and indexed
+	time.Sleep(500 * time.Millisecond)
+
+	// --- Step 4: Query using the seed node's embedding ---
+	// The query embedding matches the seed node, which should trigger graph expansion
+	retrieveReq := RetrieveRequest{
+		SpaceID:        spaceID,
+		QueryEmbedding: seedEmbedding,
+		CandidateK:     50,
+		TopK:           10,
+		HopDepth:       2, // Enable 2-hop expansion to find related nodes
+	}
+
+	retrieveBody, err := json.Marshal(retrieveReq)
+	if err != nil {
+		t.Fatalf("failed to marshal retrieve request: %v", err)
+	}
+
+	retrieveURL := cfg.MDEMGEndpoint + "/v1/memory/retrieve"
+	httpRetrieveReq, err := http.NewRequest(http.MethodPost, retrieveURL, bytes.NewReader(retrieveBody))
+	if err != nil {
+		t.Fatalf("failed to create retrieve HTTP request: %v", err)
+	}
+	httpRetrieveReq.Header.Set("Content-Type", "application/json")
+
+	retrieveResp, err := client.Do(httpRetrieveReq)
+	if err != nil {
+		t.Fatalf("retrieve request failed: %v", err)
+	}
+	defer retrieveResp.Body.Close()
+
+	if retrieveResp.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		json.NewDecoder(retrieveResp.Body).Decode(&errResp)
+		t.Fatalf("retrieve returned status %d: %v", retrieveResp.StatusCode, errResp)
+	}
+
+	var retrieveResponse RetrieveResponse
+	if err := json.NewDecoder(retrieveResp.Body).Decode(&retrieveResponse); err != nil {
+		t.Fatalf("failed to decode retrieve response: %v", err)
+	}
+
+	// --- Step 5: Verify results include both seed and related nodes ---
+
+	// Check that results are not empty
+	if len(retrieveResponse.Results) == 0 {
+		t.Fatal("retrieve returned no results - expected seed and related nodes")
+	}
+
+	t.Logf("Retrieve returned %d results", len(retrieveResponse.Results))
+
+	// Find the seed node in results (should have high vector_sim)
+	var foundSeed *RetrieveResult
+	for i, result := range retrieveResponse.Results {
+		if result.NodeID == seedNodeID {
+			foundSeed = &retrieveResponse.Results[i]
+			break
+		}
+	}
+
+	if foundSeed == nil {
+		t.Fatalf("seed node %q not found in retrieve results. Got results: %+v", seedNodeID, retrieveResponse.Results)
+	}
+
+	t.Logf("Found seed node: score=%f, vector_sim=%f, activation=%f", foundSeed.Score, foundSeed.VectorSim, foundSeed.Activation)
+
+	// Verify seed node has high vector similarity (since we used its embedding for the query)
+	if foundSeed.VectorSim < 0.9 {
+		t.Errorf("seed node should have high vector_sim, got %f", foundSeed.VectorSim)
+	}
+
+	// Check that related nodes are in the results (they should be found via graph expansion)
+	foundRelatedCount := 0
+	for _, rn := range relatedNodes {
+		for i, result := range retrieveResponse.Results {
+			if result.NodeID == rn.nodeID {
+				foundRelatedCount++
+				t.Logf("Found %s: score=%f, vector_sim=%f, activation=%f", rn.name, result.Score, result.VectorSim, result.Activation)
+
+				// Related nodes should have lower vector_sim (different embeddings)
+				// but positive activation (received activation from seed via graph expansion)
+				if retrieveResponse.Results[i].Activation <= 0 {
+					t.Errorf("%s should have positive activation from graph expansion, got %f", rn.name, result.Activation)
+				}
+				break
+			}
+		}
+	}
+
+	if foundRelatedCount < len(relatedNodes) {
+		t.Errorf("expected to find %d related nodes via graph expansion, found %d", len(relatedNodes), foundRelatedCount)
+		t.Logf("Results: %+v", retrieveResponse.Results)
+	}
+
+	// Verify debug info shows edges were fetched (evidence of graph expansion)
+	if retrieveResponse.Debug != nil {
+		if edgesFetched, ok := retrieveResponse.Debug["edges_fetched"]; ok {
+			t.Logf("Debug: edges_fetched=%v", edgesFetched)
+			// We created 2 edges, so at least 2 should have been fetched
+			if edgeCount, ok := edgesFetched.(float64); ok && edgeCount < 2 {
+				t.Errorf("expected at least 2 edges to be fetched for graph expansion, got %v", edgesFetched)
+			}
+		}
+	}
+
+	t.Logf("Graph expansion test passed: found seed node and %d related nodes via ASSOCIATED_WITH edges", foundRelatedCount)
+}
+
+// createAssociatedWithEdges creates ASSOCIATED_WITH edges from srcNodeID to each of the dstNodeIDs.
+// This helper is used to set up graph relationships for testing graph expansion.
+func createAssociatedWithEdges(t *testing.T, driver neo4j.DriverWithContext, spaceID, srcNodeID string, dstNodeIDs []string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	for _, dstNodeID := range dstNodeIDs {
+		_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			cypher := `
+				MATCH (src:MemoryNode {space_id: $spaceId, node_id: $srcNodeId})
+				MATCH (dst:MemoryNode {space_id: $spaceId, node_id: $dstNodeId})
+				MERGE (src)-[r:ASSOCIATED_WITH {space_id: $spaceId}]->(dst)
+				ON CREATE SET r.weight = 0.8,
+				              r.dim_semantic = 0.7,
+				              r.dim_temporal = 0.1,
+				              r.dim_coactivation = 0.1,
+				              r.status = 'active',
+				              r.created_at = datetime(),
+				              r.updated_at = datetime()
+				RETURN r
+			`
+			res, err := tx.Run(ctx, cypher, map[string]any{
+				"spaceId":   spaceID,
+				"srcNodeId": srcNodeID,
+				"dstNodeId": dstNodeID,
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			// Consume result to ensure the query executed
+			if !res.Next(ctx) {
+				return nil, fmt.Errorf("failed to create edge from %s to %s - nodes may not exist", srcNodeID, dstNodeID)
+			}
+
+			return nil, res.Err()
+		})
+		if err != nil {
+			t.Fatalf("failed to create ASSOCIATED_WITH edge from %s to %s: %v", srcNodeID, dstNodeID, err)
+		}
+		t.Logf("Created ASSOCIATED_WITH edge: %s -> %s", srcNodeID, dstNodeID)
+	}
 }
 
 // TestScoringDeterminism verifies that identical queries produce identical scores across multiple runs.

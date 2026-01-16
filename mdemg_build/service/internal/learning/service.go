@@ -117,9 +117,9 @@ WITH a,b, (p.ai * p.aj) AS prod
 MERGE (a)-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(b)
 ON CREATE SET r.edge_id=randomUUID(), r.created_at=datetime(), r.updated_at=datetime(),
               r.last_activated_at=datetime(), r.status='active', r.weight=0.10,
-              r.evidence_count=1, r.dim_coactivation=1.0, r.decay_rate=0.001
+              r.evidence_count=1, r.version=1, r.dim_coactivation=1.0, r.decay_rate=0.001
 ON MATCH SET r.updated_at=datetime(), r.last_activated_at=datetime(),
-             r.evidence_count=coalesce(r.evidence_count,0)+1
+             r.evidence_count=coalesce(r.evidence_count,0)+1, r.version=coalesce(r.version,0)+1
 WITH a,b,prod,r
 WITH a,b,prod,r,
      coalesce(r.weight,0.10) AS w
@@ -133,9 +133,9 @@ END
 MERGE (b)-[rr:CO_ACTIVATED_WITH {space_id:$spaceId}]->(a)
 ON CREATE SET rr.edge_id=randomUUID(), rr.created_at=datetime(), rr.updated_at=datetime(),
               rr.last_activated_at=datetime(), rr.status='active', rr.weight=r.weight,
-              rr.evidence_count=1, rr.dim_coactivation=1.0, rr.decay_rate=0.001
+              rr.evidence_count=1, rr.version=1, rr.dim_coactivation=1.0, rr.decay_rate=0.001
 ON MATCH SET rr.updated_at=datetime(), rr.last_activated_at=datetime(),
-             rr.evidence_count=coalesce(rr.evidence_count,0)+1, rr.weight=r.weight
+             rr.evidence_count=coalesce(rr.evidence_count,0)+1, rr.version=coalesce(rr.version,0)+1, rr.weight=r.weight
 RETURN count(*) AS updated;`
 		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {

@@ -200,6 +200,7 @@ type pruneConfig struct {
 	// Node merging parameters
 	SimilarityThreshold float64 // default: 0.98
 	MergeEnabled        bool    // default: false
+	VectorIndexName     string  // default: memNodeEmbedding
 
 	// Processing options
 	DryRun    bool
@@ -256,6 +257,7 @@ func parseConfig() (pruneConfig, error) {
 	// Node merging parameters
 	flag.Float64Var(&cfg.SimilarityThreshold, "similarity-threshold", 0.98, "Vector similarity threshold for merge")
 	flag.BoolVar(&cfg.MergeEnabled, "merge-enabled", false, "Enable node merging (more destructive)")
+	flag.StringVar(&cfg.VectorIndexName, "vector-index", "memNodeEmbedding", "Vector index name for similarity search")
 
 	// Processing options
 	flag.BoolVar(&cfg.DryRun, "dry-run", true, "Preview mode - no modifications (default: true)")
@@ -749,10 +751,305 @@ type nodeMergeStats struct {
 	merged int
 }
 
+// mergePair represents a pair of nodes that should be merged.
+// The survivor is the older node (by created_at) which will remain,
+// and the merged node will be tombstoned after transferring its edges/observations.
+type mergePair struct {
+	SurvivorID        string
+	MergedID          string
+	Similarity        float64
+	SurvivorCreatedAt time.Time
+	MergedCreatedAt   time.Time
+}
+
+// mergeCandidate represents a node with its embedding for merge candidate search
+type mergeCandidate struct {
+	NodeID    string
+	Layer     int
+	Embedding []float32
+	CreatedAt time.Time
+}
+
 // mergeRedundantNodes merges highly similar nodes
 func mergeRedundantNodes(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneConfig) (nodeMergeStats, error) {
-	// TODO: Implement in subtask 4-1
-	return nodeMergeStats{}, nil
+	stats := nodeMergeStats{}
+
+	// Query all merge candidates
+	pairs, err := queryMergeCandidates(ctx, driver, cfg)
+	if err != nil {
+		return stats, fmt.Errorf("query merge candidates: %w", err)
+	}
+
+	if len(pairs) == 0 {
+		fmt.Println("  No merge candidates found")
+		return stats, nil
+	}
+
+	fmt.Printf("  Found %d merge pairs\n", len(pairs))
+
+	// TODO: Implement in subtask 4-2 and 4-3:
+	// - resolveTransitiveMerges() to handle chains
+	// - mergeNodes() to transfer edges and tombstone merged node
+
+	stats.merges = len(pairs)
+	stats.merged = len(pairs) // Each pair merges one node
+
+	return stats, nil
+}
+
+// queryMergeCandidates finds pairs of highly similar nodes at the same layer
+// that can be merged. Uses vector similarity search to find candidates.
+// From spec: Nodes with vector similarity > threshold, same space_id, same layer,
+// not abstraction nodes, are merged.
+func queryMergeCandidates(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneConfig) ([]mergePair, error) {
+	// Step 1: Get all nodes with embeddings in this space (not tombstoned, not abstraction nodes)
+	candidates, err := queryNodesWithEmbeddings(ctx, driver, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("query nodes with embeddings: %w", err)
+	}
+
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+
+	// Step 2: For each node, find similar nodes at the same layer
+	// Track which nodes we've already paired to avoid duplicates
+	paired := make(map[string]bool)
+	var pairs []mergePair
+
+	for _, candidate := range candidates {
+		// Skip if this node has already been paired
+		if paired[candidate.NodeID] {
+			continue
+		}
+
+		// Find similar nodes for this candidate
+		similarNodes, err := findSimilarNodes(ctx, driver, cfg, candidate)
+		if err != nil {
+			// Log error but continue with other candidates
+			log.Printf("prune: error finding similar nodes for %s: %v", candidate.NodeID, err)
+			continue
+		}
+
+		// Create merge pairs from similar nodes
+		for _, similar := range similarNodes {
+			// Skip if already paired
+			if paired[similar.NodeID] {
+				continue
+			}
+
+			// Determine survivor (older node) vs merged (newer node)
+			var pair mergePair
+			if candidate.CreatedAt.Before(similar.CreatedAt) || candidate.CreatedAt.Equal(similar.CreatedAt) {
+				pair = mergePair{
+					SurvivorID:        candidate.NodeID,
+					MergedID:          similar.NodeID,
+					Similarity:        similar.Similarity,
+					SurvivorCreatedAt: candidate.CreatedAt,
+					MergedCreatedAt:   similar.CreatedAt,
+				}
+			} else {
+				pair = mergePair{
+					SurvivorID:        similar.NodeID,
+					MergedID:          candidate.NodeID,
+					Similarity:        similar.Similarity,
+					SurvivorCreatedAt: similar.CreatedAt,
+					MergedCreatedAt:   candidate.CreatedAt,
+				}
+			}
+
+			pairs = append(pairs, pair)
+
+			// Mark both nodes as paired
+			paired[candidate.NodeID] = true
+			paired[similar.NodeID] = true
+
+			// Once this candidate is paired, move to next candidate
+			break
+		}
+	}
+
+	return pairs, nil
+}
+
+// similarNode represents a node similar to a query node
+type similarNode struct {
+	NodeID     string
+	Layer      int
+	CreatedAt  time.Time
+	Similarity float64
+}
+
+// queryNodesWithEmbeddings returns all non-tombstoned nodes with embeddings
+// that are not part of abstraction chains (i.e., don't have ABSTRACTS_TO relationships)
+func queryNodesWithEmbeddings(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneConfig) ([]mergeCandidate, error) {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Query for nodes with embeddings that are not tombstoned and not abstraction nodes
+	cypher := `
+MATCH (n:MemoryNode)
+WHERE n.space_id = $spaceId
+  AND coalesce(n.status, 'active') <> 'tombstoned'
+  AND n.embedding IS NOT NULL
+  AND size(n.embedding) > 0
+// Exclude nodes that are part of abstraction chains
+WITH n
+WHERE NOT exists((n)-[:ABSTRACTS_TO]->())
+  AND NOT exists((n)<-[:ABSTRACTS_TO]-())
+RETURN n.node_id AS nodeId,
+       coalesce(n.layer, 0) AS layer,
+       n.embedding AS embedding,
+       n.created_at AS createdAt
+ORDER BY n.created_at ASC`
+
+	params := map[string]any{
+		"spaceId": cfg.SpaceID,
+	}
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		candidates := make([]mergeCandidate, 0)
+		for res.Next(ctx) {
+			rec := res.Record()
+
+			nodeID, _ := rec.Get("nodeId")
+			layer, _ := rec.Get("layer")
+			embedding, _ := rec.Get("embedding")
+			createdAt, _ := rec.Get("createdAt")
+
+			// Convert embedding to []float32
+			emb := asFloat32Slice(embedding)
+			if len(emb) == 0 {
+				continue
+			}
+
+			candidates = append(candidates, mergeCandidate{
+				NodeID:    asString(nodeID),
+				Layer:     asInt(layer),
+				Embedding: emb,
+				CreatedAt: asTime(createdAt),
+			})
+		}
+
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return candidates, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]mergeCandidate), nil
+}
+
+// findSimilarNodes uses vector similarity search to find nodes similar to the given candidate.
+// Returns nodes at the same layer with similarity >= threshold, excluding abstraction nodes.
+func findSimilarNodes(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneConfig, candidate mergeCandidate) ([]similarNode, error) {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Vector similarity search for similar nodes at the same layer
+	// Following pattern from internal/anomaly/service.go
+	cypher := `
+CALL db.index.vector.queryNodes($indexName, 10, $embedding)
+YIELD node, score
+WHERE node.space_id = $spaceId
+  AND node.node_id <> $nodeId
+  AND coalesce(node.layer, 0) = $layer
+  AND score >= $threshold
+  AND coalesce(node.status, 'active') <> 'tombstoned'
+  AND NOT exists((node)-[:ABSTRACTS_TO]->())
+  AND NOT exists((node)<-[:ABSTRACTS_TO]-())
+RETURN node.node_id AS nodeId,
+       coalesce(node.layer, 0) AS layer,
+       node.created_at AS createdAt,
+       score
+ORDER BY score DESC`
+
+	params := map[string]any{
+		"indexName": cfg.VectorIndexName,
+		"embedding": candidate.Embedding,
+		"spaceId":   cfg.SpaceID,
+		"nodeId":    candidate.NodeID,
+		"layer":     candidate.Layer,
+		"threshold": cfg.SimilarityThreshold,
+	}
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		nodes := make([]similarNode, 0)
+		for res.Next(ctx) {
+			rec := res.Record()
+
+			nodeID, _ := rec.Get("nodeId")
+			layer, _ := rec.Get("layer")
+			createdAt, _ := rec.Get("createdAt")
+			score, _ := rec.Get("score")
+
+			nodes = append(nodes, similarNode{
+				NodeID:     asString(nodeID),
+				Layer:      asInt(layer),
+				CreatedAt:  asTime(createdAt),
+				Similarity: asFloat64(score),
+			})
+		}
+
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return nodes, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]similarNode), nil
+}
+
+// asFloat32Slice safely converts interface{} to []float32
+// Neo4j may return embedding as []float64 or []any, so we handle both
+func asFloat32Slice(v any) []float32 {
+	if v == nil {
+		return nil
+	}
+
+	switch s := v.(type) {
+	case []float32:
+		return s
+	case []float64:
+		result := make([]float32, len(s))
+		for i, f := range s {
+			result[i] = float32(f)
+		}
+		return result
+	case []any:
+		result := make([]float32, len(s))
+		for i, val := range s {
+			switch n := val.(type) {
+			case float64:
+				result[i] = float32(n)
+			case float32:
+				result[i] = n
+			case int64:
+				result[i] = float32(n)
+			default:
+				return nil // Invalid type in slice
+			}
+		}
+		return result
+	default:
+		return nil
+	}
 }
 
 // printHeader outputs the job configuration header

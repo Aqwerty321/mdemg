@@ -2,7 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **New here?** Read `HANDOFF.md` for current development status, TODO list, and context from the previous session.
+> **New here?** Read these documents in order:
+> 1. `VISION.md` - Core purpose, architecture philosophy, and roadmap
+> 2. `HANDOFF.md` - Current development status and TODO list
+> 3. `docs/` - Setup guides and connection info
 
 ## Project Overview
 

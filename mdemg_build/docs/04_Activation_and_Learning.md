@@ -1,6 +1,14 @@
 # Activation + Learning Engine
 
-This doc specifies the “physics” that produces emergent association patterns.
+This doc specifies the "physics" that produces emergent association patterns.
+
+> **Design Principle:** Local rules produce global behavior. Simple mechanisms (Hebbian learning, decay) create complex emergent structures without explicit programming.
+
+## The Emergence Principle
+
+> "The system must be highly dynamic with the ability to reorder its nodes as new information causes unanticipated changes to the underlying data structures. Edges will not likely change, but the path to nodes will."
+
+This captures the key insight: **relationships are stable, but the conceptual organization is fluid**. Just as human memory reorganizes concepts as understanding deepens, MDEMG allows nodes to migrate through layers while preserving their relational connections.
 
 ## 1) Activation state
 Activation values are transient per query.
@@ -88,3 +96,43 @@ LIMIT $maxEdges;
   - fix: apply updates only to top-K and require minimum activation threshold
 - **Forgetting everything**: decay too aggressive.
   - fix: lower decay, add pinning, add baseline importance
+
+## 9) From Learning to Emergence
+
+Hebbian learning is the foundation for emergent behavior. Over time:
+
+### Pattern Detection
+When nodes are repeatedly co-activated:
+1. `CO_ACTIVATED_WITH` edges strengthen
+2. Clusters form naturally
+3. These clusters become candidates for **layer promotion**
+
+### Promotion Trigger Signals
+
+| Signal | Threshold | Action |
+|--------|-----------|--------|
+| **Cluster Density** | >5 nodes with mutual `CO_ACTIVATED_WITH` edges (weight > 0.3) | Flag for abstraction |
+| **Retrieval Frequency** | Node appears in >10% of queries for space | Increase importance baseline |
+| **Cross-Space Activation** | Pattern appears in 3+ distinct `space_id`s | Mark as generalizable |
+| **Temporal Persistence** | Pattern stable for >7 days | Confirm not transient |
+
+### Emergence Lifecycle
+
+```
+[Observations]     →     [Co-activation]     →     [Cluster Detection]
+     ↓                        ↓                          ↓
+Many L1 nodes          Edges strengthen          Consolidation job runs
+                                                         ↓
+                                                  [Abstraction Created]
+                                                         ↓
+                                                  New L(k+1) node
+                                                  with ABSTRACTS_TO edges
+```
+
+### Success Metrics
+
+The learning system is working when:
+1. **`CO_ACTIVATED_WITH` edges form** - Nodes retrieved together develop connections
+2. **Clusters emerge** - Dense subgraphs appear without explicit creation
+3. **Abstractions crystallize** - Higher-layer nodes capture general principles
+4. **Cross-pollination occurs** - Knowledge from one project helps another

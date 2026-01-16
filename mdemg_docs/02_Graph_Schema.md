@@ -2,6 +2,25 @@
 
 This spec is optimized for Neo4j property graphs.
 
+> **Key Principle:** Edges are the durable truth; node organization is fluid. Relationships persist while concepts can migrate between layers as understanding deepens.
+
+## Dynamic Layer System
+
+Nodes exist at different abstraction levels:
+
+| Layer | Content | Example |
+|-------|---------|---------|
+| 1 | Raw observations, events | "Fixed null pointer in auth.go line 42" |
+| 2 | Patterns, regularities | "Null pointer errors often occur in auth flows" |
+| 3 | Concepts, abstractions | "Input validation is critical for auth" |
+| N | Principles, axioms | "Defense in depth" |
+
+**Layer behavior:**
+- Layers grow dynamically as data accumulates (no fixed maximum)
+- Nodes can be **promoted** to higher layers when patterns emerge
+- Promotion preserves existing edges while adding `ABSTRACTS_TO` relationships
+- Layer 1 is always concrete observations; higher layers are emergent
+
 ## Namespaces
 All nodes include:
 - `space_id` (string): tenant/agent namespace
@@ -51,7 +70,7 @@ Properties:
 - `math_block` (optional JSON string)
 - `created_at`
 
-### debug labels
+### Optional debug labels
 - `:ActivationSnapshot` (store per-query activation traces for debugging)
 
 ## Relationship types (minimum set)
@@ -123,3 +142,30 @@ Neo4j relationships cannot store nested maps as flexibly as documents—prefer *
 
 Compute effective traversal weight at query time:
 - `w_eff = weight * (α*dim_semantic + β*dim_temporal + ...) * recency_factor`
+
+## Layer Promotion Mechanics
+
+Nodes are promoted to higher layers based on a **combination of signals**:
+
+| Signal | Description | Detection Method |
+|--------|-------------|------------------|
+| **Frequency** | Pattern appears across multiple contexts | Count distinct contexts referencing node |
+| **Clustering** | Multiple L(n) nodes form stable associations | Detect cliques in `CO_ACTIVATED_WITH` edges |
+| **Edge Strength** | `CO_ACTIVATED_WITH` edges exceed threshold | Sum edge weights above threshold |
+| **Temporal Stability** | Pattern persists over time, not transient | Track first_seen vs recent_activity |
+| **Cross-Domain Relevance** | Pattern applies across different projects/spaces | Count distinct `space_id` references |
+
+### Promotion Process
+
+1. **Detection**: Consolidation job identifies promotion candidates
+2. **Abstraction**: Create new node at layer `k+1`
+3. **Linking**: Add `ABSTRACTS_TO` edges from source nodes
+4. **Edge Preservation**: All existing edges remain on source nodes
+5. **Inheritance**: New abstract node inherits aggregated properties
+
+### Edge Stability Guarantee
+
+When a node is promoted:
+- **Edges are NEVER deleted** (unless explicit decay/pruning)
+- **Relationships are additive** - new `ABSTRACTS_TO` edges supplement existing
+- **Queries can traverse both layers** - concrete and abstract paths coexist

@@ -1,7 +1,9 @@
 # MDEMG Development Handoff Document
 
-**Date:** 2026-01-15
+**Date:** 2026-01-16
 **Status:** MCP Integration Complete - Ready for Agent Use
+
+> **Vision Document:** See [VISION.md](./VISION.md) for the complete architectural philosophy and design principles.
 
 ---
 
@@ -404,10 +406,27 @@ WHERE a <> b
 RETURN a.name, b.name, length(path)
 ```
 
-### User's Vision
+### MDEMG Vision Summary
 
-The goal is persistent long-term memory for coding agents running in the IDE. Over time, the system should develop:
-1. **Concept clustering** - Similar patterns grouping together
-2. **Cross-project knowledge transfer** - Learnings from one project helping another
-3. **Workflow recognition** - Recognizing recurring patterns
-4. **Abstraction emergence** - General principles forming from specific examples
+MDEMG is a **cognitive substrate** for AI coding agents where higher-level concepts **emerge automatically** through Hebbian learning. Key design principles:
+
+| Principle | Description |
+|-----------|-------------|
+| **Dynamic Layers** | Layers grow without limit (hardware-bound only); abstractions emerge as data accumulates |
+| **Edge Stability** | Relationships persist while node organization is fluid |
+| **Active Participation** | Not just passive storage; proactive surfacing, anomaly detection, agent consulting |
+| **Combination Signals** | Promotion based on frequency + clustering + edge strength + temporal stability + cross-domain relevance |
+
+**Expected Emergent Behaviors:**
+1. **Concept clustering** - Similar patterns grouping together via `CO_ACTIVATED_WITH` edges
+2. **Cross-project transfer** - Knowledge from one project surfaces when relevant to another
+3. **Workflow recognition** - System learns recurring patterns in how you work
+4. **Abstraction emergence** - Higher-layer nodes crystallize from specific examples
+
+**Integration Modes:**
+- Background service (always running)
+- Event-driven hooks (git commits, file saves)
+- Proactive surfacing (context suggestions, anomaly detection)
+- Agent consulting service (SME-like guidance)
+
+See [VISION.md](./VISION.md) for the complete architectural philosophy.

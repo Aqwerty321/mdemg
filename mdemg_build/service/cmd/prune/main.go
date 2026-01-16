@@ -33,6 +33,23 @@ type edgePruneResult struct {
 	ProtectReason string // "pinned", "high_evidence", or ""
 }
 
+// node represents a MemoryNode in the graph for prune processing
+type node struct {
+	NodeID              string
+	Degree              int       // Total number of edges (in + out)
+	LastObservationTime time.Time // Most recent observation timestamp
+	InAbstractionChain  bool      // Has ABSTRACTS_TO or INSTANTIATES relationships
+	Status              string    // Current status (active, tombstoned, etc.)
+}
+
+// nodeTombstoneResult holds the result of tombstoning evaluation for a single node
+type nodeTombstoneResult struct {
+	Node          node
+	ShouldTombstone bool
+	Protected       bool
+	ProtectReason   string // "high_degree", "recent_observation", "abstraction_chain", or ""
+}
+
 // shouldPruneEdge determines if an edge should be pruned based on pruning rules.
 // From docs/07_Consolidation_and_Pruning.md Section 5.1:
 // Prune edges if ALL are true:
@@ -96,6 +113,71 @@ func processEdgeForPruning(e edge, cfg pruneConfig, now time.Time) edgePruneResu
 		ShouldPrune:   prune,
 		Protected:     protected,
 		ProtectReason: reason,
+	}
+}
+
+// shouldTombstoneNode determines if a node should be tombstoned based on pruning rules.
+// From docs/07_Consolidation_and_Pruning.md Section 5.2:
+// Tombstone nodes if ALL are true:
+// - degree <= maxDegree (low connectivity, orphan-like)
+// - no observations within retentionDays (no recent activity)
+// - not part of any abstraction chain (no ABSTRACTS_TO/INSTANTIATES relationships)
+//
+// Protection rules (node will NOT be tombstoned):
+// - If degree > maxDegree (well-connected node)
+// - If has observation within retention window (recently active)
+// - If part of abstraction chain (structural importance)
+// - If already tombstoned (no need to re-tombstone)
+func shouldTombstoneNode(n node, maxDegree int, retentionDays int, now time.Time) (tombstone bool, protected bool, reason string) {
+	// Skip already tombstoned nodes
+	if n.Status == "tombstoned" {
+		return false, false, ""
+	}
+
+	// Protection: nodes in abstraction chains are never tombstoned
+	// These are structurally important for the concept hierarchy
+	if n.InAbstractionChain {
+		return false, true, "abstraction_chain"
+	}
+
+	// Protection: nodes with high degree are well-connected and valuable
+	if n.Degree > maxDegree {
+		return false, true, "high_degree"
+	}
+
+	// Protection: nodes with recent observations show active use
+	if hasRecentObservation(n.LastObservationTime, retentionDays, now) {
+		return false, true, "recent_observation"
+	}
+
+	// All tombstone conditions met:
+	// - degree <= maxDegree (orphan-like)
+	// - no recent observations
+	// - not in abstraction chain
+	return true, false, ""
+}
+
+// hasRecentObservation checks if the node has an observation within the retention window.
+// Returns true if the lastObservationTime is within retentionDays of now.
+// If lastObservationTime is zero (no observations), returns false.
+func hasRecentObservation(lastObservationTime time.Time, retentionDays int, now time.Time) bool {
+	if lastObservationTime.IsZero() {
+		// No observations at all means no recent observation
+		return false
+	}
+	cutoff := now.AddDate(0, 0, -retentionDays)
+	return lastObservationTime.After(cutoff) || lastObservationTime.Equal(cutoff)
+}
+
+// processNodeForTombstoning evaluates a single node for tombstoning
+func processNodeForTombstoning(n node, cfg pruneConfig, now time.Time) nodeTombstoneResult {
+	tombstone, protected, reason := shouldTombstoneNode(n, cfg.MaxDegree, cfg.RetentionDays, now)
+
+	return nodeTombstoneResult{
+		Node:            n,
+		ShouldTombstone: tombstone,
+		Protected:       protected,
+		ProtectReason:   reason,
 	}
 }
 

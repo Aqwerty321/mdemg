@@ -751,6 +751,159 @@ type nodeMergeStats struct {
 	merged int
 }
 
+// unionFind implements a union-find (disjoint-set) data structure
+// for resolving transitive merge chains.
+// The key is a node ID, parent maps each node to its parent,
+// and nodeInfo stores the creation time for each node to determine the oldest.
+type unionFind struct {
+	parent   map[string]string
+	rank     map[string]int
+	nodeInfo map[string]time.Time // node_id -> created_at
+}
+
+// newUnionFind creates a new union-find data structure
+func newUnionFind() *unionFind {
+	return &unionFind{
+		parent:   make(map[string]string),
+		rank:     make(map[string]int),
+		nodeInfo: make(map[string]time.Time),
+	}
+}
+
+// addNode adds a node to the union-find structure if not already present.
+// Each node starts as its own parent (self-loop).
+func (uf *unionFind) addNode(nodeID string, createdAt time.Time) {
+	if _, exists := uf.parent[nodeID]; !exists {
+		uf.parent[nodeID] = nodeID
+		uf.rank[nodeID] = 0
+		uf.nodeInfo[nodeID] = createdAt
+	}
+}
+
+// find returns the root of the set containing nodeID, with path compression.
+func (uf *unionFind) find(nodeID string) string {
+	if uf.parent[nodeID] != nodeID {
+		// Path compression: make all nodes on the path point directly to root
+		uf.parent[nodeID] = uf.find(uf.parent[nodeID])
+	}
+	return uf.parent[nodeID]
+}
+
+// union merges the sets containing nodeA and nodeB.
+// The older node (by created_at) becomes the root to ensure the survivor
+// is always the oldest node in the merged set.
+func (uf *unionFind) union(nodeA, nodeB string) {
+	rootA := uf.find(nodeA)
+	rootB := uf.find(nodeB)
+
+	if rootA == rootB {
+		return // Already in same set
+	}
+
+	// Determine which root is older
+	timeA := uf.nodeInfo[rootA]
+	timeB := uf.nodeInfo[rootB]
+
+	// The older node becomes the root (survivor)
+	// If times are equal, use lexicographic order for determinism
+	var olderRoot, newerRoot string
+	if timeA.Before(timeB) {
+		olderRoot = rootA
+		newerRoot = rootB
+	} else if timeB.Before(timeA) {
+		olderRoot = rootB
+		newerRoot = rootA
+	} else {
+		// Equal times: use lexicographic order for determinism
+		if rootA < rootB {
+			olderRoot = rootA
+			newerRoot = rootB
+		} else {
+			olderRoot = rootB
+			newerRoot = rootA
+		}
+	}
+
+	// Always make the older node the parent (survivor)
+	uf.parent[newerRoot] = olderRoot
+	// Update rank if needed
+	if uf.rank[olderRoot] == uf.rank[newerRoot] {
+		uf.rank[olderRoot]++
+	}
+}
+
+// resolveTransitiveMerges takes a slice of merge pairs and resolves transitive chains.
+// For example, if pairs contain (A->B) and (B->C), all three nodes should merge
+// to the oldest one. This function uses union-find to identify connected components
+// and ensures the oldest node (by created_at) in each component becomes the survivor.
+//
+// Returns a new slice of merge pairs where each non-survivor node in a component
+// is paired with the component's survivor (oldest node).
+func resolveTransitiveMerges(pairs []mergePair) []mergePair {
+	if len(pairs) == 0 {
+		return pairs
+	}
+
+	// Build union-find structure from all pairs
+	uf := newUnionFind()
+
+	// First pass: add all nodes from pairs
+	for _, p := range pairs {
+		uf.addNode(p.SurvivorID, p.SurvivorCreatedAt)
+		uf.addNode(p.MergedID, p.MergedCreatedAt)
+	}
+
+	// Second pass: union all pairs
+	for _, p := range pairs {
+		uf.union(p.SurvivorID, p.MergedID)
+	}
+
+	// Third pass: group nodes by their root (representative)
+	// The root of each set is the oldest node in that set
+	components := make(map[string][]string) // root -> list of non-root nodes
+	for nodeID := range uf.parent {
+		root := uf.find(nodeID)
+		if nodeID != root {
+			components[root] = append(components[root], nodeID)
+		}
+	}
+
+	// Build the resolved merge pairs
+	// Each non-root node in a component merges to the root (oldest node)
+	var resolved []mergePair
+	for survivorID, mergedNodes := range components {
+		survivorCreatedAt := uf.nodeInfo[survivorID]
+
+		for _, mergedID := range mergedNodes {
+			mergedCreatedAt := uf.nodeInfo[mergedID]
+
+			// Find the original similarity score if available
+			// Use the maximum similarity among related pairs
+			var similarity float64
+			for _, p := range pairs {
+				if (p.SurvivorID == survivorID && p.MergedID == mergedID) ||
+					(p.SurvivorID == mergedID && p.MergedID == survivorID) ||
+					(p.MergedID == mergedID) ||
+					(p.SurvivorID == mergedID) {
+					if p.Similarity > similarity {
+						similarity = p.Similarity
+					}
+				}
+			}
+
+			resolved = append(resolved, mergePair{
+				SurvivorID:        survivorID,
+				MergedID:          mergedID,
+				Similarity:        similarity,
+				SurvivorCreatedAt: survivorCreatedAt,
+				MergedCreatedAt:   mergedCreatedAt,
+			})
+		}
+	}
+
+	return resolved
+}
+
 // mergePair represents a pair of nodes that should be merged.
 // The survivor is the older node (by created_at) which will remain,
 // and the merged node will be tombstoned after transferring its edges/observations.
@@ -785,14 +938,19 @@ func mergeRedundantNodes(ctx context.Context, driver neo4j.DriverWithContext, cf
 		return stats, nil
 	}
 
-	fmt.Printf("  Found %d merge pairs\n", len(pairs))
+	fmt.Printf("  Found %d initial merge pairs\n", len(pairs))
 
-	// TODO: Implement in subtask 4-2 and 4-3:
-	// - resolveTransitiveMerges() to handle chains
+	// Resolve transitive chains (A->B, B->C all merge to oldest)
+	resolvedPairs := resolveTransitiveMerges(pairs)
+	if len(resolvedPairs) != len(pairs) {
+		fmt.Printf("  Resolved to %d merge pairs after transitive chain resolution\n", len(resolvedPairs))
+	}
+
+	// TODO: Implement in subtask 4-3:
 	// - mergeNodes() to transfer edges and tombstone merged node
 
-	stats.merges = len(pairs)
-	stats.merged = len(pairs) // Each pair merges one node
+	stats.merges = len(resolvedPairs)
+	stats.merged = len(resolvedPairs) // Each pair merges one node
 
 	return stats, nil
 }

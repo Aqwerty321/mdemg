@@ -620,8 +620,3 @@ func verifyRankingOrder(t *testing.T, results []RetrieveResult, nodeIDs map[stri
 	}
 }
 
-// floatNearlyEqualGolden compares two float64 values with tolerance.
-// This is a duplicate of floatNearlyEqual to avoid cross-file dependencies in tests.
-func floatNearlyEqualGolden(a, b, epsilon float64) bool {
-	return math.Abs(a-b) < epsilon
-}

@@ -103,31 +103,39 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 	defer sess.Close(ctx)
 
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Cypher query implements MERGE pattern for CO_ACTIVATED_WITH edges:
+		// - MERGE creates edge if missing, matches if exists
+		// - ON CREATE SET initializes all required edge properties
+		// - ON MATCH SET updates timestamps and evidence count
+		// - Weight is calculated using Hebbian formula after MERGE
+		// - Symmetric edges are created in both directions
 		cypher := `UNWIND $pairs AS p
 MATCH (a:MemoryNode {space_id:$spaceId, node_id:p.src})
 MATCH (b:MemoryNode {space_id:$spaceId, node_id:p.dst})
 WITH a,b, (p.ai * p.aj) AS prod
-// forward
+// forward edge: create or update
 MERGE (a)-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(b)
 ON CREATE SET r.edge_id=randomUUID(), r.created_at=datetime(), r.updated_at=datetime(),
-              r.status='active', r.weight=0.10, r.evidence_count=1,
-              r.dim_coactivation=1.0, r.decay_rate=0.001
-ON MATCH SET r.updated_at=datetime(), r.evidence_count=coalesce(r.evidence_count,0)+1
+              r.last_activated_at=datetime(), r.status='active', r.weight=0.10,
+              r.evidence_count=1, r.dim_coactivation=1.0, r.decay_rate=0.001
+ON MATCH SET r.updated_at=datetime(), r.last_activated_at=datetime(),
+             r.evidence_count=coalesce(r.evidence_count,0)+1
 WITH a,b,prod,r
-WITH a,b,prod,
+WITH a,b,prod,r,
      coalesce(r.weight,0.10) AS w
+// Apply Hebbian weight update: new_w = (1-μ)*w + η*prod, clamped to [wmin,wmax]
 SET r.weight = CASE
   WHEN ((1-$mu)*w + $eta*prod) < $wmin THEN $wmin
   WHEN ((1-$mu)*w + $eta*prod) > $wmax THEN $wmax
   ELSE ((1-$mu)*w + $eta*prod)
 END
-// reverse (symmetry)
+// reverse edge (symmetry): mirrors forward edge weight
 MERGE (b)-[rr:CO_ACTIVATED_WITH {space_id:$spaceId}]->(a)
 ON CREATE SET rr.edge_id=randomUUID(), rr.created_at=datetime(), rr.updated_at=datetime(),
-              rr.status='active', rr.weight=r.weight, rr.evidence_count=1,
-              rr.dim_coactivation=1.0, rr.decay_rate=0.001
-ON MATCH SET rr.updated_at=datetime(), rr.evidence_count=coalesce(rr.evidence_count,0)+1,
-             rr.weight=r.weight
+              rr.last_activated_at=datetime(), rr.status='active', rr.weight=r.weight,
+              rr.evidence_count=1, rr.dim_coactivation=1.0, rr.decay_rate=0.001
+ON MATCH SET rr.updated_at=datetime(), rr.last_activated_at=datetime(),
+             rr.evidence_count=coalesce(rr.evidence_count,0)+1, rr.weight=r.weight
 RETURN count(*) AS updated;`
 		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {

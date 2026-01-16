@@ -382,6 +382,43 @@ func toFloat64Val(v any, def float64) float64 {
 	}
 }
 
+func (s *Server) handleReflect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req models.ReflectRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+
+	// Generate embedding from topic if provided and no embedding given
+	if len(req.TopicEmbedding) == 0 && req.Topic != "" {
+		if s.embedder == nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": "topic provided but no embedding provider configured (set EMBEDDING_PROVIDER env var)",
+			})
+			return
+		}
+		emb, err := s.embedder.Embed(r.Context(), req.Topic)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"error": fmt.Sprintf("failed to generate embedding: %v", err),
+			})
+			return
+		}
+		req.TopicEmbedding = emb
+	}
+
+	resp, err := s.retriever.Reflect(r.Context(), req)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
 // contentToText converts the content field to a string for embedding
 func contentToText(content any) string {
 	switch v := content.(type) {

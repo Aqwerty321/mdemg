@@ -75,3 +75,47 @@ type ActivityStats struct {
 	EdgesCreated int64 `json:"edges_created"`
 	Retrievals   int64 `json:"retrievals"`
 }
+
+// ReflectRequest - request for deep context exploration via /v1/memory/reflect
+type ReflectRequest struct {
+	SpaceID        string    `json:"space_id"`
+	Topic          string    `json:"topic"`                     // natural language topic (required)
+	TopicEmbedding []float32 `json:"topic_embedding,omitempty"` // pre-computed embedding for topic
+	MaxDepth       int       `json:"max_depth,omitempty"`       // hop depth (default: 3)
+	MaxNodes       int       `json:"max_nodes,omitempty"`       // cap results (default: 50)
+}
+
+// ReflectResponse - response from deep context exploration
+type ReflectResponse struct {
+	Topic           string        `json:"topic"`
+	CoreMemories    []ScoredNode  `json:"core_memories"`
+	RelatedConcepts []ScoredNode  `json:"related_concepts"`
+	Abstractions    []ScoredNode  `json:"abstractions"`
+	Insights        []Insight     `json:"insights"`
+	GraphContext    *GraphContext `json:"graph_context"`
+}
+
+// ScoredNode - a node with relevance scoring for reflection results
+type ScoredNode struct {
+	NodeID   string  `json:"node_id"`
+	Name     string  `json:"name"`
+	Path     string  `json:"path,omitempty"`
+	Summary  string  `json:"summary,omitempty"`
+	Layer    int     `json:"layer"`
+	Score    float64 `json:"score"`    // relevance score
+	Distance int     `json:"distance"` // hops from seed
+}
+
+// Insight - a detected pattern or observation from reflection
+type Insight struct {
+	Type        string   `json:"type"`        // "cluster", "pattern", "gap"
+	Description string   `json:"description"`
+	NodeIDs     []string `json:"node_ids"`
+}
+
+// GraphContext - traversal statistics from reflection
+type GraphContext struct {
+	NodesExplored   int `json:"nodes_explored"`
+	EdgesTraversed  int `json:"edges_traversed"`
+	MaxLayerReached int `json:"max_layer_reached"`
+}

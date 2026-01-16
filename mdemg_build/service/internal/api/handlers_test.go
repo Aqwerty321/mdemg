@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"mdemg/internal/models"
 )
 
 // TestHandleMetrics_MethodNotAllowed tests that handleMetrics returns 405 for non-GET methods
@@ -275,5 +277,318 @@ func TestHandleMetrics_WithSpaceID(t *testing.T) {
 				t.Errorf("space_id from URL %q = %q, want %q", tt.url, gotSpaceID, tt.expectSpaceID)
 			}
 		})
+	}
+}
+
+// TestHandleStats_MethodNotAllowed tests that handleStats returns 405 for non-GET methods
+func TestHandleStats_MethodNotAllowed(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+	}{
+		{"POST method not allowed", http.MethodPost},
+		{"PUT method not allowed", http.MethodPut},
+		{"DELETE method not allowed", http.MethodDelete},
+		{"PATCH method not allowed", http.MethodPatch},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a minimal server (no driver needed for method validation)
+			s := &Server{}
+
+			// Create test request with the specified method
+			req := httptest.NewRequest(tt.method, "/v1/memory/stats?space_id=test", nil)
+			w := httptest.NewRecorder()
+
+			// Call the handler directly
+			s.handleStats(w, req)
+
+			// Verify response
+			if w.Code != http.StatusMethodNotAllowed {
+				t.Errorf("handleStats(%s) status = %d, want %d", tt.method, w.Code, http.StatusMethodNotAllowed)
+			}
+		})
+	}
+}
+
+// TestHandleStats_MissingSpaceID tests that handleStats returns 400 when space_id is missing
+func TestHandleStats_MissingSpaceID(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{"no space_id parameter", "/v1/memory/stats"},
+		{"empty space_id parameter", "/v1/memory/stats?space_id="},
+		{"other parameter but no space_id", "/v1/memory/stats?other=value"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a minimal server (no driver needed for validation)
+			s := &Server{}
+
+			// Create test request with GET method
+			req := httptest.NewRequest(http.MethodGet, tt.url, nil)
+			w := httptest.NewRecorder()
+
+			// Call the handler directly
+			s.handleStats(w, req)
+
+			// Verify response is 400 Bad Request
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("handleStats(GET %s) status = %d, want %d", tt.url, w.Code, http.StatusBadRequest)
+			}
+
+			// Verify error message is present
+			var body map[string]any
+			if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode response body: %v", err)
+			}
+
+			if _, ok := body["error"]; !ok {
+				t.Errorf("handleStats(GET %s) response missing 'error' field", tt.url)
+			}
+		})
+	}
+}
+
+// TestHandleStats_Success tests that a GET request with valid space_id is accepted
+// Note: This test validates HTTP handling layer; full database integration requires a running Neo4j instance
+func TestHandleStats_Success(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{"GET with space_id", "/v1/memory/stats?space_id=test-space"},
+		{"GET with different space_id", "/v1/memory/stats?space_id=production"},
+		{"GET with special characters in space_id", "/v1/memory/stats?space_id=space-123_test"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a minimal server (nil driver will cause internal error, but
+			// method and parameter validation passes - verifying HTTP handling layer)
+			s := &Server{}
+
+			// Create test request with GET method
+			req := httptest.NewRequest(http.MethodGet, tt.url, nil)
+			w := httptest.NewRecorder()
+
+			// Call the handler - will panic or return error due to nil driver,
+			// but we can use recover to verify the parameter validation passed
+			func() {
+				defer func() {
+					// Expected: either panic (nil pointer) or graceful error handling
+					// The key assertion is that we did not get 400 Bad Request for missing space_id
+					if r := recover(); r != nil {
+						// Panic means we got past validation - that is expected with nil driver
+						// This validates the space_id is correctly accepted
+						t.Logf("Expected panic due to nil driver: %v", r)
+					}
+				}()
+				s.handleStats(w, req)
+			}()
+
+			// If we got past without panic, verify we did not get 400 or 405
+			if w.Code == http.StatusBadRequest {
+				// Check if the error is about space_id
+				var body map[string]any
+				if err := json.NewDecoder(w.Body).Decode(&body); err == nil {
+					if errMsg, ok := body["error"].(string); ok {
+						if errMsg == "space_id query parameter is required" {
+							t.Errorf("handleStats(GET %s) returned space_id required error, but space_id was provided", tt.url)
+						}
+					}
+				}
+			}
+			if w.Code == http.StatusMethodNotAllowed {
+				t.Errorf("handleStats(GET %s) returned 405 Method Not Allowed, but GET should be allowed", tt.url)
+			}
+		})
+	}
+}
+
+// TestHandleStats_WithSpaceID tests that the space_id query parameter is correctly parsed
+func TestHandleStats_WithSpaceID(t *testing.T) {
+	tests := []struct {
+		name          string
+		url           string
+		expectSpaceID string
+	}{
+		{
+			name:          "with space_id parameter",
+			url:           "/v1/memory/stats?space_id=test-space",
+			expectSpaceID: "test-space",
+		},
+		{
+			name:          "with different space_id",
+			url:           "/v1/memory/stats?space_id=production",
+			expectSpaceID: "production",
+		},
+		{
+			name:          "with special characters in space_id",
+			url:           "/v1/memory/stats?space_id=space-123_test",
+			expectSpaceID: "space-123_test",
+		},
+		{
+			name:          "with UUID-style space_id",
+			url:           "/v1/memory/stats?space_id=550e8400-e29b-41d4-a716-446655440000",
+			expectSpaceID: "550e8400-e29b-41d4-a716-446655440000",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test request to verify URL parsing
+			req := httptest.NewRequest(http.MethodGet, tt.url, nil)
+
+			// Verify space_id is correctly extracted from query parameters
+			gotSpaceID := req.URL.Query().Get("space_id")
+			if gotSpaceID != tt.expectSpaceID {
+				t.Errorf("space_id from URL %q = %q, want %q", tt.url, gotSpaceID, tt.expectSpaceID)
+			}
+		})
+	}
+}
+
+// TestComputeHealthScore tests the computeHealthScore function
+func TestComputeHealthScore(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    StatsResponseForTest
+		expected float64
+		delta    float64 // acceptable difference from expected
+	}{
+		{
+			name: "empty space returns 0.0",
+			input: StatsResponseForTest{
+				MemoryCount:       0,
+				EmbeddingCoverage: 0.0,
+				Connectivity:      &ConnectivityForTest{OrphanCount: 0},
+				TemporalDist:      &TemporalDistForTest{Last7d: 0},
+			},
+			expected: 0.0,
+			delta:    0.001,
+		},
+		{
+			name: "perfect health - all embeddings, no orphans, all recent",
+			input: StatsResponseForTest{
+				MemoryCount:       100,
+				EmbeddingCoverage: 1.0,
+				Connectivity:      &ConnectivityForTest{OrphanCount: 0},
+				TemporalDist:      &TemporalDistForTest{Last7d: 100},
+			},
+			expected: 1.0,
+			delta:    0.001,
+		},
+		{
+			name: "no embeddings, all orphans, no recent activity",
+			input: StatsResponseForTest{
+				MemoryCount:       100,
+				EmbeddingCoverage: 0.0,
+				Connectivity:      &ConnectivityForTest{OrphanCount: 100},
+				TemporalDist:      &TemporalDistForTest{Last7d: 0},
+			},
+			expected: 0.0,
+			delta:    0.001,
+		},
+		{
+			name: "50% embeddings, 50% orphans, 50% recent",
+			input: StatsResponseForTest{
+				MemoryCount:       100,
+				EmbeddingCoverage: 0.5,
+				Connectivity:      &ConnectivityForTest{OrphanCount: 50},
+				TemporalDist:      &TemporalDistForTest{Last7d: 50},
+			},
+			expected: 0.5,
+			delta:    0.001,
+		},
+		{
+			name: "only embeddings component",
+			input: StatsResponseForTest{
+				MemoryCount:       100,
+				EmbeddingCoverage: 1.0,
+				Connectivity:      &ConnectivityForTest{OrphanCount: 100},
+				TemporalDist:      &TemporalDistForTest{Last7d: 0},
+			},
+			expected: 0.4, // 1.0 * 0.4 = 0.4
+			delta:    0.001,
+		},
+		{
+			name: "only connectivity component",
+			input: StatsResponseForTest{
+				MemoryCount:       100,
+				EmbeddingCoverage: 0.0,
+				Connectivity:      &ConnectivityForTest{OrphanCount: 0},
+				TemporalDist:      &TemporalDistForTest{Last7d: 0},
+			},
+			expected: 0.3, // (1.0 - 0.0) * 0.3 = 0.3
+			delta:    0.001,
+		},
+		{
+			name: "only recency component",
+			input: StatsResponseForTest{
+				MemoryCount:       100,
+				EmbeddingCoverage: 0.0,
+				Connectivity:      &ConnectivityForTest{OrphanCount: 100},
+				TemporalDist:      &TemporalDistForTest{Last7d: 100},
+			},
+			expected: 0.3, // 1.0 * 0.3 = 0.3
+			delta:    0.001,
+		},
+		{
+			name: "partial scores across all components",
+			input: StatsResponseForTest{
+				MemoryCount:       200,
+				EmbeddingCoverage: 0.75,          // 0.75 * 0.4 = 0.3
+				Connectivity:      &ConnectivityForTest{OrphanCount: 50}, // (1 - 0.25) * 0.3 = 0.225
+				TemporalDist:      &TemporalDistForTest{Last7d: 100},     // 0.5 * 0.3 = 0.15
+			},
+			expected: 0.675, // 0.3 + 0.225 + 0.15 = 0.675
+			delta:    0.001,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Convert test input to actual StatsResponse
+			resp := convertToStatsResponse(tt.input)
+			result := computeHealthScore(resp)
+
+			if diff := result - tt.expected; diff < -tt.delta || diff > tt.delta {
+				t.Errorf("computeHealthScore() = %f, want %f (delta %f)", result, tt.expected, tt.delta)
+			}
+		})
+	}
+}
+
+// StatsResponseForTest is a simplified version for test data construction
+type StatsResponseForTest struct {
+	MemoryCount       int64
+	EmbeddingCoverage float64
+	Connectivity      *ConnectivityForTest
+	TemporalDist      *TemporalDistForTest
+}
+
+type ConnectivityForTest struct {
+	OrphanCount int64
+}
+
+type TemporalDistForTest struct {
+	Last7d int64
+}
+
+// convertToStatsResponse converts test helper struct to actual models.StatsResponse
+func convertToStatsResponse(input StatsResponseForTest) models.StatsResponse {
+	return models.StatsResponse{
+		MemoryCount:       input.MemoryCount,
+		EmbeddingCoverage: input.EmbeddingCoverage,
+		Connectivity: &models.Connectivity{
+			OrphanCount: input.Connectivity.OrphanCount,
+		},
+		TemporalDistribution: &models.TemporalDistribution{
+			Last7d: input.TemporalDist.Last7d,
+		},
 	}
 }

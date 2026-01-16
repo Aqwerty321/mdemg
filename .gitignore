@@ -1,0 +1,68 @@
+# Environment and secrets
+.env
+*.env
+.env.*
+!.env.example
+
+# API Keys - NEVER COMMIT
+**/secrets/
+*.key
+*.pem
+
+# Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+mdemg-server
+mdemg-mcp
+/mdemg_build/mcp-server/mdemg-mcp
+/mdemg_build/service/bin/
+
+# Go test and build
+*.test
+*.out
+coverage.html
+coverage.txt
+
+# IDE (keeping .vscode for shared settings)
+# .vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude config (user-specific)
+.claude/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# Neo4j data (local dev)
+neo4j_data/
+neo4j_logs/
+data/
+
+# Cursor project files (user-specific)
+.cursor/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Logs
+*.log
+logs/

@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "golang.go",
+    "jakeboone02.cypher-query-language",
+    "ms-azuretools.vscode-docker",
+    "humao.rest-client",
+    "eamodio.gitlens",
+    "mohsen1.prettify-json",
+    "redhat.vscode-yaml",
+    "usernamehw.errorlens"
+  ],
+  "unwantedRecommendations": []
+}

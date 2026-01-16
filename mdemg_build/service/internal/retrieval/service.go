@@ -1,0 +1,466 @@
+package retrieval
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"math"
+	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/config"
+	"mdemg/internal/models"
+)
+
+type Service struct {
+	cfg config.Config
+	driver neo4j.DriverWithContext
+}
+
+func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
+	return &Service{cfg: cfg, driver: driver}
+}
+
+// Retrieve performs:
+// 1) vector recall (top candidateK)
+// 2) bounded neighborhood expansion (<= hopDepth, degree caps)
+// 3) spreading activation in memory
+// 4) scoring + topK selection
+func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (models.RetrieveResponse, error) {
+	if req.SpaceID == "" {
+		return models.RetrieveResponse{}, errors.New("space_id is required")
+	}
+	candK := req.CandidateK
+	if candK <= 0 {
+		candK = s.cfg.DefaultCandidateK
+	}
+	topK := req.TopK
+	if topK <= 0 {
+		topK = s.cfg.DefaultTopK
+	}
+	hopDepth := req.HopDepth
+	if hopDepth <= 0 {
+		hopDepth = s.cfg.DefaultHopDepth
+	}
+	if hopDepth > 3 {
+		hopDepth = 3 // keep bounded by default
+	}
+
+	if len(req.QueryEmbedding) == 0 {
+		// Intentionally not generating embeddings here; plug your embedder in upstream.
+		return models.RetrieveResponse{}, errors.New("query_embedding is required (wire your embedder upstream)")
+	}
+
+	// 1) Vector recall
+	cands, err := s.vectorRecall(ctx, req.SpaceID, req.QueryEmbedding, candK)
+	if err != nil {
+		return models.RetrieveResponse{}, err
+	}
+	if len(cands) == 0 {
+		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: []models.RetrieveResult{}}, nil
+	}
+
+	// Seeds: use first N for expansion (keep bounded)
+	seedN := minInt(50, len(cands))
+	seedIDs := make([]string, 0, seedN)
+	for i := 0; i < seedN; i++ {
+		seedIDs = append(seedIDs, cands[i].NodeID)
+	}
+
+	// 2) Expansion: iterative 1-hop fetch up to hopDepth
+	edges := make([]Edge, 0, 1024)
+	seenEdge := map[string]struct{}{}
+	frontier := append([]string{}, seedIDs...)
+	seenNode := map[string]struct{}{}
+	for _, id := range frontier {
+		seenNode[id] = struct{}{}
+	}
+
+	for d := 0; d < hopDepth; d++ {
+		if len(frontier) == 0 {
+			break
+		}
+		batchEdges, nextNodes, err := s.fetchOutgoingEdges(ctx, req.SpaceID, frontier)
+		if err != nil {
+			return models.RetrieveResponse{}, err
+		}
+		frontier = frontier[:0]
+		for _, e := range batchEdges {
+			key := e.Src + "|" + e.RelType + "|" + e.Dst
+			if _, ok := seenEdge[key]; ok {
+				continue
+			}
+			seenEdge[key] = struct{}{}
+			edges = append(edges, e)
+		}
+		for _, nid := range nextNodes {
+			if _, ok := seenNode[nid]; ok {
+				continue
+			}
+			seenNode[nid] = struct{}{}
+			frontier = append(frontier, nid)
+		}
+	}
+
+	// 3) Activation physics
+	act := SpreadingActivation(cands, edges, 2, 0.15)
+
+	// 4) Final ranking
+	results := ScoreAndRank(cands, act, edges, topK)
+
+	resp := models.RetrieveResponse{
+		SpaceID: req.SpaceID,
+		Results: results,
+		Debug: map[string]any{
+			"candidate_k": candK,
+			"seed_n": seedN,
+			"edges_fetched": len(edges),
+			"hop_depth": hopDepth,
+		},
+	}
+	return resp, nil
+}
+
+type Candidate struct {
+	NodeID string
+	Path string
+	Name string
+	Summary string
+	UpdatedAt time.Time
+	Confidence float64
+	VectorSim float64
+}
+
+func (s *Service) vectorRecall(ctx context.Context, spaceID string, q []float32, k int) ([]Candidate, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"spaceId": spaceID,
+		"k": k,
+		"q": q,
+		"index": s.cfg.VectorIndexName,
+	}
+	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `WITH $q AS q
+CALL db.index.vector.queryNodes($index, $k, q)
+YIELD node, score
+WHERE node.space_id = $spaceId
+RETURN node.node_id AS node_id,
+       node.path AS path,
+       node.name AS name,
+       coalesce(node.summary,'') AS summary,
+       coalesce(node.confidence,0.6) AS confidence,
+       coalesce(node.updated_at, datetime()) AS updated_at,
+       score AS score
+ORDER BY score DESC`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		cands := make([]Candidate, 0, k)
+		for res.Next(ctx) {
+			rec := res.Record()
+			nid, _ := rec.Get("node_id")
+			path, _ := rec.Get("path")
+			name, _ := rec.Get("name")
+			sum, _ := rec.Get("summary")
+			conf, _ := rec.Get("confidence")
+			upd, _ := rec.Get("updated_at")
+			sc, _ := rec.Get("score")
+
+			ct := Candidate{
+				NodeID: fmt.Sprint(nid),
+				Path: fmt.Sprint(path),
+				Name: fmt.Sprint(name),
+				Summary: fmt.Sprint(sum),
+				Confidence: toFloat64(conf, 0.6),
+				VectorSim: toFloat64(sc, 0),
+			}
+			// neo4j returns time as neo4j.LocalDateTime or time.Time depending on driver
+			switch v := upd.(type) {
+			case time.Time:
+				ct.UpdatedAt = v
+			default:
+				ct.UpdatedAt = time.Now()
+			}
+			cands = append(cands, ct)
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return cands, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return outAny.([]Candidate), nil
+}
+
+type Edge struct {
+	Src string
+	Dst string
+	RelType string
+	Weight float64
+	DimSemantic float64
+	DimTemporal float64
+	DimCoactivation float64
+	UpdatedAt time.Time
+}
+
+func (s *Service) fetchOutgoingEdges(ctx context.Context, spaceID string, nodeIDs []string) ([]Edge, []string, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"spaceId": spaceID,
+		"nodeIds": nodeIDs,
+		"allowed": s.cfg.AllowedRelationshipTypes,
+		"maxNbr": s.cfg.MaxNeighborsPerNode,
+		"maxTotal": s.cfg.MaxTotalEdgesFetched,
+	}
+
+	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `UNWIND $nodeIds AS sid
+MATCH (src:MemoryNode {space_id:$spaceId, node_id:sid})
+CALL {
+  WITH src
+  MATCH (src)-[r]->(dst:MemoryNode {space_id:$spaceId})
+  WHERE type(r) IN $allowed AND coalesce(r.status,'active')='active'
+  RETURN src.node_id AS s, dst.node_id AS d, type(r) AS t,
+         coalesce(r.weight,0.0) AS w,
+         coalesce(r.dim_semantic,0.0) AS ds,
+         coalesce(r.dim_temporal,0.0) AS dt,
+         coalesce(r.dim_coactivation,0.0) AS dc,
+         coalesce(r.updated_at, datetime()) AS upd
+  ORDER BY w DESC
+  LIMIT $maxNbr
+}
+RETURN s, d, t, w, ds, dt, dc, upd
+LIMIT $maxTotal`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		edges := make([]Edge, 0, 1024)
+		next := make([]string, 0, 1024)
+		seenNext := map[string]struct{}{}
+		for res.Next(ctx) {
+			rec := res.Record()
+			s, _ := rec.Get("s")
+			d, _ := rec.Get("d")
+			t, _ := rec.Get("t")
+			w, _ := rec.Get("w")
+			ds, _ := rec.Get("ds")
+			dt, _ := rec.Get("dt")
+			dc, _ := rec.Get("dc")
+			upd, _ := rec.Get("upd")
+
+			e := Edge{
+				Src: fmt.Sprint(s),
+				Dst: fmt.Sprint(d),
+				RelType: fmt.Sprint(t),
+				Weight: toFloat64(w, 0),
+				DimSemantic: toFloat64(ds, 0),
+				DimTemporal: toFloat64(dt, 0),
+				DimCoactivation: toFloat64(dc, 0),
+				UpdatedAt: time.Now(),
+			}
+			edges = append(edges, e)
+			if _, ok := seenNext[e.Dst]; !ok {
+				seenNext[e.Dst] = struct{}{}
+				next = append(next, e.Dst)
+			}
+			_ = upd
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return struct {
+			Edges []Edge
+			Next []string
+		}{Edges: edges, Next: next}, nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	pack := outAny.(struct {
+		Edges []Edge
+		Next []string
+	})
+	return pack.Edges, pack.Next, nil
+}
+
+// IngestObservation is intentionally minimal: append-only Observation + basic node upsert.
+func (s *Service) IngestObservation(ctx context.Context, req models.IngestRequest) (models.IngestResponse, error) {
+	if req.SpaceID == "" {
+		return models.IngestResponse{}, errors.New("space_id is required")
+	}
+	if req.Source == "" {
+		return models.IngestResponse{}, errors.New("source is required")
+	}
+	if req.Timestamp == "" {
+		return models.IngestResponse{}, errors.New("timestamp is required")
+	}
+
+	nodeID := req.NodeID
+	if nodeID == "" {
+		nodeID = newID("n")
+	}
+	obsID := newID("o")
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"spaceId":     req.SpaceID,
+		"nodeId":      nodeID,
+		"path":        req.Path,
+		"name":        req.Name,
+		"obsId":       obsID,
+		"timestamp":   req.Timestamp,
+		"source":      req.Source,
+		"content":     req.Content,
+		"tags":        req.Tags,
+		"sensitivity": req.Sensitivity,
+		"confidence":  req.Confidence,
+		"embedding":   req.Embedding, // May be nil/empty
+	}
+
+	// Determine merge key: prefer path if provided, else use node_id
+	mergeKey := "node_id"
+	mergeValue := nodeID
+	if req.Path != "" {
+		mergeKey = "path"
+		mergeValue = req.Path
+	}
+	params["mergeValue"] = mergeValue
+
+	// Build embedding SET clause (only if embedding provided)
+	embeddingClause := ""
+	if len(req.Embedding) > 0 {
+		embeddingClause = ", n.embedding = $embedding"
+	}
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Build cypher dynamically based on merge key
+		var cypher string
+		if mergeKey == "path" {
+			cypher = `
+MERGE (t:TapRoot {space_id:$spaceId})
+ON CREATE SET t.name='tap_root', t.created_at=datetime()
+WITH t
+MERGE (n:MemoryNode {space_id:$spaceId, path:$mergeValue})
+ON CREATE SET n.node_id=$nodeId,
+              n.name=coalesce($name, $mergeValue),
+              n.layer=0,
+              n.role_type='leaf',
+              n.version=1,
+              n.status='active',
+              n.created_at=datetime(),
+              n.updated_at=datetime(),
+              n.update_count=0,
+              n.summary='',
+              n.description='',
+              n.confidence=coalesce($confidence, 0.6),
+              n.sensitivity=coalesce($sensitivity,'internal'),
+              n.tags=coalesce($tags,[])
+WITH n
+CREATE (o:Observation {
+  space_id:$spaceId,
+  obs_id:$obsId,
+  timestamp: datetime($timestamp),
+  source:$source,
+  content:$content,
+  created_at: datetime()
+})
+MERGE (n)-[:HAS_OBSERVATION {space_id:$spaceId, created_at:datetime()}]->(o)
+SET n.updated_at=datetime(),
+    n.update_count = coalesce(n.update_count,0) + 1` + embeddingClause + `
+RETURN n.node_id AS node_id`
+		} else {
+			cypher = `
+MERGE (t:TapRoot {space_id:$spaceId})
+ON CREATE SET t.name='tap_root', t.created_at=datetime()
+WITH t
+MERGE (n:MemoryNode {space_id:$spaceId, node_id:$mergeValue})
+ON CREATE SET n.path=coalesce($path, $mergeValue),
+              n.name=coalesce($name, $mergeValue),
+              n.layer=0,
+              n.role_type='leaf',
+              n.version=1,
+              n.status='active',
+              n.created_at=datetime(),
+              n.updated_at=datetime(),
+              n.update_count=0,
+              n.summary='',
+              n.description='',
+              n.confidence=coalesce($confidence, 0.6),
+              n.sensitivity=coalesce($sensitivity,'internal'),
+              n.tags=coalesce($tags,[])
+WITH n
+CREATE (o:Observation {
+  space_id:$spaceId,
+  obs_id:$obsId,
+  timestamp: datetime($timestamp),
+  source:$source,
+  content:$content,
+  created_at: datetime()
+})
+MERGE (n)-[:HAS_OBSERVATION {space_id:$spaceId, created_at:datetime()}]->(o)
+SET n.updated_at=datetime(),
+    n.update_count = coalesce(n.update_count,0) + 1` + embeddingClause + `
+RETURN n.node_id AS node_id`
+		}
+
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			// consume
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return models.IngestResponse{}, err
+	}
+
+	return models.IngestResponse{SpaceID: req.SpaceID, NodeID: nodeID, ObsID: obsID}, nil
+}
+
+func newID(prefix string) string {
+	b := make([]byte, 10)
+	_, _ = rand.Read(b)
+	return prefix + "_" + hex.EncodeToString(b)
+}
+
+func toFloat64(v any, def float64) float64 {
+	switch x := v.(type) {
+	case float64:
+		return x
+	case float32:
+		return float64(x)
+	case int64:
+		return float64(x)
+	case int:
+		return float64(x)
+	default:
+		return def
+	}
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// helpers used by scoring
+func expRecency(updatedAt time.Time, rho float64) float64 {
+	age := time.Since(updatedAt).Hours() / 24.0
+	return math.Exp(-rho * age)
+}

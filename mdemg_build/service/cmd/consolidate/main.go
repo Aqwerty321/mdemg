@@ -435,6 +435,123 @@ func asFloat64Slice(v any) []float64 {
 	return nil
 }
 
+// abstractionResult holds the result of creating an abstraction node
+type abstractionResult struct {
+	NodeID      string
+	MemberCount int
+}
+
+// createAbstraction creates a new MemoryNode at layer+1 and ABSTRACTS_TO edges from cluster members.
+// Returns the new abstraction node's ID and the count of edges created.
+// This function performs actual database writes - only call when dryRun is false.
+func createAbstraction(ctx context.Context, driver neo4j.DriverWithContext, cfg consolidateConfig, c cluster, embedding []float64) (*abstractionResult, error) {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Generate name and summary from cluster members
+	name := generateAbstractionName(c.Members)
+	summary := fmt.Sprintf("Cluster abstraction of %d nodes at layer %d", len(c.Members), c.Layer)
+	newLayer := c.Layer + 1
+
+	// Collect member node IDs
+	memberIDs := make([]string, 0, len(c.Members))
+	for _, m := range c.Members {
+		memberIDs = append(memberIDs, m.NodeID)
+	}
+
+	params := map[string]any{
+		"spaceId":   cfg.SpaceID,
+		"name":      name,
+		"summary":   summary,
+		"layer":     newLayer,
+		"embedding": embedding,
+		"memberIds": memberIDs,
+	}
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Cypher query creates abstraction node and ABSTRACTS_TO edges:
+		// - CREATE for the new abstraction node with all required properties
+		// - UNWIND + MATCH to find each cluster member
+		// - CREATE for ABSTRACTS_TO edges with required properties
+		cypher := `
+CREATE (abs:MemoryNode {
+  space_id: $spaceId,
+  node_id: randomUUID(),
+  name: $name,
+  summary: $summary,
+  layer: $layer,
+  embedding: $embedding,
+  created_at: datetime(),
+  updated_at: datetime(),
+  role_type: 'abstraction',
+  version: 1
+})
+WITH abs
+UNWIND $memberIds AS memberId
+MATCH (m:MemoryNode {space_id: $spaceId, node_id: memberId})
+CREATE (m)-[:ABSTRACTS_TO {
+  space_id: $spaceId,
+  edge_id: randomUUID(),
+  created_at: datetime(),
+  updated_at: datetime()
+}]->(abs)
+RETURN abs.node_id AS absNodeId, count(m) AS memberCount`
+
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		// Expect exactly one result record
+		if res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("absNodeId")
+			memberCount, _ := rec.Get("memberCount")
+			return &abstractionResult{
+				NodeID:      asString(nodeID),
+				MemberCount: asInt(memberCount),
+			}, nil
+		}
+
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+
+		// No result returned - shouldn't happen if query is correct
+		return nil, errors.New("no result returned from abstraction creation query")
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.(*abstractionResult), nil
+}
+
+// generateAbstractionName creates a descriptive name for the abstraction node
+// based on cluster member node IDs, truncating if too long
+func generateAbstractionName(members []clusterMember) string {
+	if len(members) == 0 {
+		return "Abstraction: (empty)"
+	}
+
+	// Collect node IDs
+	ids := make([]string, 0, len(members))
+	for _, m := range members {
+		ids = append(ids, m.NodeID)
+	}
+
+	// Join IDs with commas
+	joined := strings.Join(ids, ", ")
+
+	// Truncate if too long (max ~60 chars for readability)
+	const maxLen = 60
+	if len(joined) > maxLen {
+		joined = joined[:maxLen-3] + "..."
+	}
+
+	return fmt.Sprintf("Abstraction: [%s]", joined)
+}
+
 // averageEmbeddings computes the centroid (element-wise average) of multiple embedding vectors.
 // Returns nil if embeddings is empty. Skips embeddings with mismatched dimensions.
 func averageEmbeddings(embeddings [][]float64) []float64 {

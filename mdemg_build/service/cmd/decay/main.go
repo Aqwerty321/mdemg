@@ -231,25 +231,200 @@ func newDriver(cfg decayConfig) (neo4j.DriverWithContext, error) {
 	return driver, nil
 }
 
+// decayStats tracks statistics for the decay job
+type decayStats struct {
+	scanned           int
+	decayed           int
+	pruned            int
+	protectedEvidence int
+	protectedPinned   int
+	samples           []decayResult // first few decay results for sample output
+}
+
 // runDecayJob executes the decay and pruning operations
 func runDecayJob(ctx context.Context, driver neo4j.DriverWithContext, cfg decayConfig) error {
 	// Print header
 	printHeader(cfg)
 
-	// TODO: Implement edge querying, decay calculation, and pruning (subtasks 1-2 through 1-5)
 	fmt.Println("\nProcessing...")
-	fmt.Println("\nStatistics:")
-	fmt.Println("- Edges scanned: 0")
-	fmt.Println("- Edges decayed: 0")
-	fmt.Println("- Edges to prune: 0")
-	fmt.Println("- Edges protected (high evidence): 0")
-	fmt.Println("- Edges protected (pinned): 0")
 
-	if cfg.DryRun {
-		fmt.Println("\nRun with --dry-run=false to apply changes.")
+	now := time.Now()
+	stats := decayStats{
+		samples: make([]decayResult, 0, 5),
+	}
+	offset := 0
+	batchNum := 0
+
+	for {
+		// Query batch of edges
+		edges, err := queryEdgeBatch(ctx, driver, cfg, offset)
+		if err != nil {
+			return fmt.Errorf("query batch %d: %w", batchNum+1, err)
+		}
+
+		if len(edges) == 0 {
+			break
+		}
+
+		batchNum++
+		fmt.Printf("Batch %d: %d edges\n", batchNum, len(edges))
+
+		// Collect results to update/delete
+		var toUpdate []decayResult
+		var toDelete []decayResult
+
+		for _, e := range edges {
+			stats.scanned++
+
+			result := processEdge(e, cfg, now)
+
+			// Track protection stats
+			if result.Protected {
+				if result.ProtectReason == "pinned" {
+					stats.protectedPinned++
+				} else if result.ProtectReason == "high_evidence" {
+					stats.protectedEvidence++
+				}
+			}
+
+			// Collect sample results for output (first 5)
+			if len(stats.samples) < 5 && result.DecayPercent > 0.1 {
+				stats.samples = append(stats.samples, result)
+			}
+
+			// Decide action
+			if result.ShouldPrune {
+				toDelete = append(toDelete, result)
+			} else if result.OldWeight != result.NewWeight {
+				toUpdate = append(toUpdate, result)
+			}
+		}
+
+		// Apply changes if not dry-run
+		if !cfg.DryRun {
+			// Update weights
+			for _, r := range toUpdate {
+				if err := updateEdgeWeight(ctx, driver, r.Edge.ID, r.NewWeight); err != nil {
+					return fmt.Errorf("update edge %d: %w", r.Edge.ID, err)
+				}
+			}
+
+			// Delete pruned edges
+			for _, r := range toDelete {
+				if err := deleteEdge(ctx, driver, r.Edge.ID); err != nil {
+					return fmt.Errorf("delete edge %d: %w", r.Edge.ID, err)
+				}
+			}
+		}
+
+		stats.decayed += len(toUpdate)
+		stats.pruned += len(toDelete)
+
+		offset += len(edges)
+
+		// If we got fewer than batch size, we're done
+		if len(edges) < cfg.BatchSize {
+			break
+		}
 	}
 
+	// Print statistics
+	printStats(stats, cfg.DryRun)
+
 	return nil
+}
+
+// updateEdgeWeight updates the weight of an edge in the database
+func updateEdgeWeight(ctx context.Context, driver neo4j.DriverWithContext, edgeID int64, newWeight float64) error {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH ()-[r]->()
+WHERE id(r) = $edgeId
+SET r.weight = $newWeight,
+    r.updated_at = datetime()
+RETURN count(*) AS updated`
+
+		params := map[string]any{
+			"edgeId":    edgeID,
+			"newWeight": newWeight,
+		}
+
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		// Consume result
+		for res.Next(ctx) {
+			// consume
+		}
+		return nil, res.Err()
+	})
+
+	return err
+}
+
+// deleteEdge removes an edge from the database
+func deleteEdge(ctx context.Context, driver neo4j.DriverWithContext, edgeID int64) error {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH ()-[r]->()
+WHERE id(r) = $edgeId
+DELETE r`
+
+		params := map[string]any{
+			"edgeId": edgeID,
+		}
+
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		// Consume result
+		for res.Next(ctx) {
+			// consume
+		}
+		return nil, res.Err()
+	})
+
+	return err
+}
+
+// printStats outputs the job statistics
+func printStats(stats decayStats, dryRun bool) {
+	fmt.Println("\nStatistics:")
+	fmt.Printf("- Edges scanned: %d\n", stats.scanned)
+	fmt.Printf("- Edges decayed: %d\n", stats.decayed)
+	if dryRun {
+		fmt.Printf("- Edges to prune: %d\n", stats.pruned)
+	} else {
+		fmt.Printf("- Edges pruned: %d\n", stats.pruned)
+	}
+	fmt.Printf("- Edges protected (high evidence): %d\n", stats.protectedEvidence)
+	fmt.Printf("- Edges protected (pinned): %d\n", stats.protectedPinned)
+
+	// Print sample decays
+	if len(stats.samples) > 0 {
+		fmt.Println("\nSample decays:")
+		for _, r := range stats.samples {
+			fmt.Printf("  [%s]-%s->[%s]: %.3f -> %.3f (%.1f%% decay)\n",
+				r.Edge.SourceID, r.Edge.RelType, r.Edge.TargetID,
+				r.OldWeight, r.NewWeight, r.DecayPercent)
+		}
+	}
+
+	if dryRun {
+		fmt.Println("\nRun with --dry-run=false to apply changes.")
+	} else {
+		fmt.Println("\nChanges applied successfully.")
+	}
 }
 
 // printHeader outputs the job configuration header

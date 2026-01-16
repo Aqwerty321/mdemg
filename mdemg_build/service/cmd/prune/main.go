@@ -317,6 +317,86 @@ func pruneEdges(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneCo
 	return edgePruneStats{}, nil
 }
 
+// queryEdgeBatch fetches a batch of edges from Neo4j for prune processing.
+// It filters by space_id (required) and age threshold (older than N days).
+func queryEdgeBatch(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneConfig, offset int) ([]edge, error) {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Build the Cypher query with space filtering
+	// For pruning, we use updated_at to determine edge age
+	// Note: space_id is REQUIRED for prune operations
+	cypher := `
+MATCH (a:MemoryNode)-[r]->(b:MemoryNode)
+WHERE r.space_id = $spaceId
+  AND (
+    (r.updated_at IS NOT NULL AND r.updated_at < datetime() - duration({days: $olderThanDays}))
+    OR (r.updated_at IS NULL AND r.created_at IS NOT NULL AND r.created_at < datetime() - duration({days: $olderThanDays}))
+    OR (r.updated_at IS NULL AND r.created_at IS NULL)
+  )
+RETURN id(r) AS edgeId,
+       type(r) AS relType,
+       a.node_id AS sourceId,
+       b.node_id AS targetId,
+       coalesce(r.weight, 0.0) AS weight,
+       coalesce(r.evidence_count, 0) AS evidence,
+       coalesce(r.pinned, false) AS pinned,
+       coalesce(r.updated_at, r.created_at) AS updatedAt
+ORDER BY updatedAt ASC
+SKIP $offset
+LIMIT $batchSize`
+
+	params := map[string]any{
+		"spaceId":       cfg.SpaceID,
+		"olderThanDays": cfg.OlderThanDays,
+		"offset":        offset,
+		"batchSize":     cfg.BatchSize,
+	}
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		edges := make([]edge, 0)
+		for res.Next(ctx) {
+			rec := res.Record()
+
+			edgeID, _ := rec.Get("edgeId")
+			relType, _ := rec.Get("relType")
+			sourceID, _ := rec.Get("sourceId")
+			targetID, _ := rec.Get("targetId")
+			weight, _ := rec.Get("weight")
+			evidence, _ := rec.Get("evidence")
+			pinned, _ := rec.Get("pinned")
+			updatedAt, _ := rec.Get("updatedAt")
+
+			e := edge{
+				ID:            edgeID.(int64),
+				RelType:       relType.(string),
+				SourceID:      asString(sourceID),
+				TargetID:      asString(targetID),
+				Weight:        asFloat64(weight),
+				EvidenceCount: asInt(evidence),
+				Pinned:        asBool(pinned),
+				UpdatedAt:     asTime(updatedAt),
+			}
+			edges = append(edges, e)
+		}
+
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return edges, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]edge), nil
+}
+
 // nodeTombstoneStats holds node tombstoning statistics
 type nodeTombstoneStats struct {
 	scanned    int

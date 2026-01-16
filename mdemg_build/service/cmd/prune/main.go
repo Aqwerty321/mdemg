@@ -578,6 +578,92 @@ func tombstoneOrphans(ctx context.Context, driver neo4j.DriverWithContext, cfg p
 	return nodeTombstoneStats{}, nil
 }
 
+// queryOrphanCandidates fetches nodes that are candidates for tombstoning.
+// A node is an orphan candidate if:
+// - It belongs to the specified space_id
+// - It has low degree (total edges <= maxDegree)
+// - It is not already tombstoned
+// Returns nodes with their degree, last observation time, and abstraction chain status.
+// The actual tombstoning decision is made by shouldTombstoneNode() after evaluating
+// observation recency and abstraction chain membership.
+func queryOrphanCandidates(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneConfig) ([]node, error) {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Query for nodes with low degree that are potential orphan candidates.
+	// We fetch:
+	// - Node basic info (node_id, status)
+	// - Degree (count of all edges, both directions)
+	// - Last observation time (max timestamp from HAS_OBSERVATION relationships)
+	// - Whether the node is part of an abstraction chain (has ABSTRACTS_TO or INSTANTIATES)
+	//
+	// Note: We filter by degree in the query for efficiency, but the final
+	// tombstoning decision is made in Go code by shouldTombstoneNode().
+	cypher := `
+MATCH (n:MemoryNode)
+WHERE n.space_id = $spaceId
+  AND coalesce(n.status, 'active') <> 'tombstoned'
+WITH n
+// Count all edges (both directions) for degree calculation
+OPTIONAL MATCH (n)-[e]-()
+WITH n, count(DISTINCT e) AS degree
+WHERE degree <= $maxDegree
+// Get the most recent observation timestamp
+OPTIONAL MATCH (n)-[:HAS_OBSERVATION]->(obs:Observation)
+WITH n, degree, max(obs.observed_at) AS lastObsTime
+// Check if node is part of abstraction chain (ABSTRACTS_TO or INSTANTIATES)
+OPTIONAL MATCH (n)-[:ABSTRACTS_TO|INSTANTIATES]-()
+WITH n, degree, lastObsTime, count(*) > 0 AS inAbstractionChain
+RETURN n.node_id AS nodeId,
+       degree,
+       lastObsTime,
+       inAbstractionChain,
+       coalesce(n.status, 'active') AS status
+ORDER BY degree ASC, lastObsTime ASC`
+
+	params := map[string]any{
+		"spaceId":   cfg.SpaceID,
+		"maxDegree": cfg.MaxDegree,
+	}
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		nodes := make([]node, 0)
+		for res.Next(ctx) {
+			rec := res.Record()
+
+			nodeID, _ := rec.Get("nodeId")
+			degree, _ := rec.Get("degree")
+			lastObsTime, _ := rec.Get("lastObsTime")
+			inAbstractionChain, _ := rec.Get("inAbstractionChain")
+			status, _ := rec.Get("status")
+
+			n := node{
+				NodeID:              asString(nodeID),
+				Degree:              asInt(degree),
+				LastObservationTime: asTime(lastObsTime),
+				InAbstractionChain:  asBool(inAbstractionChain),
+				Status:              asString(status),
+			}
+			nodes = append(nodes, n)
+		}
+
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return nodes, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]node), nil
+}
+
 // nodeMergeStats holds node merging statistics
 type nodeMergeStats struct {
 	merges int

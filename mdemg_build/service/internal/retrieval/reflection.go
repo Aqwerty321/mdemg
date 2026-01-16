@@ -45,6 +45,11 @@ func (s *Service) Reflect(ctx context.Context, req models.ReflectRequest) (model
 		maxNodes = 200 // cap to prevent memory issues
 	}
 
+	// Validate embedding is provided (embeddings are generated upstream, per project design)
+	if len(req.TopicEmbedding) == 0 {
+		return models.ReflectResponse{}, errors.New("topic_embedding is required (wire your embedder upstream)")
+	}
+
 	// Initialize response with empty slices (not nil)
 	resp := models.ReflectResponse{
 		Topic:           req.Topic,
@@ -59,10 +64,40 @@ func (s *Service) Reflect(ctx context.Context, req models.ReflectRequest) (model
 		},
 	}
 
-	// TODO (subtask-2-2): Stage 1 - SEED: Vector search for topic using embedding
-	// - Generate/receive embedding for topic
-	// - Call vectorRecall to find core memories
-	// - Convert Candidate to ScoredNode with Distance=0
+	// Stage 1: SEED - Vector search for topic using embedding
+	// Use vectorRecall to find core memories matching the topic
+	cands, err := s.vectorRecall(ctx, req.SpaceID, req.TopicEmbedding, DefaultReflectSeedK)
+	if err != nil {
+		return models.ReflectResponse{}, err
+	}
+
+	// Initialize visited set with core memory node IDs
+	visited := make(map[string]struct{}, len(cands))
+
+	// Convert Candidate to ScoredNode with Distance=0 for core memories
+	for _, c := range cands {
+		visited[c.NodeID] = struct{}{}
+		resp.CoreMemories = append(resp.CoreMemories, models.ScoredNode{
+			NodeID:   c.NodeID,
+			Name:     c.Name,
+			Path:     c.Path,
+			Summary:  c.Summary,
+			Layer:    0, // Will be updated when we fetch node layer info
+			Score:    c.VectorSim,
+			Distance: 0, // Core memories are at distance 0
+		})
+	}
+
+	// Update graph context with nodes explored
+	resp.GraphContext.NodesExplored = len(cands)
+
+	// If no core memories found, return early with empty response
+	if len(cands) == 0 {
+		return resp, nil
+	}
+
+	// Store visited set for later stages (will be used by EXPAND and ABSTRACT)
+	_ = visited
 
 	// TODO (subtask-2-3): Stage 2 - EXPAND: Lateral traversal
 	// - BFS traversal with depth limit

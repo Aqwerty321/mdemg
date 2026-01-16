@@ -13,6 +13,92 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
+// edge represents a relationship in the graph for prune processing
+type edge struct {
+	ID            int64
+	RelType       string
+	SourceID      string
+	TargetID      string
+	Weight        float64
+	EvidenceCount int
+	Pinned        bool
+	UpdatedAt     time.Time
+}
+
+// edgePruneResult holds the result of pruning evaluation for a single edge
+type edgePruneResult struct {
+	Edge          edge
+	ShouldPrune   bool
+	Protected     bool
+	ProtectReason string // "pinned", "high_evidence", or ""
+}
+
+// shouldPruneEdge determines if an edge should be pruned based on pruning rules.
+// From docs/07_Consolidation_and_Pruning.md Section 5.1:
+// Prune edges if ALL are true:
+// - weight < weight_threshold
+// - evidence_count < min_evidence
+// - updated_at older than olderThanDays
+// - edge not pinned
+// Special case: weight <= 0 always marks for pruning (regardless of other factors)
+func shouldPruneEdge(e edge, weightThreshold float64, minEvidence int, olderThanDays int, now time.Time) (prune bool, protected bool, reason string) {
+	// Special case: zero or negative weight always pruned
+	if e.Weight <= 0 {
+		return true, false, ""
+	}
+
+	// Check if weight is below threshold
+	if e.Weight >= weightThreshold {
+		// Weight is high enough, no need to prune
+		return false, false, ""
+	}
+
+	// Weight is below threshold - check protection rules
+
+	// Protection: pinned edges are never pruned
+	if e.Pinned {
+		return false, true, "pinned"
+	}
+
+	// Protection: high evidence count protects the edge
+	if e.EvidenceCount >= minEvidence {
+		return false, true, "high_evidence"
+	}
+
+	// Check age criterion: edge must be old enough to prune
+	if !isOlderThan(e.UpdatedAt, olderThanDays, now) {
+		// Edge is too recent, don't prune
+		return false, false, ""
+	}
+
+	// All prune conditions met: weight < threshold AND evidence < min AND age > days AND !pinned
+	return true, false, ""
+}
+
+// isOlderThan checks if the given timestamp is older than the specified number of days.
+// Returns true if updatedAt is older than olderThanDays, false otherwise.
+// If updatedAt is zero (unset), treats as very old (should be pruned).
+func isOlderThan(updatedAt time.Time, olderThanDays int, now time.Time) bool {
+	if updatedAt.IsZero() {
+		// No timestamp means very old, consider it old enough
+		return true
+	}
+	cutoff := now.AddDate(0, 0, -olderThanDays)
+	return updatedAt.Before(cutoff)
+}
+
+// processEdgeForPruning evaluates a single edge for pruning
+func processEdgeForPruning(e edge, cfg pruneConfig, now time.Time) edgePruneResult {
+	prune, protected, reason := shouldPruneEdge(e, cfg.WeightThreshold, cfg.MinEvidence, cfg.OlderThanDays, now)
+
+	return edgePruneResult{
+		Edge:          e,
+		ShouldPrune:   prune,
+		Protected:     protected,
+		ProtectReason: reason,
+	}
+}
+
 // pruneConfig holds CLI and environment configuration for the pruning job
 type pruneConfig struct {
 	// Neo4j connection

@@ -146,9 +146,15 @@ type decayConfig struct {
 }
 
 func main() {
+	// Print banner first (always shown, even on error)
+	fmt.Println("MDEMG Decay Job")
+	fmt.Println("===============")
+	fmt.Println()
+
 	cfg, err := parseConfig()
 	if err != nil {
-		log.Fatalf("configuration error: %v", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 
 	ctx := context.Background()
@@ -429,10 +435,6 @@ func printStats(stats decayStats, dryRun bool) {
 
 // printHeader outputs the job configuration header
 func printHeader(cfg decayConfig) {
-	fmt.Println("MDEMG Decay Job")
-	fmt.Println("===============")
-	fmt.Println()
-
 	if cfg.DryRun {
 		fmt.Println("Mode: DRY RUN (no changes will be made)")
 	} else {

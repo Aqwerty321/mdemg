@@ -67,6 +67,10 @@ type Config struct {
 	ScoringPhi   float64 // Hub penalty coefficient (default: 0.08)
 	ScoringKappa float64 // Redundancy penalty coefficient (default: 0.12)
 	ScoringRho   float64 // Recency decay rate per day (default: 0.05)
+
+	// Logging settings
+	LogFormat     string // "text" (default) or "json"
+	LogSkipHealth bool   // Skip logging for /healthz and /readyz endpoints (default: false)
 }
 
 func FromEnv() (Config, error) {
@@ -340,6 +344,13 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("EMBEDDING_CACHE_SIZE must be > 0 when caching is enabled")
 	}
 
+	// Logging settings
+	logFormat := get("LOG_FORMAT", "text")
+	if logFormat != "text" && logFormat != "json" {
+		return Config{}, errors.New("LOG_FORMAT must be 'text' or 'json'")
+	}
+	logSkipHealth := getBool("LOG_SKIP_HEALTH", false)
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -384,5 +395,7 @@ func FromEnv() (Config, error) {
 		ScoringPhi:                scoringPhi,
 		ScoringKappa:              scoringKappa,
 		ScoringRho:                scoringRho,
+		LogFormat:                 logFormat,
+		LogSkipHealth:             logSkipHealth,
 	}, nil
 }

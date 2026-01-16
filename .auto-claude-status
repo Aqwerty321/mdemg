@@ -1,17 +1,17 @@
 {
   "active": true,
-  "spec": "021-015-memory-archive",
-  "state": "building",
+  "spec": "019-013-configurable-scoring",
+  "state": "complete",
   "subtasks": {
-    "completed": 7,
-    "total": 10,
-    "in_progress": 1,
+    "completed": 8,
+    "total": 8,
+    "in_progress": 0,
     "failed": 0
   },
   "phase": {
-    "current": "Register Routes in Server",
+    "current": "Verification",
     "id": null,
-    "total": 1
+    "total": 2
   },
   "workers": {
     "active": 0,
@@ -19,7 +19,7 @@
   },
   "session": {
     "number": 8,
-    "started_at": "2026-01-16T18:13:05.919316"
+    "started_at": "2026-01-16T17:59:38.978983"
   },
-  "last_update": "2026-01-16T18:22:24.930857"
+  "last_update": "2026-01-16T18:11:27.846768"
 }

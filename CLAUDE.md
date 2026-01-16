@@ -110,6 +110,13 @@ internal/
 | `DEFAULT_HOP_DEPTH` | 2 | Graph expansion depth |
 | `MAX_NEIGHBORS_PER_NODE` | 50 | Per-hop degree cap |
 | `LEARNING_EDGE_CAP_PER_REQUEST` | 200 | Max edges written per request |
+| `SCORING_ALPHA` | 0.55 | Vector similarity weight |
+| `SCORING_BETA` | 0.30 | Activation weight |
+| `SCORING_GAMMA` | 0.10 | Recency weight |
+| `SCORING_DELTA` | 0.05 | Confidence weight |
+| `SCORING_PHI` | 0.08 | Hub penalty coefficient |
+| `SCORING_KAPPA` | 0.12 | Redundancy penalty coefficient |
+| `SCORING_RHO` | 0.05 | Recency decay rate per day |
 
 ## Key Design Notes
 

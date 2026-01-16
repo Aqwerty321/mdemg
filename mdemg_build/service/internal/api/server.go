@@ -76,10 +76,17 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/ingest", s.handleIngest)
 	mux.HandleFunc("/v1/memory/ingest/batch", s.handleBatchIngest)
 	mux.HandleFunc("/v1/memory/reflect", s.handleReflect)
+	mux.HandleFunc("/v1/memory/stats", s.handleStats)
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
 	mux.HandleFunc("/v1/memory/archive/bulk", s.handleBulkArchive)
 	mux.HandleFunc("/v1/memory/nodes/", s.handleNodeOperation)
-	return mux
+
+	// Wrap mux with logging middleware
+	logCfg := LogConfig{
+		Format:     s.cfg.LogFormat,
+		SkipHealth: s.cfg.LogSkipHealth,
+	}
+	return LoggingMiddleware(mux, logCfg)
 }
 
 // handleNodeOperation routes requests under /v1/memory/nodes/{node_id}/... to the appropriate handler

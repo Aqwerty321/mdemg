@@ -179,6 +179,44 @@ type BatchIngestResponse struct {
 	Results      []BatchIngestResult `json:"results"`
 }
 
+// StatsResponse - response for GET /v1/memory/stats endpoint
+// Provides comprehensive per-space memory statistics including counts,
+// embedding coverage, learning metrics, and health indicators.
+type StatsResponse struct {
+	SpaceID               string               `json:"space_id"`
+	MemoryCount           int64                `json:"memory_count"`
+	ObservationCount      int64                `json:"observation_count"`
+	MemoriesByLayer       map[int]int64        `json:"memories_by_layer"`
+	EmbeddingCoverage     float64              `json:"embedding_coverage"`      // 0.0 - 1.0
+	AvgEmbeddingDimensions int                 `json:"avg_embedding_dimensions"`
+	LearningActivity      *LearningActivity    `json:"learning_activity"`
+	TemporalDistribution  *TemporalDistribution `json:"temporal_distribution"`
+	Connectivity          *Connectivity        `json:"connectivity"`
+	HealthScore           float64              `json:"health_score"` // 0.0 - 1.0
+	ComputedAt            string               `json:"computed_at"`  // ISO8601 timestamp
+}
+
+// LearningActivity - Hebbian learning metrics from CO_ACTIVATED_WITH edges
+type LearningActivity struct {
+	CoActivatedEdges int64   `json:"co_activated_edges"`
+	AvgWeight        float64 `json:"avg_weight"`
+	MaxWeight        float64 `json:"max_weight"`
+}
+
+// TemporalDistribution - memory creation counts over time periods
+type TemporalDistribution struct {
+	Last24h int64 `json:"last_24h"`
+	Last7d  int64 `json:"last_7d"`
+	Last30d int64 `json:"last_30d"`
+}
+
+// Connectivity - graph connectivity statistics for a space
+type Connectivity struct {
+	AvgDegree   float64 `json:"avg_degree"`
+	MaxDegree   int     `json:"max_degree"`
+	OrphanCount int64   `json:"orphan_count"`
+}
+
 // ArchiveRequest - request for archiving a memory node
 type ArchiveRequest struct {
 	Reason string `json:"reason,omitempty"` // optional reason for archiving

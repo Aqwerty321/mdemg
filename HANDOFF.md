@@ -37,12 +37,12 @@
 - ✅ **Consolidation CLI** - `cmd/consolidate` for cluster detection and abstraction promotion (PR #5)
 - ✅ **Metrics Endpoint** - `GET /v1/metrics` for graph health monitoring (PR #4)
 - ✅ **Integration Tests** - Comprehensive test suite for retrieval pipeline (PR #3)
+- ✅ **Batch Ingest Endpoint** - `POST /v1/memory/ingest/batch` for bulk imports (Task 7)
 
 ### What's Next (Priority Order)
-1. **Batch Ingest Endpoint** - `POST /v1/memory/ingest/batch` for bulk imports (Task 7)
-2. **Reflection Endpoint** - `POST /v1/memory/reflect` for deep context exploration (Task 8)
-3. **Anomaly Detection** - Non-blocking contradiction detection on ingest (Task 9)
-4. **Use the system!** - The more memories stored, the more emergent behaviors appear
+1. **Reflection Endpoint** - `POST /v1/memory/reflect` for deep context exploration (Task 8)
+2. **Anomaly Detection** - Non-blocking contradiction detection on ingest (Task 9)
+3. **Use the system!** - The more memories stored, the more emergent behaviors appear
 
 ### Key Commands
 ```bash
@@ -162,6 +162,17 @@ curl -s http://localhost:8082/v1/memory/ingest \
     "timestamp": "2026-01-15T12:00:00Z",
     "content": "Description of the concept for embedding generation."
   }' | jq
+
+# Batch ingest (up to 100 items per request)
+curl -s http://localhost:8082/v1/memory/ingest/batch \
+  -H 'content-type: application/json' \
+  -d '{
+    "space_id": "demo",
+    "observations": [
+      {"timestamp": "2026-01-16T12:00:00Z", "source": "batch", "name": "Item 1", "content": "First item"},
+      {"timestamp": "2026-01-16T12:00:01Z", "source": "batch", "name": "Item 2", "content": "Second item"}
+    ]
+  }' | jq
 ```
 
 **Neo4j Browser:** http://localhost:7474 (neo4j / testpassword)
@@ -219,13 +230,13 @@ The MCP server is configured in `~/.cursor/mcp.json`:
 - [x] **Integration Tests** - Comprehensive test suite (PR #3)
 - [x] **Graph Health Metrics** - `GET /v1/metrics` endpoint (PR #4)
 - [x] **Consolidation CLI** - Cluster detection and abstraction promotion (PR #5)
+- [x] **Batch Ingest Endpoint** (Task 7) - `POST /v1/memory/ingest/batch`
+  - Up to 100 observations per request (configurable via BATCH_INGEST_MAX_ITEMS)
+  - Partial success support with HTTP 207 Multi-Status
+  - Auto-generates embeddings for items without pre-computed embeddings
+  - Per-item results with status, node_id, obs_id
 
-### Priority 1: Batch & Reflection (Next)
-- [ ] **Batch Ingest Endpoint** (Task 7)
-  - `POST /v1/memory/ingest/batch` for up to 100 observations
-  - Partial success support, batch embedding generation
-  - Per-item results with status
-
+### Priority 1: Reflection Endpoint (Next)
 - [ ] **Reflection Endpoint** (Task 8)
   - `POST /v1/memory/reflect` for deep context exploration
   - Multi-hop traversal, abstraction surfacing
@@ -322,7 +333,10 @@ LEARNING_EDGE_CAP_PER_REQUEST=200
 # Service
 LISTEN_ADDR=:8082
 
-# Embedding Provider (NEW)
+# Batch ingest
+BATCH_INGEST_MAX_ITEMS=100         # Max observations per batch request (1-1000)
+
+# Embedding Provider
 EMBEDDING_PROVIDER=ollama          # "openai" or "ollama" or "" (disabled)
 
 # OpenAI settings (if EMBEDDING_PROVIDER=openai)

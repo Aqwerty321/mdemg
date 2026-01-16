@@ -44,6 +44,9 @@ type Config struct {
 	SemanticEdgeTopN          int     // Max similar nodes to query (default: 5)
 	SemanticEdgeMinSimilarity float64 // Minimum similarity threshold (default: 0.7)
 	SemanticEdgeInitialWeight float64 // Initial edge weight (default: 0.5)
+
+	// Batch ingest settings
+	BatchIngestMaxItems int // Maximum items per batch request (default: 100)
 }
 
 func FromEnv() (Config, error) {
@@ -207,6 +210,15 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("SEMANTIC_EDGE_INITIAL_WEIGHT must be in range [0, 1]")
 	}
 
+	// Batch ingest settings
+	batchMaxItems, err := atoi("BATCH_INGEST_MAX_ITEMS", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	if batchMaxItems < 1 || batchMaxItems > 1000 {
+		return Config{}, errors.New("BATCH_INGEST_MAX_ITEMS must be in range [1, 1000]")
+	}
+
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "")
 	openaiKey := get("OPENAI_API_KEY", "")
@@ -244,5 +256,6 @@ func FromEnv() (Config, error) {
 		SemanticEdgeTopN:          semEdgeTopN,
 		SemanticEdgeMinSimilarity: semEdgeMinSim,
 		SemanticEdgeInitialWeight: semEdgeInitWeight,
+		BatchIngestMaxItems:       batchMaxItems,
 	}, nil
 }

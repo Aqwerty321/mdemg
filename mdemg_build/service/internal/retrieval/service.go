@@ -561,6 +561,90 @@ RETURN n.node_id AS node_id`
 	return models.IngestResponse{SpaceID: req.SpaceID, NodeID: nodeID, ObsID: obsID}, nil
 }
 
+// BatchIngestObservations processes multiple observations in a single batch.
+// Returns results for each item, supporting partial success (some items may fail while others succeed).
+func (s *Service) BatchIngestObservations(ctx context.Context, req models.BatchIngestRequest) (models.BatchIngestResponse, error) {
+	if req.SpaceID == "" {
+		return models.BatchIngestResponse{}, errors.New("space_id is required")
+	}
+	if len(req.Observations) == 0 {
+		return models.BatchIngestResponse{}, errors.New("observations array is required and must not be empty")
+	}
+
+	results := make([]models.BatchIngestResult, 0, len(req.Observations))
+	successCount := 0
+	errorCount := 0
+
+	for i, obs := range req.Observations {
+		// Convert BatchIngestItem to IngestRequest
+		ingestReq := models.IngestRequest{
+			SpaceID:     req.SpaceID,
+			Timestamp:   obs.Timestamp,
+			Source:      obs.Source,
+			Content:     obs.Content,
+			Tags:        obs.Tags,
+			NodeID:      obs.NodeID,
+			Path:        obs.Path,
+			Name:        obs.Name,
+			Sensitivity: obs.Sensitivity,
+			Confidence:  obs.Confidence,
+			Embedding:   obs.Embedding,
+		}
+
+		// Validate required fields
+		if ingestReq.Source == "" {
+			results = append(results, models.BatchIngestResult{
+				Index:  i,
+				Status: "error",
+				Error:  "source is required",
+			})
+			errorCount++
+			continue
+		}
+		if ingestReq.Timestamp == "" {
+			results = append(results, models.BatchIngestResult{
+				Index:  i,
+				Status: "error",
+				Error:  "timestamp is required",
+			})
+			errorCount++
+			continue
+		}
+
+		// Use existing IngestObservation logic
+		resp, err := s.IngestObservation(ctx, ingestReq)
+		if err != nil {
+			results = append(results, models.BatchIngestResult{
+				Index:  i,
+				Status: "error",
+				Error:  err.Error(),
+			})
+			errorCount++
+			continue
+		}
+
+		result := models.BatchIngestResult{
+			Index:  i,
+			Status: "success",
+			NodeID: resp.NodeID,
+			ObsID:  resp.ObsID,
+		}
+		if resp.EmbeddingDims > 0 {
+			result.EmbeddingDims = resp.EmbeddingDims
+		}
+		results = append(results, result)
+		successCount++
+	}
+
+	return models.BatchIngestResponse{
+		SpaceID:      req.SpaceID,
+		TotalItems:   len(req.Observations),
+		SuccessCount: successCount,
+		ErrorCount:   errorCount,
+		Results:      results,
+	}, nil
+}
+
 func newID(prefix string) string {
 	b := make([]byte, 10)
 	_, _ = rand.Read(b)

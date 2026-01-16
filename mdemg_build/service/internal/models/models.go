@@ -119,3 +119,42 @@ type GraphContext struct {
 	EdgesTraversed  int `json:"edges_traversed"`
 	MaxLayerReached int `json:"max_layer_reached"`
 }
+
+// BatchIngestRequest - request for batch ingest endpoint
+type BatchIngestRequest struct {
+	SpaceID      string            `json:"space_id"`
+	Observations []BatchIngestItem `json:"observations"`
+}
+
+// BatchIngestItem - single observation in a batch ingest request
+type BatchIngestItem struct {
+	Timestamp   string    `json:"timestamp"`
+	Source      string    `json:"source"`
+	Content     any       `json:"content"`
+	Tags        []string  `json:"tags,omitempty"`
+	NodeID      string    `json:"node_id,omitempty"`
+	Path        string    `json:"path,omitempty"`
+	Name        string    `json:"name,omitempty"`
+	Sensitivity string    `json:"sensitivity,omitempty"`
+	Confidence  *float64  `json:"confidence,omitempty"`
+	Embedding   []float32 `json:"embedding,omitempty"`
+}
+
+// BatchIngestResult - result for a single item in batch ingest
+type BatchIngestResult struct {
+	Index         int    `json:"index"`
+	Status        string `json:"status"` // "success" or "error"
+	NodeID        string `json:"node_id,omitempty"`
+	ObsID         string `json:"obs_id,omitempty"`
+	EmbeddingDims int    `json:"embedding_dims,omitempty"`
+	Error         string `json:"error,omitempty"`
+}
+
+// BatchIngestResponse - response for batch ingest endpoint
+type BatchIngestResponse struct {
+	SpaceID      string              `json:"space_id"`
+	TotalItems   int                 `json:"total_items"`
+	SuccessCount int                 `json:"success_count"`
+	ErrorCount   int                 `json:"error_count"`
+	Results      []BatchIngestResult `json:"results"`
+}

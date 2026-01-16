@@ -119,6 +119,60 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req models.BatchIngestRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+
+	// Validate batch size limit
+	if len(req.Observations) > s.cfg.BatchIngestMaxItems {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": fmt.Sprintf("batch size %d exceeds maximum allowed %d items", len(req.Observations), s.cfg.BatchIngestMaxItems),
+		})
+		return
+	}
+
+	// Generate embeddings for items that don't have them
+	if s.embedder != nil {
+		for i := range req.Observations {
+			if len(req.Observations[i].Embedding) == 0 {
+				textForEmbedding := contentToText(req.Observations[i].Content)
+				if req.Observations[i].Name != "" {
+					textForEmbedding = req.Observations[i].Name + ": " + textForEmbedding
+				}
+				if textForEmbedding != "" {
+					emb, err := s.embedder.Embed(r.Context(), textForEmbedding)
+					if err == nil {
+						req.Observations[i].Embedding = emb
+					}
+					// Embedding errors are non-fatal for batch ingest
+				}
+			}
+		}
+	}
+
+	resp, err := s.retriever.BatchIngestObservations(r.Context(), req)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+
+	// Set appropriate status code based on results
+	statusCode := http.StatusOK
+	if resp.ErrorCount > 0 && resp.SuccessCount > 0 {
+		statusCode = http.StatusMultiStatus // 207 for partial success
+	} else if resp.ErrorCount > 0 && resp.SuccessCount == 0 {
+		statusCode = http.StatusBadRequest // All failed
+	}
+
+	writeJSON(w, statusCode, resp)
+}
+
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)

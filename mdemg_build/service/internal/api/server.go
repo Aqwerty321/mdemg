@@ -75,6 +75,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/ingest", s.handleIngest)
 	mux.HandleFunc("/v1/memory/ingest/batch", s.handleBatchIngest)
 	mux.HandleFunc("/v1/memory/reflect", s.handleReflect)
+	mux.HandleFunc("/v1/memory/stats", s.handleStats)
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
 	return mux
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/anomaly"
@@ -77,6 +78,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/reflect", s.handleReflect)
 	mux.HandleFunc("/v1/memory/stats", s.handleStats)
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
+	mux.HandleFunc("/v1/memory/archive/bulk", s.handleBulkArchive)
+	mux.HandleFunc("/v1/memory/nodes/", s.handleNodeOperation)
 
 	// Wrap mux with logging middleware
 	logCfg := LogConfig{
@@ -84,6 +87,25 @@ func (s *Server) Routes() http.Handler {
 		SkipHealth: s.cfg.LogSkipHealth,
 	}
 	return LoggingMiddleware(mux, logCfg)
+}
+
+// handleNodeOperation routes requests under /v1/memory/nodes/{node_id}/... to the appropriate handler
+// based on the path suffix and HTTP method:
+//   - POST /v1/memory/nodes/{node_id}/archive   -> handleArchiveNode
+//   - POST /v1/memory/nodes/{node_id}/unarchive -> handleUnarchiveNode
+//   - DELETE /v1/memory/nodes/{node_id}         -> handleDeleteNode
+func (s *Server) handleNodeOperation(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+
+	switch {
+	case strings.HasSuffix(path, "/archive"):
+		s.handleArchiveNode(w, r)
+	case strings.HasSuffix(path, "/unarchive"):
+		s.handleUnarchiveNode(w, r)
+	default:
+		// DELETE /v1/memory/nodes/{node_id} - permanent deletion
+		s.handleDeleteNode(w, r)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

@@ -154,7 +154,7 @@ func (s *Service) vectorRecall(ctx context.Context, spaceID string, q []float32,
 		cypher := `WITH $q AS q
 CALL db.index.vector.queryNodes($index, $k, q)
 YIELD node, score
-WHERE node.space_id = $spaceId
+WHERE node.space_id = $spaceId AND NOT coalesce(node.is_archived, false)
 RETURN node.node_id AS node_id,
        node.path AS path,
        node.name AS name,
@@ -232,7 +232,7 @@ func (s *Service) FindSimilarNodes(ctx context.Context, spaceID string, embeddin
 		cypher := `WITH $q AS q
 CALL db.index.vector.queryNodes($index, $k, q)
 YIELD node, score
-WHERE node.space_id = $spaceId AND node.node_id <> $excludeNodeId
+WHERE node.space_id = $spaceId AND node.node_id <> $excludeNodeId AND NOT coalesce(node.is_archived, false)
 RETURN node.node_id AS node_id, score
 ORDER BY score DESC
 LIMIT $k`

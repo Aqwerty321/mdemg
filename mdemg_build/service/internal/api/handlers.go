@@ -450,6 +450,335 @@ func toFloat64Val(v any, def float64) float64 {
 	}
 }
 
+// handleStats returns comprehensive per-space memory statistics
+// GET /v1/memory/stats?space_id={space_id}
+func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse required space_id query parameter
+	spaceID := r.URL.Query().Get("space_id")
+	if spaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query parameter is required"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	resp, err := s.queryStats(ctx, spaceID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// queryStats executes Neo4j queries to gather per-space memory statistics
+func (s *Server) queryStats(ctx context.Context, spaceID string) (models.StatsResponse, error) {
+	// Initialize response with empty maps and slices (avoid nil)
+	resp := models.StatsResponse{
+		SpaceID:              spaceID,
+		MemoriesByLayer:      make(map[int]int64),
+		LearningActivity:     &models.LearningActivity{},
+		TemporalDistribution: &models.TemporalDistribution{},
+		Connectivity:         &models.Connectivity{},
+		ComputedAt:           time.Now().UTC().Format(time.RFC3339),
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"spaceId": spaceID,
+	}
+
+	// Query 1: Memory count and memories by layer
+	_, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE n.space_id = $spaceId
+WITH count(n) AS total, collect(coalesce(n.layer, 0)) AS layers
+RETURN total, layers`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if total, ok := rec.Get("total"); ok {
+				resp.MemoryCount = toInt64(total)
+			}
+			if layers, ok := rec.Get("layers"); ok {
+				if layerList, ok := layers.([]any); ok {
+					for _, l := range layerList {
+						layer := int(toInt64(l))
+						resp.MemoriesByLayer[layer]++
+					}
+				}
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query memory count: %w", err)
+	}
+
+	// Query 2: Observation count
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)-[:HAS_OBSERVATION]->(o:Observation)
+WHERE n.space_id = $spaceId
+RETURN count(o) AS total`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if total, ok := rec.Get("total"); ok {
+				resp.ObservationCount = toInt64(total)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query observation count: %w", err)
+	}
+
+	// Query 3: Embedding coverage
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE n.space_id = $spaceId
+WITH count(n) AS total,
+     sum(CASE WHEN n.embedding IS NOT NULL AND size(n.embedding) > 0 THEN 1 ELSE 0 END) AS with_embedding,
+     avg(CASE WHEN n.embedding IS NOT NULL AND size(n.embedding) > 0 THEN size(n.embedding) ELSE NULL END) AS avg_dims
+RETURN total, with_embedding, avg_dims`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			total, _ := rec.Get("total")
+			withEmb, _ := rec.Get("with_embedding")
+			avgDims, _ := rec.Get("avg_dims")
+
+			totalCount := toInt64(total)
+			withEmbCount := toInt64(withEmb)
+			if totalCount > 0 {
+				resp.EmbeddingCoverage = float64(withEmbCount) / float64(totalCount)
+			}
+			resp.AvgEmbeddingDimensions = int(toFloat64Val(avgDims, 0.0))
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query embedding coverage: %w", err)
+	}
+
+	// Query 4: Learning activity (CO_ACTIVATED_WITH edges)
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (a:MemoryNode)-[r:CO_ACTIVATED_WITH]->(b:MemoryNode)
+WHERE a.space_id = $spaceId AND b.space_id = $spaceId
+RETURN count(r) AS edge_count,
+       avg(coalesce(r.weight, 0.0)) AS avg_weight,
+       max(coalesce(r.weight, 0.0)) AS max_weight`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if cnt, ok := rec.Get("edge_count"); ok {
+				resp.LearningActivity.CoActivatedEdges = toInt64(cnt)
+			}
+			if avgW, ok := rec.Get("avg_weight"); ok {
+				resp.LearningActivity.AvgWeight = toFloat64Val(avgW, 0.0)
+			}
+			if maxW, ok := rec.Get("max_weight"); ok {
+				resp.LearningActivity.MaxWeight = toFloat64Val(maxW, 0.0)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query learning activity: %w", err)
+	}
+
+	// Query 5: Temporal distribution - last 24h
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE n.space_id = $spaceId
+  AND n.created_at >= datetime() - duration('P1D')
+RETURN count(n) AS count_24h`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if cnt, ok := rec.Get("count_24h"); ok {
+				resp.TemporalDistribution.Last24h = toInt64(cnt)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query temporal distribution (24h): %w", err)
+	}
+
+	// Query 6: Temporal distribution - last 7d
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE n.space_id = $spaceId
+  AND n.created_at >= datetime() - duration('P7D')
+RETURN count(n) AS count_7d`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if cnt, ok := rec.Get("count_7d"); ok {
+				resp.TemporalDistribution.Last7d = toInt64(cnt)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query temporal distribution (7d): %w", err)
+	}
+
+	// Query 7: Temporal distribution - last 30d
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE n.space_id = $spaceId
+  AND n.created_at >= datetime() - duration('P30D')
+RETURN count(n) AS count_30d`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if cnt, ok := rec.Get("count_30d"); ok {
+				resp.TemporalDistribution.Last30d = toInt64(cnt)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query temporal distribution (30d): %w", err)
+	}
+
+	// Query 8: Connectivity stats
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE n.space_id = $spaceId
+OPTIONAL MATCH (n)-[r]-()
+WITH n, count(r) AS degree
+RETURN avg(degree) AS avg_degree, max(degree) AS max_degree`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if avgD, ok := rec.Get("avg_degree"); ok {
+				resp.Connectivity.AvgDegree = toFloat64Val(avgD, 0.0)
+			}
+			if maxD, ok := rec.Get("max_degree"); ok {
+				resp.Connectivity.MaxDegree = int(toInt64(maxD))
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query connectivity stats: %w", err)
+	}
+
+	// Query 9: Orphan count (nodes with no edges)
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE n.space_id = $spaceId
+  AND NOT (n)-[]-()
+RETURN count(n) AS orphan_count`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if cnt, ok := rec.Get("orphan_count"); ok {
+				resp.Connectivity.OrphanCount = toInt64(cnt)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query orphan count: %w", err)
+	}
+
+	// Compute health score
+	resp.HealthScore = computeHealthScore(resp)
+
+	return resp, nil
+}
+
+// computeHealthScore calculates a 0.0-1.0 health score based on:
+// - Embedding coverage (40% weight)
+// - Connectivity (30% weight) - penalized for too many orphans
+// - Recency (30% weight) - based on recent activity
+func computeHealthScore(resp models.StatsResponse) float64 {
+	if resp.MemoryCount == 0 {
+		return 0.0
+	}
+
+	// Embedding coverage component (40%)
+	embeddingScore := resp.EmbeddingCoverage * 0.4
+
+	// Connectivity component (30%)
+	// Score based on orphan ratio - lower is better
+	orphanRatio := float64(resp.Connectivity.OrphanCount) / float64(resp.MemoryCount)
+	connectivityScore := (1.0 - orphanRatio) * 0.3
+
+	// Recency component (30%)
+	// Score based on ratio of 7d activity to total
+	var recencyScore float64
+	if resp.MemoryCount > 0 {
+		recentRatio := float64(resp.TemporalDistribution.Last7d) / float64(resp.MemoryCount)
+		// Cap at 1.0 (if all memories are recent)
+		if recentRatio > 1.0 {
+			recentRatio = 1.0
+		}
+		recencyScore = recentRatio * 0.3
+	}
+
+	// Combine scores
+	healthScore := embeddingScore + connectivityScore + recencyScore
+
+	// Ensure result is in 0.0-1.0 range
+	if healthScore < 0.0 {
+		healthScore = 0.0
+	}
+	if healthScore > 1.0 {
+		healthScore = 1.0
+	}
+
+	return healthScore
+}
+
 func (s *Server) handleReflect(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)

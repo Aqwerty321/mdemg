@@ -109,7 +109,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	act := SpreadingActivation(cands, edges, 2, 0.15)
 
 	// 4) Final ranking
-	results := ScoreAndRank(cands, act, edges, topK)
+	results := ScoreAndRank(cands, act, edges, topK, s.cfg)
 
 	resp := models.RetrieveResponse{
 		SpaceID: req.SpaceID,

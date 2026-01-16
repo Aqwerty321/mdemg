@@ -434,3 +434,50 @@ func asFloat64Slice(v any) []float64 {
 	}
 	return nil
 }
+
+// averageEmbeddings computes the centroid (element-wise average) of multiple embedding vectors.
+// Returns nil if embeddings is empty. Skips embeddings with mismatched dimensions.
+func averageEmbeddings(embeddings [][]float64) []float64 {
+	if len(embeddings) == 0 {
+		return nil
+	}
+
+	// Find the first non-nil, non-empty embedding to determine dimensions
+	var dim int
+	for _, emb := range embeddings {
+		if len(emb) > 0 {
+			dim = len(emb)
+			break
+		}
+	}
+	if dim == 0 {
+		return nil
+	}
+
+	result := make([]float64, dim)
+	validCount := 0
+
+	for _, emb := range embeddings {
+		// Skip nil, empty, or mismatched dimension embeddings
+		if len(emb) != dim {
+			continue
+		}
+		for i, v := range emb {
+			result[i] += v
+		}
+		validCount++
+	}
+
+	// If no valid embeddings were found, return nil
+	if validCount == 0 {
+		return nil
+	}
+
+	// Divide by count to get average
+	count := float64(validCount)
+	for i := range result {
+		result[i] /= count
+	}
+
+	return result
+}

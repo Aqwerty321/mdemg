@@ -58,6 +58,15 @@ type Config struct {
 	AnomalyOutlierStdDevs   float64 // Standard deviations for outlier detection (default: 2.0)
 	AnomalyStaleDays        int     // Days after which an update is considered stale (default: 30)
 	AnomalyMaxCheckMs       int     // Maximum time for anomaly checks in ms (default: 100)
+
+	// Scoring hyperparameters for retrieval ranking
+	ScoringAlpha float64 // Vector similarity weight (default: 0.55)
+	ScoringBeta  float64 // Activation weight (default: 0.30)
+	ScoringGamma float64 // Recency weight (default: 0.10)
+	ScoringDelta float64 // Confidence weight (default: 0.05)
+	ScoringPhi   float64 // Hub penalty coefficient (default: 0.08)
+	ScoringKappa float64 // Redundancy penalty coefficient (default: 0.12)
+	ScoringRho   float64 // Recency decay rate per day (default: 0.05)
 }
 
 func FromEnv() (Config, error) {

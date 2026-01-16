@@ -118,6 +118,50 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse optional space_id query parameter
+	spaceID := r.URL.Query().Get("space_id")
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	// Execute metrics queries
+	resp, err := s.queryMetrics(ctx, spaceID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// queryMetrics executes Neo4j queries to gather graph metrics
+func (s *Server) queryMetrics(ctx context.Context, spaceID string) (models.MetricsResponse, error) {
+	// Initialize response with empty maps and slices (avoid nil)
+	resp := models.MetricsResponse{
+		NodesByLayer:   make(map[int]int64),
+		EdgesByType:    make(map[string]int64),
+		HubNodes:       []models.HubNode{},
+		RecentActivity: &models.ActivityStats{},
+	}
+
+	// Convert empty string to nil for Cypher NULL handling
+	var spaceParam any
+	if spaceID != "" {
+		spaceParam = spaceID
+	}
+	_ = spaceParam // Will be used in subsequent subtasks for Neo4j queries
+
+	// TODO: Neo4j queries will be added in subtasks 3-2, 3-3, 3-4
+
+	return resp, nil
+}
+
 // contentToText converts the content field to a string for embedding
 func contentToText(content any) string {
 	switch v := content.(type) {

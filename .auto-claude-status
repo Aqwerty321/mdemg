@@ -1,17 +1,17 @@
 {
   "active": true,
-  "spec": "003-implement-edge-weight-decay-cli-command",
+  "spec": "006-add-get-v1-metrics-endpoint-for-graph-health",
   "state": "building",
   "subtasks": {
     "completed": 2,
-    "total": 7,
+    "total": 9,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "CLI Implementation",
+    "current": "Handler Implementation",
     "id": null,
-    "total": 5
+    "total": 4
   },
   "workers": {
     "active": 0,
@@ -19,7 +19,7 @@
   },
   "session": {
     "number": 3,
-    "started_at": "2026-01-16T11:53:51.861206"
+    "started_at": "2026-01-16T13:07:17.416180"
   },
-  "last_update": "2026-01-16T11:57:17.559808"
+  "last_update": "2026-01-16T13:09:34.388057"
 }

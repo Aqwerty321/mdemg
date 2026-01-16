@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"time"
 
@@ -133,6 +134,12 @@ type Candidate struct {
 	VectorSim float64
 }
 
+// SimilarNode represents a node returned from vector similarity search
+type SimilarNode struct {
+	NodeID string
+	Score  float64
+}
+
 func (s *Service) vectorRecall(ctx context.Context, spaceID string, q []float32, k int) ([]Candidate, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
@@ -197,6 +204,110 @@ ORDER BY score DESC`
 		return nil, err
 	}
 	return outAny.([]Candidate), nil
+}
+
+// FindSimilarNodes queries the vector index for nodes similar to the provided embedding,
+// excluding the specified node (self-match). Used for semantic edge creation on ingest.
+func (s *Service) FindSimilarNodes(ctx context.Context, spaceID string, embedding []float32, excludeNodeID string, topN int) ([]SimilarNode, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Use a larger k value to account for cross-space filtering.
+	// The vector index returns top-k across ALL spaces, then we filter by space_id.
+	// Using DefaultCandidateK ensures we have enough candidates after filtering.
+	queryK := s.cfg.DefaultCandidateK
+	if queryK < topN+1 {
+		queryK = topN + 1
+	}
+
+	params := map[string]any{
+		"spaceId":       spaceID,
+		"k":             queryK,
+		"q":             embedding,
+		"index":         s.cfg.VectorIndexName,
+		"excludeNodeId": excludeNodeID,
+	}
+
+	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `WITH $q AS q
+CALL db.index.vector.queryNodes($index, $k, q)
+YIELD node, score
+WHERE node.space_id = $spaceId AND node.node_id <> $excludeNodeId
+RETURN node.node_id AS node_id, score
+ORDER BY score DESC
+LIMIT $k`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		results := make([]SimilarNode, 0, topN)
+		for res.Next(ctx) {
+			rec := res.Record()
+			nid, _ := rec.Get("node_id")
+			sc, _ := rec.Get("score")
+
+			sn := SimilarNode{
+				NodeID: fmt.Sprint(nid),
+				Score:  toFloat64(sc, 0),
+			}
+			results = append(results, sn)
+			// Stop after topN results
+			if len(results) >= topN {
+				break
+			}
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return results, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return outAny.([]SimilarNode), nil
+}
+
+// CreateAssociatedWithEdge creates or updates an ASSOCIATED_WITH edge between two nodes.
+// Uses MERGE to avoid duplicates. On create, sets initial weight from config.
+// On match, increments weight and evidence_count.
+func (s *Service) CreateAssociatedWithEdge(ctx context.Context, spaceID, fromNodeID, toNodeID string, similarityScore float64) error {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"spaceId":         spaceID,
+		"fromNodeId":      fromNodeID,
+		"toNodeId":        toNodeID,
+		"initialWeight":   s.cfg.SemanticEdgeInitialWeight,
+		"similarityScore": similarityScore,
+	}
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `MATCH (a:MemoryNode {space_id:$spaceId, node_id:$fromNodeId})
+MATCH (b:MemoryNode {space_id:$spaceId, node_id:$toNodeId})
+MERGE (a)-[r:ASSOCIATED_WITH]->(b)
+ON CREATE SET
+    r.edge_id = randomUUID(),
+    r.space_id = $spaceId,
+    r.weight = $initialWeight,
+    r.dim_semantic = $similarityScore,
+    r.evidence_count = 1,
+    r.status = 'active',
+    r.created_at = datetime(),
+    r.updated_at = datetime()
+ON MATCH SET
+    r.weight = CASE WHEN r.weight + ($similarityScore * 0.1) > 1.0 THEN 1.0 ELSE r.weight + ($similarityScore * 0.1) END,
+    r.evidence_count = r.evidence_count + 1,
+    r.updated_at = datetime()`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		// Consume the result
+		_, err = res.Consume(ctx)
+		return nil, err
+	})
+	return err
 }
 
 type Edge struct {
@@ -426,6 +537,25 @@ RETURN n.node_id AS node_id`
 	})
 	if err != nil {
 		return models.IngestResponse{}, err
+	}
+
+	// Semantic edge creation: link to similar existing nodes
+	if s.cfg.SemanticEdgeOnIngest && len(req.Embedding) > 0 {
+		similarNodes, findErr := s.FindSimilarNodes(ctx, req.SpaceID, req.Embedding, nodeID, s.cfg.SemanticEdgeTopN)
+		if findErr != nil {
+			// Log warning but don't fail the ingest
+			log.Printf("WARN: FindSimilarNodes failed for node %s: %v", nodeID, findErr)
+		} else {
+			for _, sn := range similarNodes {
+				if sn.Score >= s.cfg.SemanticEdgeMinSimilarity {
+					edgeErr := s.CreateAssociatedWithEdge(ctx, req.SpaceID, nodeID, sn.NodeID, sn.Score)
+					if edgeErr != nil {
+						// Log warning but don't fail the ingest
+						log.Printf("WARN: CreateAssociatedWithEdge failed from %s to %s: %v", nodeID, sn.NodeID, edgeErr)
+					}
+				}
+			}
+		}
 	}
 
 	return models.IngestResponse{SpaceID: req.SpaceID, NodeID: nodeID, ObsID: obsID}, nil

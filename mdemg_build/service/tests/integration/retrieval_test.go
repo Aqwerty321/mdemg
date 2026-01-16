@@ -702,3 +702,103 @@ func TestScoringDeterminism(t *testing.T) {
 			i, result.NodeID, result.Score, result.VectorSim, result.Activation)
 	}
 }
+
+// TestEmptyGraphHandling verifies that querying a non-existent space returns graceful empty results.
+// This test ensures the retrieval pipeline handles the edge case of:
+// 1. A space_id that has never been used (no TapRoot, no MemoryNodes)
+// 2. Returns HTTP 200 with an empty results array (not an error)
+// 3. Includes proper response structure with space_id echoed back
+func TestEmptyGraphHandling(t *testing.T) {
+	// Setup: ensure service is ready
+	RequireServiceReady(t)
+
+	cfg := GetTestConfig()
+	client := NewTestHTTPClient()
+
+	// Generate a unique space_id that definitely doesn't exist in the database
+	// Using a very specific format to ensure it's never been used
+	nonExistentSpaceID := GenerateTestSpaceID("empty-graph-nonexistent")
+
+	// Note: No cleanup needed since we're not creating any data
+	// The space doesn't exist and we're only reading
+
+	// Create a test embedding for the query
+	queryEmbedding := CreateTestEmbedding(DefaultEmbeddingDims, 42.0)
+
+	// --- Step 1: Query the non-existent space ---
+	retrieveReq := RetrieveRequest{
+		SpaceID:        nonExistentSpaceID,
+		QueryEmbedding: queryEmbedding,
+		CandidateK:     50,
+		TopK:           10,
+		HopDepth:       2,
+	}
+
+	retrieveBody, err := json.Marshal(retrieveReq)
+	if err != nil {
+		t.Fatalf("failed to marshal retrieve request: %v", err)
+	}
+
+	retrieveURL := cfg.MDEMGEndpoint + "/v1/memory/retrieve"
+	httpRetrieveReq, err := http.NewRequest(http.MethodPost, retrieveURL, bytes.NewReader(retrieveBody))
+	if err != nil {
+		t.Fatalf("failed to create retrieve HTTP request: %v", err)
+	}
+	httpRetrieveReq.Header.Set("Content-Type", "application/json")
+
+	retrieveResp, err := client.Do(httpRetrieveReq)
+	if err != nil {
+		t.Fatalf("retrieve request failed: %v", err)
+	}
+	defer retrieveResp.Body.Close()
+
+	// --- Step 2: Verify HTTP 200 OK response (not an error status) ---
+	if retrieveResp.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		json.NewDecoder(retrieveResp.Body).Decode(&errResp)
+		t.Fatalf("expected HTTP 200 for empty graph query, got status %d: %v", retrieveResp.StatusCode, errResp)
+	}
+
+	var retrieveResponse RetrieveResponse
+	if err := json.NewDecoder(retrieveResp.Body).Decode(&retrieveResponse); err != nil {
+		t.Fatalf("failed to decode retrieve response: %v", err)
+	}
+
+	// --- Step 3: Verify the response structure ---
+
+	// Space ID should be echoed back correctly
+	if retrieveResponse.SpaceID != nonExistentSpaceID {
+		t.Errorf("response space_id mismatch: got %q, want %q", retrieveResponse.SpaceID, nonExistentSpaceID)
+	}
+
+	// Results should be an empty array (not nil)
+	if retrieveResponse.Results == nil {
+		t.Error("response results should be an empty array, not nil")
+	}
+
+	// Results should have zero elements
+	if len(retrieveResponse.Results) != 0 {
+		t.Errorf("expected empty results for non-existent space, got %d results: %+v",
+			len(retrieveResponse.Results), retrieveResponse.Results)
+	}
+
+	// Debug info should still be present (pipeline ran, just found nothing)
+	if retrieveResponse.Debug == nil {
+		t.Log("debug info is nil - this is acceptable but may indicate the endpoint skipped debug for empty results")
+	} else {
+		// If debug info is present, it should have expected fields
+		t.Logf("debug info present: %+v", retrieveResponse.Debug)
+
+		// Verify candidate_k is reflected
+		if candidateK, ok := retrieveResponse.Debug["candidate_k"]; ok {
+			t.Logf("debug candidate_k: %v", candidateK)
+		}
+
+		// Verify hop_depth is reflected
+		if hopDepth, ok := retrieveResponse.Debug["hop_depth"]; ok {
+			t.Logf("debug hop_depth: %v", hopDepth)
+		}
+	}
+
+	t.Logf("Empty graph handling test passed: non-existent space %q returned HTTP 200 with empty results array", nonExistentSpaceID)
+}

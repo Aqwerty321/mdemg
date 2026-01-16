@@ -685,6 +685,120 @@ RETURN n.node_id AS node_id,
 	writeJSON(w, http.StatusOK, result)
 }
 
+// handleBulkArchive handles POST /v1/memory/archive/bulk
+// Archives multiple memory nodes in a single request with partial success support
+func (s *Server) handleBulkArchive(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req models.BulkArchiveRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+
+	// Validate non-empty node_ids array
+	if len(req.NodeIDs) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": "node_ids array cannot be empty",
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Process each node
+	results := make([]models.BulkArchiveResult, 0, len(req.NodeIDs))
+	var successCount, errorCount int
+
+	for _, nodeID := range req.NodeIDs {
+		params := map[string]any{
+			"nodeId": nodeID,
+			"reason": req.Reason,
+		}
+
+		// Execute archive operation for this node
+		result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			cypher := `
+MATCH (n:MemoryNode {node_id: $nodeId})
+SET n.is_archived = true,
+    n.archived_at = datetime(),
+    n.archive_reason = $reason
+RETURN n.node_id AS node_id, n.archived_at AS archived_at`
+			res, err := tx.Run(ctx, cypher, params)
+			if err != nil {
+				return nil, err
+			}
+			if res.Next(ctx) {
+				rec := res.Record()
+				archivedAtVal, _ := rec.Get("archived_at")
+
+				// Convert archived_at to ISO string
+				var archivedAtStr string
+				if at, ok := archivedAtVal.(neo4j.LocalDateTime); ok {
+					archivedAtStr = at.Time().Format(time.RFC3339)
+				} else if at, ok := archivedAtVal.(time.Time); ok {
+					archivedAtStr = at.Format(time.RFC3339)
+				} else {
+					archivedAtStr = fmt.Sprint(archivedAtVal)
+				}
+
+				return archivedAtStr, nil
+			}
+			if err := res.Err(); err != nil {
+				return nil, err
+			}
+			// Node not found
+			return nil, nil
+		})
+
+		if err != nil {
+			results = append(results, models.BulkArchiveResult{
+				NodeID: nodeID,
+				Status: "error",
+				Error:  err.Error(),
+			})
+			errorCount++
+		} else if result == nil {
+			results = append(results, models.BulkArchiveResult{
+				NodeID: nodeID,
+				Status: "error",
+				Error:  "node not found",
+			})
+			errorCount++
+		} else {
+			results = append(results, models.BulkArchiveResult{
+				NodeID:     nodeID,
+				Status:     "success",
+				ArchivedAt: result.(string),
+			})
+			successCount++
+		}
+	}
+
+	resp := models.BulkArchiveResponse{
+		SpaceID:      req.SpaceID,
+		TotalItems:   len(req.NodeIDs),
+		SuccessCount: successCount,
+		ErrorCount:   errorCount,
+		Results:      results,
+	}
+
+	// Set appropriate status code based on results
+	statusCode := http.StatusOK
+	if errorCount > 0 && successCount > 0 {
+		statusCode = http.StatusMultiStatus // 207 for partial success
+	} else if errorCount > 0 && successCount == 0 {
+		statusCode = http.StatusBadRequest // All failed
+	}
+
+	writeJSON(w, statusCode, resp)
+}
+
 // handleDeleteNode handles DELETE /v1/memory/nodes/{node_id}
 // Hard-deletes a memory node (DETACH DELETE) with safety checks
 func (s *Server) handleDeleteNode(w http.ResponseWriter, r *http.Request) {

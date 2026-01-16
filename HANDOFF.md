@@ -1,7 +1,7 @@
 # MDEMG Development Handoff Document
 
 **Date:** 2026-01-16
-**Status:** Core Features Complete - 8 Tasks Merged (PRs #1-7 + Task 7)
+**Status:** Core Features Complete - 9 Tasks Merged (PRs #1-7 + Tasks 7-9)
 
 > **Vision Document:** See [VISION.md](./VISION.md) for the complete architectural philosophy and design principles.
 
@@ -39,11 +39,12 @@
 - ✅ **Integration Tests** - Comprehensive test suite for retrieval pipeline (PR #3)
 - ✅ **Batch Ingest Endpoint** - `POST /v1/memory/ingest/batch` for bulk imports (Task 7)
 - ✅ **Reflection Endpoint** - `POST /v1/memory/reflect` for deep context exploration (Task 8, PR #7)
+- ✅ **Anomaly Detection** - Non-blocking duplicate/stale detection on ingest (Task 9)
 
 ### What's Next (Priority Order)
-1. **Anomaly Detection** - Non-blocking contradiction detection on ingest (Task 9) - Auto-Claude at human review
-2. **Golden Test for Scoring** - Comprehensive tests implemented, currently in progress (`scoring_golden_test.go`)
-3. **Use the system!** - The more memories stored, the more emergent behaviors appear
+1. **Use the system!** - The more memories stored, the more emergent behaviors appear
+2. **Graph pruning** - Remove weak/deprecated edges, merge redundant nodes
+3. **Proactive surfacing** - Context suggestions, anomaly alerts
 
 ### Key Commands
 ```bash
@@ -91,7 +92,7 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
 | **Embedding generation** | `internal/embeddings/` package with OpenAI and Ollama providers |
 | **End-to-end retrieval** | Tested with Ollama `nomic-embed-text` model |
 
-### 🆕 New in This Session (2026-01-16) - 8 Tasks Merged
+### 🆕 New in This Session (2026-01-16) - 9 Tasks Merged
 
 | PR/Task | Feature | Files Added/Modified |
 |---------|---------|---------------------|
@@ -103,6 +104,7 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
 | #6 | **Semantic Edges on Ingest** | Auto-creates ASSOCIATED_WITH edges (182 lines) |
 | Task 7 | **Batch Ingest Endpoint** | `POST /v1/memory/ingest/batch` - bulk imports up to 100 items |
 | #7 | **Reflection Endpoint** | `POST /v1/memory/reflect` - `internal/retrieval/reflection.go`, tests |
+| Task 9 | **Anomaly Detection** | `internal/anomaly/` - non-blocking duplicate/stale detection (783 lines) |
 
 **Key Implementations:**
 
@@ -139,6 +141,12 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
    - Stage 2: EXPAND - Lateral traversal via CO_ACTIVATED_WITH/ASSOCIATED_WITH
    - Stage 3: ABSTRACT - Upward traversal via ABSTRACTS_TO
    - Insight generation: clusters, patterns, knowledge gaps
+
+8. **Anomaly Detection** (`internal/anomaly/`)
+   - Non-blocking detection during ingest (100ms timeout)
+   - Duplicate detection: vector similarity > 0.95
+   - Stale update detection: nodes not modified in 30+ days
+   - Configurable via ANOMALY_* environment variables
 
 ---
 
@@ -254,14 +262,12 @@ The MCP server is configured in `~/.cursor/mcp.json`:
   - Insight generation: cluster detection, pattern identification, knowledge gaps
   - Comprehensive unit and integration tests
   - `internal/retrieval/reflection.go`, `internal/api/handlers.go`
-
-### Priority 1: Anomaly Detection (In Progress)
-- [🟡] **Anomaly Detection Service** (Task 9) - Auto-Claude at human review stage
-  - Non-blocking contradiction detection on ingest
-  - Duplicate detection (similarity > 0.95)
-  - Outlier detection, stale update warnings
-  - Returns warnings without blocking ingest
-  - Implementation plan ready for review at `.auto-claude/specs/010-09-implement-non-blocking-anomaly-detection-on-ing/`
+- [x] **Anomaly Detection Service** (Task 9)
+  - Non-blocking detection during ingest (100ms timeout)
+  - Duplicate detection: vector similarity > 0.95
+  - Stale update detection: nodes not modified in 30+ days
+  - `internal/anomaly/types.go`, `internal/anomaly/service.go`, unit tests
+  - Integration test: `TestIngestAnomalyDuplicateDetection`
 
 ### Priority 2: Testing & Validation
 - [x] **Golden tests for scoring** - Complete at `tests/integration/scoring_golden_test.go`
@@ -307,6 +313,9 @@ The MCP server is configured in `~/.cursor/mcp.json`:
 | `internal/retrieval/reflection_test.go` | Reflection unit tests |
 | `internal/learning/service.go` | Hebbian learning (ApplyCoactivation) |
 | `internal/learning/service_test.go` | Learning unit tests (NEW) |
+| `internal/anomaly/types.go` | Anomaly detection types and config (NEW) |
+| `internal/anomaly/service.go` | Anomaly detection logic (NEW) |
+| `internal/anomaly/service_test.go` | Anomaly unit tests (NEW) |
 | `internal/models/models.go` | Request/response types |
 | `tests/integration/` | Integration test suite (NEW) |
 
@@ -352,6 +361,13 @@ LISTEN_ADDR=:8082
 
 # Batch ingest
 BATCH_INGEST_MAX_ITEMS=100         # Max observations per batch request (1-1000)
+
+# Anomaly detection
+ANOMALY_DETECTION_ENABLED=true     # Enable/disable anomaly detection
+ANOMALY_DUPLICATE_THRESHOLD=0.95   # Vector similarity threshold for duplicates
+ANOMALY_OUTLIER_STDDEVS=2.0        # Std devs for outlier detection
+ANOMALY_STALE_DAYS=30              # Days after which update is stale
+ANOMALY_MAX_CHECK_MS=100           # Timeout for anomaly checks
 
 # Embedding Provider
 EMBEDDING_PROVIDER=ollama          # "openai" or "ollama" or "" (disabled)
@@ -437,12 +453,13 @@ OLLAMA_MODEL=nomic-embed-text
 - Add `handleReflect` to `internal/api/handlers.go`
 - Multi-hop traversal, abstraction surfacing, insight generation
 
-### Task 9: Anomaly Detection Service
+### Task 9: Anomaly Detection Service ✅ COMPLETE
 
 **Implementation:**
-- Create `internal/anomaly/service.go`
-- Non-blocking detection during ingest
-- Types: contradiction, duplicate, outlier, stale_update
+- `internal/anomaly/types.go` - Config, DetectionContext, Service types
+- `internal/anomaly/service.go` - Duplicate and stale update detection
+- `internal/anomaly/service_test.go` - Unit tests (10 tests)
+- Integration test: `TestIngestAnomalyDuplicateDetection`
 
 ### Observing Emergent Behaviors
 

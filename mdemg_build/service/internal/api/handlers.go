@@ -220,8 +220,85 @@ RETURN type(r) AS rel_type, count(r) AS cnt`
 		return resp, fmt.Errorf("failed to query edge metrics: %w", err)
 	}
 
-	// TODO: Hub nodes, orphan nodes, avg edge weight, and recent activity
-	// will be added in subtasks 3-3, 3-4
+	// Query 3: Hub nodes (top 10 by degree)
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE $spaceId IS NULL OR n.space_id = $spaceId
+OPTIONAL MATCH (n)-[r]-()
+WITH n, count(r) AS degree
+ORDER BY degree DESC
+LIMIT 10
+RETURN n.node_id AS node_id, coalesce(n.name, n.node_id) AS name, degree`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("node_id")
+			name, _ := rec.Get("name")
+			degree, _ := rec.Get("degree")
+			if nodeID != nil {
+				resp.HubNodes = append(resp.HubNodes, models.HubNode{
+					NodeID: fmt.Sprint(nodeID),
+					Name:   fmt.Sprint(name),
+					Degree: int(toInt64(degree)),
+				})
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query hub nodes: %w", err)
+	}
+
+	// Query 4: Orphan nodes (nodes with no edges)
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE ($spaceId IS NULL OR n.space_id = $spaceId)
+  AND NOT (n)-[]-()
+RETURN count(n) AS orphan_count`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if cnt, ok := rec.Get("orphan_count"); ok {
+				resp.OrphanNodes = toInt64(cnt)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query orphan nodes: %w", err)
+	}
+
+	// Query 5: Average edge weight
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (a:MemoryNode)-[r]->(b:MemoryNode)
+WHERE $spaceId IS NULL OR (a.space_id = $spaceId AND b.space_id = $spaceId)
+RETURN avg(coalesce(r.weight, 0.0)) AS avg_weight`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if avgW, ok := rec.Get("avg_weight"); ok {
+				resp.AvgEdgeWeight = toFloat64Val(avgW, 0.0)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query avg edge weight: %w", err)
+	}
+
+	// TODO: Recent activity will be added in subtask 3-4
 
 	return resp, nil
 }
@@ -239,6 +316,22 @@ func toInt64(v any) int64 {
 		return int64(x)
 	default:
 		return 0
+	}
+}
+
+// toFloat64Val converts various Neo4j numeric types to float64 with default
+func toFloat64Val(v any, def float64) float64 {
+	switch x := v.(type) {
+	case float64:
+		return x
+	case float32:
+		return float64(x)
+	case int64:
+		return float64(x)
+	case int:
+		return float64(x)
+	default:
+		return def
 	}
 }
 

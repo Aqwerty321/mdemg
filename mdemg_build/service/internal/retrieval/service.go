@@ -133,6 +133,12 @@ type Candidate struct {
 	VectorSim float64
 }
 
+// SimilarNode represents a node returned from vector similarity search
+type SimilarNode struct {
+	NodeID string
+	Score  float64
+}
+
 func (s *Service) vectorRecall(ctx context.Context, spaceID string, q []float32, k int) ([]Candidate, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
@@ -197,6 +203,60 @@ ORDER BY score DESC`
 		return nil, err
 	}
 	return outAny.([]Candidate), nil
+}
+
+// FindSimilarNodes queries the vector index for nodes similar to the provided embedding,
+// excluding the specified node (self-match). Used for semantic edge creation on ingest.
+func (s *Service) FindSimilarNodes(ctx context.Context, spaceID string, embedding []float32, excludeNodeID string, topN int) ([]SimilarNode, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Query for topN+1 to account for potential self-match that we'll filter out
+	params := map[string]any{
+		"spaceId":       spaceID,
+		"k":             topN + 1,
+		"q":             embedding,
+		"index":         s.cfg.VectorIndexName,
+		"excludeNodeId": excludeNodeID,
+	}
+
+	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `WITH $q AS q
+CALL db.index.vector.queryNodes($index, $k, q)
+YIELD node, score
+WHERE node.space_id = $spaceId AND node.node_id <> $excludeNodeId
+RETURN node.node_id AS node_id, score
+ORDER BY score DESC
+LIMIT $k`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		results := make([]SimilarNode, 0, topN)
+		for res.Next(ctx) {
+			rec := res.Record()
+			nid, _ := rec.Get("node_id")
+			sc, _ := rec.Get("score")
+
+			sn := SimilarNode{
+				NodeID: fmt.Sprint(nid),
+				Score:  toFloat64(sc, 0),
+			}
+			results = append(results, sn)
+			// Stop after topN results
+			if len(results) >= topN {
+				break
+			}
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return results, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return outAny.([]SimilarNode), nil
 }
 
 type Edge struct {

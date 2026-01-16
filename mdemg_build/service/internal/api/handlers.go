@@ -298,7 +298,54 @@ RETURN avg(coalesce(r.weight, 0.0)) AS avg_weight`
 		return resp, fmt.Errorf("failed to query avg edge weight: %w", err)
 	}
 
-	// TODO: Recent activity will be added in subtask 3-4
+	// Query 6: Recent activity (24h window) - nodes created
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE ($spaceId IS NULL OR n.space_id = $spaceId)
+  AND n.created_at >= datetime() - duration('P1D')
+RETURN count(n) AS nodes_created`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if cnt, ok := rec.Get("nodes_created"); ok {
+				resp.RecentActivity.NodesCreated = toInt64(cnt)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query recent nodes: %w", err)
+	}
+
+	// Query 7: Recent activity (24h window) - edges created
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (a:MemoryNode)-[r]->(b:MemoryNode)
+WHERE ($spaceId IS NULL OR (a.space_id = $spaceId AND b.space_id = $spaceId))
+  AND r.created_at >= datetime() - duration('P1D')
+RETURN count(r) AS edges_created`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if cnt, ok := rec.Get("edges_created"); ok {
+				resp.RecentActivity.EdgesCreated = toInt64(cnt)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query recent edges: %w", err)
+	}
+
+	// Note: Retrievals cannot be tracked from Neo4j as retrieval counts
+	// are not persisted to the database (per design: no per-request writes)
 
 	return resp, nil
 }

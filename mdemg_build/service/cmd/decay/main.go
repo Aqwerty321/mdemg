@@ -9,9 +9,22 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
+
+// edge represents a relationship in the graph for decay processing
+type edge struct {
+	ID            int64
+	RelType       string
+	SourceID      string
+	TargetID      string
+	Weight        float64
+	EvidenceCount int
+	Pinned        bool
+	LastActivated time.Time
+}
 
 // decayConfig holds CLI and environment configuration for the decay job
 type decayConfig struct {
@@ -161,6 +174,155 @@ func printHeader(cfg decayConfig) {
 	fmt.Printf("Decay rate: %g\n", cfg.DecayRate)
 	fmt.Printf("Prune threshold: %g\n", cfg.PruneThreshold)
 	fmt.Printf("Min evidence to keep: %d\n", cfg.MinEvidence)
+}
+
+// queryEdgeBatch fetches a batch of edges from Neo4j for decay processing.
+// It filters by space_id (optional) and age threshold (older than N days).
+func queryEdgeBatch(ctx context.Context, driver neo4j.DriverWithContext, cfg decayConfig, offset int) ([]edge, error) {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Build the Cypher query with optional space filtering
+	// Note: We use updated_at as fallback if last_activated_at is not present
+	cypher := `
+MATCH (a:MemoryNode)-[r]->(b:MemoryNode)
+WHERE (r.last_activated_at IS NOT NULL AND r.last_activated_at < datetime() - duration({days: $olderThan}))
+   OR (r.last_activated_at IS NULL AND r.updated_at IS NOT NULL AND r.updated_at < datetime() - duration({days: $olderThan}))
+WITH a, b, r
+WHERE $spaceId = '' OR r.space_id = $spaceId
+RETURN id(r) AS edgeId,
+       type(r) AS relType,
+       a.node_id AS sourceId,
+       b.node_id AS targetId,
+       coalesce(r.weight, 0.0) AS weight,
+       coalesce(r.evidence_count, 0) AS evidence,
+       coalesce(r.pinned, false) AS pinned,
+       coalesce(r.last_activated_at, r.updated_at, r.created_at) AS lastActivated
+ORDER BY lastActivated ASC
+SKIP $offset
+LIMIT $batchSize`
+
+	params := map[string]any{
+		"olderThan": cfg.OlderThanDays,
+		"spaceId":   cfg.SpaceID,
+		"offset":    offset,
+		"batchSize": cfg.BatchSize,
+	}
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		edges := make([]edge, 0)
+		for res.Next(ctx) {
+			rec := res.Record()
+
+			edgeID, _ := rec.Get("edgeId")
+			relType, _ := rec.Get("relType")
+			sourceID, _ := rec.Get("sourceId")
+			targetID, _ := rec.Get("targetId")
+			weight, _ := rec.Get("weight")
+			evidence, _ := rec.Get("evidence")
+			pinned, _ := rec.Get("pinned")
+			lastActivated, _ := rec.Get("lastActivated")
+
+			e := edge{
+				ID:            edgeID.(int64),
+				RelType:       relType.(string),
+				SourceID:      asString(sourceID),
+				TargetID:      asString(targetID),
+				Weight:        asFloat64(weight),
+				EvidenceCount: asInt(evidence),
+				Pinned:        asBool(pinned),
+				LastActivated: asTime(lastActivated),
+			}
+			edges = append(edges, e)
+		}
+
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return edges, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]edge), nil
+}
+
+// asString safely converts interface{} to string
+func asString(v any) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return fmt.Sprintf("%v", v)
+}
+
+// asFloat64 safely converts interface{} to float64
+func asFloat64(v any) float64 {
+	if v == nil {
+		return 0.0
+	}
+	switch n := v.(type) {
+	case float64:
+		return n
+	case int64:
+		return float64(n)
+	case int:
+		return float64(n)
+	default:
+		return 0.0
+	}
+}
+
+// asInt safely converts interface{} to int
+func asInt(v any) int {
+	if v == nil {
+		return 0
+	}
+	switch n := v.(type) {
+	case int64:
+		return int(n)
+	case int:
+		return n
+	case float64:
+		return int(n)
+	default:
+		return 0
+	}
+}
+
+// asBool safely converts interface{} to bool
+func asBool(v any) bool {
+	if v == nil {
+		return false
+	}
+	if b, ok := v.(bool); ok {
+		return b
+	}
+	return false
+}
+
+// asTime safely converts interface{} to time.Time
+func asTime(v any) time.Time {
+	if v == nil {
+		return time.Time{}
+	}
+	// Neo4j returns datetime as neo4j.Time or time.Time depending on driver version
+	if t, ok := v.(time.Time); ok {
+		return t
+	}
+	// Handle neo4j.LocalDateTime and similar types that have Time() method
+	if dt, ok := v.(interface{ Time() time.Time }); ok {
+		return dt.Time()
+	}
+	return time.Time{}
 }
 
 // atoi is a helper for parsing environment variables as integers

@@ -1,7 +1,7 @@
 # MDEMG Development Handoff Document
 
 **Date:** 2026-01-16
-**Status:** Core Features Complete - 6 PRs Merged Today
+**Status:** Core Features Complete - 8 Tasks Merged (PRs #1-7 + Task 7)
 
 > **Vision Document:** See [VISION.md](./VISION.md) for the complete architectural philosophy and design principles.
 
@@ -38,10 +38,11 @@
 - ✅ **Metrics Endpoint** - `GET /v1/metrics` for graph health monitoring (PR #4)
 - ✅ **Integration Tests** - Comprehensive test suite for retrieval pipeline (PR #3)
 - ✅ **Batch Ingest Endpoint** - `POST /v1/memory/ingest/batch` for bulk imports (Task 7)
+- ✅ **Reflection Endpoint** - `POST /v1/memory/reflect` for deep context exploration (Task 8, PR #7)
 
 ### What's Next (Priority Order)
-1. **Reflection Endpoint** - `POST /v1/memory/reflect` for deep context exploration (Task 8)
-2. **Anomaly Detection** - Non-blocking contradiction detection on ingest (Task 9)
+1. **Anomaly Detection** - Non-blocking contradiction detection on ingest (Task 9) - Auto-Claude at human review
+2. **Golden Test for Scoring** - Comprehensive tests implemented, currently in progress (`scoring_golden_test.go`)
 3. **Use the system!** - The more memories stored, the more emergent behaviors appear
 
 ### Key Commands
@@ -90,16 +91,18 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
 | **Embedding generation** | `internal/embeddings/` package with OpenAI and Ollama providers |
 | **End-to-end retrieval** | Tested with Ollama `nomic-embed-text` model |
 
-### 🆕 New in This Session (2026-01-16) - 6 PRs Merged
+### 🆕 New in This Session (2026-01-16) - 8 Tasks Merged
 
-| PR | Feature | Files Added/Modified |
-|----|---------|---------------------|
+| PR/Task | Feature | Files Added/Modified |
+|---------|---------|---------------------|
 | #1 | **Edge Weight Decay CLI** | `cmd/decay/main.go` (617 lines), tests (443 lines) |
 | #2 | **Hebbian Learning Loop** | `internal/learning/service.go`, unit + integration tests (2079 lines) |
 | #3 | **Integration Tests** | `tests/integration/` - helpers, ingest, retrieval (1754 lines) |
 | #4 | **Graph Health Metrics** | `GET /v1/metrics` endpoint, handler tests (570 lines) |
 | #5 | **Consolidation CLI** | `cmd/consolidate/main.go` (760 lines), tests (829 lines) |
 | #6 | **Semantic Edges on Ingest** | Auto-creates ASSOCIATED_WITH edges (182 lines) |
+| Task 7 | **Batch Ingest Endpoint** | `POST /v1/memory/ingest/batch` - bulk imports up to 100 items |
+| #7 | **Reflection Endpoint** | `POST /v1/memory/reflect` - `internal/retrieval/reflection.go`, tests |
 
 **Key Implementations:**
 
@@ -125,6 +128,17 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
 5. **Metrics Endpoint** (`GET /v1/metrics`)
    - Node/edge counts, distribution by layer/type
    - Hub nodes, orphan count, avg edge weight, 24h activity
+
+6. **Batch Ingest** (`POST /v1/memory/ingest/batch`)
+   - Bulk ingest up to 100 observations per request
+   - Partial success with HTTP 207 Multi-Status
+   - Configurable: BATCH_INGEST_MAX_ITEMS=100
+
+7. **Reflection Endpoint** (`POST /v1/memory/reflect`)
+   - Stage 1: SEED - Vector search for topic
+   - Stage 2: EXPAND - Lateral traversal via CO_ACTIVATED_WITH/ASSOCIATED_WITH
+   - Stage 3: ABSTRACT - Upward traversal via ABSTRACTS_TO
+   - Insight generation: clusters, patterns, knowledge gaps
 
 ---
 
@@ -235,25 +249,26 @@ The MCP server is configured in `~/.cursor/mcp.json`:
   - Partial success support with HTTP 207 Multi-Status
   - Auto-generates embeddings for items without pre-computed embeddings
   - Per-item results with status, node_id, obs_id
+- [x] **Reflection Endpoint** (Task 8) - `POST /v1/memory/reflect` (PR #7)
+  - Multi-hop traversal with 3 stages: SEED (vector search) → EXPAND (lateral traversal) → ABSTRACT (upward hierarchy)
+  - Insight generation: cluster detection, pattern identification, knowledge gaps
+  - Comprehensive unit and integration tests
+  - `internal/retrieval/reflection.go`, `internal/api/handlers.go`
 
-### Priority 1: Reflection Endpoint (Next)
-- [ ] **Reflection Endpoint** (Task 8)
-  - `POST /v1/memory/reflect` for deep context exploration
-  - Multi-hop traversal, abstraction surfacing
-  - Insight generation (clusters, patterns, gaps)
-
-### Priority 2: Anomaly Detection
-- [ ] **Anomaly Detection Service** (Task 9)
+### Priority 1: Anomaly Detection (In Progress)
+- [🟡] **Anomaly Detection Service** (Task 9) - Auto-Claude at human review stage
   - Non-blocking contradiction detection on ingest
   - Duplicate detection (similarity > 0.95)
   - Outlier detection, stale update warnings
   - Returns warnings without blocking ingest
+  - Implementation plan ready for review at `.auto-claude/specs/010-09-implement-non-blocking-anomaly-detection-on-ing/`
 
-### Priority 3: Testing & Validation
-- [ ] **Create golden test for scoring**
-  - Ingest known nodes with known embeddings
-  - Retrieve and verify scores match expected values
-  - See `docs/12_Retrieval_Scoring_Worked_Examples.md`
+### Priority 2: Testing & Validation
+- [x] **Golden tests for scoring** - Complete at `tests/integration/scoring_golden_test.go`
+  - `TestScoringGolden` - Validates 5-node graph with controlled edges, verifies ranking order
+  - `TestScoringGoldenDeterminism` - Verifies ranking consistency across multiple runs
+  - `TestScoringComponentBreakdown` - Tests isolated node scoring components
+  - Fixed `TestScoringDeterminism` tolerance to account for Hebbian learning effects
 
 ### Priority 4: Future Enhancements
 - [ ] **Graph pruning** - Remove weak/deprecated edges, merge redundant nodes
@@ -288,6 +303,8 @@ The MCP server is configured in `~/.cursor/mcp.json`:
 | `internal/retrieval/service.go` | Vector recall + expansion + semantic edges |
 | `internal/retrieval/activation.go` | Spreading activation |
 | `internal/retrieval/scoring.go` | Final ranking |
+| `internal/retrieval/reflection.go` | Reflection endpoint (SEED/EXPAND/ABSTRACT) |
+| `internal/retrieval/reflection_test.go` | Reflection unit tests |
 | `internal/learning/service.go` | Hebbian learning (ApplyCoactivation) |
 | `internal/learning/service_test.go` | Learning unit tests (NEW) |
 | `internal/models/models.go` | Request/response types |

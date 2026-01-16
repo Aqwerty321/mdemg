@@ -19,6 +19,7 @@ mdemg-server
 mdemg-mcp
 /mdemg_build/mcp-server/mdemg-mcp
 /mdemg_build/service/bin/
+/mdemg_build/service/consolidate
 
 # Go test and build
 *.test

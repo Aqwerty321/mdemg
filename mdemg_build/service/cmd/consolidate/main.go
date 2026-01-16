@@ -154,10 +154,88 @@ func runConsolidationJob(ctx context.Context, driver neo4j.DriverWithContext, cf
 
 	fmt.Println("\nProcessing...")
 
-	// TODO: Implement cluster detection and abstraction promotion in subsequent subtasks
-	// This subtask focuses on CLI setup only
-
 	stats := consolidateStats{}
+
+	// Step 1: Query cluster candidates from Neo4j
+	fmt.Println("\nStep 1: Detecting cluster candidates...")
+	candidates, err := queryClusterCandidates(ctx, driver, cfg)
+	if err != nil {
+		return fmt.Errorf("query cluster candidates: %w", err)
+	}
+	fmt.Printf("Found %d nodes with sufficient high-weight neighbors\n", len(candidates))
+
+	if len(candidates) == 0 {
+		fmt.Println("\nNo cluster candidates found. Nothing to promote.")
+		printStats(stats, cfg.DryRun)
+		return nil
+	}
+
+	// Step 2: Build clusters from candidates using greedy first-come assignment
+	fmt.Println("\nStep 2: Building clusters...")
+	clusters := buildClusters(candidates, cfg.MinClusterSize)
+	stats.clustersFound = len(clusters)
+	fmt.Printf("Formed %d clusters (min size: %d)\n", len(clusters), cfg.MinClusterSize)
+
+	if len(clusters) == 0 {
+		fmt.Println("\nNo clusters met the minimum size requirement. Nothing to promote.")
+		printStats(stats, cfg.DryRun)
+		return nil
+	}
+
+	// Step 3: Process clusters and create abstractions
+	fmt.Println("\nStep 3: Processing clusters for abstraction promotion...")
+	promotionCount := 0
+
+	for i, c := range clusters {
+		// Respect max promotions cap
+		if promotionCount >= cfg.MaxPromotions {
+			fmt.Printf("\nReached max promotions cap (%d). Stopping.\n", cfg.MaxPromotions)
+			break
+		}
+
+		// Collect embeddings from cluster members
+		var embeddings [][]float64
+		for _, member := range c.Members {
+			if len(member.Embedding) > 0 {
+				embeddings = append(embeddings, member.Embedding)
+			} else {
+				stats.skippedNoEmbed++
+			}
+		}
+
+		// Calculate averaged embedding for the abstraction node
+		avgEmbedding := averageEmbeddings(embeddings)
+		if avgEmbedding == nil {
+			fmt.Printf("  Cluster %d: Skipped (no valid embeddings)\n", i+1)
+			stats.skippedTooSmall++
+			continue
+		}
+
+		// Report cluster info
+		memberIDs := make([]string, 0, len(c.Members))
+		for _, m := range c.Members {
+			memberIDs = append(memberIDs, m.NodeID)
+		}
+		fmt.Printf("  Cluster %d: %d members at layer %d -> layer %d\n",
+			i+1, len(c.Members), c.Layer, c.Layer+1)
+
+		if cfg.DryRun {
+			// Dry-run mode: just count what would happen
+			stats.nodesPromoted++
+			stats.edgesCreated += len(c.Members)
+		} else {
+			// Live mode: create abstraction node and edges
+			result, err := createAbstraction(ctx, driver, cfg, c, avgEmbedding)
+			if err != nil {
+				return fmt.Errorf("create abstraction for cluster %d: %w", i+1, err)
+			}
+			fmt.Printf("    Created abstraction node: %s (%d edges)\n", result.NodeID, result.MemberCount)
+			stats.nodesPromoted++
+			stats.edgesCreated += result.MemberCount
+		}
+
+		promotionCount++
+	}
 
 	// Print statistics
 	printStats(stats, cfg.DryRun)

@@ -178,3 +178,54 @@ type BatchIngestResponse struct {
 	ErrorCount   int                 `json:"error_count"`
 	Results      []BatchIngestResult `json:"results"`
 }
+
+// ArchiveRequest - request for archiving a memory node
+type ArchiveRequest struct {
+	Reason string `json:"reason,omitempty"` // optional reason for archiving
+}
+
+// ArchiveResponse - response from archive endpoint
+type ArchiveResponse struct {
+	NodeID     string `json:"node_id"`
+	Name       string `json:"name"`
+	ArchivedAt string `json:"archived_at"`
+	Reason     string `json:"reason,omitempty"`
+}
+
+// UnarchiveResponse - response from unarchive endpoint
+type UnarchiveResponse struct {
+	NodeID       string `json:"node_id"`
+	Name         string `json:"name"`
+	UnarchivedAt string `json:"unarchived_at"`
+}
+
+// DeleteResponse - response from delete endpoint
+type DeleteResponse struct {
+	NodeID       string `json:"node_id"`
+	DeletedNodes int    `json:"deleted_nodes"`
+	DeletedEdges int    `json:"deleted_edges"`
+}
+
+// BulkArchiveRequest - request for bulk archiving memory nodes
+type BulkArchiveRequest struct {
+	SpaceID string   `json:"space_id"`
+	NodeIDs []string `json:"node_ids"`
+	Reason  string   `json:"reason,omitempty"` // optional reason for archiving
+}
+
+// BulkArchiveResult - result for a single item in bulk archive
+type BulkArchiveResult struct {
+	NodeID     string `json:"node_id"`
+	Status     string `json:"status"` // "success" or "error"
+	ArchivedAt string `json:"archived_at,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
+// BulkArchiveResponse - response for bulk archive endpoint
+type BulkArchiveResponse struct {
+	SpaceID      string              `json:"space_id"`
+	TotalItems   int                 `json:"total_items"`
+	SuccessCount int                 `json:"success_count"`
+	ErrorCount   int                 `json:"error_count"`
+	Results      []BulkArchiveResult `json:"results"`
+}

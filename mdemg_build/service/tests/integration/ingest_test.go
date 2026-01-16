@@ -387,6 +387,268 @@ func TestIngestGeneratesEmbedding(t *testing.T) {
 	verifyEmbeddingInNeo4j(t, driver, spaceID, ingestResp.NodeID, expectedDims)
 }
 
+// TestIngestIdempotent verifies that ingesting with the same path twice updates
+// the existing node instead of creating a duplicate.
+func TestIngestIdempotent(t *testing.T) {
+	// Setup: ensure service is ready and create Neo4j driver for verification
+	RequireServiceReady(t)
+	driver := SetupTestNeo4j(t)
+
+	cfg := GetTestConfig()
+	client := NewTestHTTPClient()
+
+	// Create unique space ID and path for test isolation
+	spaceID := GenerateTestSpaceID("ingest-idempotent")
+	testPath := "/test/idempotent/node"
+
+	// Register cleanup
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// --- First ingest ---
+	confidence1 := 0.75
+	embedding1 := CreateTestEmbedding(DefaultEmbeddingDims, 1.0)
+
+	req1 := IngestRequest{
+		SpaceID:     spaceID,
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Source:      "source-first",
+		Content:     "First content for idempotent test",
+		Tags:        []string{"first", "idempotent"},
+		Name:        "idempotent-node-v1",
+		Path:        testPath,
+		Sensitivity: "internal",
+		Confidence:  &confidence1,
+		Embedding:   embedding1,
+	}
+
+	reqBody1, err := json.Marshal(req1)
+	if err != nil {
+		t.Fatalf("failed to marshal first request: %v", err)
+	}
+
+	ingestURL := cfg.MDEMGEndpoint + "/v1/memory/ingest"
+	httpReq1, err := http.NewRequest(http.MethodPost, ingestURL, bytes.NewReader(reqBody1))
+	if err != nil {
+		t.Fatalf("failed to create first HTTP request: %v", err)
+	}
+	httpReq1.Header.Set("Content-Type", "application/json")
+
+	resp1, err := client.Do(httpReq1)
+	if err != nil {
+		t.Fatalf("first ingest request failed: %v", err)
+	}
+	defer resp1.Body.Close()
+
+	if resp1.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		json.NewDecoder(resp1.Body).Decode(&errResp)
+		t.Fatalf("first ingest returned status %d: %v", resp1.StatusCode, errResp)
+	}
+
+	var ingestResp1 IngestResponse
+	if err := json.NewDecoder(resp1.Body).Decode(&ingestResp1); err != nil {
+		t.Fatalf("failed to decode first response: %v", err)
+	}
+
+	firstNodeID := ingestResp1.NodeID
+	firstObsID := ingestResp1.ObsID
+
+	if firstNodeID == "" {
+		t.Fatal("first ingest: node_id is empty")
+	}
+	if firstObsID == "" {
+		t.Fatal("first ingest: obs_id is empty")
+	}
+
+	// Small delay to ensure updated_at timestamps differ
+	time.Sleep(100 * time.Millisecond)
+
+	// --- Second ingest with same path ---
+	confidence2 := 0.85
+	embedding2 := CreateTestEmbedding(DefaultEmbeddingDims, 2.0) // Different seed
+
+	req2 := IngestRequest{
+		SpaceID:     spaceID,
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Source:      "source-second",
+		Content:     "Second content for idempotent test",
+		Tags:        []string{"second", "idempotent"},
+		Name:        "idempotent-node-v2", // Different name
+		Path:        testPath,             // SAME path - should merge
+		Sensitivity: "public",             // Different sensitivity
+		Confidence:  &confidence2,
+		Embedding:   embedding2,
+	}
+
+	reqBody2, err := json.Marshal(req2)
+	if err != nil {
+		t.Fatalf("failed to marshal second request: %v", err)
+	}
+
+	httpReq2, err := http.NewRequest(http.MethodPost, ingestURL, bytes.NewReader(reqBody2))
+	if err != nil {
+		t.Fatalf("failed to create second HTTP request: %v", err)
+	}
+	httpReq2.Header.Set("Content-Type", "application/json")
+
+	resp2, err := client.Do(httpReq2)
+	if err != nil {
+		t.Fatalf("second ingest request failed: %v", err)
+	}
+	defer resp2.Body.Close()
+
+	if resp2.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		json.NewDecoder(resp2.Body).Decode(&errResp)
+		t.Fatalf("second ingest returned status %d: %v", resp2.StatusCode, errResp)
+	}
+
+	var ingestResp2 IngestResponse
+	if err := json.NewDecoder(resp2.Body).Decode(&ingestResp2); err != nil {
+		t.Fatalf("failed to decode second response: %v", err)
+	}
+
+	secondObsID := ingestResp2.ObsID
+
+	if secondObsID == "" {
+		t.Fatal("second ingest: obs_id is empty")
+	}
+	if secondObsID == firstObsID {
+		t.Errorf("second observation has same obs_id as first: %s", secondObsID)
+	}
+
+	// --- Verify only ONE node exists for this path ---
+	verifyNodeCountForPath(t, driver, spaceID, testPath, 1)
+
+	// --- Verify update_count was incremented ---
+	verifyNodeUpdateCount(t, driver, spaceID, testPath, 2)
+
+	// --- Verify TWO observations exist linked to the same node ---
+	verifyObservationCount(t, driver, spaceID, testPath, 2)
+}
+
+// verifyNodeCountForPath checks that exactly expectedCount MemoryNodes exist for the given path.
+func verifyNodeCountForPath(t *testing.T, driver neo4j.DriverWithContext, spaceID, path string, expectedCount int) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode {space_id: $spaceId, path: $path})
+			RETURN count(n) AS node_count
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+			"path":    path,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if !res.Next(ctx) {
+			return nil, fmt.Errorf("no result from count query")
+		}
+
+		count, _ := res.Record().Get("node_count")
+		return count, res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to query node count: %v", err)
+	}
+
+	count := result.(int64)
+	if int(count) != expectedCount {
+		t.Errorf("node count mismatch for path %q: got %d, want %d (idempotent ingestion should NOT create duplicates)", path, count, expectedCount)
+	}
+}
+
+// verifyNodeUpdateCount checks that the node's update_count matches expected value.
+func verifyNodeUpdateCount(t *testing.T, driver neo4j.DriverWithContext, spaceID, path string, expectedUpdateCount int) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode {space_id: $spaceId, path: $path})
+			RETURN n.update_count AS update_count
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+			"path":    path,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if !res.Next(ctx) {
+			return nil, fmt.Errorf("node not found for path: %s", path)
+		}
+
+		updateCount, _ := res.Record().Get("update_count")
+		return updateCount, res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to query update_count: %v", err)
+	}
+
+	updateCount := result.(int64)
+	if int(updateCount) != expectedUpdateCount {
+		t.Errorf("update_count mismatch: got %d, want %d (should increment on each ingest)", updateCount, expectedUpdateCount)
+	}
+}
+
+// verifyObservationCount checks that exactly expectedCount Observations are linked to the node.
+func verifyObservationCount(t *testing.T, driver neo4j.DriverWithContext, spaceID, path string, expectedCount int) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode {space_id: $spaceId, path: $path})-[:HAS_OBSERVATION]->(o:Observation)
+			RETURN count(o) AS obs_count
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+			"path":    path,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if !res.Next(ctx) {
+			return nil, fmt.Errorf("no result from observation count query")
+		}
+
+		count, _ := res.Record().Get("obs_count")
+		return count, res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to query observation count: %v", err)
+	}
+
+	count := result.(int64)
+	if int(count) != expectedCount {
+		t.Errorf("observation count mismatch: got %d, want %d (each ingest should create a new observation)", count, expectedCount)
+	}
+}
+
 // verifyEmbeddingInNeo4j checks that the MemoryNode has an embedding of the expected dimension.
 func verifyEmbeddingInNeo4j(t *testing.T, driver neo4j.DriverWithContext, spaceID, nodeID string, expectedDims int) {
 	t.Helper()

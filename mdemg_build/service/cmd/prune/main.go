@@ -313,8 +313,94 @@ type edgePruneStats struct {
 
 // pruneEdges removes weak/deprecated edges
 func pruneEdges(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneConfig) (edgePruneStats, error) {
-	// TODO: Implement in subtask 2-1
-	return edgePruneStats{}, nil
+	now := time.Now()
+	stats := edgePruneStats{}
+	offset := 0
+	batchNum := 0
+
+	for {
+		// Query batch of edges
+		edges, err := queryEdgeBatch(ctx, driver, cfg, offset)
+		if err != nil {
+			return stats, fmt.Errorf("query batch %d: %w", batchNum+1, err)
+		}
+
+		if len(edges) == 0 {
+			break
+		}
+
+		batchNum++
+		fmt.Printf("  Batch %d: %d edges\n", batchNum, len(edges))
+
+		// Collect edges to delete
+		var toDelete []edgePruneResult
+
+		for _, e := range edges {
+			stats.scanned++
+
+			result := processEdgeForPruning(e, cfg, now)
+
+			// Track protection stats
+			if result.Protected {
+				stats.protected++
+			}
+
+			// Collect edges to prune
+			if result.ShouldPrune {
+				toDelete = append(toDelete, result)
+			}
+		}
+
+		// Apply changes if not dry-run
+		if !cfg.DryRun {
+			for _, r := range toDelete {
+				if err := deleteEdge(ctx, driver, r.Edge.ID); err != nil {
+					return stats, fmt.Errorf("delete edge %d: %w", r.Edge.ID, err)
+				}
+			}
+		}
+
+		stats.pruned += len(toDelete)
+
+		offset += len(edges)
+
+		// If we got fewer than batch size, we're done
+		if len(edges) < cfg.BatchSize {
+			break
+		}
+	}
+
+	return stats, nil
+}
+
+// deleteEdge removes an edge from the database
+func deleteEdge(ctx context.Context, driver neo4j.DriverWithContext, edgeID int64) error {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH ()-[r]->()
+WHERE id(r) = $edgeId
+DELETE r`
+
+		params := map[string]any{
+			"edgeId": edgeID,
+		}
+
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		// Consume result
+		for res.Next(ctx) {
+			// consume
+		}
+		return nil, res.Err()
+	})
+
+	return err
 }
 
 // queryEdgeBatch fetches a batch of edges from Neo4j for prune processing.

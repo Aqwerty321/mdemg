@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/db"
 	"mdemg/internal/models"
 )
@@ -155,11 +156,90 @@ func (s *Server) queryMetrics(ctx context.Context, spaceID string) (models.Metri
 	if spaceID != "" {
 		spaceParam = spaceID
 	}
-	_ = spaceParam // Will be used in subsequent subtasks for Neo4j queries
 
-	// TODO: Neo4j queries will be added in subtasks 3-2, 3-3, 3-4
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"spaceId": spaceParam,
+	}
+
+	// Query 1: Total nodes and nodes by layer
+	_, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE $spaceId IS NULL OR n.space_id = $spaceId
+WITH count(n) AS total, collect(coalesce(n.layer, 0)) AS layers
+RETURN total, layers`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if total, ok := rec.Get("total"); ok {
+				resp.TotalNodes = toInt64(total)
+			}
+			if layers, ok := rec.Get("layers"); ok {
+				if layerList, ok := layers.([]any); ok {
+					for _, l := range layerList {
+						layer := int(toInt64(l))
+						resp.NodesByLayer[layer]++
+					}
+				}
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query node metrics: %w", err)
+	}
+
+	// Query 2: Total edges and edges by type
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (a:MemoryNode)-[r]->(b:MemoryNode)
+WHERE $spaceId IS NULL OR (a.space_id = $spaceId AND b.space_id = $spaceId)
+RETURN type(r) AS rel_type, count(r) AS cnt`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			relType, _ := rec.Get("rel_type")
+			cnt, _ := rec.Get("cnt")
+			if relType != nil {
+				resp.EdgesByType[fmt.Sprint(relType)] = toInt64(cnt)
+				resp.TotalEdges += toInt64(cnt)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		return resp, fmt.Errorf("failed to query edge metrics: %w", err)
+	}
+
+	// TODO: Hub nodes, orphan nodes, avg edge weight, and recent activity
+	// will be added in subtasks 3-3, 3-4
 
 	return resp, nil
+}
+
+// toInt64 converts various Neo4j numeric types to int64
+func toInt64(v any) int64 {
+	switch x := v.(type) {
+	case int64:
+		return x
+	case int:
+		return int64(x)
+	case float64:
+		return int64(x)
+	case float32:
+		return int64(x)
+	default:
+		return 0
+	}
 }
 
 // contentToText converts the content field to a string for embedding

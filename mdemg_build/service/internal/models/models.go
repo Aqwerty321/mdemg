@@ -30,17 +30,17 @@ type RetrieveResponse struct {
 }
 
 type IngestRequest struct {
-	SpaceID     string    `json:"space_id"`
-	Timestamp   string    `json:"timestamp"`
-	Source      string    `json:"source"`
-	Content     any       `json:"content"`
-	Tags        []string  `json:"tags,omitempty"`
+	SpaceID     string    `json:"space_id" validate:"required,min=1,max=256"`
+	Timestamp   string    `json:"timestamp" validate:"required,min=1"`
+	Source      string    `json:"source" validate:"required,min=1,max=64"`
+	Content     any       `json:"content" validate:"required"`
+	Tags        []string  `json:"tags,omitempty" validate:"omitempty,dive,min=1"`
 	NodeID      string    `json:"node_id,omitempty"`
-	Path        string    `json:"path,omitempty"`
+	Path        string    `json:"path,omitempty" validate:"omitempty,max=512"`
 	Name        string    `json:"name,omitempty"`
-	Sensitivity string    `json:"sensitivity,omitempty"`
-	Confidence  *float64  `json:"confidence,omitempty"`
-	Embedding   []float32 `json:"embedding,omitempty"` // Optional: pre-computed embedding
+	Sensitivity string    `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
+	Confidence  *float64  `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
+	Embedding   []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"` // Optional: pre-computed embedding
 }
 
 type IngestResponse struct {

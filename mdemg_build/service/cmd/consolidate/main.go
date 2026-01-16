@@ -125,6 +125,17 @@ type consolidateStats struct {
 	edgesCreated     int
 	skippedNoEmbed   int
 	skippedTooSmall  int
+	samples          []clusterSample // first few clusters for sample output
+}
+
+// clusterSample holds information about a processed cluster for sample output
+type clusterSample struct {
+	ClusterNum    int
+	MemberCount   int
+	SourceLayer   int
+	TargetLayer   int
+	MemberIDs     []string
+	AbstractionID string // empty in dry-run
 }
 
 // clusterCandidate represents a node with its high-weight neighbors at the same layer
@@ -154,7 +165,9 @@ func runConsolidationJob(ctx context.Context, driver neo4j.DriverWithContext, cf
 
 	fmt.Println("\nProcessing...")
 
-	stats := consolidateStats{}
+	stats := consolidateStats{
+		samples: make([]clusterSample, 0, 5),
+	}
 
 	// Step 1: Query cluster candidates from Neo4j
 	fmt.Println("\nStep 1: Detecting cluster candidates...")
@@ -223,6 +236,18 @@ func runConsolidationJob(ctx context.Context, driver neo4j.DriverWithContext, cf
 			// Dry-run mode: just count what would happen
 			stats.nodesPromoted++
 			stats.edgesCreated += len(c.Members)
+
+			// Collect sample cluster data (first 5)
+			if len(stats.samples) < 5 {
+				stats.samples = append(stats.samples, clusterSample{
+					ClusterNum:    i + 1,
+					MemberCount:   len(c.Members),
+					SourceLayer:   c.Layer,
+					TargetLayer:   c.Layer + 1,
+					MemberIDs:     memberIDs,
+					AbstractionID: "", // empty in dry-run
+				})
+			}
 		} else {
 			// Live mode: create abstraction node and edges
 			result, err := createAbstraction(ctx, driver, cfg, c, avgEmbedding)
@@ -232,6 +257,18 @@ func runConsolidationJob(ctx context.Context, driver neo4j.DriverWithContext, cf
 			fmt.Printf("    Created abstraction node: %s (%d edges)\n", result.NodeID, result.MemberCount)
 			stats.nodesPromoted++
 			stats.edgesCreated += result.MemberCount
+
+			// Collect sample cluster data (first 5)
+			if len(stats.samples) < 5 {
+				stats.samples = append(stats.samples, clusterSample{
+					ClusterNum:    i + 1,
+					MemberCount:   len(c.Members),
+					SourceLayer:   c.Layer,
+					TargetLayer:   c.Layer + 1,
+					MemberIDs:     memberIDs,
+					AbstractionID: result.NodeID,
+				})
+			}
 		}
 
 		promotionCount++
@@ -259,23 +296,68 @@ func printHeader(cfg consolidateConfig) {
 
 // printStats outputs the job statistics
 func printStats(stats consolidateStats, dryRun bool) {
-	fmt.Println("\nStatistics:")
-	fmt.Printf("- Clusters found: %d\n", stats.clustersFound)
-	if dryRun {
-		fmt.Printf("- Nodes to promote: %d\n", stats.nodesPromoted)
-		fmt.Printf("- Edges to create: %d\n", stats.edgesCreated)
-	} else {
-		fmt.Printf("- Nodes promoted: %d\n", stats.nodesPromoted)
-		fmt.Printf("- Edges created: %d\n", stats.edgesCreated)
-	}
-	fmt.Printf("- Skipped (no embedding): %d\n", stats.skippedNoEmbed)
-	fmt.Printf("- Skipped (too small): %d\n", stats.skippedTooSmall)
+	fmt.Println("\n========================================")
+	fmt.Println("Statistics")
+	fmt.Println("========================================")
 
+	// Main counts
+	fmt.Printf("Clusters found:          %d\n", stats.clustersFound)
 	if dryRun {
-		fmt.Println("\nRun with --dry-run=false to apply changes.")
+		fmt.Printf("Nodes to promote:        %d\n", stats.nodesPromoted)
+		fmt.Printf("Edges to create:         %d\n", stats.edgesCreated)
 	} else {
-		fmt.Println("\nChanges applied successfully.")
+		fmt.Printf("Nodes promoted:          %d\n", stats.nodesPromoted)
+		fmt.Printf("Edges created:           %d\n", stats.edgesCreated)
 	}
+
+	// Skip reasons
+	fmt.Println("\nSkipped clusters:")
+	fmt.Printf("- No valid embeddings:   %d\n", stats.skippedNoEmbed)
+	fmt.Printf("- Too small:             %d\n", stats.skippedTooSmall)
+
+	// Print sample clusters (up to 5)
+	if len(stats.samples) > 0 {
+		fmt.Println("\nSample clusters:")
+		for _, s := range stats.samples {
+			// Truncate member IDs display if too many
+			displayIDs := s.MemberIDs
+			suffix := ""
+			if len(displayIDs) > 4 {
+				displayIDs = displayIDs[:4]
+				suffix = fmt.Sprintf("... +%d more", len(s.MemberIDs)-4)
+			}
+
+			memberList := strings.Join(displayIDs, ", ")
+			if suffix != "" {
+				memberList += " " + suffix
+			}
+
+			if s.AbstractionID != "" {
+				// Live run - show created abstraction ID
+				fmt.Printf("  Cluster %d: %d members (layer %d->%d) -> %s\n",
+					s.ClusterNum, s.MemberCount, s.SourceLayer, s.TargetLayer, truncateID(s.AbstractionID))
+			} else {
+				// Dry run - show member IDs
+				fmt.Printf("  Cluster %d: %d members (layer %d->%d) [%s]\n",
+					s.ClusterNum, s.MemberCount, s.SourceLayer, s.TargetLayer, memberList)
+			}
+		}
+	}
+
+	fmt.Println()
+	if dryRun {
+		fmt.Println("Run with --dry-run=false to apply changes.")
+	} else {
+		fmt.Println("Changes applied successfully.")
+	}
+}
+
+// truncateID shortens a UUID for display (first 8 chars + "...")
+func truncateID(id string) string {
+	if len(id) <= 12 {
+		return id
+	}
+	return id[:8] + "..."
 }
 
 // queryClusterCandidates fetches nodes with sufficient high-weight neighbors at the same layer.

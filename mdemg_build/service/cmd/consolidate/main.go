@@ -127,6 +127,14 @@ type consolidateStats struct {
 	skippedTooSmall  int
 }
 
+// clusterCandidate represents a node with its high-weight neighbors at the same layer
+type clusterCandidate struct {
+	NodeID      string
+	Layer       int
+	Embedding   []float64
+	NeighborIDs []string
+}
+
 // runConsolidationJob executes the cluster detection and abstraction promotion
 func runConsolidationJob(ctx context.Context, driver neo4j.DriverWithContext, cfg consolidateConfig) error {
 	// Print header
@@ -178,6 +186,91 @@ func printStats(stats consolidateStats, dryRun bool) {
 	} else {
 		fmt.Println("\nChanges applied successfully.")
 	}
+}
+
+// queryClusterCandidates fetches nodes with sufficient high-weight neighbors at the same layer.
+// Each returned candidate has ≥ (minSize - 1) neighbors with CO_ACTIVATED_WITH weight ≥ threshold.
+// This is the first step in cluster detection - nodes are later grouped into actual clusters.
+func queryClusterCandidates(ctx context.Context, driver neo4j.DriverWithContext, cfg consolidateConfig) ([]clusterCandidate, error) {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Find nodes with enough high-weight neighbors at same layer
+	// The query returns nodes where each has at least (minSize-1) neighbors with weight >= threshold
+	// This means when combined with the node itself, we have >= minSize nodes in potential cluster
+	cypher := `
+MATCH (a:MemoryNode)-[r:CO_ACTIVATED_WITH]-(b:MemoryNode)
+WHERE a.space_id = $spaceId
+  AND r.weight >= $threshold
+  AND a.layer = b.layer
+WITH a, collect(DISTINCT b) AS neighbors
+WHERE size(neighbors) >= $minNeighbors
+RETURN a.node_id AS nodeId,
+       a.layer AS layer,
+       a.embedding AS embedding,
+       [n IN neighbors | n.node_id] AS neighborIds
+ORDER BY size(neighbors) DESC`
+
+	params := map[string]any{
+		"spaceId":      cfg.SpaceID,
+		"threshold":    cfg.WeightThreshold,
+		"minNeighbors": cfg.MinClusterSize - 1, // need minSize-1 neighbors to form cluster of minSize
+	}
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		candidates := make([]clusterCandidate, 0)
+		for res.Next(ctx) {
+			rec := res.Record()
+
+			nodeID, _ := rec.Get("nodeId")
+			layer, _ := rec.Get("layer")
+			embedding, _ := rec.Get("embedding")
+			neighborIDs, _ := rec.Get("neighborIds")
+
+			candidate := clusterCandidate{
+				NodeID:      asString(nodeID),
+				Layer:       asInt(layer),
+				Embedding:   asFloat64Slice(embedding),
+				NeighborIDs: asStringSlice(neighborIDs),
+			}
+			candidates = append(candidates, candidate)
+		}
+
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return candidates, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]clusterCandidate), nil
+}
+
+// asStringSlice safely converts interface{} to []string
+func asStringSlice(v any) []string {
+	if v == nil {
+		return nil
+	}
+	// Neo4j returns arrays as []interface{} or []any
+	if arr, ok := v.([]any); ok {
+		result := make([]string, 0, len(arr))
+		for _, item := range arr {
+			result = append(result, asString(item))
+		}
+		return result
+	}
+	// Direct string slice (rare but possible)
+	if arr, ok := v.([]string); ok {
+		return arr
+	}
+	return nil
 }
 
 // asString safely converts interface{} to string

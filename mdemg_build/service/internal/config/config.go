@@ -38,6 +38,12 @@ type Config struct {
 	OpenAIEndpoint      string // default: https://api.openai.com/v1
 	OllamaEndpoint      string // default: http://localhost:11434
 	OllamaModel         string // default: nomic-embed-text
+
+	// Semantic edge creation on ingest settings
+	SemanticEdgeOnIngest      bool    // Feature toggle (default: true)
+	SemanticEdgeTopN          int     // Max similar nodes to query (default: 5)
+	SemanticEdgeMinSimilarity float64 // Minimum similarity threshold (default: 0.7)
+	SemanticEdgeInitialWeight float64 // Initial edge weight (default: 0.5)
 }
 
 func FromEnv() (Config, error) {
@@ -58,6 +64,24 @@ func FromEnv() (Config, error) {
 			return 0, fmt.Errorf("%s must be int: %w", k, err)
 		}
 		return n, nil
+	}
+	atof := func(k string, def float64) (float64, error) {
+		v := strings.TrimSpace(os.Getenv(k))
+		if v == "" {
+			return def, nil
+		}
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0, fmt.Errorf("%s must be float: %w", k, err)
+		}
+		return f, nil
+	}
+	getBool := func(k string, def bool) bool {
+		v := strings.ToLower(strings.TrimSpace(os.Getenv(k)))
+		if v == "" {
+			return def
+		}
+		return v == "true" || v == "1" || v == "yes"
 	}
 
 	listen := get("LISTEN_ADDR", ":8080")
@@ -159,6 +183,30 @@ func FromEnv() (Config, error) {
 
 	idx := get("VECTOR_INDEX_NAME", "memNodeEmbedding")
 
+	// Semantic edge creation on ingest settings
+	semEdgeEnabled := getBool("SEMANTIC_EDGE_ON_INGEST", true)
+	semEdgeTopN, err := atoi("SEMANTIC_EDGE_TOP_N", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	if semEdgeTopN < 1 {
+		return Config{}, errors.New("SEMANTIC_EDGE_TOP_N must be >= 1")
+	}
+	semEdgeMinSim, err := atof("SEMANTIC_EDGE_MIN_SIMILARITY", 0.7)
+	if err != nil {
+		return Config{}, err
+	}
+	if semEdgeMinSim < 0 || semEdgeMinSim > 1 {
+		return Config{}, errors.New("SEMANTIC_EDGE_MIN_SIMILARITY must be in range [0, 1]")
+	}
+	semEdgeInitWeight, err := atof("SEMANTIC_EDGE_INITIAL_WEIGHT", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	if semEdgeInitWeight < 0 || semEdgeInitWeight > 1 {
+		return Config{}, errors.New("SEMANTIC_EDGE_INITIAL_WEIGHT must be in range [0, 1]")
+	}
+
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "")
 	openaiKey := get("OPENAI_API_KEY", "")
@@ -192,5 +240,9 @@ func FromEnv() (Config, error) {
 		OpenAIEndpoint: openaiEndpoint,
 		OllamaEndpoint: ollamaEndpoint,
 		OllamaModel: ollamaModel,
+		SemanticEdgeOnIngest:      semEdgeEnabled,
+		SemanticEdgeTopN:          semEdgeTopN,
+		SemanticEdgeMinSimilarity: semEdgeMinSim,
+		SemanticEdgeInitialWeight: semEdgeInitWeight,
 	}, nil
 }

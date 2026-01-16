@@ -1,0 +1,25 @@
+{
+  "active": true,
+  "spec": "003-implement-edge-weight-decay-cli-command",
+  "state": "building",
+  "subtasks": {
+    "completed": 2,
+    "total": 7,
+    "in_progress": 1,
+    "failed": 0
+  },
+  "phase": {
+    "current": "CLI Implementation",
+    "id": null,
+    "total": 5
+  },
+  "workers": {
+    "active": 0,
+    "max": 1
+  },
+  "session": {
+    "number": 3,
+    "started_at": "2026-01-16T11:53:51.861206"
+  },
+  "last_update": "2026-01-16T11:57:17.559808"
+}

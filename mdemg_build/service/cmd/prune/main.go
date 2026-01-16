@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -326,4 +327,76 @@ func printStats(stats pruneStats, cfg pruneConfig) {
 	} else {
 		fmt.Println("Changes applied successfully.")
 	}
+}
+
+// asString safely converts interface{} to string
+func asString(v any) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return fmt.Sprintf("%v", v)
+}
+
+// asFloat64 safely converts interface{} to float64
+func asFloat64(v any) float64 {
+	if v == nil {
+		return 0.0
+	}
+	switch n := v.(type) {
+	case float64:
+		return n
+	case int64:
+		return float64(n)
+	case int:
+		return float64(n)
+	default:
+		return 0.0
+	}
+}
+
+// asInt safely converts interface{} to int
+func asInt(v any) int {
+	if v == nil {
+		return 0
+	}
+	switch n := v.(type) {
+	case int64:
+		return int(n)
+	case int:
+		return n
+	case float64:
+		return int(n)
+	default:
+		return 0
+	}
+}
+
+// asBool safely converts interface{} to bool
+func asBool(v any) bool {
+	if v == nil {
+		return false
+	}
+	if b, ok := v.(bool); ok {
+		return b
+	}
+	return false
+}
+
+// asTime safely converts interface{} to time.Time
+func asTime(v any) time.Time {
+	if v == nil {
+		return time.Time{}
+	}
+	// Neo4j returns datetime as neo4j.Time or time.Time depending on driver version
+	if t, ok := v.(time.Time); ok {
+		return t
+	}
+	// Handle neo4j.LocalDateTime and similar types that have Time() method
+	if dt, ok := v.(interface{ Time() time.Time }); ok {
+		return dt.Time()
+	}
+	return time.Time{}
 }

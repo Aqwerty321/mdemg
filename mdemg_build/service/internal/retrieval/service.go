@@ -259,6 +259,49 @@ LIMIT $k`
 	return outAny.([]SimilarNode), nil
 }
 
+// CreateAssociatedWithEdge creates or updates an ASSOCIATED_WITH edge between two nodes.
+// Uses MERGE to avoid duplicates. On create, sets initial weight from config.
+// On match, increments weight and evidence_count.
+func (s *Service) CreateAssociatedWithEdge(ctx context.Context, spaceID, fromNodeID, toNodeID string, similarityScore float64) error {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"spaceId":         spaceID,
+		"fromNodeId":      fromNodeID,
+		"toNodeId":        toNodeID,
+		"initialWeight":   s.cfg.SemanticEdgeInitialWeight,
+		"similarityScore": similarityScore,
+	}
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `MATCH (a:MemoryNode {space_id:$spaceId, node_id:$fromNodeId})
+MATCH (b:MemoryNode {space_id:$spaceId, node_id:$toNodeId})
+MERGE (a)-[r:ASSOCIATED_WITH]->(b)
+ON CREATE SET
+    r.edge_id = randomUUID(),
+    r.space_id = $spaceId,
+    r.weight = $initialWeight,
+    r.dim_semantic = $similarityScore,
+    r.evidence_count = 1,
+    r.status = 'active',
+    r.created_at = datetime(),
+    r.updated_at = datetime()
+ON MATCH SET
+    r.weight = CASE WHEN r.weight + ($similarityScore * 0.1) > 1.0 THEN 1.0 ELSE r.weight + ($similarityScore * 0.1) END,
+    r.evidence_count = r.evidence_count + 1,
+    r.updated_at = datetime()`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		// Consume the result
+		_, err = res.Consume(ctx)
+		return nil, err
+	})
+	return err
+}
+
 type Edge struct {
 	Src string
 	Dst string

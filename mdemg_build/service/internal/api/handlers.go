@@ -684,3 +684,130 @@ RETURN n.node_id AS node_id,
 
 	writeJSON(w, http.StatusOK, result)
 }
+
+// handleDeleteNode handles DELETE /v1/memory/nodes/{node_id}
+// Hard-deletes a memory node (DETACH DELETE) with safety checks
+func (s *Server) handleDeleteNode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract node_id from URL path: /v1/memory/nodes/{node_id}
+	path := strings.TrimPrefix(r.URL.Path, "/v1/memory/nodes/")
+	nodeID := path
+	if nodeID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid node_id in path"})
+		return
+	}
+
+	// Require ?confirm=true query parameter for safety
+	if r.URL.Query().Get("confirm") != "true" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": "deletion requires ?confirm=true query parameter",
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"nodeId": nodeID,
+	}
+
+	// Check for outgoing ABSTRACTS_TO edges (block deletion if present)
+	hasAbstractions, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode {node_id: $nodeId})-[:ABSTRACTS_TO]->()
+RETURN count(*) > 0 AS has_abstractions`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return false, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if val, ok := rec.Get("has_abstractions"); ok {
+				if b, ok := val.(bool); ok {
+					return b, nil
+				}
+			}
+		}
+		return false, res.Err()
+	})
+
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	if hasAbstractions.(bool) {
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error": "cannot delete node with outgoing ABSTRACTS_TO edges; delete child abstractions first or use archive instead",
+		})
+		return
+	}
+
+	// Execute delete operation with DETACH DELETE
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// First check if node exists and count edges
+		checkCypher := `
+MATCH (n:MemoryNode {node_id: $nodeId})
+OPTIONAL MATCH (n)-[r]-()
+RETURN n.node_id AS node_id, count(DISTINCT r) AS edge_count`
+		checkRes, err := tx.Run(ctx, checkCypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		var edgeCount int64
+		var foundNodeID string
+		if checkRes.Next(ctx) {
+			rec := checkRes.Record()
+			if nid, ok := rec.Get("node_id"); ok && nid != nil {
+				foundNodeID = fmt.Sprint(nid)
+			}
+			if ec, ok := rec.Get("edge_count"); ok {
+				edgeCount = toInt64(ec)
+			}
+		}
+		if err := checkRes.Err(); err != nil {
+			return nil, err
+		}
+
+		if foundNodeID == "" {
+			// Node not found
+			return nil, nil
+		}
+
+		// Execute DETACH DELETE
+		deleteCypher := `
+MATCH (n:MemoryNode {node_id: $nodeId})
+DETACH DELETE n`
+		_, err = tx.Run(ctx, deleteCypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		return &models.DeleteResponse{
+			NodeID:       nodeID,
+			DeletedNodes: 1,
+			DeletedEdges: int(edgeCount),
+		}, nil
+	})
+
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	if result == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": fmt.Sprintf("node not found: %s", nodeID)})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}

@@ -1,17 +1,17 @@
 {
   "active": true,
-  "spec": "007-implement-deep-context-exploration-endpoint",
+  "spec": "021-015-memory-archive",
   "state": "building",
   "subtasks": {
     "completed": 3,
-    "total": 11,
+    "total": 10,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Core Reflection Algorithm",
+    "current": "Delete Handler with Safety Checks",
     "id": null,
-    "total": 5
+    "total": 1
   },
   "workers": {
     "active": 0,
@@ -19,7 +19,7 @@
   },
   "session": {
     "number": 4,
-    "started_at": "2026-01-16T13:55:16.861148"
+    "started_at": "2026-01-16T18:13:05.919316"
   },
-  "last_update": "2026-01-16T13:59:43.976991"
+  "last_update": "2026-01-16T18:17:22.164591"
 }

@@ -848,13 +848,14 @@ func TestCachedEmbedder(t *testing.T) {
 			t.Errorf("call count after re-embedding evicted text = %d, expected 4", mock.getCallCount())
 		}
 
-		// Re-embed text2 - should be cache hit (still in cache)
+		// Re-embed text2 - should be cache miss (text2 was evicted when text1 was re-added)
+		// After step 4, cache contains [text1, text3] - text2 was LRU and got evicted
 		_, err = cached.Embed(ctx, "text2")
 		if err != nil {
 			t.Fatalf("re-embed text2 failed: %v", err)
 		}
-		if mock.getCallCount() != 4 {
-			t.Errorf("call count after cache hit = %d, expected 4 (not 5)", mock.getCallCount())
+		if mock.getCallCount() != 5 {
+			t.Errorf("call count after re-embedding text2 (evicted) = %d, expected 5", mock.getCallCount())
 		}
 	})
 }

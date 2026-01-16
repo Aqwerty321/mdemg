@@ -135,6 +135,18 @@ type clusterCandidate struct {
 	NeighborIDs []string
 }
 
+// clusterMember represents a single node within a cluster
+type clusterMember struct {
+	NodeID    string
+	Embedding []float64
+}
+
+// cluster represents a group of co-activated nodes at the same layer
+type cluster struct {
+	Members []clusterMember
+	Layer   int
+}
+
 // runConsolidationJob executes the cluster detection and abstraction promotion
 func runConsolidationJob(ctx context.Context, driver neo4j.DriverWithContext, cfg consolidateConfig) error {
 	// Print header
@@ -251,6 +263,80 @@ ORDER BY size(neighbors) DESC`
 		return nil, err
 	}
 	return result.([]clusterCandidate), nil
+}
+
+// buildClusters groups cluster candidates into non-overlapping clusters using greedy first-come assignment.
+// Each node can only belong to one cluster. Candidates are processed in order (highest neighbor count first,
+// as returned by queryClusterCandidates). For each unassigned candidate, we form a cluster from the candidate
+// plus any of its unassigned neighbors. Clusters smaller than minSize are discarded.
+func buildClusters(candidates []clusterCandidate, minSize int) []cluster {
+	// Build a map of candidate node IDs to their data for quick lookup
+	candidateMap := make(map[string]clusterCandidate)
+	for _, c := range candidates {
+		candidateMap[c.NodeID] = c
+	}
+
+	// Track which nodes have been assigned to a cluster
+	assigned := make(map[string]bool)
+
+	// Result clusters
+	var clusters []cluster
+
+	// Process candidates in order (already sorted by neighbor count descending)
+	for _, candidate := range candidates {
+		// Skip if this node is already assigned to a cluster
+		if assigned[candidate.NodeID] {
+			continue
+		}
+
+		// Build cluster starting from this candidate
+		var members []clusterMember
+
+		// Add the candidate itself
+		members = append(members, clusterMember{
+			NodeID:    candidate.NodeID,
+			Embedding: candidate.Embedding,
+		})
+
+		// Add unassigned neighbors
+		for _, neighborID := range candidate.NeighborIDs {
+			if assigned[neighborID] {
+				continue
+			}
+
+			// Get neighbor's embedding from candidateMap if available
+			var neighborEmbedding []float64
+			if neighborCandidate, exists := candidateMap[neighborID]; exists {
+				neighborEmbedding = neighborCandidate.Embedding
+			}
+			// Note: If neighbor is not in candidateMap, it means it didn't have
+			// enough neighbors to be a candidate itself, but we still include it
+			// in this cluster. Its embedding may be nil.
+
+			members = append(members, clusterMember{
+				NodeID:    neighborID,
+				Embedding: neighborEmbedding,
+			})
+		}
+
+		// Only keep clusters that meet minimum size requirement
+		if len(members) < minSize {
+			continue
+		}
+
+		// Mark all members as assigned
+		for _, member := range members {
+			assigned[member.NodeID] = true
+		}
+
+		// Add cluster to results
+		clusters = append(clusters, cluster{
+			Members: members,
+			Layer:   candidate.Layer,
+		})
+	}
+
+	return clusters
 }
 
 // asStringSlice safely converts interface{} to []string

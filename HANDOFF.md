@@ -1,7 +1,7 @@
 # MDEMG Development Handoff Document
 
 **Date:** 2026-01-16
-**Status:** Core Features Complete - 9 Tasks Merged (PRs #1-7 + Tasks 7-9)
+**Status:** Core Features Complete - 10 Tasks Merged (PRs #1-8 + Tasks 7-9)
 
 > **Vision Document:** See [VISION.md](./VISION.md) for the complete architectural philosophy and design principles.
 
@@ -10,24 +10,28 @@
 ## 🚀 RESUME DEVELOPMENT - START HERE
 
 ### Before Coding
-1. **Start the infrastructure:**
+1. **Configure embedding provider** in `mdemg_build/service/.env`:
+   - OpenAI: Set `EMBEDDING_PROVIDER=openai` and `OPENAI_API_KEY=sk-...`
+   - Ollama: Set `EMBEDDING_PROVIDER=ollama` (local, no API key needed)
+
+2. **Start the infrastructure:**
    ```bash
    cd /Users/reh3376/mdemg
    ./start-mdemg.sh
    ```
-   This starts Neo4j (if not running), checks Ollama, and launches the MDEMG service on :8082.
+   This starts Neo4j (if not running), sources `.env`, and launches the MDEMG service on :8082.
 
-2. **Verify everything is working:**
+3. **Verify everything is working:**
    ```bash
    curl -s http://localhost:8082/readyz | jq
-   # Should show: {"status":"ready","embedding_provider":"ollama:nomic-embed-text",...}
+   # Should show: {"status":"ready","embedding_provider":"openai:text-embedding-ada-002+cache",...}
    ```
 
-3. **If Cursor was restarted**, the MCP tools (`memory_store`, `memory_recall`, etc.) should be available. Test with `memory_status`.
+4. **If Cursor was restarted**, the MCP tools (`memory_store`, `memory_recall`, etc.) should be available. Test with `memory_status`.
 
 ### What's Working
-- ✅ Neo4j graph database with vector indexes (768-dim for Ollama)
-- ✅ Go service with embedding generation (Ollama/OpenAI)
+- ✅ Neo4j graph database with vector indexes (1536-dim for OpenAI, 768-dim for Ollama)
+- ✅ Go service with embedding generation (OpenAI or Ollama) + LRU caching
 - ✅ Full retrieval pipeline: vector recall → graph expansion → spreading activation → scoring
 - ✅ MCP server with 5 memory tools for agent integration
 - ✅ Ingest and retrieve endpoints with auto-embedding
@@ -40,6 +44,7 @@
 - ✅ **Batch Ingest Endpoint** - `POST /v1/memory/ingest/batch` for bulk imports (Task 7)
 - ✅ **Reflection Endpoint** - `POST /v1/memory/reflect` for deep context exploration (Task 8, PR #7)
 - ✅ **Anomaly Detection** - Non-blocking duplicate/stale detection on ingest (Task 9)
+- ✅ **Embedding Cache** - LRU cache for embedding results, reduces API calls (PR #8)
 
 ### What's Next (Priority Order)
 1. **Use the system!** - The more memories stored, the more emergent behaviors appear
@@ -92,7 +97,7 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
 | **Embedding generation** | `internal/embeddings/` package with OpenAI and Ollama providers |
 | **End-to-end retrieval** | Tested with Ollama `nomic-embed-text` model |
 
-### 🆕 New in This Session (2026-01-16) - 9 Tasks Merged
+### 🆕 New in This Session (2026-01-16) - 10 Tasks Merged
 
 | PR/Task | Feature | Files Added/Modified |
 |---------|---------|---------------------|
@@ -105,6 +110,7 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
 | Task 7 | **Batch Ingest Endpoint** | `POST /v1/memory/ingest/batch` - bulk imports up to 100 items |
 | #7 | **Reflection Endpoint** | `POST /v1/memory/reflect` - `internal/retrieval/reflection.go`, tests |
 | Task 9 | **Anomaly Detection** | `internal/anomaly/` - non-blocking duplicate/stale detection (783 lines) |
+| #8 | **Embedding Cache** | `internal/embeddings/cache.go`, `cache_test.go` (1153 lines) - LRU caching |
 
 **Key Implementations:**
 
@@ -147,6 +153,12 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
    - Duplicate detection: vector similarity > 0.95
    - Stale update detection: nodes not modified in 30+ days
    - Configurable via ANOMALY_* environment variables
+
+9. **Embedding Cache** (`internal/embeddings/cache.go`)
+   - Thread-safe LRU cache for embedding results
+   - Reduces API calls and latency for repeated content
+   - Configurable: EMBEDDING_CACHE_ENABLED=true, EMBEDDING_CACHE_SIZE=1000
+   - Shows in readyz: `"embedding_provider": "openai:text-embedding-ada-002+cache"`
 
 ---
 
@@ -306,6 +318,7 @@ The MCP server is configured in `~/.cursor/mcp.json`:
 | `internal/embeddings/embeddings.go` | Embedder interface + factory |
 | `internal/embeddings/openai.go` | OpenAI embedding provider |
 | `internal/embeddings/ollama.go` | Ollama embedding provider |
+| `internal/embeddings/cache.go` | LRU embedding cache (NEW) |
 | `internal/retrieval/service.go` | Vector recall + expansion + semantic edges |
 | `internal/retrieval/activation.go` | Spreading activation |
 | `internal/retrieval/scoring.go` | Final ranking |
@@ -380,6 +393,10 @@ OPENAI_ENDPOINT=https://api.openai.com/v1
 # Ollama settings (if EMBEDDING_PROVIDER=ollama)
 OLLAMA_ENDPOINT=http://localhost:11434
 OLLAMA_MODEL=nomic-embed-text
+
+# Embedding cache
+EMBEDDING_CACHE_ENABLED=true        # Enable LRU cache for embeddings
+EMBEDDING_CACHE_SIZE=1000           # Max cached embeddings (default 1000)
 ```
 
 ---

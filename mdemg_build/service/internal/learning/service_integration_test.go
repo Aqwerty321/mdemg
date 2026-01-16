@@ -11,6 +11,7 @@ package learning
 import (
 	"context"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -637,6 +638,189 @@ func TestApplyCoactivationMultipleIterations(t *testing.T) {
 	}
 
 	t.Logf("Weight progression over %d iterations: %v", iterations, weights)
+}
+
+// TestApplyCoactivationEdgeCapEnforcement tests that the edge write cap is enforced
+// This is an important safeguard: with N nodes, there are C(N,2) = N*(N-1)/2 potential pairs
+// Without the cap, this could lead to excessive database writes
+func TestApplyCoactivationEdgeCapEnforcement(t *testing.T) {
+	driver := setupTestDriver(t)
+	defer driver.Close(context.Background())
+
+	ctx := context.Background()
+	cfg := testConfig()
+
+	// Set a small cap for testing (10 edges max)
+	cap := 10
+	cfg.LearningEdgeCapPerRequest = cap
+	cfg.LearningMinActivation = 0.0 // Include all nodes
+
+	spaceID := "test-learning-cap-" + time.Now().Format("20060102150405")
+
+	// Create 10 nodes - this generates C(10,2) = 45 potential pairs
+	// With cap=10, only top 10 should be written
+	numNodes := 10
+	nodeIDs := make([]string, numNodes)
+	for i := 0; i < numNodes; i++ {
+		nodeIDs[i] = "cap-node-" + strconv.Itoa(i)
+	}
+
+	cleanup := setupTestNodes(t, ctx, driver, spaceID, nodeIDs)
+	defer cleanup()
+
+	svc := NewService(cfg, driver)
+
+	// Create results with varying activation levels
+	// Higher-indexed nodes get higher activations so we can predict which pairs win
+	results := make([]models.RetrieveResult, numNodes)
+	for i := 0; i < numNodes; i++ {
+		// Activation ranges from 0.1 to 1.0
+		results[i] = models.RetrieveResult{
+			NodeID:     nodeIDs[i],
+			Activation: 0.1 + 0.9*float64(i)/float64(numNodes-1),
+		}
+	}
+
+	resp := models.RetrieveResponse{
+		SpaceID: spaceID,
+		Results: results,
+	}
+
+	err := svc.ApplyCoactivation(ctx, spaceID, resp)
+	if err != nil {
+		t.Fatalf("ApplyCoactivation failed: %v", err)
+	}
+
+	// Count actual edges created in the database
+	edgeCount, err := countEdges(ctx, driver, spaceID)
+	if err != nil {
+		t.Fatalf("Failed to count edges: %v", err)
+	}
+
+	// Each pair creates 2 directed edges (bidirectional)
+	// So cap=10 pairs means 20 directed edges
+	expectedEdges := cap * 2
+	if edgeCount != expectedEdges {
+		t.Errorf("Expected %d directed edges (%d pairs x 2), got %d",
+			expectedEdges, cap, edgeCount)
+	}
+
+	// Verify that the highest activation product pairs were selected
+	// The highest product is between the two highest-activated nodes (indices 8 and 9)
+	// node 8: activation = 0.9, node 9: activation = 1.0
+	highestPairEdge, err := getEdge(ctx, driver, spaceID, nodeIDs[8], nodeIDs[9])
+	if err != nil {
+		t.Fatalf("Failed to get highest pair edge: %v", err)
+	}
+	if highestPairEdge == nil {
+		t.Error("Expected edge between highest activated nodes to exist (should be in top-K)")
+	}
+
+	// The lowest product pair (indices 0 and 1) should NOT be selected
+	// node 0: activation = 0.1, node 1: activation = 0.2
+	lowestPairEdge, err := getEdge(ctx, driver, spaceID, nodeIDs[0], nodeIDs[1])
+	if err != nil {
+		t.Fatalf("Failed to get lowest pair edge: %v", err)
+	}
+	if lowestPairEdge != nil {
+		t.Error("Edge between lowest activated nodes should NOT exist (not in top-K)")
+	}
+
+	t.Logf("Edge cap enforcement verified: %d edges created (cap=%d pairs)", edgeCount, cap)
+}
+
+// TestApplyCoactivationEdgeCapWithLargeInput tests cap enforcement with more nodes
+func TestApplyCoactivationEdgeCapWithLargeInput(t *testing.T) {
+	driver := setupTestDriver(t)
+	defer driver.Close(context.Background())
+
+	ctx := context.Background()
+	cfg := testConfig()
+
+	// Set cap to 50 edges
+	cap := 50
+	cfg.LearningEdgeCapPerRequest = cap
+	cfg.LearningMinActivation = 0.0
+
+	spaceID := "test-learning-cap-large-" + time.Now().Format("20060102150405")
+
+	// Create 20 nodes - this generates C(20,2) = 190 potential pairs
+	// With cap=50, only top 50 should be written
+	numNodes := 20
+	nodeIDs := make([]string, numNodes)
+	for i := 0; i < numNodes; i++ {
+		nodeIDs[i] = "lcap-" + strconv.Itoa(i)
+	}
+
+	cleanup := setupTestNodes(t, ctx, driver, spaceID, nodeIDs)
+	defer cleanup()
+
+	svc := NewService(cfg, driver)
+
+	// Create results with varying activation levels
+	results := make([]models.RetrieveResult, numNodes)
+	for i := 0; i < numNodes; i++ {
+		results[i] = models.RetrieveResult{
+			NodeID:     nodeIDs[i],
+			Activation: 0.1 + 0.9*float64(i)/float64(numNodes-1),
+		}
+	}
+
+	resp := models.RetrieveResponse{
+		SpaceID: spaceID,
+		Results: results,
+	}
+
+	err := svc.ApplyCoactivation(ctx, spaceID, resp)
+	if err != nil {
+		t.Fatalf("ApplyCoactivation failed: %v", err)
+	}
+
+	// Count actual edges
+	edgeCount, err := countEdges(ctx, driver, spaceID)
+	if err != nil {
+		t.Fatalf("Failed to count edges: %v", err)
+	}
+
+	// cap=50 pairs means 100 directed edges
+	expectedEdges := cap * 2
+	if edgeCount != expectedEdges {
+		t.Errorf("Expected %d directed edges (%d pairs x 2), got %d",
+			expectedEdges, cap, edgeCount)
+	}
+
+	// Without cap, we would have C(20,2) = 190 pairs = 380 edges
+	potentialEdges := numNodes * (numNodes - 1) // directed edges
+	t.Logf("Cap enforcement: %d edges created from %d potential (cap=%d pairs)",
+		edgeCount, potentialEdges, cap)
+}
+
+// countEdges counts the number of CO_ACTIVATED_WITH edges in a space
+func countEdges(ctx context.Context, driver neo4j.DriverWithContext, spaceID string) (int, error) {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH ()-[r:CO_ACTIVATED_WITH {space_id: $spaceId}]->()
+			RETURN count(r) AS edge_count
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if !res.Next(ctx) {
+			return 0, nil
+		}
+		count, _ := res.Record().Get("edge_count")
+		return count, nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return int(result.(int64)), nil
 }
 
 // TestApplyCoactivationWeightBounds tests that weights stay within bounds

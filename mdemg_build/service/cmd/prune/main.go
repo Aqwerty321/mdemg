@@ -574,8 +574,87 @@ type nodeTombstoneStats struct {
 
 // tombstoneOrphans marks orphan nodes as tombstoned
 func tombstoneOrphans(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneConfig) (nodeTombstoneStats, error) {
-	// TODO: Implement in subtask 3-1
-	return nodeTombstoneStats{}, nil
+	now := time.Now()
+	stats := nodeTombstoneStats{}
+
+	// Query all orphan candidates (nodes with low degree)
+	candidates, err := queryOrphanCandidates(ctx, driver, cfg)
+	if err != nil {
+		return stats, fmt.Errorf("query orphan candidates: %w", err)
+	}
+
+	if len(candidates) == 0 {
+		fmt.Println("  No orphan candidates found")
+		return stats, nil
+	}
+
+	fmt.Printf("  Found %d orphan candidates\n", len(candidates))
+
+	// Collect nodes to tombstone
+	var toTombstone []nodeTombstoneResult
+
+	for _, n := range candidates {
+		stats.scanned++
+
+		result := processNodeForTombstoning(n, cfg, now)
+
+		// Track protection stats
+		if result.Protected {
+			stats.protected++
+		}
+
+		// Collect nodes to tombstone
+		if result.ShouldTombstone {
+			toTombstone = append(toTombstone, result)
+		}
+	}
+
+	// Apply changes if not dry-run
+	if !cfg.DryRun {
+		for _, r := range toTombstone {
+			if err := tombstoneNode(ctx, driver, cfg.SpaceID, r.Node.NodeID); err != nil {
+				return stats, fmt.Errorf("tombstone node %s: %w", r.Node.NodeID, err)
+			}
+		}
+	}
+
+	stats.tombstoned = len(toTombstone)
+
+	return stats, nil
+}
+
+// tombstoneNode marks a node as tombstoned in the database by setting status='tombstoned'
+func tombstoneNode(ctx context.Context, driver neo4j.DriverWithContext, spaceID string, nodeID string) error {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode)
+WHERE n.space_id = $spaceId
+  AND n.node_id = $nodeId
+SET n.status = 'tombstoned',
+    n.tombstoned_at = datetime()
+RETURN count(*) AS updated`
+
+		params := map[string]any{
+			"spaceId": spaceID,
+			"nodeId":  nodeID,
+		}
+
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		// Consume result
+		for res.Next(ctx) {
+			// consume
+		}
+		return nil, res.Err()
+	})
+
+	return err
 }
 
 // queryOrphanCandidates fetches nodes that are candidates for tombstoning.

@@ -1,8 +1,21 @@
 # Multi-Dimensional Emergent Memory Graph (MDEMG) — Documentation Index
 
-> **Start Here:** For the architectural vision and design philosophy, see [VISION.md](../../VISION.md)
+> ⚠️ **LEGACY DOCUMENTATION**
 >
-> **For Development:** See [HANDOFF.md](../../HANDOFF.md) for current state and next tasks
+> This directory contains the **original FSD (Functional Specification Documents)** and may be outdated.
+>
+> **For current documentation, see:** [`mdemg_build/docs/`](../mdemg_build/docs/00_README.md)
+>
+> The `mdemg_build/docs/` directory contains:
+> - Updated technical docs (01-14)
+> - New features: batch ingest, reflection endpoint, anomaly detection, embedding cache
+> - Current configuration and environment variables
+
+---
+
+> **Start Here:** For the architectural vision and design philosophy, see [VISION.md](../VISION.md)
+>
+> **For Development:** See [HANDOFF.md](../HANDOFF.md) for current state and next tasks
 
 ## What is MDEMG?
 

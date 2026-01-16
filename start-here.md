@@ -1,5 +1,9 @@
 # MDEMG Long-Term Memory - Build Starter (for a coding agent)
 
+> **Note:** This is the original build starter document. For current development status and quick start, see [HANDOFF.md](./HANDOFF.md).
+>
+> **Recommended startup:** Use `./start-mdemg.sh` which handles all configuration automatically.
+
 ## Axioms (do not violate)
 - Vector index = recall (candidate set)
 - Graph = reasoning (multi-hop context)
@@ -61,20 +65,39 @@ Sanity checks (run in Browser):
 - `MATCH (m:SchemaMeta {key:'schema'}) RETURN m;` (confirm schema version tracking node)
 
 ## 3) Configure the Go service
-Create `.env` (or export env vars) used by the service:
+Create `mdemg_build/service/.env` with the following configuration:
 
 ```bash
-export NEO4J_URI=bolt://localhost:7687
-export NEO4J_USER=neo4j
-export NEO4J_PASS=testpassword
-export NEO4J_DB=neo4j
-export REQUIRED_SCHEMA_VERSION=4
-export HTTP_PORT=8080
+# Neo4j Connection
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASS=testpassword
+REQUIRED_SCHEMA_VERSION=4
+
+# Service
+LISTEN_ADDR=:8082
+
+# Embedding Provider (choose one)
+EMBEDDING_PROVIDER=openai              # or "ollama"
+
+# OpenAI Configuration (if EMBEDDING_PROVIDER=openai)
+OPENAI_API_KEY=sk-...                  # Your OpenAI API key
+OPENAI_MODEL=text-embedding-ada-002    # 1536 dimensions
+OPENAI_ENDPOINT=https://api.openai.com/v1
+
+# Ollama Configuration (if EMBEDDING_PROVIDER=ollama)
+# OLLAMA_ENDPOINT=http://localhost:11434
+# OLLAMA_MODEL=nomic-embed-text        # 768 dimensions
+
+# Embedding Cache
+EMBEDDING_CACHE_ENABLED=true
+EMBEDDING_CACHE_SIZE=1000
 ```
 
-Notes:
+**Important Notes:**
 - `REQUIRED_SCHEMA_VERSION` must match the last migration version applied.
-- If the service includes readiness checks, `/readyz` should fail until versions match.
+- Vector index dimensions must match embedding provider (1536 for OpenAI, 768 for Ollama).
+- If switching providers, drop and recreate the vector index with correct dimensions.
 
 ## 4) Run the service
 From the service module root (where `go.mod` is):
@@ -84,11 +107,14 @@ go mod tidy
 GO111MODULE=on go run ./cmd/server
 ```
 
-Expected endpoints (baseline):
+Expected endpoints:
 - `GET /healthz` : process up
-- `GET /readyz` : DB reachable + schema version matches + vector index exists
-- `POST /v1/ingest` : ingest observations/memories (creates/updates nodes, embeddings)
-- `POST /v1/retrieve` : retrieve candidates (vector recall + bounded expansion + scoring)
+- `GET /readyz` : DB reachable + schema version matches + embedding provider status
+- `POST /v1/memory/ingest` : ingest single observation (creates/updates nodes, embeddings)
+- `POST /v1/memory/ingest/batch` : bulk ingest up to 100 observations
+- `POST /v1/memory/retrieve` : retrieve candidates (vector recall + expansion + scoring)
+- `POST /v1/memory/reflect` : deep context exploration (3-stage traversal)
+- `GET /v1/metrics` : graph health statistics
 
 ## 5) Retrieval pipeline implementation checklist
 Implement in this order to get an end-to-end loop:

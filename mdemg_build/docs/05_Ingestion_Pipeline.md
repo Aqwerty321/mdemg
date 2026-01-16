@@ -83,13 +83,92 @@ ON MATCH SET r.updated_at=datetime(), r.evidence_count=r.evidence_count+1,
              r.weight = min(1.0, r.weight + 0.02);
 ```
 
-### 7.2 Semantic association via vector nearest neighbors
-Your service does:
-1) query index for nearest neighbors
-2) create/update `ASSOCIATED_WITH` edges to top M neighbors
-3) set `dim_semantic` based on similarity score
+### 7.2 Semantic Association via Vector Nearest Neighbors
 
-### 7.3 Containment via path conventions
+On every ingest, the service automatically creates ASSOCIATED_WITH edges to similar existing nodes.
+
+**Process:**
+1. Generate embedding for new/updated node content
+2. Query vector index for top-N most similar nodes
+3. Filter by minimum similarity threshold
+4. Create/update ASSOCIATED_WITH edges with similarity-based weights
+
+**Configuration:**
+```bash
+SEMANTIC_EDGE_TOP_N=5                # Max edges created per ingest (default 5)
+SEMANTIC_EDGE_MIN_SIMILARITY=0.7     # Minimum cosine similarity (default 0.7)
+```
+
+**Implementation (service.go):**
+```cypher
+CALL db.index.vector.queryNodes('memNodeEmbedding', $topN, $nodeEmbedding)
+YIELD node AS neighbor, score
+WHERE neighbor.space_id = $spaceId
+  AND neighbor.node_id <> $nodeId
+  AND score >= $minSimilarity
+RETURN neighbor.node_id AS neighbor_id, score
+ORDER BY score DESC
+LIMIT $topN
+```
+
+**Edge Creation:**
+```cypher
+MERGE (a)-[r:ASSOCIATED_WITH {space_id:$spaceId}]->(b)
+ON CREATE SET
+  r.edge_id = $edgeId,
+  r.created_at = datetime(),
+  r.updated_at = datetime(),
+  r.weight = $similarity,
+  r.dim_semantic = 1.0,
+  r.dim_temporal = 0.0,
+  r.dim_coactivation = 0.0,
+  r.evidence_count = 1,
+  r.status = 'active'
+ON MATCH SET
+  r.updated_at = datetime(),
+  r.weight = CASE WHEN $similarity > r.weight THEN $similarity ELSE r.weight END,
+  r.evidence_count = r.evidence_count + 1
+```
+
+**Response includes created edges:**
+```json
+{
+  "node_id": "abc-123",
+  "obs_id": "obs-456",
+  "created_edges": [
+    {"target": "def-789", "type": "ASSOCIATED_WITH", "weight": 0.85},
+    {"target": "ghi-012", "type": "ASSOCIATED_WITH", "weight": 0.78}
+  ]
+}
+```
+
+### 7.3 Anomaly Detection During Ingest
+
+Non-blocking anomaly detection runs on each ingest (100ms timeout).
+
+**Detected Anomalies:**
+- **Duplicate**: Vector similarity > 0.95 to existing node
+- **Stale Update**: Node not modified in 30+ days being updated
+
+**Configuration:**
+```bash
+ANOMALY_DETECTION_ENABLED=true
+ANOMALY_DUPLICATE_THRESHOLD=0.95
+ANOMALY_STALE_DAYS=30
+ANOMALY_MAX_CHECK_MS=100
+```
+
+**Response includes anomalies:**
+```json
+{
+  "node_id": "abc-123",
+  "anomalies": [
+    {"type": "duplicate", "similar_node_id": "xyz-999", "similarity": 0.97}
+  ]
+}
+```
+
+### 7.4 Containment via path conventions
 If your `path` encodes hierarchy, derive CONTAINS/PART_OF edges accordingly.
 
 ## 8) Evidence discipline

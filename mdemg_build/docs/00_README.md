@@ -45,13 +45,28 @@ MDEMG is a **cognitive substrate** for AI coding agents where higher-level conce
 | `13_Go_Service_Framework.md` | Go service implementation details |
 | `14_Operations_Runbook.md` | Operational procedures |
 
-## Build Priorities (MVP)
+## Completed Features (10 PRs Merged)
+
+| # | Feature | Description | Doc Reference |
+|---|---------|-------------|---------------|
+| 1 | **Edge Weight Decay CLI** | Exponential decay, pinned protection | `08_Config_and_Tuning.md` |
+| 2 | **Hebbian Learning Loop** | CO_ACTIVATED_WITH edge creation | `04_Activation_and_Learning.md` |
+| 3 | **Integration Tests** | End-to-end test suite | `09_Testing_and_Simulation.md` |
+| 4 | **Graph Health Metrics** | `GET /v1/metrics` endpoint | `06_Retrieval_API_and_Scoring.md` |
+| 5 | **Consolidation CLI** | Cluster detection, abstraction promotion | `07_Consolidation_and_Pruning.md` |
+| 6 | **Semantic Edges on Ingest** | Auto-creates ASSOCIATED_WITH edges | `05_Ingestion_Pipeline.md` |
+| 7 | **Batch Ingest Endpoint** | `POST /v1/memory/ingest/batch` | `06_Retrieval_API_and_Scoring.md` |
+| 8 | **Reflection Endpoint** | `POST /v1/memory/reflect` (3-stage) | `06_Retrieval_API_and_Scoring.md` |
+| 9 | **Anomaly Detection** | Duplicate/stale detection on ingest | `05_Ingestion_Pipeline.md` |
+| 10 | **Embedding Cache** | LRU cache for API calls | `08_Config_and_Tuning.md` |
+
+## Build Priorities (MVP) ✅ COMPLETE
 
 1. **Schema + constraints** — labels, relationship types, property conventions ✅
 2. **Ingestion** — append-only observations + embedding creation + basic edges ✅
 3. **Retrieval** — vector candidate recall + expansion + scoring ✅
-4. **Learning loop** — co-activation edge strengthening + decay job 🔄
-5. **Consolidation** — create abstraction nodes from stable clusters ⏳
+4. **Learning loop** — co-activation edge strengthening + decay job ✅
+5. **Consolidation** — create abstraction nodes from stable clusters ✅
 
 ## Design Principles
 

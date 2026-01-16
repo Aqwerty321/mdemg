@@ -69,7 +69,9 @@ Located in `mdemg_build/service/.env`:
 | NEO4J_PASS | testpassword |
 | REQUIRED_SCHEMA_VERSION | 4 |
 | VECTOR_INDEX_NAME | memNodeEmbedding |
-| LISTEN_ADDR | :8080 |
+| LISTEN_ADDR | :8082 |
+| EMBEDDING_PROVIDER | openai (or ollama) |
+| EMBEDDING_CACHE_ENABLED | true |
 
 ## Docker Commands
 

@@ -161,25 +161,30 @@ A higher-order capability where MDEMG acts as an **SME (Subject Matter Expert)**
 
 ---
 
-## Future Roadmap
+## Development Roadmap
 
-### Phase 1: Core Infrastructure (Current)
+### Phase 1: Core Infrastructure ✅ COMPLETE
 - [x] Neo4j graph with vector indexes
 - [x] Go service with retrieval pipeline
 - [x] Embedding generation (Ollama/OpenAI)
-- [ ] Learning loop (CO_ACTIVATED_WITH edges)
-- [ ] Decay and pruning jobs
+- [x] Embedding cache (LRU)
+- [x] Learning loop (CO_ACTIVATED_WITH edges via Hebbian formula)
+- [x] Edge weight decay CLI (`cmd/decay`)
+- [x] Integration test suite
 
-### Phase 2: Emergence Mechanics
-- [ ] Layer promotion algorithms
-- [ ] Cluster detection for abstraction
+### Phase 2: Emergence Mechanics (Current)
+- [x] Cluster detection for abstraction (`cmd/consolidate`)
+- [x] Layer promotion via CLI
+- [ ] Automatic layer promotion triggers
 - [ ] Dynamic node reorganization
 - [ ] Cross-layer relationship management
 
-### Phase 3: Active Participation
+### Phase 3: Active Participation (In Progress)
+- [x] Reflection endpoint (`POST /v1/memory/reflect`)
+- [x] Anomaly detection on ingest (duplicates, stale updates)
+- [x] Graph health metrics (`GET /v1/metrics`)
 - [ ] Context-triggered suggestions
 - [ ] Periodic reflection summaries
-- [ ] Anomaly/conflict detection
 - [ ] Agent consulting service API
 
 ### Phase 4: IDE Integration

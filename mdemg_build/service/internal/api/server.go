@@ -55,6 +55,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/readyz", s.handleReadyz)
 	mux.HandleFunc("/v1/memory/retrieve", s.handleRetrieve)
 	mux.HandleFunc("/v1/memory/ingest", s.handleIngest)
+	mux.HandleFunc("/v1/metrics", s.handleMetrics)
 	return mux
 }
 

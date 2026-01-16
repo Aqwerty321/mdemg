@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"time"
 
@@ -529,6 +530,25 @@ RETURN n.node_id AS node_id`
 	})
 	if err != nil {
 		return models.IngestResponse{}, err
+	}
+
+	// Semantic edge creation: link to similar existing nodes
+	if s.cfg.SemanticEdgeOnIngest && len(req.Embedding) > 0 {
+		similarNodes, findErr := s.FindSimilarNodes(ctx, req.SpaceID, req.Embedding, nodeID, s.cfg.SemanticEdgeTopN)
+		if findErr != nil {
+			// Log warning but don't fail the ingest
+			log.Printf("WARN: FindSimilarNodes failed for node %s: %v", nodeID, findErr)
+		} else {
+			for _, sn := range similarNodes {
+				if sn.Score >= s.cfg.SemanticEdgeMinSimilarity {
+					edgeErr := s.CreateAssociatedWithEdge(ctx, req.SpaceID, nodeID, sn.NodeID, sn.Score)
+					if edgeErr != nil {
+						// Log warning but don't fail the ingest
+						log.Printf("WARN: CreateAssociatedWithEdge failed from %s to %s: %v", nodeID, sn.NodeID, edgeErr)
+					}
+				}
+			}
+		}
 	}
 
 	return models.IngestResponse{SpaceID: req.SpaceID, NodeID: nodeID, ObsID: obsID}, nil

@@ -271,33 +271,34 @@ func FromEnv() (Config, error) {
 	}
 
 	// Scoring hyperparameters for retrieval ranking
+	// Weights (alpha, beta, gamma, delta) must be in [0, 1]
 	scoringAlpha, err := atof("SCORING_ALPHA", 0.55)
 	if err != nil {
 		return Config{}, err
 	}
-	if scoringAlpha < 0 {
-		return Config{}, errors.New("SCORING_ALPHA must be >= 0")
+	if scoringAlpha < 0 || scoringAlpha > 1 {
+		return Config{}, errors.New("SCORING_ALPHA must be in range [0, 1]")
 	}
 	scoringBeta, err := atof("SCORING_BETA", 0.30)
 	if err != nil {
 		return Config{}, err
 	}
-	if scoringBeta < 0 {
-		return Config{}, errors.New("SCORING_BETA must be >= 0")
+	if scoringBeta < 0 || scoringBeta > 1 {
+		return Config{}, errors.New("SCORING_BETA must be in range [0, 1]")
 	}
 	scoringGamma, err := atof("SCORING_GAMMA", 0.10)
 	if err != nil {
 		return Config{}, err
 	}
-	if scoringGamma < 0 {
-		return Config{}, errors.New("SCORING_GAMMA must be >= 0")
+	if scoringGamma < 0 || scoringGamma > 1 {
+		return Config{}, errors.New("SCORING_GAMMA must be in range [0, 1]")
 	}
 	scoringDelta, err := atof("SCORING_DELTA", 0.05)
 	if err != nil {
 		return Config{}, err
 	}
-	if scoringDelta < 0 {
-		return Config{}, errors.New("SCORING_DELTA must be >= 0")
+	if scoringDelta < 0 || scoringDelta > 1 {
+		return Config{}, errors.New("SCORING_DELTA must be in range [0, 1]")
 	}
 	scoringPhi, err := atof("SCORING_PHI", 0.08)
 	if err != nil {

@@ -4,6 +4,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -167,7 +168,7 @@ func RequireServiceReady(t *testing.T) {
 }
 
 // RequireEmbeddingProvider checks if an embedding provider is configured.
-// It calls the /readyz endpoint and checks for embedding readiness.
+// It calls the /readyz endpoint and checks for the embedding_provider field.
 // Returns true if embedding provider is available, false otherwise.
 // Does not fail the test - caller should use t.Skip() if needed.
 func RequireEmbeddingProvider(t *testing.T) bool {
@@ -184,8 +185,19 @@ func RequireEmbeddingProvider(t *testing.T) bool {
 	}
 	defer resp.Body.Close()
 
-	// If readyz returns OK, the service including embedding provider is ready
-	return resp.StatusCode == http.StatusOK
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+
+	// Decode response and check for embedding_provider field
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false
+	}
+
+	// Check if embedding_provider field exists and is non-empty
+	provider, ok := result["embedding_provider"].(string)
+	return ok && provider != ""
 }
 
 // CreateTestEmbedding generates a test embedding of the specified dimension.

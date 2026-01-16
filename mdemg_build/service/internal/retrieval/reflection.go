@@ -310,10 +310,25 @@ func (s *Service) Reflect(ctx context.Context, req models.ReflectRequest) (model
 	resp.GraphContext.EdgesTraversed = totalEdgesTraversed
 	resp.GraphContext.MaxLayerReached = maxLayerReached
 
-	// TODO (subtask-2-5): Stage 4 - INSIGHT GENERATION
-	// - Cluster detection: find groups of 3+ nodes with mutual edges
-	// - Pattern detection: count edge types, flag if one type > 50%
-	// - Gap detection: check for expected edges missing
+	// Stage 4: INSIGHT GENERATION
+	// Collect all explored node IDs for insight detection
+	allExploredIDs := make([]string, 0, len(visited)+len(abstractionIDs))
+	for id := range visited {
+		allExploredIDs = append(allExploredIDs, id)
+	}
+	for id := range abstractionIDs {
+		allExploredIDs = append(allExploredIDs, id)
+	}
+
+	// Generate insights from the explored subgraph
+	insights, err := s.generateInsights(ctx, req.SpaceID, allExploredIDs)
+	if err != nil {
+		// Log error but don't fail the entire request - insights are optional
+		// Just return empty insights
+		resp.Insights = []models.Insight{}
+	} else {
+		resp.Insights = insights
+	}
 
 	return resp, nil
 }
@@ -504,4 +519,346 @@ RETURN DISTINCT s, d, w`
 		return nil, err
 	}
 	return outAny.([]AbstractionEdge), nil
+}
+
+// generateInsights detects patterns in the explored subgraph
+// Returns a list of insights including clusters, patterns, and gaps
+func (s *Service) generateInsights(ctx context.Context, spaceID string, nodeIDs []string) ([]models.Insight, error) {
+	if len(nodeIDs) < 3 {
+		// Need at least 3 nodes for meaningful insight detection
+		return []models.Insight{}, nil
+	}
+
+	// Fetch all edges within the explored node set for analysis
+	edges, err := s.fetchEdgesAmongNodes(ctx, spaceID, nodeIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	insights := make([]models.Insight, 0)
+
+	// Cluster detection: find groups of 3+ nodes with mutual edges
+	clusters := detectClusters(nodeIDs, edges)
+	for _, cluster := range clusters {
+		insights = append(insights, models.Insight{
+			Type:        "cluster",
+			Description: fmt.Sprintf("Found cluster of %d densely connected nodes", len(cluster)),
+			NodeIDs:     cluster,
+		})
+	}
+
+	// Pattern detection: identify dominant edge types
+	patterns := detectPatterns(edges)
+	insights = append(insights, patterns...)
+
+	// Gap detection: find core memories that aren't connected
+	gaps := detectGaps(nodeIDs, edges)
+	insights = append(insights, gaps...)
+
+	return insights, nil
+}
+
+// InsightEdge represents an edge for insight analysis
+type InsightEdge struct {
+	Src     string
+	Dst     string
+	RelType string
+	Weight  float64
+}
+
+// fetchEdgesAmongNodes fetches all edges between the given node IDs
+// Used for insight generation to analyze the subgraph structure
+func (s *Service) fetchEdgesAmongNodes(ctx context.Context, spaceID string, nodeIDs []string) ([]InsightEdge, error) {
+	if len(nodeIDs) == 0 {
+		return []InsightEdge{}, nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"spaceId": spaceID,
+		"nodeIds": nodeIDs,
+	}
+
+	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Query for all edges between the specified nodes
+		// This includes CO_ACTIVATED_WITH, ASSOCIATED_WITH, ABSTRACTS_TO, etc.
+		cypher := `MATCH (src:MemoryNode {space_id:$spaceId})-[r]-(dst:MemoryNode {space_id:$spaceId})
+WHERE src.node_id IN $nodeIds AND dst.node_id IN $nodeIds
+  AND src.node_id < dst.node_id
+  AND coalesce(r.status,'active')='active'
+RETURN DISTINCT src.node_id AS s, dst.node_id AS d, type(r) AS t,
+       coalesce(r.weight,0.0) AS w`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		edges := make([]InsightEdge, 0, 256)
+		for res.Next(ctx) {
+			rec := res.Record()
+			srcVal, _ := rec.Get("s")
+			dstVal, _ := rec.Get("d")
+			typeVal, _ := rec.Get("t")
+			weightVal, _ := rec.Get("w")
+
+			e := InsightEdge{
+				Src:     fmt.Sprint(srcVal),
+				Dst:     fmt.Sprint(dstVal),
+				RelType: fmt.Sprint(typeVal),
+				Weight:  toFloat64(weightVal, 0),
+			}
+			edges = append(edges, e)
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return edges, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return outAny.([]InsightEdge), nil
+}
+
+// detectClusters finds groups of 3+ nodes that form densely connected subgraphs
+// Uses triangle detection as the basis for identifying clusters
+func detectClusters(nodeIDs []string, edges []InsightEdge) [][]string {
+	if len(nodeIDs) < 3 || len(edges) < 3 {
+		return nil
+	}
+
+	// Build adjacency map for fast lookups
+	nodeSet := make(map[string]struct{}, len(nodeIDs))
+	for _, id := range nodeIDs {
+		nodeSet[id] = struct{}{}
+	}
+
+	// Adjacency list: node -> set of neighbors
+	adj := make(map[string]map[string]struct{})
+	for _, id := range nodeIDs {
+		adj[id] = make(map[string]struct{})
+	}
+
+	// Populate adjacency list from edges
+	for _, e := range edges {
+		if _, ok := nodeSet[e.Src]; !ok {
+			continue
+		}
+		if _, ok := nodeSet[e.Dst]; !ok {
+			continue
+		}
+		adj[e.Src][e.Dst] = struct{}{}
+		adj[e.Dst][e.Src] = struct{}{}
+	}
+
+	// Find all triangles (3-cliques)
+	triangles := make([][]string, 0)
+	processed := make(map[string]struct{})
+
+	for _, a := range nodeIDs {
+		for b := range adj[a] {
+			if _, done := processed[b]; done {
+				continue
+			}
+			for c := range adj[a] {
+				if c == b {
+					continue
+				}
+				if _, done := processed[c]; done {
+					continue
+				}
+				// Check if b and c are connected
+				if _, connected := adj[b][c]; connected {
+					// Found a triangle: a, b, c
+					tri := []string{a, b, c}
+					// Sort for consistent ordering
+					sortStrings(tri)
+					triangles = append(triangles, tri)
+				}
+			}
+		}
+		processed[a] = struct{}{}
+	}
+
+	// Deduplicate triangles
+	triangles = deduplicateTriangles(triangles)
+
+	// Merge overlapping triangles into larger clusters
+	clusters := mergeOverlappingClusters(triangles)
+
+	// Filter to return only clusters with 3+ nodes
+	result := make([][]string, 0)
+	for _, cluster := range clusters {
+		if len(cluster) >= 3 {
+			result = append(result, cluster)
+		}
+	}
+
+	return result
+}
+
+// sortStrings sorts a slice of strings in place
+func sortStrings(s []string) {
+	for i := 0; i < len(s)-1; i++ {
+		for j := i + 1; j < len(s); j++ {
+			if s[i] > s[j] {
+				s[i], s[j] = s[j], s[i]
+			}
+		}
+	}
+}
+
+// deduplicateTriangles removes duplicate triangles
+func deduplicateTriangles(triangles [][]string) [][]string {
+	seen := make(map[string]struct{})
+	result := make([][]string, 0, len(triangles))
+
+	for _, tri := range triangles {
+		key := tri[0] + "|" + tri[1] + "|" + tri[2]
+		if _, exists := seen[key]; !exists {
+			seen[key] = struct{}{}
+			result = append(result, tri)
+		}
+	}
+
+	return result
+}
+
+// mergeOverlappingClusters merges triangles that share 2+ nodes into larger clusters
+func mergeOverlappingClusters(triangles [][]string) [][]string {
+	if len(triangles) == 0 {
+		return nil
+	}
+
+	// Use union-find to merge overlapping triangles
+	// Start with each triangle as its own cluster
+	clusters := make([]map[string]struct{}, len(triangles))
+	for i, tri := range triangles {
+		clusters[i] = make(map[string]struct{})
+		for _, id := range tri {
+			clusters[i][id] = struct{}{}
+		}
+	}
+
+	// Merge clusters that share 2+ nodes
+	merged := true
+	for merged {
+		merged = false
+		for i := 0; i < len(clusters); i++ {
+			for j := i + 1; j < len(clusters); j++ {
+				// Count shared nodes
+				sharedCount := 0
+				for id := range clusters[i] {
+					if _, exists := clusters[j][id]; exists {
+						sharedCount++
+					}
+				}
+
+				// Merge if 2+ shared nodes
+				if sharedCount >= 2 {
+					// Merge j into i
+					for id := range clusters[j] {
+						clusters[i][id] = struct{}{}
+					}
+					// Remove j
+					clusters = append(clusters[:j], clusters[j+1:]...)
+					merged = true
+					break
+				}
+			}
+			if merged {
+				break
+			}
+		}
+	}
+
+	// Convert back to slices
+	result := make([][]string, 0, len(clusters))
+	for _, cluster := range clusters {
+		ids := make([]string, 0, len(cluster))
+		for id := range cluster {
+			ids = append(ids, id)
+		}
+		sortStrings(ids)
+		result = append(result, ids)
+	}
+
+	return result
+}
+
+// detectPatterns analyzes edge type distribution to identify dominant patterns
+func detectPatterns(edges []InsightEdge) []models.Insight {
+	if len(edges) == 0 {
+		return nil
+	}
+
+	// Count edge types
+	typeCounts := make(map[string]int)
+	for _, e := range edges {
+		typeCounts[e.RelType]++
+	}
+
+	insights := make([]models.Insight, 0)
+	totalEdges := len(edges)
+
+	// Check for dominant edge type (> 50%)
+	for relType, count := range typeCounts {
+		percentage := float64(count) / float64(totalEdges) * 100
+		if percentage > 50 {
+			insights = append(insights, models.Insight{
+				Type:        "pattern",
+				Description: fmt.Sprintf("Dominant relationship: %s (%.0f%% of edges)", relType, percentage),
+				NodeIDs:     []string{}, // Pattern applies to the whole subgraph
+			})
+		}
+	}
+
+	return insights
+}
+
+// detectGaps identifies potential missing connections between core memories
+// If we have nodes that should be connected but aren't, flag as a gap
+func detectGaps(nodeIDs []string, edges []InsightEdge) []models.Insight {
+	if len(nodeIDs) < 2 {
+		return nil
+	}
+
+	// Build adjacency set for fast lookups
+	connected := make(map[string]struct{})
+	for _, e := range edges {
+		// Create bidirectional key
+		key1 := e.Src + "|" + e.Dst
+		key2 := e.Dst + "|" + e.Src
+		connected[key1] = struct{}{}
+		connected[key2] = struct{}{}
+	}
+
+	// Find isolated nodes (nodes with no edges to other explored nodes)
+	isolatedNodes := make([]string, 0)
+	nodeEdgeCount := make(map[string]int)
+
+	for _, e := range edges {
+		nodeEdgeCount[e.Src]++
+		nodeEdgeCount[e.Dst]++
+	}
+
+	for _, id := range nodeIDs {
+		if nodeEdgeCount[id] == 0 {
+			isolatedNodes = append(isolatedNodes, id)
+		}
+	}
+
+	insights := make([]models.Insight, 0)
+
+	// If we have isolated nodes, flag as a gap
+	if len(isolatedNodes) > 0 && len(isolatedNodes) < len(nodeIDs) {
+		insights = append(insights, models.Insight{
+			Type:        "gap",
+			Description: fmt.Sprintf("%d node(s) have no connections to other explored concepts", len(isolatedNodes)),
+			NodeIDs:     isolatedNodes,
+		})
+	}
+
+	return insights
 }

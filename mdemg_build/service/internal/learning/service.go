@@ -2,6 +2,7 @@ package learning
 
 import (
 	"context"
+	"sort"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
@@ -48,17 +49,27 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 	}
 
 	// Build pair updates (cap to config)
+	// Generate all O(n²) candidate pairs with their activation products
 	pairs := make([]pair, 0)
 	for i := 0; i < len(nodes); i++ {
 		for j := i + 1; j < len(nodes); j++ {
 			pairs = append(pairs, pair{src: nodes[i].NodeID, dst: nodes[j].NodeID, ai: nodes[i].Activation, aj: nodes[j].Activation})
 		}
 	}
+
 	capN := s.cfg.LearningEdgeCapPerRequest
 	if capN <= 0 {
 		capN = 200
 	}
+
+	// Select top-K pairs by activation product (ai * aj)
+	// This prioritizes strengthening edges between the most strongly co-activated nodes
+	// and prevents clique spam per 04_Activation_and_Learning.md guidelines
 	if len(pairs) > capN {
+		sort.Slice(pairs, func(i, j int) bool {
+			// Sort descending by activation product
+			return pairs[i].ai*pairs[i].aj > pairs[j].ai*pairs[j].aj
+		})
 		pairs = pairs[:capN]
 	}
 

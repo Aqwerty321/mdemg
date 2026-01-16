@@ -98,11 +98,11 @@ type ActivityStats struct {
 
 // ReflectRequest - request for deep context exploration via /v1/memory/reflect
 type ReflectRequest struct {
-	SpaceID        string    `json:"space_id"`
-	Topic          string    `json:"topic"`                     // natural language topic (required)
-	TopicEmbedding []float32 `json:"topic_embedding,omitempty"` // pre-computed embedding for topic
-	MaxDepth       int       `json:"max_depth,omitempty"`       // hop depth (default: 3)
-	MaxNodes       int       `json:"max_nodes,omitempty"`       // cap results (default: 50)
+	SpaceID        string    `json:"space_id" validate:"required,min=1"`
+	Topic          string    `json:"topic" validate:"required_without=TopicEmbedding,omitempty,min=1,max=500"`                     // natural language topic (required)
+	TopicEmbedding []float32 `json:"topic_embedding,omitempty" validate:"required_without=Topic,omitempty,embedding_dims"` // pre-computed embedding for topic
+	MaxDepth       int       `json:"max_depth,omitempty" validate:"omitempty,min=1,max=10"`       // hop depth (default: 3)
+	MaxNodes       int       `json:"max_nodes,omitempty" validate:"omitempty,min=1,max=500"`       // cap results (default: 50)
 }
 
 // ReflectResponse - response from deep context exploration

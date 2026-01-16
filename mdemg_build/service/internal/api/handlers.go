@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -509,4 +510,96 @@ func contentToText(content any) string {
 	default:
 		return fmt.Sprintf("%v", v)
 	}
+}
+
+// handleArchiveNode handles POST /v1/memory/nodes/{node_id}/archive
+// Soft-deletes a memory node by setting is_archived=true and archived_at timestamp
+func (s *Server) handleArchiveNode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract node_id from URL path: /v1/memory/nodes/{node_id}/archive
+	path := strings.TrimPrefix(r.URL.Path, "/v1/memory/nodes/")
+	nodeID := strings.TrimSuffix(path, "/archive")
+	if nodeID == "" || nodeID == path {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid node_id in path"})
+		return
+	}
+
+	// Parse optional ArchiveRequest (body may be empty)
+	var req models.ArchiveRequest
+	if r.ContentLength > 0 {
+		if !readJSON(w, r, &req) {
+			return
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	params := map[string]any{
+		"nodeId": nodeID,
+		"reason": req.Reason,
+	}
+
+	// Execute archive operation
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+MATCH (n:MemoryNode {node_id: $nodeId})
+SET n.is_archived = true,
+    n.archived_at = datetime(),
+    n.archive_reason = $reason
+RETURN n.node_id AS node_id,
+       coalesce(n.name, n.node_id) AS name,
+       n.archived_at AS archived_at`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			nodeIDVal, _ := rec.Get("node_id")
+			nameVal, _ := rec.Get("name")
+			archivedAtVal, _ := rec.Get("archived_at")
+
+			// Convert archived_at to ISO string
+			var archivedAtStr string
+			if at, ok := archivedAtVal.(neo4j.LocalDateTime); ok {
+				archivedAtStr = at.Time().Format(time.RFC3339)
+			} else if at, ok := archivedAtVal.(time.Time); ok {
+				archivedAtStr = at.Format(time.RFC3339)
+			} else {
+				archivedAtStr = fmt.Sprint(archivedAtVal)
+			}
+
+			return &models.ArchiveResponse{
+				NodeID:     fmt.Sprint(nodeIDVal),
+				Name:       fmt.Sprint(nameVal),
+				ArchivedAt: archivedAtStr,
+				Reason:     req.Reason,
+			}, nil
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		// Node not found
+		return nil, nil
+	})
+
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	if result == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": fmt.Sprintf("node not found: %s", nodeID)})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }

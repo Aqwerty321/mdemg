@@ -1,7 +1,7 @@
 # MDEMG Development Handoff Document
 
 **Date:** 2026-01-16
-**Status:** MCP Integration Complete - Ready for Agent Use
+**Status:** Core Features Complete - 6 PRs Merged Today
 
 > **Vision Document:** See [VISION.md](./VISION.md) for the complete architectural philosophy and design principles.
 
@@ -31,11 +31,18 @@
 - ✅ Full retrieval pipeline: vector recall → graph expansion → spreading activation → scoring
 - ✅ MCP server with 5 memory tools for agent integration
 - ✅ Ingest and retrieve endpoints with auto-embedding
+- ✅ **Hebbian Learning** - `ApplyCoactivation()` creates CO_ACTIVATED_WITH edges (PR #2)
+- ✅ **Semantic Edges on Ingest** - Auto-creates ASSOCIATED_WITH edges to similar nodes (PR #6)
+- ✅ **Edge Weight Decay CLI** - `cmd/decay` for memory maintenance (PR #1)
+- ✅ **Consolidation CLI** - `cmd/consolidate` for cluster detection and abstraction promotion (PR #5)
+- ✅ **Metrics Endpoint** - `GET /v1/metrics` for graph health monitoring (PR #4)
+- ✅ **Integration Tests** - Comprehensive test suite for retrieval pipeline (PR #3)
 
 ### What's Next (Priority Order)
-1. **Learning Loop** - Implement `ApplyCoactivation()` in `internal/learning/service.go`
-2. **Semantic Edges on Ingest** - Auto-create `ASSOCIATED_WITH` edges to similar nodes
-3. **Use the system!** - The more memories stored, the more emergent behaviors appear
+1. **Batch Ingest Endpoint** - `POST /v1/memory/ingest/batch` for bulk imports (Task 7)
+2. **Reflection Endpoint** - `POST /v1/memory/reflect` for deep context exploration (Task 8)
+3. **Anomaly Detection** - Non-blocking contradiction detection on ingest (Task 9)
+4. **Use the system!** - The more memories stored, the more emergent behaviors appear
 
 ### Key Commands
 ```bash
@@ -83,34 +90,41 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
 | **Embedding generation** | `internal/embeddings/` package with OpenAI and Ollama providers |
 | **End-to-end retrieval** | Tested with Ollama `nomic-embed-text` model |
 
-### 🆕 New in This Session (2026-01-15)
+### 🆕 New in This Session (2026-01-16) - 6 PRs Merged
 
-1. **MCP Server Integration** (`mdemg_build/mcp-server/`)
-   - Go-based MCP server for Cursor/Claude agent integration
-   - Tools: `memory_store`, `memory_recall`, `memory_associate`, `memory_reflect`, `memory_status`
-   - Configured in `~/.cursor/mcp.json`
-   - Connects to MDEMG HTTP API on localhost:8082
+| PR | Feature | Files Added/Modified |
+|----|---------|---------------------|
+| #1 | **Edge Weight Decay CLI** | `cmd/decay/main.go` (617 lines), tests (443 lines) |
+| #2 | **Hebbian Learning Loop** | `internal/learning/service.go`, unit + integration tests (2079 lines) |
+| #3 | **Integration Tests** | `tests/integration/` - helpers, ingest, retrieval (1754 lines) |
+| #4 | **Graph Health Metrics** | `GET /v1/metrics` endpoint, handler tests (570 lines) |
+| #5 | **Consolidation CLI** | `cmd/consolidate/main.go` (760 lines), tests (829 lines) |
+| #6 | **Semantic Edges on Ingest** | Auto-creates ASSOCIATED_WITH edges (182 lines) |
 
-2. **Embedding Package** (`internal/embeddings/`)
-   - Interface-based design supporting multiple providers
-   - OpenAI implementation (1536-dim, `text-embedding-ada-002`)
-   - Ollama implementation (768-dim, `nomic-embed-text`)
-   - Auto-initialization based on `EMBEDDING_PROVIDER` env var
+**Key Implementations:**
 
-3. **API Enhancements**
-   - `/v1/memory/retrieve` now accepts `query_text` and auto-generates embeddings
-   - `/v1/memory/ingest` auto-generates embeddings from content
-   - `/readyz` reports embedding provider info
+1. **Hebbian Learning** (`internal/learning/service.go`)
+   - Formula: `Δw = η * a_i * a_j - μ * w_ij`
+   - Configurable: η=0.1, μ=0.01, wmin=0.0, wmax=1.0
+   - Edge cap per request (LEARNING_EDGE_CAP_PER_REQUEST=200)
 
-4. **IDE Setup**
-   - `.vscode/extensions.json` - Recommended extensions
-   - `.vscode/launch.json` - Debug configurations
-   - `.vscode/tasks.json` - Common tasks
-   - `mdemg_build/service/api-tests.http` - REST Client test file
-   - `start-mdemg.sh` - One-command startup script
+2. **Edge Decay** (`cmd/decay/`)
+   - Formula: `w_new = w_old * exp(-decay_rate * days)`
+   - CLI: `go run ./cmd/decay --space-id <id> --dry-run`
+   - Protection for pinned edges
 
-5. **Bug Fixes**
-   - Fixed Cypher syntax error in `IngestObservation` (duplicate variable declaration)
+3. **Semantic Edge Creation** (`internal/retrieval/service.go`)
+   - Auto-creates ASSOCIATED_WITH edges on ingest
+   - Configurable: SEMANTIC_EDGE_TOP_N=5, SEMANTIC_EDGE_MIN_SIMILARITY=0.7
+
+4. **Consolidation** (`cmd/consolidate/`)
+   - Detects clusters via CO_ACTIVATED_WITH edges
+   - Creates abstraction nodes at layer+1
+   - CLI: `go run ./cmd/consolidate --space-id <id> --dry-run`
+
+5. **Metrics Endpoint** (`GET /v1/metrics`)
+   - Node/edge counts, distribution by layer/type
+   - Hub nodes, orphan count, avg edge weight, 24h activity
 
 ---
 
@@ -198,21 +212,31 @@ The MCP server is configured in `~/.cursor/mcp.json`:
 
 ## TODO List - Remaining Work
 
-### Priority 1: Learning Loop (Next)
-- [ ] **Complete `internal/learning/service.go`**
-  - Implement `ApplyCoactivation()` to write `CO_ACTIVATED_WITH` edges
-  - Cap writes per request (default 200 edges max)
-  - Never write activation values - only edge weights
+### ✅ Completed (2026-01-16)
+- [x] **Learning Loop** - `ApplyCoactivation()` with Hebbian formula (PR #2)
+- [x] **Edge Weight Decay CLI** - `cmd/decay` with exponential decay (PR #1)
+- [x] **Semantic Edges on Ingest** - Auto-creates ASSOCIATED_WITH edges (PR #6)
+- [x] **Integration Tests** - Comprehensive test suite (PR #3)
+- [x] **Graph Health Metrics** - `GET /v1/metrics` endpoint (PR #4)
+- [x] **Consolidation CLI** - Cluster detection and abstraction promotion (PR #5)
 
-- [ ] **Add decay job (offline)**
-  - Exponentially decay edge weights over time
-  - Prune edges below threshold
-  - Can be a CLI command or separate cron job
+### Priority 1: Batch & Reflection (Next)
+- [ ] **Batch Ingest Endpoint** (Task 7)
+  - `POST /v1/memory/ingest/batch` for up to 100 observations
+  - Partial success support, batch embedding generation
+  - Per-item results with status
 
-### Priority 2: Enhanced Ingestion
-- [ ] **Add semantic edge creation on ingest**
-  - Find nearest neighbors by vector similarity
-  - Create `ASSOCIATED_WITH` edges to top-N similar nodes
+- [ ] **Reflection Endpoint** (Task 8)
+  - `POST /v1/memory/reflect` for deep context exploration
+  - Multi-hop traversal, abstraction surfacing
+  - Insight generation (clusters, patterns, gaps)
+
+### Priority 2: Anomaly Detection
+- [ ] **Anomaly Detection Service** (Task 9)
+  - Non-blocking contradiction detection on ingest
+  - Duplicate detection (similarity > 0.95)
+  - Outlier detection, stale update warnings
+  - Returns warnings without blocking ingest
 
 ### Priority 3: Testing & Validation
 - [ ] **Create golden test for scoring**
@@ -220,20 +244,10 @@ The MCP server is configured in `~/.cursor/mcp.json`:
   - Retrieve and verify scores match expected values
   - See `docs/12_Retrieval_Scoring_Worked_Examples.md`
 
-- [ ] **Add integration tests**
-  - Test against live Neo4j container
-  - Verify schema version checks work
-  - Test edge case: empty graph retrieval
-
-### Priority 4: Consolidation & Pruning (Later)
-- [ ] **Implement abstraction promotion**
-  - Detect stable clusters at layer k
-  - Create abstraction node at layer k+1
-  - Add `ABSTRACTS_TO` edges
-
-- [ ] **Implement graph pruning**
-  - Remove weak/deprecated edges
-  - Merge redundant nodes
+### Priority 4: Future Enhancements
+- [ ] **Graph pruning** - Remove weak/deprecated edges, merge redundant nodes
+- [ ] **Proactive surfacing** - Context suggestions, anomaly alerts
+- [ ] **Agent consulting service** - SME-like guidance API
 
 ---
 
@@ -250,18 +264,23 @@ The MCP server is configured in `~/.cursor/mcp.json`:
 | File | Purpose |
 |------|---------|
 | `cmd/server/main.go` | Entry point, schema version check |
+| `cmd/decay/main.go` | Edge weight decay CLI (NEW) |
+| `cmd/consolidate/main.go` | Cluster detection + abstraction promotion CLI (NEW) |
 | `internal/config/config.go` | Environment variable parsing |
 | `internal/db/neo4j.go` | Driver creation, schema validation |
 | `internal/api/server.go` | HTTP routes registration |
-| `internal/api/handlers.go` | Request handlers |
+| `internal/api/handlers.go` | Request handlers (includes /v1/metrics) |
+| `internal/api/handlers_test.go` | Handler unit tests (NEW) |
 | `internal/embeddings/embeddings.go` | Embedder interface + factory |
 | `internal/embeddings/openai.go` | OpenAI embedding provider |
 | `internal/embeddings/ollama.go` | Ollama embedding provider |
-| `internal/retrieval/service.go` | Vector recall + expansion |
+| `internal/retrieval/service.go` | Vector recall + expansion + semantic edges |
 | `internal/retrieval/activation.go` | Spreading activation |
 | `internal/retrieval/scoring.go` | Final ranking |
-| `internal/learning/service.go` | CO_ACTIVATED_WITH writeback |
+| `internal/learning/service.go` | Hebbian learning (ApplyCoactivation) |
+| `internal/learning/service_test.go` | Learning unit tests (NEW) |
 | `internal/models/models.go` | Request/response types |
+| `tests/integration/` | Integration test suite (NEW) |
 
 ### MCP Server (`mdemg_build/mcp-server/`)
 | File | Purpose |
@@ -366,44 +385,56 @@ OLLAMA_MODEL=nomic-embed-text
 
 ---
 
-## Next Development Task: Learning Loop
+## Next Development Tasks
 
-The retrieval pipeline is complete. The next step is implementing **Hebbian learning** so the graph strengthens connections between co-activated memories.
+### Task 7: Batch Ingest Endpoint
 
-### Task: Implement `ApplyCoactivation()`
+**Endpoint:** `POST /v1/memory/ingest/batch`
 
-**File:** `mdemg_build/service/internal/learning/service.go`
+**Implementation:**
+- Add `BatchIngestRequest/Response` to `internal/models/models.go`
+- Add `handleBatchIngest` to `internal/api/handlers.go`
+- Add `BatchIngestObservations` to `internal/retrieval/service.go`
+- Max 100 observations per request, partial success supported
 
-**What it should do:**
-1. After a retrieval returns results, create/strengthen `CO_ACTIVATED_WITH` edges between the returned nodes
-2. Edge weight increases when nodes are retrieved together (Hebbian: "neurons that fire together wire together")
-3. Cap writes per request (env: `LEARNING_EDGE_CAP_PER_REQUEST=200`)
-4. Never write activation values - only edge weights
+### Task 8: Reflection Endpoint
 
-**Reference docs:**
-- `mdemg_build/docs/04_Activation_and_Learning.md` - Learning algorithm
-- `mdemg_build/docs/02_Graph_Schema.md` - Edge properties
+**Endpoint:** `POST /v1/memory/reflect`
 
-**Current state:** The function is called in `handlers.go:handleRetrieve` but the implementation is a stub.
+**Implementation:**
+- Create `internal/retrieval/reflection.go`
+- Add `handleReflect` to `internal/api/handlers.go`
+- Multi-hop traversal, abstraction surfacing, insight generation
+
+### Task 9: Anomaly Detection Service
+
+**Implementation:**
+- Create `internal/anomaly/service.go`
+- Non-blocking detection during ingest
+- Types: contradiction, duplicate, outlier, stale_update
 
 ### Observing Emergent Behaviors
 
-Once learning is implemented, monitor the graph:
+Monitor the graph as it learns:
 ```cypher
 // See CO_ACTIVATED_WITH edges forming
-MATCH ()-[r:CO_ACTIVATED_WITH]->() 
+MATCH ()-[r:CO_ACTIVATED_WITH]->()
 RETURN count(r), avg(r.weight)
 
 // Find strongly connected memory pairs
-MATCH (a)-[r:CO_ACTIVATED_WITH]->(b) 
+MATCH (a)-[r:CO_ACTIVATED_WITH]->(b)
 WHERE r.weight > 0.5
-RETURN a.name, b.name, r.weight 
+RETURN a.name, b.name, r.weight
 ORDER BY r.weight DESC LIMIT 20
 
 // See clusters emerging
-MATCH path = (a:MemoryNode)-[:CO_ACTIVATED_WITH*2..3]-(b:MemoryNode) 
-WHERE a <> b 
+MATCH path = (a:MemoryNode)-[:CO_ACTIVATED_WITH*2..3]-(b:MemoryNode)
+WHERE a <> b
 RETURN a.name, b.name, length(path)
+
+// Check semantic edges from ingest
+MATCH ()-[r:ASSOCIATED_WITH]->()
+RETURN count(r), avg(r.weight), avg(r.dim_semantic)
 ```
 
 ### MDEMG Vision Summary

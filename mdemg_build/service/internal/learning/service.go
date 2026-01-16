@@ -73,13 +73,30 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 		pairs = pairs[:capN]
 	}
 
+	// Hebbian learning parameters from config (with fallback defaults)
+	// Formula: Δw_ij = η * a_i * a_j - μ * w_ij
+	// Simplified: new_w = (1-μ)*w + η*prod, clamped to [wmin, wmax]
+	eta := s.cfg.LearningEta
+	if eta <= 0 {
+		eta = 0.02 // fallback default learning rate
+	}
+	mu := s.cfg.LearningMu
+	if mu <= 0 {
+		mu = 0.01 // fallback default decay rate
+	}
+	wmin := s.cfg.LearningWMin
+	wmax := s.cfg.LearningWMax
+	if wmax <= wmin {
+		wmin, wmax = 0.0, 1.0 // fallback default bounds
+	}
+
 	params := map[string]any{
 		"spaceId": spaceID,
 		"pairs":   pairsToMaps(pairs),
-		"eta":     0.02,
-		"mu":      0.01,
-		"wmin":    0.0,
-		"wmax":    1.0,
+		"eta":     eta,
+		"mu":      mu,
+		"wmin":    wmin,
+		"wmax":    wmax,
 	}
 
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
@@ -145,4 +162,35 @@ func clamp01(x float64) float64 {
 		return 1
 	}
 	return x
+}
+
+// HebbianWeightUpdate computes the new weight using the Hebbian learning formula.
+// The formula is: Δw = η * a_i * a_j - μ * w_ij
+// Which simplifies to: new_w = (1-μ)*w + η*a_i*a_j
+// The result is clamped to [wmin, wmax].
+//
+// Parameters:
+//   - w: current weight
+//   - ai: activation of node i (0 to 1)
+//   - aj: activation of node j (0 to 1)
+//   - eta: learning rate (η) - controls strengthening from co-activation
+//   - mu: decay rate (μ) - controls regularization/forgetting
+//   - wmin: minimum allowed weight
+//   - wmax: maximum allowed weight
+//
+// This is a pure function exposed for unit testing.
+func HebbianWeightUpdate(w, ai, aj, eta, mu, wmin, wmax float64) float64 {
+	// Δw = η * a_i * a_j - μ * w
+	// new_w = w + Δw = w + η*a_i*a_j - μ*w = (1-μ)*w + η*a_i*a_j
+	prod := ai * aj
+	newW := (1-mu)*w + eta*prod
+
+	// Clamp to bounds
+	if newW < wmin {
+		return wmin
+	}
+	if newW > wmax {
+		return wmax
+	}
+	return newW
 }

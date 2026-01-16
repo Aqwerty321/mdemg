@@ -212,10 +212,17 @@ func (s *Service) FindSimilarNodes(ctx context.Context, spaceID string, embeddin
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
-	// Query for topN+1 to account for potential self-match that we'll filter out
+	// Use a larger k value to account for cross-space filtering.
+	// The vector index returns top-k across ALL spaces, then we filter by space_id.
+	// Using DefaultCandidateK ensures we have enough candidates after filtering.
+	queryK := s.cfg.DefaultCandidateK
+	if queryK < topN+1 {
+		queryK = topN + 1
+	}
+
 	params := map[string]any{
 		"spaceId":       spaceID,
-		"k":             topN + 1,
+		"k":             queryK,
 		"q":             embedding,
 		"index":         s.cfg.VectorIndexName,
 		"excludeNodeId": excludeNodeID,

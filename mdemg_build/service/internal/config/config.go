@@ -25,6 +25,11 @@ type Config struct {
 	AllowedRelationshipTypes []string
 
 	LearningEdgeCapPerRequest int
+	LearningMinActivation     float64
+	LearningEta               float64 // Hebbian learning rate (η)
+	LearningMu                float64 // Hebbian decay/regularization (μ)
+	LearningWMin              float64 // Minimum weight clamp
+	LearningWMax              float64 // Maximum weight clamp
 
 	// Embedding provider settings
 	EmbeddingProvider   string // "openai", "ollama", or "" (disabled)
@@ -96,6 +101,52 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// Learning minimum activation threshold (0.0-1.0)
+	learnMinActStr := get("LEARNING_MIN_ACTIVATION", "0.20")
+	learnMinAct, err := strconv.ParseFloat(learnMinActStr, 64)
+	if err != nil {
+		return Config{}, fmt.Errorf("LEARNING_MIN_ACTIVATION must be float: %w", err)
+	}
+	if learnMinAct < 0 || learnMinAct > 1 {
+		return Config{}, errors.New("LEARNING_MIN_ACTIVATION must be in range [0, 1]")
+	}
+
+	// Hebbian learning rate (η) - controls how much activation product strengthens edges
+	learnEtaStr := get("LEARNING_ETA", "0.02")
+	learnEta, err := strconv.ParseFloat(learnEtaStr, 64)
+	if err != nil {
+		return Config{}, fmt.Errorf("LEARNING_ETA must be float: %w", err)
+	}
+	if learnEta < 0 {
+		return Config{}, errors.New("LEARNING_ETA must be >= 0")
+	}
+
+	// Hebbian decay/regularization (μ) - controls weight decay toward zero
+	learnMuStr := get("LEARNING_MU", "0.01")
+	learnMu, err := strconv.ParseFloat(learnMuStr, 64)
+	if err != nil {
+		return Config{}, fmt.Errorf("LEARNING_MU must be float: %w", err)
+	}
+	if learnMu < 0 || learnMu > 1 {
+		return Config{}, errors.New("LEARNING_MU must be in range [0, 1]")
+	}
+
+	// Weight clamp bounds for Hebbian updates
+	learnWMinStr := get("LEARNING_WMIN", "0.0")
+	learnWMin, err := strconv.ParseFloat(learnWMinStr, 64)
+	if err != nil {
+		return Config{}, fmt.Errorf("LEARNING_WMIN must be float: %w", err)
+	}
+
+	learnWMaxStr := get("LEARNING_WMAX", "1.0")
+	learnWMax, err := strconv.ParseFloat(learnWMaxStr, 64)
+	if err != nil {
+		return Config{}, fmt.Errorf("LEARNING_WMAX must be float: %w", err)
+	}
+	if learnWMin >= learnWMax {
+		return Config{}, errors.New("LEARNING_WMIN must be < LEARNING_WMAX")
+	}
+
 	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES")
 	parts := strings.Split(allowed, ",")
 	out := make([]string, 0, len(parts))
@@ -128,9 +179,14 @@ func FromEnv() (Config, error) {
 		DefaultHopDepth: hops,
 		MaxNeighborsPerNode: maxNbr,
 		MaxTotalEdgesFetched: maxEdges,
-		AllowedRelationshipTypes: out,
+		AllowedRelationshipTypes:  out,
 		LearningEdgeCapPerRequest: learnCap,
-		EmbeddingProvider: embProvider,
+		LearningMinActivation:     learnMinAct,
+		LearningEta:               learnEta,
+		LearningMu:                learnMu,
+		LearningWMin:              learnWMin,
+		LearningWMax:              learnWMax,
+		EmbeddingProvider:         embProvider,
 		OpenAIAPIKey: openaiKey,
 		OpenAIModel: openaiModel,
 		OpenAIEndpoint: openaiEndpoint,

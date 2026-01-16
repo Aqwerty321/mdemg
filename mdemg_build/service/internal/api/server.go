@@ -11,6 +11,7 @@ import (
 	"mdemg/internal/embeddings"
 	"mdemg/internal/learning"
 	"mdemg/internal/retrieval"
+	"mdemg/internal/validation"
 )
 
 type Server struct {
@@ -96,6 +97,18 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return false
+	}
+	return true
+}
+
+// validateRequest validates a request struct using the validation package.
+// Returns false and writes an error response if validation fails.
+// Use after readJSON with the same pattern: if !validateRequest(w, &req) { return }
+func validateRequest(w http.ResponseWriter, v any) bool {
+	if err := validation.Validate(v); err != nil {
+		resp := validation.FormatValidationErrors(err)
+		writeJSON(w, http.StatusBadRequest, resp)
 		return false
 	}
 	return true

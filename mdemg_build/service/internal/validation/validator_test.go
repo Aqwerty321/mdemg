@@ -2,6 +2,8 @@ package validation
 
 import (
 	"testing"
+
+	"mdemg/internal/models"
 )
 
 // Test structs for validation tests
@@ -624,4 +626,591 @@ func TestValidationErrorResponse_Struct(t *testing.T) {
 	if resp.Details[0].Field != "field1" {
 		t.Errorf("Details[0].Field = %q, want %q", resp.Details[0].Field, "field1")
 	}
+}
+
+// TestValidateRetrieveRequest tests all validation rules for RetrieveRequest
+func TestValidateRetrieveRequest(t *testing.T) {
+	// Helper to create a valid 1536-dim embedding
+	validEmbedding := func() []float32 {
+		return make([]float32, 1536)
+	}
+
+	// Helper to create a valid 768-dim embedding
+	validEmbedding768 := func() []float32 {
+		return make([]float32, 768)
+	}
+
+	tests := []struct {
+		name        string
+		request     models.RetrieveRequest
+		expectError bool
+		errorField  string // expected field in error (optional)
+	}{
+		// Valid cases
+		{
+			name: "valid request with query_text",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+			},
+			expectError: false,
+		},
+		{
+			name: "valid request with query_embedding (1536 dims)",
+			request: models.RetrieveRequest{
+				SpaceID:        "test-space",
+				QueryEmbedding: validEmbedding(),
+			},
+			expectError: false,
+		},
+		{
+			name: "valid request with query_embedding (768 dims)",
+			request: models.RetrieveRequest{
+				SpaceID:        "test-space",
+				QueryEmbedding: validEmbedding768(),
+			},
+			expectError: false,
+		},
+		{
+			name: "valid request with both query_text and query_embedding",
+			request: models.RetrieveRequest{
+				SpaceID:        "test-space",
+				QueryText:      "search query",
+				QueryEmbedding: validEmbedding(),
+			},
+			expectError: false,
+		},
+		{
+			name: "valid request with all optional fields",
+			request: models.RetrieveRequest{
+				SpaceID:        "test-space",
+				QueryText:      "search query",
+				CandidateK:     100,
+				TopK:           10,
+				HopDepth:       2,
+				PolicyContext:  map[string]any{"key": "value"},
+			},
+			expectError: false,
+		},
+
+		// space_id validation
+		{
+			name: "missing space_id fails",
+			request: models.RetrieveRequest{
+				QueryText: "search query",
+			},
+			expectError: true,
+			errorField:  "space_id",
+		},
+		{
+			name: "empty space_id fails",
+			request: models.RetrieveRequest{
+				SpaceID:   "",
+				QueryText: "search query",
+			},
+			expectError: true,
+			errorField:  "space_id",
+		},
+		{
+			name: "space_id at max length (256) passes",
+			request: models.RetrieveRequest{
+				SpaceID:   string(make([]byte, 256)),
+				QueryText: "search query",
+			},
+			expectError: false,
+		},
+		{
+			name: "space_id exceeds max length (257) fails",
+			request: models.RetrieveRequest{
+				SpaceID:   string(make([]byte, 257)),
+				QueryText: "search query",
+			},
+			expectError: true,
+			errorField:  "space_id",
+		},
+		{
+			name: "space_id single character passes",
+			request: models.RetrieveRequest{
+				SpaceID:   "a",
+				QueryText: "search query",
+			},
+			expectError: false,
+		},
+
+		// Either-or validation (query_text OR query_embedding)
+		{
+			name: "neither query_text nor query_embedding fails",
+			request: models.RetrieveRequest{
+				SpaceID: "test-space",
+			},
+			expectError: true,
+		},
+		{
+			name: "empty query_text with nil query_embedding fails",
+			request: models.RetrieveRequest{
+				SpaceID:        "test-space",
+				QueryText:      "",
+				QueryEmbedding: nil,
+			},
+			expectError: true,
+		},
+
+		// query_embedding validation
+		{
+			name: "query_embedding with wrong dimensions (512) fails",
+			request: models.RetrieveRequest{
+				SpaceID:        "test-space",
+				QueryEmbedding: make([]float32, 512),
+			},
+			expectError: true,
+			errorField:  "query_embedding",
+		},
+		{
+			name: "query_embedding with wrong dimensions (100) fails",
+			request: models.RetrieveRequest{
+				SpaceID:        "test-space",
+				QueryEmbedding: make([]float32, 100),
+			},
+			expectError: true,
+			errorField:  "query_embedding",
+		},
+		{
+			name: "query_embedding with wrong dimensions (3072) fails",
+			request: models.RetrieveRequest{
+				SpaceID:        "test-space",
+				QueryEmbedding: make([]float32, 3072),
+			},
+			expectError: true,
+			errorField:  "query_embedding",
+		},
+		{
+			name: "empty query_embedding slice with query_text passes",
+			request: models.RetrieveRequest{
+				SpaceID:        "test-space",
+				QueryText:      "search query",
+				QueryEmbedding: []float32{},
+			},
+			expectError: true, // empty slice still fails embedding_dims validation
+		},
+
+		// candidate_k validation
+		{
+			name: "candidate_k=0 fails (below min)",
+			request: models.RetrieveRequest{
+				SpaceID:    "test-space",
+				QueryText:  "search query",
+				CandidateK: 0,
+			},
+			expectError: false, // omitempty allows 0 (zero value is skipped)
+		},
+		{
+			name: "candidate_k=1 passes (min boundary)",
+			request: models.RetrieveRequest{
+				SpaceID:    "test-space",
+				QueryText:  "search query",
+				CandidateK: 1,
+			},
+			expectError: false,
+		},
+		{
+			name: "candidate_k=1000 passes (max boundary)",
+			request: models.RetrieveRequest{
+				SpaceID:    "test-space",
+				QueryText:  "search query",
+				CandidateK: 1000,
+			},
+			expectError: false,
+		},
+		{
+			name: "candidate_k=1001 fails (exceeds max)",
+			request: models.RetrieveRequest{
+				SpaceID:    "test-space",
+				QueryText:  "search query",
+				CandidateK: 1001,
+			},
+			expectError: true,
+			errorField:  "candidate_k",
+		},
+		{
+			name: "candidate_k=-1 fails (negative)",
+			request: models.RetrieveRequest{
+				SpaceID:    "test-space",
+				QueryText:  "search query",
+				CandidateK: -1,
+			},
+			expectError: true,
+			errorField:  "candidate_k",
+		},
+
+		// top_k validation
+		{
+			name: "top_k=0 passes (omitempty skips zero value)",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+				TopK:      0,
+			},
+			expectError: false,
+		},
+		{
+			name: "top_k=1 passes (min boundary)",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+				TopK:      1,
+			},
+			expectError: false,
+		},
+		{
+			name: "top_k=100 passes (max boundary)",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+				TopK:      100,
+			},
+			expectError: false,
+		},
+		{
+			name: "top_k=101 fails (exceeds max)",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+				TopK:      101,
+			},
+			expectError: true,
+			errorField:  "top_k",
+		},
+		{
+			name: "top_k=-1 fails (negative)",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+				TopK:      -1,
+			},
+			expectError: true,
+			errorField:  "top_k",
+		},
+
+		// hop_depth validation
+		{
+			name: "hop_depth=0 passes (min boundary)",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+				HopDepth:  0,
+			},
+			expectError: false,
+		},
+		{
+			name: "hop_depth=5 passes (max boundary)",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+				HopDepth:  5,
+			},
+			expectError: false,
+		},
+		{
+			name: "hop_depth=6 fails (exceeds max)",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+				HopDepth:  6,
+			},
+			expectError: true,
+			errorField:  "hop_depth",
+		},
+		{
+			name: "hop_depth=-1 fails (negative)",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+				HopDepth:  -1,
+			},
+			expectError: true,
+			errorField:  "hop_depth",
+		},
+		{
+			name: "hop_depth=3 passes (typical value)",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+				HopDepth:  3,
+			},
+			expectError: false,
+		},
+
+		// Combined field validation
+		{
+			name: "multiple invalid fields produce multiple errors",
+			request: models.RetrieveRequest{
+				SpaceID:    "",
+				QueryText:  "",
+				CandidateK: 2000,
+				TopK:       200,
+				HopDepth:   10,
+			},
+			expectError: true,
+		},
+		{
+			name: "valid max boundaries for all numeric fields",
+			request: models.RetrieveRequest{
+				SpaceID:    "test-space",
+				QueryText:  "search query",
+				CandidateK: 1000,
+				TopK:       100,
+				HopDepth:   5,
+			},
+			expectError: false,
+		},
+		{
+			name: "valid min boundaries for all numeric fields",
+			request: models.RetrieveRequest{
+				SpaceID:    "test-space",
+				QueryText:  "search query",
+				CandidateK: 1,
+				TopK:       1,
+				HopDepth:   0,
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := Validate(tt.request)
+
+			if tt.expectError && err == nil {
+				t.Error("expected validation error, got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("expected no error, got: %v", err)
+			}
+
+			// If we expect a specific field error, verify it
+			if tt.expectError && err != nil && tt.errorField != "" {
+				resp := FormatValidationErrors(err)
+				found := false
+				for _, d := range resp.Details {
+					if d.Field == tt.errorField {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error for field %q, got errors: %v", tt.errorField, resp.Details)
+				}
+			}
+		})
+	}
+}
+
+// TestValidateRetrieveRequest_EitherOrLogic tests the required_without logic specifically
+func TestValidateRetrieveRequest_EitherOrLogic(t *testing.T) {
+	tests := []struct {
+		name           string
+		queryText      string
+		queryEmbedding []float32
+		expectError    bool
+		errorFields    []string // fields expected in error
+	}{
+		{
+			name:           "only query_text provided",
+			queryText:      "search query",
+			queryEmbedding: nil,
+			expectError:    false,
+		},
+		{
+			name:           "only query_embedding provided (1536 dims)",
+			queryText:      "",
+			queryEmbedding: make([]float32, 1536),
+			expectError:    false,
+		},
+		{
+			name:           "only query_embedding provided (768 dims)",
+			queryText:      "",
+			queryEmbedding: make([]float32, 768),
+			expectError:    false,
+		},
+		{
+			name:           "both provided",
+			queryText:      "search query",
+			queryEmbedding: make([]float32, 1536),
+			expectError:    false,
+		},
+		{
+			name:           "neither provided - both should error",
+			queryText:      "",
+			queryEmbedding: nil,
+			expectError:    true,
+			errorFields:    []string{"query_text", "query_embedding"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := models.RetrieveRequest{
+				SpaceID:        "test-space",
+				QueryText:      tt.queryText,
+				QueryEmbedding: tt.queryEmbedding,
+			}
+			err := Validate(req)
+
+			if tt.expectError && err == nil {
+				t.Error("expected validation error, got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("expected no error, got: %v", err)
+			}
+
+			// Verify expected error fields
+			if tt.expectError && err != nil && len(tt.errorFields) > 0 {
+				resp := FormatValidationErrors(err)
+				for _, expectedField := range tt.errorFields {
+					found := false
+					for _, d := range resp.Details {
+						if d.Field == expectedField {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("expected error for field %q, got errors: %v", expectedField, resp.Details)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestValidateRetrieveRequest_PolicyContext tests that PolicyContext allows any map
+func TestValidateRetrieveRequest_PolicyContext(t *testing.T) {
+	tests := []struct {
+		name          string
+		policyContext map[string]any
+		expectError   bool
+	}{
+		{
+			name:          "nil policy_context passes",
+			policyContext: nil,
+			expectError:   false,
+		},
+		{
+			name:          "empty policy_context passes",
+			policyContext: map[string]any{},
+			expectError:   false,
+		},
+		{
+			name:          "policy_context with string values",
+			policyContext: map[string]any{"key": "value"},
+			expectError:   false,
+		},
+		{
+			name:          "policy_context with mixed types",
+			policyContext: map[string]any{"str": "value", "num": 42, "bool": true},
+			expectError:   false,
+		},
+		{
+			name:          "policy_context with nested map",
+			policyContext: map[string]any{"nested": map[string]any{"inner": "value"}},
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := models.RetrieveRequest{
+				SpaceID:       "test-space",
+				QueryText:     "search query",
+				PolicyContext: tt.policyContext,
+			}
+			err := Validate(req)
+
+			if tt.expectError && err == nil {
+				t.Error("expected validation error, got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("expected no error, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestValidateRetrieveRequest_ErrorMessages tests that error messages are user-friendly
+func TestValidateRetrieveRequest_ErrorMessages(t *testing.T) {
+	tests := []struct {
+		name            string
+		request         models.RetrieveRequest
+		expectedField   string
+		containsMessage string
+	}{
+		{
+			name: "missing space_id has friendly message",
+			request: models.RetrieveRequest{
+				QueryText: "search query",
+			},
+			expectedField:   "space_id",
+			containsMessage: "required",
+		},
+		{
+			name: "invalid embedding dims has friendly message",
+			request: models.RetrieveRequest{
+				SpaceID:        "test-space",
+				QueryEmbedding: make([]float32, 512),
+			},
+			expectedField:   "query_embedding",
+			containsMessage: "768 or 1536",
+		},
+		{
+			name: "top_k exceeds max has friendly message",
+			request: models.RetrieveRequest{
+				SpaceID:   "test-space",
+				QueryText: "search query",
+				TopK:      101,
+			},
+			expectedField:   "top_k",
+			containsMessage: "100",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := Validate(tt.request)
+			if err == nil {
+				t.Fatal("expected validation error, got nil")
+			}
+
+			resp := FormatValidationErrors(err)
+			found := false
+			for _, d := range resp.Details {
+				if d.Field == tt.expectedField {
+					found = true
+					if tt.containsMessage != "" && !contains(d.Message, tt.containsMessage) {
+						t.Errorf("message for %s = %q, expected to contain %q",
+							tt.expectedField, d.Message, tt.containsMessage)
+					}
+					break
+				}
+			}
+
+			if !found {
+				t.Errorf("expected error for field %q, got errors: %v", tt.expectedField, resp.Details)
+			}
+		})
+	}
+}
+
+// contains checks if s contains substr (case-insensitive for flexibility)
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > 0 && containsSubstring(s, substr)))
+}
+
+func containsSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

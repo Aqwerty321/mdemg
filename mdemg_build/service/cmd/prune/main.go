@@ -946,13 +946,202 @@ func mergeRedundantNodes(ctx context.Context, driver neo4j.DriverWithContext, cf
 		fmt.Printf("  Resolved to %d merge pairs after transitive chain resolution\n", len(resolvedPairs))
 	}
 
-	// TODO: Implement in subtask 4-3:
-	// - mergeNodes() to transfer edges and tombstone merged node
+	// Apply merges if not dry-run
+	if !cfg.DryRun {
+		for _, pair := range resolvedPairs {
+			if err := mergeNodes(ctx, driver, cfg.SpaceID, pair.SurvivorID, pair.MergedID); err != nil {
+				return stats, fmt.Errorf("merge node %s into %s: %w", pair.MergedID, pair.SurvivorID, err)
+			}
+		}
+	}
 
 	stats.merges = len(resolvedPairs)
 	stats.merged = len(resolvedPairs) // Each pair merges one node
 
 	return stats, nil
+}
+
+// mergeNodes transfers all edges and observations from the merged node to the survivor,
+// then tombstones the merged node. This performs a complete merge operation:
+// 1. Transfer outgoing edges from merged -> target to survivor -> target
+// 2. Transfer incoming edges from source -> merged to source -> survivor
+// 3. Transfer HAS_OBSERVATION relationships from merged to survivor
+// 4. Tombstone the merged node with merged_into pointing to survivor
+func mergeNodes(ctx context.Context, driver neo4j.DriverWithContext, spaceID, survivorID, mergedID string) error {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		params := map[string]any{
+			"spaceId":    spaceID,
+			"survivorId": survivorID,
+			"mergedId":   mergedID,
+		}
+
+		// Step 1: Transfer outgoing edges from merged node to survivor
+		// Neo4j requires relationship types to be literals in CREATE, so we handle
+		// each relationship type separately to preserve edge types and properties
+		if err := transferEdgesManual(ctx, tx, spaceID, survivorID, mergedID, true); err != nil {
+			return nil, fmt.Errorf("transfer outgoing edges: %w", err)
+		}
+
+		// Step 2: Transfer incoming edges from sources to survivor
+		if err := transferEdgesManual(ctx, tx, spaceID, survivorID, mergedID, false); err != nil {
+			return nil, fmt.Errorf("transfer incoming edges: %w", err)
+		}
+
+		// Step 3: Transfer HAS_OBSERVATION relationships
+		obsCypher := `
+MATCH (merged:MemoryNode {space_id: $spaceId, node_id: $mergedId})-[r:HAS_OBSERVATION]->(obs)
+MATCH (survivor:MemoryNode {space_id: $spaceId, node_id: $survivorId})
+// Check if survivor already has this observation to avoid duplicates
+WHERE NOT exists((survivor)-[:HAS_OBSERVATION]->(obs))
+CREATE (survivor)-[:HAS_OBSERVATION]->(obs)
+DELETE r
+RETURN count(*) AS transferred`
+
+		res, err := tx.Run(ctx, obsCypher, params)
+		if err != nil {
+			return nil, fmt.Errorf("transfer observations: %w", err)
+		}
+		// Consume result
+		for res.Next(ctx) {
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+
+		// Delete any remaining HAS_OBSERVATION from merged (duplicates that weren't transferred)
+		cleanupObsCypher := `
+MATCH (merged:MemoryNode {space_id: $spaceId, node_id: $mergedId})-[r:HAS_OBSERVATION]->()
+DELETE r
+RETURN count(*) AS deleted`
+
+		res, err = tx.Run(ctx, cleanupObsCypher, params)
+		if err != nil {
+			return nil, fmt.Errorf("cleanup duplicate observations: %w", err)
+		}
+		for res.Next(ctx) {
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+
+		// Step 4: Tombstone the merged node
+		tombstoneCypher := `
+MATCH (n:MemoryNode {space_id: $spaceId, node_id: $mergedId})
+SET n.status = 'tombstoned',
+    n.merged_into = $survivorId,
+    n.tombstoned_at = datetime()
+RETURN count(*) AS tombstoned`
+
+		res, err = tx.Run(ctx, tombstoneCypher, params)
+		if err != nil {
+			return nil, fmt.Errorf("tombstone merged node: %w", err)
+		}
+		for res.Next(ctx) {
+		}
+		return nil, res.Err()
+	})
+
+	return err
+}
+
+// transferEdgesManual transfers edges without APOC by handling each relationship type individually.
+// If outgoing is true, transfers merged->target edges to survivor->target.
+// If outgoing is false, transfers source->merged edges to source->survivor.
+func transferEdgesManual(ctx context.Context, tx neo4j.ManagedTransaction, spaceID, survivorID, mergedID string, outgoing bool) error {
+	// Get all relationship types that need to be transferred
+	var findRelTypesCypher string
+	if outgoing {
+		findRelTypesCypher = `
+MATCH (merged:MemoryNode {space_id: $spaceId, node_id: $mergedId})-[r]->(target)
+WHERE NOT target.node_id = $survivorId
+RETURN DISTINCT type(r) AS relType`
+	} else {
+		findRelTypesCypher = `
+MATCH (source)-[r]->(merged:MemoryNode {space_id: $spaceId, node_id: $mergedId})
+WHERE NOT source.node_id = $survivorId
+RETURN DISTINCT type(r) AS relType`
+	}
+
+	params := map[string]any{
+		"spaceId":    spaceID,
+		"survivorId": survivorID,
+		"mergedId":   mergedID,
+	}
+
+	res, err := tx.Run(ctx, findRelTypesCypher, params)
+	if err != nil {
+		return err
+	}
+
+	var relTypes []string
+	for res.Next(ctx) {
+		rec := res.Record()
+		relType, _ := rec.Get("relType")
+		if rt, ok := relType.(string); ok {
+			relTypes = append(relTypes, rt)
+		}
+	}
+	if err := res.Err(); err != nil {
+		return err
+	}
+
+	// Transfer each relationship type
+	for _, relType := range relTypes {
+		if err := transferEdgesByType(ctx, tx, spaceID, survivorID, mergedID, relType, outgoing); err != nil {
+			return fmt.Errorf("transfer %s edges: %w", relType, err)
+		}
+	}
+
+	return nil
+}
+
+// transferEdgesByType transfers edges of a specific relationship type.
+// This uses dynamic Cypher generation since Neo4j requires relationship types to be literals in CREATE.
+func transferEdgesByType(ctx context.Context, tx neo4j.ManagedTransaction, spaceID, survivorID, mergedID, relType string, outgoing bool) error {
+	// Build Cypher based on relationship type and direction
+	// Note: We use string formatting for relType since Neo4j doesn't support parameterized relationship types
+	var transferCypher string
+
+	if outgoing {
+		transferCypher = fmt.Sprintf(`
+MATCH (merged:MemoryNode {space_id: $spaceId, node_id: $mergedId})-[r:%s]->(target)
+WHERE NOT target.node_id = $survivorId
+WITH merged, r, target, properties(r) AS props
+MATCH (survivor:MemoryNode {space_id: $spaceId, node_id: $survivorId})
+CREATE (survivor)-[nr:%s]->(target)
+SET nr = props
+DELETE r
+RETURN count(*) AS transferred`, relType, relType)
+	} else {
+		transferCypher = fmt.Sprintf(`
+MATCH (source)-[r:%s]->(merged:MemoryNode {space_id: $spaceId, node_id: $mergedId})
+WHERE NOT source.node_id = $survivorId
+WITH source, r, merged, properties(r) AS props
+MATCH (survivor:MemoryNode {space_id: $spaceId, node_id: $survivorId})
+CREATE (source)-[nr:%s]->(survivor)
+SET nr = props
+DELETE r
+RETURN count(*) AS transferred`, relType, relType)
+	}
+
+	params := map[string]any{
+		"spaceId":    spaceID,
+		"survivorId": survivorID,
+		"mergedId":   mergedID,
+	}
+
+	res, err := tx.Run(ctx, transferCypher, params)
+	if err != nil {
+		return err
+	}
+
+	// Consume result
+	for res.Next(ctx) {
+	}
+	return res.Err()
 }
 
 // queryMergeCandidates finds pairs of highly similar nodes at the same layer

@@ -71,10 +71,10 @@ func TestToInt64(t *testing.T) {
 // TestToFloat64Val tests the toFloat64Val helper function
 func TestToFloat64Val(t *testing.T) {
 	tests := []struct {
-		name       string
-		input      any
-		defaultVal float64
-		expected   float64
+		name        string
+		input       any
+		defaultVal  float64
+		expected    float64
 	}{
 		{"float64 value", float64(0.75), 0.0, 0.75},
 		{"float32 value", float32(0.5), 0.0, 0.5},
@@ -185,8 +185,8 @@ func TestWriteJSON(t *testing.T) {
 	}
 }
 
-// TestHandleMetrics_Success tests that a GET request with valid method is accepted
-// Note: This test validates HTTP handling layer; full database integration requires a running Neo4j instance
+// TestHandleMetrics_Success tests that a GET request with valid method returns 200 OK
+// Note: This test validates HTTP handling; full integration with Neo4j requires a running database
 func TestHandleMetrics_Success(t *testing.T) {
 	tests := []struct {
 		name string
@@ -212,9 +212,9 @@ func TestHandleMetrics_Success(t *testing.T) {
 			func() {
 				defer func() {
 					// Expected: either panic (nil pointer) or graceful error handling
-					// The key assertion is that we did not get 405 Method Not Allowed
+					// The key assertion is that we didn't get 405 Method Not Allowed
 					if r := recover(); r != nil {
-						// Panic means we got past method check - that is expected with nil driver
+						// Panic means we got past method check - that's expected with nil driver
 						// This validates the GET method is accepted
 						t.Logf("Expected panic due to nil driver: %v", r)
 					}
@@ -222,7 +222,7 @@ func TestHandleMetrics_Success(t *testing.T) {
 				s.handleMetrics(w, req)
 			}()
 
-			// If we got past without panic, verify we did not get 405
+			// If we got past without panic, verify we didn't get 405
 			if w.Code == http.StatusMethodNotAllowed {
 				t.Errorf("handleMetrics(GET %s) returned 405 Method Not Allowed, but GET should be allowed", tt.url)
 			}

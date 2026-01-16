@@ -486,6 +486,455 @@ func TestAsConversionHelpers(t *testing.T) {
 	})
 }
 
+// TestShouldTombstoneNode verifies the node tombstoning decision logic.
+// From docs/07_Consolidation_and_Pruning.md Section 5.2:
+// Tombstone nodes if ALL are true:
+// - degree <= maxDegree (low connectivity, orphan-like)
+// - no observations within retentionDays (no recent activity)
+// - not part of any abstraction chain (no ABSTRACTS_TO/INSTANTIATES relationships)
+//
+// Protection rules:
+// - If degree > maxDegree -> protected (high_degree)
+// - If has observation within retention window -> protected (recent_observation)
+// - If part of abstraction chain -> protected (abstraction_chain)
+func TestShouldTombstoneNode(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name            string
+		node            node
+		maxDegree       int
+		retentionDays   int
+		expectTombstone bool
+		expectProtected bool
+		expectReason    string
+	}{
+		// Orphan tombstone cases - should be tombstoned
+		{
+			name: "orphan node with zero degree, no observations -> tombstone",
+			node: node{
+				NodeID:              "orphan-1",
+				Degree:              0,
+				LastObservationTime: time.Time{}, // no observations
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: true,
+			expectProtected: false,
+			expectReason:    "",
+		},
+		{
+			name: "orphan node with one edge, old observation -> tombstone",
+			node: node{
+				NodeID:              "orphan-2",
+				Degree:              1,
+				LastObservationTime: now.Add(-180 * 24 * time.Hour), // 180 days old
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: true,
+			expectProtected: false,
+			expectReason:    "",
+		},
+		{
+			name: "orphan node at max degree threshold, very old observation -> tombstone",
+			node: node{
+				NodeID:              "orphan-3",
+				Degree:              2,
+				LastObservationTime: now.Add(-365 * 24 * time.Hour), // 1 year old
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       2,
+			retentionDays:   30,
+			expectTombstone: true,
+			expectProtected: false,
+			expectReason:    "",
+		},
+
+		// Abstraction protection cases - nodes in abstraction chains are never tombstoned
+		{
+			name: "node in abstraction chain with zero degree -> protected",
+			node: node{
+				NodeID:              "abstraction-1",
+				Degree:              0,
+				LastObservationTime: time.Time{}, // no observations
+				InAbstractionChain:  true,
+				Status:              "active",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "abstraction_chain",
+		},
+		{
+			name: "node in abstraction chain with old observations -> protected",
+			node: node{
+				NodeID:              "abstraction-2",
+				Degree:              1,
+				LastObservationTime: now.Add(-365 * 24 * time.Hour), // 1 year old
+				InAbstractionChain:  true,
+				Status:              "active",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "abstraction_chain",
+		},
+		{
+			name: "abstraction node takes priority over other checks",
+			node: node{
+				NodeID:              "abstraction-3",
+				Degree:              0, // would qualify as orphan
+				LastObservationTime: time.Time{}, // would qualify for old observation
+				InAbstractionChain:  true,        // but this protects it
+				Status:              "active",
+			},
+			maxDegree:       5,
+			retentionDays:   7,
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "abstraction_chain",
+		},
+
+		// High degree protection cases - well-connected nodes are valuable
+		{
+			name: "node with high degree -> protected",
+			node: node{
+				NodeID:              "hub-1",
+				Degree:              5,
+				LastObservationTime: time.Time{}, // no recent observations
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "high_degree",
+		},
+		{
+			name: "node with degree just above threshold -> protected",
+			node: node{
+				NodeID:              "hub-2",
+				Degree:              2,
+				LastObservationTime: now.Add(-180 * 24 * time.Hour), // old observation
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "high_degree",
+		},
+		{
+			name: "node with very high degree -> protected even without observations",
+			node: node{
+				NodeID:              "hub-3",
+				Degree:              100,
+				LastObservationTime: time.Time{},
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       10,
+			retentionDays:   30,
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "high_degree",
+		},
+
+		// Recent observation protection cases - recently active nodes are kept
+		{
+			name: "node with recent observation -> protected",
+			node: node{
+				NodeID:              "recent-1",
+				Degree:              0,
+				LastObservationTime: now.Add(-30 * 24 * time.Hour), // 30 days ago, within 90 day window
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "recent_observation",
+		},
+		{
+			name: "node with observation exactly at retention window -> protected",
+			node: node{
+				NodeID:              "recent-2",
+				Degree:              1,
+				LastObservationTime: now.Add(-90 * 24 * time.Hour), // exactly 90 days ago
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "recent_observation",
+		},
+		{
+			name: "node with observation just inside window -> protected",
+			node: node{
+				NodeID:              "recent-3",
+				Degree:              0,
+				LastObservationTime: now.Add(-6 * 24 * time.Hour), // 6 days ago, within 7 day window
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       5,
+			retentionDays:   7,
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "recent_observation",
+		},
+		{
+			name: "node with today's observation -> protected",
+			node: node{
+				NodeID:              "recent-4",
+				Degree:              0,
+				LastObservationTime: now,
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "recent_observation",
+		},
+
+		// Already tombstoned cases - skip re-tombstoning
+		{
+			name: "already tombstoned node -> skip (no change needed)",
+			node: node{
+				NodeID:              "tombstoned-1",
+				Degree:              0,
+				LastObservationTime: time.Time{},
+				InAbstractionChain:  false,
+				Status:              "tombstoned",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: false,
+			expectProtected: false,
+			expectReason:    "",
+		},
+
+		// Edge cases
+		{
+			name: "observation just outside retention window -> tombstone",
+			node: node{
+				NodeID:              "edge-1",
+				Degree:              0,
+				LastObservationTime: now.Add(-91 * 24 * time.Hour), // 91 days ago, just outside 90 day window
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: true,
+			expectProtected: false,
+			expectReason:    "",
+		},
+		{
+			name: "degree exactly at threshold, no other protection -> tombstone",
+			node: node{
+				NodeID:              "edge-2",
+				Degree:              1, // at threshold (maxDegree=1)
+				LastObservationTime: now.Add(-100 * 24 * time.Hour),
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			maxDegree:       1,
+			retentionDays:   90,
+			expectTombstone: true,
+			expectProtected: false,
+			expectReason:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tombstone, protected, reason := shouldTombstoneNode(
+				tt.node, tt.maxDegree, tt.retentionDays, now,
+			)
+
+			if tombstone != tt.expectTombstone {
+				t.Errorf("shouldTombstoneNode() tombstone = %v, want %v", tombstone, tt.expectTombstone)
+			}
+			if protected != tt.expectProtected {
+				t.Errorf("shouldTombstoneNode() protected = %v, want %v", protected, tt.expectProtected)
+			}
+			if reason != tt.expectReason {
+				t.Errorf("shouldTombstoneNode() reason = %q, want %q", reason, tt.expectReason)
+			}
+		})
+	}
+}
+
+// TestHasRecentObservation verifies the observation recency check
+func TestHasRecentObservation(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name                string
+		lastObservationTime time.Time
+		retentionDays       int
+		expectRecent        bool
+	}{
+		{
+			name:                "observation 30 days ago, 90 day window -> recent",
+			lastObservationTime: now.Add(-30 * 24 * time.Hour),
+			retentionDays:       90,
+			expectRecent:        true,
+		},
+		{
+			name:                "observation exactly at cutoff -> recent",
+			lastObservationTime: now.Add(-90 * 24 * time.Hour),
+			retentionDays:       90,
+			expectRecent:        true,
+		},
+		{
+			name:                "observation just outside window -> not recent",
+			lastObservationTime: now.Add(-91 * 24 * time.Hour),
+			retentionDays:       90,
+			expectRecent:        false,
+		},
+		{
+			name:                "no observation (zero time) -> not recent",
+			lastObservationTime: time.Time{},
+			retentionDays:       90,
+			expectRecent:        false,
+		},
+		{
+			name:                "observation today -> recent",
+			lastObservationTime: now,
+			retentionDays:       7,
+			expectRecent:        true,
+		},
+		{
+			name:                "observation 1 year ago, 30 day window -> not recent",
+			lastObservationTime: now.Add(-365 * 24 * time.Hour),
+			retentionDays:       30,
+			expectRecent:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recent := hasRecentObservation(tt.lastObservationTime, tt.retentionDays, now)
+
+			if recent != tt.expectRecent {
+				t.Errorf("hasRecentObservation() = %v, want %v", recent, tt.expectRecent)
+			}
+		})
+	}
+}
+
+// TestProcessNodeForTombstoning verifies the combined node processing logic
+func TestProcessNodeForTombstoning(t *testing.T) {
+	now := time.Now()
+	cfg := pruneConfig{
+		MaxDegree:     1,
+		RetentionDays: 90,
+	}
+
+	tests := []struct {
+		name            string
+		node            node
+		expectTombstone bool
+		expectProtected bool
+		expectReason    string
+	}{
+		{
+			name: "orphan node -> tombstone",
+			node: node{
+				NodeID:              "orphan",
+				Degree:              0,
+				LastObservationTime: time.Time{},
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			expectTombstone: true,
+			expectProtected: false,
+			expectReason:    "",
+		},
+		{
+			name: "abstraction chain node -> protected",
+			node: node{
+				NodeID:              "abstraction",
+				Degree:              0,
+				LastObservationTime: time.Time{},
+				InAbstractionChain:  true,
+				Status:              "active",
+			},
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "abstraction_chain",
+		},
+		{
+			name: "high degree node -> protected",
+			node: node{
+				NodeID:              "hub",
+				Degree:              5,
+				LastObservationTime: time.Time{},
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "high_degree",
+		},
+		{
+			name: "node with recent observation -> protected",
+			node: node{
+				NodeID:              "recent",
+				Degree:              0,
+				LastObservationTime: now.Add(-30 * 24 * time.Hour),
+				InAbstractionChain:  false,
+				Status:              "active",
+			},
+			expectTombstone: false,
+			expectProtected: true,
+			expectReason:    "recent_observation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := processNodeForTombstoning(tt.node, cfg, now)
+
+			if result.ShouldTombstone != tt.expectTombstone {
+				t.Errorf("processNodeForTombstoning() ShouldTombstone = %v, want %v",
+					result.ShouldTombstone, tt.expectTombstone)
+			}
+			if result.Protected != tt.expectProtected {
+				t.Errorf("processNodeForTombstoning() Protected = %v, want %v",
+					result.Protected, tt.expectProtected)
+			}
+			if result.ProtectReason != tt.expectReason {
+				t.Errorf("processNodeForTombstoning() ProtectReason = %q, want %q",
+					result.ProtectReason, tt.expectReason)
+			}
+
+			// Verify node is preserved in result
+			if result.Node.NodeID != tt.node.NodeID {
+				t.Errorf("processNodeForTombstoning() Node.NodeID = %v, want %v",
+					result.Node.NodeID, tt.node.NodeID)
+			}
+		})
+	}
+}
+
 // TestAsFloat32Slice verifies the embedding conversion helper
 func TestAsFloat32Slice(t *testing.T) {
 	t.Run("nil returns nil", func(t *testing.T) {

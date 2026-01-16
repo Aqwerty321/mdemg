@@ -1,0 +1,39 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(/Users/reh3376/mdemg/.auto-claude/worktrees/tasks/003-implement-edge-weight-decay-cli-command/**)",
+      "Write(/Users/reh3376/mdemg/.auto-claude/worktrees/tasks/003-implement-edge-weight-decay-cli-command/**)",
+      "Edit(/Users/reh3376/mdemg/.auto-claude/worktrees/tasks/003-implement-edge-weight-decay-cli-command/**)",
+      "Glob(/Users/reh3376/mdemg/.auto-claude/worktrees/tasks/003-implement-edge-weight-decay-cli-command/**)",
+      "Grep(/Users/reh3376/mdemg/.auto-claude/worktrees/tasks/003-implement-edge-weight-decay-cli-command/**)",
+      "Read(/Users/reh3376/mdemg/.auto-claude/worktrees/tasks/003-implement-edge-weight-decay-cli-command/.auto-claude/specs/003-implement-edge-weight-decay-cli-command/**)",
+      "Write(/Users/reh3376/mdemg/.auto-claude/worktrees/tasks/003-implement-edge-weight-decay-cli-command/.auto-claude/specs/003-implement-edge-weight-decay-cli-command/**)",
+      "Edit(/Users/reh3376/mdemg/.auto-claude/worktrees/tasks/003-implement-edge-weight-decay-cli-command/.auto-claude/specs/003-implement-edge-weight-decay-cli-command/**)",
+      "Read(/Users/reh3376/mdemg/.auto-claude/**)",
+      "Write(/Users/reh3376/mdemg/.auto-claude/**)",
+      "Edit(/Users/reh3376/mdemg/.auto-claude/**)",
+      "Glob(/Users/reh3376/mdemg/.auto-claude/**)",
+      "Grep(/Users/reh3376/mdemg/.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)",
+      "mcp__graphiti-memory__search_nodes(*)",
+      "mcp__graphiti-memory__search_facts(*)",
+      "mcp__graphiti-memory__add_episode(*)",
+      "mcp__graphiti-memory__get_episodes(*)",
+      "mcp__graphiti-memory__get_entity_edge(*)"
+    ]
+  }
+}

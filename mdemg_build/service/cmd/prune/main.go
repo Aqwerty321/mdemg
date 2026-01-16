@@ -119,8 +119,8 @@ func parseConfig() (pruneConfig, error) {
 	}
 
 	// Validate flag values
-	if cfg.WeightThreshold < 0 {
-		return pruneConfig{}, errors.New("weight-threshold must be non-negative")
+	if cfg.WeightThreshold < 0 || cfg.WeightThreshold > 1 {
+		return pruneConfig{}, errors.New("weight-threshold must be between 0 and 1")
 	}
 	if cfg.MinEvidence < 0 {
 		return pruneConfig{}, errors.New("min-evidence must be non-negative")

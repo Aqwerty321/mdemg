@@ -1,17 +1,17 @@
 {
   "active": true,
-  "spec": "007-implement-deep-context-exploration-endpoint",
+  "spec": "022-016-request-validation",
   "state": "building",
   "subtasks": {
     "completed": 3,
-    "total": 11,
+    "total": 14,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Core Reflection Algorithm",
+    "current": "Model Validation Tags",
     "id": null,
-    "total": 5
+    "total": 4
   },
   "workers": {
     "active": 0,
@@ -19,7 +19,7 @@
   },
   "session": {
     "number": 4,
-    "started_at": "2026-01-16T13:55:16.861148"
+    "started_at": "2026-01-16T18:27:33.664299"
   },
-  "last_update": "2026-01-16T13:59:43.976991"
+  "last_update": "2026-01-16T18:30:38.615828"
 }

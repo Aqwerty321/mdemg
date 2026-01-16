@@ -1,13 +1,13 @@
 package models
 
 type RetrieveRequest struct {
-	SpaceID        string    `json:"space_id"`
-	QueryText      string    `json:"query_text,omitempty"`
-	QueryEmbedding []float32 `json:"query_embedding,omitempty"`
+	SpaceID        string    `json:"space_id" validate:"required,min=1,max=256"`
+	QueryText      string    `json:"query_text,omitempty" validate:"required_without=QueryEmbedding,omitempty,min=1"`
+	QueryEmbedding []float32 `json:"query_embedding,omitempty" validate:"required_without=QueryText,omitempty,embedding_dims"`
 
-	CandidateK int `json:"candidate_k,omitempty"`
-	TopK       int `json:"top_k,omitempty"`
-	HopDepth   int `json:"hop_depth,omitempty"`
+	CandidateK int `json:"candidate_k,omitempty" validate:"omitempty,min=1,max=1000"`
+	TopK       int `json:"top_k,omitempty" validate:"omitempty,min=1,max=100"`
+	HopDepth   int `json:"hop_depth,omitempty" validate:"omitempty,min=0,max=5"`
 
 	PolicyContext map[string]any `json:"policy_context,omitempty"`
 }

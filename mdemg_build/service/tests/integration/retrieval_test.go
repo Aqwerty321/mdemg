@@ -213,3 +213,191 @@ func TestIngestAndRetrieve(t *testing.T) {
 
 	t.Logf("Successfully retrieved ingested node with score=%f, vector_sim=%f", foundNode.Score, foundNode.VectorSim)
 }
+
+// TestScoringDeterminism verifies that identical queries produce identical scores across multiple runs.
+// This test ensures the retrieval pipeline (vector recall, spreading activation, scoring) is deterministic.
+// According to doc 12_Retrieval_Scoring_Worked_Examples.md, scoring is computed as:
+//   S_i = α*v_i + β*a_i + γ*r_i + δ*c_i - φ*h_i - κ*d_i
+// All these factors should produce identical results for identical inputs.
+func TestScoringDeterminism(t *testing.T) {
+	// Setup: ensure service is ready and create Neo4j driver for verification
+	RequireServiceReady(t)
+	driver := SetupTestNeo4j(t)
+
+	cfg := GetTestConfig()
+	client := NewTestHTTPClient()
+
+	// Create unique space ID for test isolation
+	spaceID := GenerateTestSpaceID("scoring-determinism")
+
+	// Register cleanup
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// --- Step 1: Ingest multiple nodes with known embeddings ---
+	// Create several nodes to ensure scoring involves non-trivial computation
+	// (vector similarity, activation spread, hub penalties)
+	testNodes := []struct {
+		name       string
+		path       string
+		seed       float32
+		confidence float64
+	}{
+		{"node-alpha", "/test/scoring/alpha", 1.0, 0.9},
+		{"node-beta", "/test/scoring/beta", 1.5, 0.8},
+		{"node-gamma", "/test/scoring/gamma", 2.0, 0.7},
+		{"node-delta", "/test/scoring/delta", 2.5, 0.6},
+		{"node-epsilon", "/test/scoring/epsilon", 3.0, 0.5},
+	}
+
+	for _, node := range testNodes {
+		embedding := CreateTestEmbedding(DefaultEmbeddingDims, node.seed)
+		confidence := node.confidence
+
+		ingestReq := IngestRequest{
+			SpaceID:     spaceID,
+			Timestamp:   time.Now().Format(time.RFC3339),
+			Source:      "test-source-determinism",
+			Content:     "Content for " + node.name + " - scoring determinism test",
+			Tags:        []string{"determinism", "test"},
+			Name:        node.name,
+			Path:        node.path,
+			Sensitivity: "internal",
+			Confidence:  &confidence,
+			Embedding:   embedding,
+		}
+
+		ingestBody, err := json.Marshal(ingestReq)
+		if err != nil {
+			t.Fatalf("failed to marshal ingest request for %s: %v", node.name, err)
+		}
+
+		ingestURL := cfg.MDEMGEndpoint + "/v1/memory/ingest"
+		httpReq, err := http.NewRequest(http.MethodPost, ingestURL, bytes.NewReader(ingestBody))
+		if err != nil {
+			t.Fatalf("failed to create ingest HTTP request for %s: %v", node.name, err)
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			t.Fatalf("ingest request failed for %s: %v", node.name, err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			var errResp map[string]any
+			json.NewDecoder(resp.Body).Decode(&errResp)
+			t.Fatalf("ingest returned status %d for %s: %v", resp.StatusCode, node.name, errResp)
+		}
+	}
+
+	// Allow time for data to be committed and indexed
+	time.Sleep(500 * time.Millisecond)
+
+	// --- Step 2: Build the query that will be repeated ---
+	// Use a known embedding that will match our test nodes at varying similarities
+	queryEmbedding := CreateTestEmbedding(DefaultEmbeddingDims, 1.25) // Between alpha and beta
+
+	retrieveReq := RetrieveRequest{
+		SpaceID:        spaceID,
+		QueryEmbedding: queryEmbedding,
+		CandidateK:     50,
+		TopK:           10,
+		HopDepth:       2,
+	}
+
+	// --- Step 3: Run the same query multiple times and collect results ---
+	numRuns := 5
+	allResponses := make([]RetrieveResponse, numRuns)
+
+	retrieveURL := cfg.MDEMGEndpoint + "/v1/memory/retrieve"
+
+	for i := 0; i < numRuns; i++ {
+		retrieveBody, err := json.Marshal(retrieveReq)
+		if err != nil {
+			t.Fatalf("run %d: failed to marshal retrieve request: %v", i+1, err)
+		}
+
+		httpReq, err := http.NewRequest(http.MethodPost, retrieveURL, bytes.NewReader(retrieveBody))
+		if err != nil {
+			t.Fatalf("run %d: failed to create retrieve HTTP request: %v", i+1, err)
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			t.Fatalf("run %d: retrieve request failed: %v", i+1, err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			var errResp map[string]any
+			json.NewDecoder(resp.Body).Decode(&errResp)
+			t.Fatalf("run %d: retrieve returned status %d: %v", i+1, resp.StatusCode, errResp)
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&allResponses[i]); err != nil {
+			t.Fatalf("run %d: failed to decode retrieve response: %v", i+1, err)
+		}
+	}
+
+	// --- Step 4: Verify all runs produced identical results ---
+	baseline := allResponses[0]
+
+	// First, check that we got results
+	if len(baseline.Results) == 0 {
+		t.Fatal("baseline query returned no results - cannot verify determinism")
+	}
+
+	t.Logf("Baseline query returned %d results", len(baseline.Results))
+
+	for runIdx := 1; runIdx < numRuns; runIdx++ {
+		current := allResponses[runIdx]
+
+		// Check result count matches
+		if len(current.Results) != len(baseline.Results) {
+			t.Errorf("run %d: result count differs from baseline: got %d, want %d",
+				runIdx+1, len(current.Results), len(baseline.Results))
+			continue
+		}
+
+		// Check each result matches exactly
+		for i, baseResult := range baseline.Results {
+			currResult := current.Results[i]
+
+			// Verify node ordering is identical
+			if currResult.NodeID != baseResult.NodeID {
+				t.Errorf("run %d, position %d: node_id differs: got %q, want %q",
+					runIdx+1, i, currResult.NodeID, baseResult.NodeID)
+			}
+
+			// Verify scores are identical (exact match - no floating point tolerance)
+			// The scoring algorithm should be fully deterministic
+			if currResult.Score != baseResult.Score {
+				t.Errorf("run %d, position %d (node %s): score differs: got %f, want %f",
+					runIdx+1, i, baseResult.NodeID, currResult.Score, baseResult.Score)
+			}
+
+			// Verify vector similarity is identical
+			if currResult.VectorSim != baseResult.VectorSim {
+				t.Errorf("run %d, position %d (node %s): vector_sim differs: got %f, want %f",
+					runIdx+1, i, baseResult.NodeID, currResult.VectorSim, baseResult.VectorSim)
+			}
+
+			// Verify activation is identical
+			if currResult.Activation != baseResult.Activation {
+				t.Errorf("run %d, position %d (node %s): activation differs: got %f, want %f",
+					runIdx+1, i, baseResult.NodeID, currResult.Activation, baseResult.Activation)
+			}
+		}
+	}
+
+	// Log summary of baseline results for debugging
+	t.Logf("Scoring determinism verified across %d runs with %d results each", numRuns, len(baseline.Results))
+	for i, result := range baseline.Results {
+		t.Logf("  Position %d: node=%s, score=%.6f, vector_sim=%.6f, activation=%.6f",
+			i, result.NodeID, result.Score, result.VectorSim, result.Activation)
+	}
+}

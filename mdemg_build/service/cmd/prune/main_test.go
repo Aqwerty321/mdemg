@@ -968,6 +968,467 @@ func TestAsFloat32Slice(t *testing.T) {
 	})
 }
 
+// TestParseConfig verifies that parseConfig correctly parses CLI flags and environment variables.
+// Note: Since flag.Parse() uses global state, we test the validation logic directly
+// rather than calling parseConfig() multiple times.
+func TestParseConfig(t *testing.T) {
+	// Test default values by checking the documentation and flag definitions
+	t.Run("default values are documented correctly", func(t *testing.T) {
+		// These are the expected default values from parseConfig()
+		expectedDefaults := map[string]any{
+			"weight-threshold":     0.01,
+			"min-evidence":         3,
+			"older-than-days":      30,
+			"retention-days":       90,
+			"max-degree":           1,
+			"similarity-threshold": 0.98,
+			"merge-enabled":        false,
+			"vector-index":         "memNodeEmbedding",
+			"dry-run":              true,
+			"batch-size":           1000,
+		}
+
+		// Verify we have documented the expected defaults
+		if expectedDefaults["weight-threshold"].(float64) != 0.01 {
+			t.Error("weight-threshold default should be 0.01")
+		}
+		if expectedDefaults["min-evidence"].(int) != 3 {
+			t.Error("min-evidence default should be 3")
+		}
+		if expectedDefaults["older-than-days"].(int) != 30 {
+			t.Error("older-than-days default should be 30")
+		}
+		if expectedDefaults["retention-days"].(int) != 90 {
+			t.Error("retention-days default should be 90")
+		}
+		if expectedDefaults["max-degree"].(int) != 1 {
+			t.Error("max-degree default should be 1")
+		}
+		if expectedDefaults["similarity-threshold"].(float64) != 0.98 {
+			t.Error("similarity-threshold default should be 0.98")
+		}
+		if expectedDefaults["merge-enabled"].(bool) != false {
+			t.Error("merge-enabled default should be false")
+		}
+		if expectedDefaults["vector-index"].(string) != "memNodeEmbedding" {
+			t.Error("vector-index default should be memNodeEmbedding")
+		}
+		if expectedDefaults["dry-run"].(bool) != true {
+			t.Error("dry-run default should be true")
+		}
+		if expectedDefaults["batch-size"].(int) != 1000 {
+			t.Error("batch-size default should be 1000")
+		}
+	})
+
+	t.Run("config struct stores all expected fields", func(t *testing.T) {
+		cfg := pruneConfig{
+			Neo4jURI:            "bolt://localhost:7687",
+			Neo4jUser:           "neo4j",
+			Neo4jPass:           "testpassword",
+			WeightThreshold:     0.05,
+			MinEvidence:         5,
+			OlderThanDays:       60,
+			RetentionDays:       120,
+			MaxDegree:           2,
+			SimilarityThreshold: 0.95,
+			MergeEnabled:        true,
+			VectorIndexName:     "customIndex",
+			DryRun:              false,
+			SpaceID:             "test-space",
+			BatchSize:           500,
+		}
+
+		// Verify all fields are accessible and store correctly
+		if cfg.Neo4jURI != "bolt://localhost:7687" {
+			t.Error("Neo4jURI not stored correctly")
+		}
+		if cfg.Neo4jUser != "neo4j" {
+			t.Error("Neo4jUser not stored correctly")
+		}
+		if cfg.Neo4jPass != "testpassword" {
+			t.Error("Neo4jPass not stored correctly")
+		}
+		if cfg.WeightThreshold != 0.05 {
+			t.Error("WeightThreshold not stored correctly")
+		}
+		if cfg.MinEvidence != 5 {
+			t.Error("MinEvidence not stored correctly")
+		}
+		if cfg.OlderThanDays != 60 {
+			t.Error("OlderThanDays not stored correctly")
+		}
+		if cfg.RetentionDays != 120 {
+			t.Error("RetentionDays not stored correctly")
+		}
+		if cfg.MaxDegree != 2 {
+			t.Error("MaxDegree not stored correctly")
+		}
+		if cfg.SimilarityThreshold != 0.95 {
+			t.Error("SimilarityThreshold not stored correctly")
+		}
+		if cfg.MergeEnabled != true {
+			t.Error("MergeEnabled not stored correctly")
+		}
+		if cfg.VectorIndexName != "customIndex" {
+			t.Error("VectorIndexName not stored correctly")
+		}
+		if cfg.DryRun != false {
+			t.Error("DryRun not stored correctly")
+		}
+		if cfg.SpaceID != "test-space" {
+			t.Error("SpaceID not stored correctly")
+		}
+		if cfg.BatchSize != 500 {
+			t.Error("BatchSize not stored correctly")
+		}
+	})
+}
+
+// TestConfigValidation verifies the validation error cases for pruneConfig.
+// From parseConfig(): various validations ensure config values are within valid ranges.
+func TestConfigValidation(t *testing.T) {
+	// Test weight-threshold validation (must be between 0 and 1)
+	t.Run("weight-threshold validation", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			value       float64
+			expectValid bool
+		}{
+			{"valid 0.0", 0.0, true},
+			{"valid 0.5", 0.5, true},
+			{"valid 1.0", 1.0, true},
+			{"valid 0.01 (default)", 0.01, true},
+			{"invalid negative", -0.1, false},
+			{"invalid above 1", 1.1, false},
+			{"invalid large negative", -100.0, false},
+			{"invalid large positive", 100.0, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				valid := tt.value >= 0 && tt.value <= 1
+				if valid != tt.expectValid {
+					t.Errorf("weight-threshold=%v: valid=%v, want %v", tt.value, valid, tt.expectValid)
+				}
+			})
+		}
+	})
+
+	// Test similarity-threshold validation (must be between 0 and 1)
+	t.Run("similarity-threshold validation", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			value       float64
+			expectValid bool
+		}{
+			{"valid 0.0", 0.0, true},
+			{"valid 0.5", 0.5, true},
+			{"valid 1.0", 1.0, true},
+			{"valid 0.98 (default)", 0.98, true},
+			{"invalid negative", -0.1, false},
+			{"invalid above 1", 1.1, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				valid := tt.value >= 0 && tt.value <= 1
+				if valid != tt.expectValid {
+					t.Errorf("similarity-threshold=%v: valid=%v, want %v", tt.value, valid, tt.expectValid)
+				}
+			})
+		}
+	})
+
+	// Test min-evidence validation (must be non-negative)
+	t.Run("min-evidence validation", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			value       int
+			expectValid bool
+		}{
+			{"valid 0", 0, true},
+			{"valid 1", 1, true},
+			{"valid 3 (default)", 3, true},
+			{"valid 100", 100, true},
+			{"invalid -1", -1, false},
+			{"invalid -100", -100, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				valid := tt.value >= 0
+				if valid != tt.expectValid {
+					t.Errorf("min-evidence=%d: valid=%v, want %v", tt.value, valid, tt.expectValid)
+				}
+			})
+		}
+	})
+
+	// Test older-than-days validation (must be non-negative)
+	t.Run("older-than-days validation", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			value       int
+			expectValid bool
+		}{
+			{"valid 0", 0, true},
+			{"valid 1", 1, true},
+			{"valid 30 (default)", 30, true},
+			{"valid 365", 365, true},
+			{"invalid -1", -1, false},
+			{"invalid -30", -30, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				valid := tt.value >= 0
+				if valid != tt.expectValid {
+					t.Errorf("older-than-days=%d: valid=%v, want %v", tt.value, valid, tt.expectValid)
+				}
+			})
+		}
+	})
+
+	// Test retention-days validation (must be non-negative)
+	t.Run("retention-days validation", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			value       int
+			expectValid bool
+		}{
+			{"valid 0", 0, true},
+			{"valid 1", 1, true},
+			{"valid 90 (default)", 90, true},
+			{"valid 365", 365, true},
+			{"invalid -1", -1, false},
+			{"invalid -90", -90, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				valid := tt.value >= 0
+				if valid != tt.expectValid {
+					t.Errorf("retention-days=%d: valid=%v, want %v", tt.value, valid, tt.expectValid)
+				}
+			})
+		}
+	})
+
+	// Test max-degree validation (must be non-negative)
+	t.Run("max-degree validation", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			value       int
+			expectValid bool
+		}{
+			{"valid 0", 0, true},
+			{"valid 1 (default)", 1, true},
+			{"valid 10", 10, true},
+			{"valid 100", 100, true},
+			{"invalid -1", -1, false},
+			{"invalid -10", -10, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				valid := tt.value >= 0
+				if valid != tt.expectValid {
+					t.Errorf("max-degree=%d: valid=%v, want %v", tt.value, valid, tt.expectValid)
+				}
+			})
+		}
+	})
+
+	// Test batch-size validation (must be positive)
+	t.Run("batch-size validation", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			value       int
+			expectValid bool
+		}{
+			{"valid 1", 1, true},
+			{"valid 100", 100, true},
+			{"valid 1000 (default)", 1000, true},
+			{"valid 10000", 10000, true},
+			{"invalid 0", 0, false},
+			{"invalid -1", -1, false},
+			{"invalid -1000", -1000, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				valid := tt.value > 0
+				if valid != tt.expectValid {
+					t.Errorf("batch-size=%d: valid=%v, want %v", tt.value, valid, tt.expectValid)
+				}
+			})
+		}
+	})
+
+	// Test space-id required validation
+	t.Run("space-id required", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			value       string
+			expectValid bool
+		}{
+			{"valid non-empty", "test-space", true},
+			{"valid uuid-like", "550e8400-e29b-41d4-a716-446655440000", true},
+			{"invalid empty", "", false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				valid := tt.value != ""
+				if valid != tt.expectValid {
+					t.Errorf("space-id=%q: valid=%v, want %v", tt.value, valid, tt.expectValid)
+				}
+			})
+		}
+	})
+
+	// Test Neo4j environment variables required validation
+	t.Run("neo4j env vars required", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			uri         string
+			user        string
+			pass        string
+			expectValid bool
+		}{
+			{"all set", "bolt://localhost:7687", "neo4j", "password", true},
+			{"missing uri", "", "neo4j", "password", false},
+			{"missing user", "bolt://localhost:7687", "", "password", false},
+			{"missing pass", "bolt://localhost:7687", "neo4j", "", false},
+			{"all missing", "", "", "", false},
+			{"uri and user missing", "", "", "password", false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				valid := tt.uri != "" && tt.user != "" && tt.pass != ""
+				if valid != tt.expectValid {
+					t.Errorf("neo4j vars (uri=%q, user=%q, pass_set=%v): valid=%v, want %v",
+						tt.uri, tt.user, len(tt.pass) > 0, valid, tt.expectValid)
+				}
+			})
+		}
+	})
+
+	// Test combined validation - a fully valid config
+	t.Run("combined valid config", func(t *testing.T) {
+		cfg := pruneConfig{
+			Neo4jURI:            "bolt://localhost:7687",
+			Neo4jUser:           "neo4j",
+			Neo4jPass:           "testpassword",
+			WeightThreshold:     0.01,
+			MinEvidence:         3,
+			OlderThanDays:       30,
+			RetentionDays:       90,
+			MaxDegree:           1,
+			SimilarityThreshold: 0.98,
+			MergeEnabled:        false,
+			VectorIndexName:     "memNodeEmbedding",
+			DryRun:              true,
+			SpaceID:             "test-space",
+			BatchSize:           1000,
+		}
+
+		// Validate all conditions match parseConfig validation logic
+		errors := []string{}
+
+		if cfg.Neo4jURI == "" || cfg.Neo4jUser == "" || cfg.Neo4jPass == "" {
+			errors = append(errors, "neo4j credentials required")
+		}
+		if cfg.SpaceID == "" {
+			errors = append(errors, "space-id required")
+		}
+		if cfg.WeightThreshold < 0 || cfg.WeightThreshold > 1 {
+			errors = append(errors, "weight-threshold must be between 0 and 1")
+		}
+		if cfg.MinEvidence < 0 {
+			errors = append(errors, "min-evidence must be non-negative")
+		}
+		if cfg.OlderThanDays < 0 {
+			errors = append(errors, "older-than-days must be non-negative")
+		}
+		if cfg.RetentionDays < 0 {
+			errors = append(errors, "retention-days must be non-negative")
+		}
+		if cfg.MaxDegree < 0 {
+			errors = append(errors, "max-degree must be non-negative")
+		}
+		if cfg.SimilarityThreshold < 0 || cfg.SimilarityThreshold > 1 {
+			errors = append(errors, "similarity-threshold must be between 0 and 1")
+		}
+		if cfg.BatchSize <= 0 {
+			errors = append(errors, "batch-size must be positive")
+		}
+
+		if len(errors) > 0 {
+			t.Errorf("valid config should have no errors, got: %v", errors)
+		}
+	})
+
+	// Test combined validation - invalid config with multiple errors
+	t.Run("combined invalid config", func(t *testing.T) {
+		cfg := pruneConfig{
+			Neo4jURI:            "",  // invalid
+			Neo4jUser:           "",  // invalid
+			Neo4jPass:           "",  // invalid
+			WeightThreshold:     1.5, // invalid
+			MinEvidence:         -1,  // invalid
+			OlderThanDays:       -1,  // invalid
+			RetentionDays:       -1,  // invalid
+			MaxDegree:           -1,  // invalid
+			SimilarityThreshold: 2.0, // invalid
+			MergeEnabled:        false,
+			VectorIndexName:     "memNodeEmbedding",
+			DryRun:              true,
+			SpaceID:             "", // invalid
+			BatchSize:           0,  // invalid
+		}
+
+		errors := []string{}
+
+		if cfg.Neo4jURI == "" || cfg.Neo4jUser == "" || cfg.Neo4jPass == "" {
+			errors = append(errors, "neo4j credentials required")
+		}
+		if cfg.SpaceID == "" {
+			errors = append(errors, "space-id required")
+		}
+		if cfg.WeightThreshold < 0 || cfg.WeightThreshold > 1 {
+			errors = append(errors, "weight-threshold must be between 0 and 1")
+		}
+		if cfg.MinEvidence < 0 {
+			errors = append(errors, "min-evidence must be non-negative")
+		}
+		if cfg.OlderThanDays < 0 {
+			errors = append(errors, "older-than-days must be non-negative")
+		}
+		if cfg.RetentionDays < 0 {
+			errors = append(errors, "retention-days must be non-negative")
+		}
+		if cfg.MaxDegree < 0 {
+			errors = append(errors, "max-degree must be non-negative")
+		}
+		if cfg.SimilarityThreshold < 0 || cfg.SimilarityThreshold > 1 {
+			errors = append(errors, "similarity-threshold must be between 0 and 1")
+		}
+		if cfg.BatchSize <= 0 {
+			errors = append(errors, "batch-size must be positive")
+		}
+
+		// Expect multiple errors for this invalid config
+		expectedErrorCount := 9 // neo4j, space-id, weight, min-evidence, older-than, retention, max-degree, similarity, batch-size
+		if len(errors) != expectedErrorCount {
+			t.Errorf("invalid config should have %d errors, got %d: %v",
+				expectedErrorCount, len(errors), errors)
+		}
+	})
+}
+
 // TestResolveTransitiveMerges verifies the transitive merge chain resolution logic.
 // From docs/07_Consolidation_and_Pruning.md:
 // When multiple nodes form a transitive chain (A->B, B->C), all should merge

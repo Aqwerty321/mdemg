@@ -1,7 +1,7 @@
 # MDEMG Development Handoff Document
 
 **Date:** 2026-01-16
-**Status:** Core Features Complete - 14 PRs Merged (#1-12)
+**Status:** Core Features Complete - 16 PRs Merged (#1-14)
 
 > **Vision Document:** See [VISION.md](./VISION.md) for the complete architectural philosophy and design principles.
 
@@ -117,6 +117,8 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
 | #10 | 013 | **Configurable Scoring** | `internal/config/config.go` - 7 hyperparameters |
 | #11 | 014 | **Memory Stats Endpoint** | `GET /v1/memory/stats`, handler tests |
 | #12 | 015 | **Memory Archive/Delete** | `handlers.go` (+415 lines), tests (+491 lines) |
+| #13 | 016 | **Request Validation Middleware** | `internal/validation/` (+2,792 lines) |
+| #14 | 017 | **Graph Pruning CLI** | `cmd/prune/main.go` (+3,292 lines) |
 
 **Key Implementations:**
 
@@ -194,6 +196,19 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
     - `DELETE /v1/memory/nodes/{node_id}?confirm=true` - Hard-delete (permanent)
     - `POST /v1/memory/archive/bulk` - Bulk archive multiple nodes
     - Archived nodes excluded from retrieval results
+
+14. **Request Validation Middleware** (`internal/validation/`)
+    - Centralized validation using `go-playground/validator/v10`
+    - Struct tag-based validation with custom domain validators
+    - Consistent, structured error messages
+    - 2,657 lines of comprehensive tests
+
+15. **Graph Pruning CLI** (`cmd/prune/main.go`)
+    - Edge pruning: removes weak edges (weight < threshold, low evidence, old)
+    - Node tombstoning: marks orphan nodes as inactive
+    - Redundant node merging: identifies and merges similar nodes
+    - Protection rules: pinned edges, high evidence, abstraction chains
+    - CLI: `go run ./cmd/prune --space-id <id> --dry-run`
 
 ---
 
@@ -323,9 +338,13 @@ The MCP server is configured in `~/.cursor/mcp.json`:
   - `TestScoringComponentBreakdown` - Tests isolated node scoring components
   - Fixed `TestScoringDeterminism` tolerance to account for Hebbian learning effects
 
-### 🔄 In Progress (Auto-Claude Tasks)
-- [ ] **Task 016: Request Validation Middleware** - Input validation for all endpoints
-- [ ] **Task 017: Graph Pruning Service** - Remove weak/deprecated edges, merge redundant nodes
+### ✅ All Auto-Claude Tasks Complete (Tasks 001-017)
+
+All 17 Auto-Claude tasks have been implemented and merged. The system now includes:
+- Full retrieval pipeline with Hebbian learning
+- 3 CLI tools: `decay`, `consolidate`, `prune`
+- 8 API endpoints with validation and logging
+- Comprehensive test suites (unit + integration)
 
 ### Priority 4: Future Enhancements
 - [ ] **Proactive surfacing** - Context suggestions, anomaly alerts
@@ -346,8 +365,9 @@ The MCP server is configured in `~/.cursor/mcp.json`:
 | File | Purpose |
 |------|---------|
 | `cmd/server/main.go` | Entry point, schema version check |
-| `cmd/decay/main.go` | Edge weight decay CLI (NEW) |
-| `cmd/consolidate/main.go` | Cluster detection + abstraction promotion CLI (NEW) |
+| `cmd/decay/main.go` | Edge weight decay CLI |
+| `cmd/consolidate/main.go` | Cluster detection + abstraction promotion CLI |
+| `cmd/prune/main.go` | Graph pruning CLI (NEW) |
 | `internal/config/config.go` | Environment variable parsing |
 | `internal/db/neo4j.go` | Driver creation, schema validation |
 | `internal/api/server.go` | HTTP routes registration |
@@ -369,7 +389,9 @@ The MCP server is configured in `~/.cursor/mcp.json`:
 | `internal/learning/service_test.go` | Learning unit tests (NEW) |
 | `internal/anomaly/types.go` | Anomaly detection types and config (NEW) |
 | `internal/anomaly/service.go` | Anomaly detection logic (NEW) |
-| `internal/anomaly/service_test.go` | Anomaly unit tests (NEW) |
+| `internal/anomaly/service_test.go` | Anomaly unit tests |
+| `internal/validation/validator.go` | Request validation (NEW) |
+| `internal/validation/errors.go` | Validation error types (NEW) |
 | `internal/models/models.go` | Request/response types |
 | `tests/integration/` | Integration test suite (NEW) |
 

@@ -967,3 +967,320 @@ func TestAsFloat32Slice(t *testing.T) {
 		}
 	})
 }
+
+// TestResolveTransitiveMerges verifies the transitive merge chain resolution logic.
+// From docs/07_Consolidation_and_Pruning.md:
+// When multiple nodes form a transitive chain (A->B, B->C), all should merge
+// to the oldest node in the chain. Uses union-find to identify connected components.
+func TestResolveTransitiveMerges(t *testing.T) {
+	// Base times for deterministic ordering
+	t1 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC) // oldest
+	t2 := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+	t3 := time.Date(2024, 1, 3, 0, 0, 0, 0, time.UTC)
+	t4 := time.Date(2024, 1, 4, 0, 0, 0, 0, time.UTC)
+	t5 := time.Date(2024, 1, 5, 0, 0, 0, 0, time.UTC)
+
+	t.Run("empty input returns empty output", func(t *testing.T) {
+		result := resolveTransitiveMerges(nil)
+		if len(result) != 0 {
+			t.Errorf("expected empty result, got %d pairs", len(result))
+		}
+
+		result = resolveTransitiveMerges([]mergePair{})
+		if len(result) != 0 {
+			t.Errorf("expected empty result, got %d pairs", len(result))
+		}
+	})
+
+	t.Run("simple pair - A merges into B (B is older)", func(t *testing.T) {
+		pairs := []mergePair{
+			{
+				SurvivorID:        "node-B",
+				MergedID:          "node-A",
+				Similarity:        0.99,
+				SurvivorCreatedAt: t1, // older
+				MergedCreatedAt:   t2, // newer
+			},
+		}
+
+		result := resolveTransitiveMerges(pairs)
+
+		if len(result) != 1 {
+			t.Fatalf("expected 1 merge pair, got %d", len(result))
+		}
+
+		// B is older, so B should be survivor
+		if result[0].SurvivorID != "node-B" {
+			t.Errorf("expected survivor node-B, got %s", result[0].SurvivorID)
+		}
+		if result[0].MergedID != "node-A" {
+			t.Errorf("expected merged node-A, got %s", result[0].MergedID)
+		}
+	})
+
+	t.Run("simple pair - survivor/merged order swapped (A is older)", func(t *testing.T) {
+		// Input has the pair ordered incorrectly (newer as survivor)
+		// The function should resolve this to make the older node the survivor
+		pairs := []mergePair{
+			{
+				SurvivorID:        "node-B", // newer
+				MergedID:          "node-A", // older
+				Similarity:        0.99,
+				SurvivorCreatedAt: t2, // newer
+				MergedCreatedAt:   t1, // older - should become survivor
+			},
+		}
+
+		result := resolveTransitiveMerges(pairs)
+
+		if len(result) != 1 {
+			t.Fatalf("expected 1 merge pair, got %d", len(result))
+		}
+
+		// A is older, so A should be survivor after resolution
+		if result[0].SurvivorID != "node-A" {
+			t.Errorf("expected survivor node-A (older), got %s", result[0].SurvivorID)
+		}
+		if result[0].MergedID != "node-B" {
+			t.Errorf("expected merged node-B (newer), got %s", result[0].MergedID)
+		}
+	})
+
+	t.Run("chain A->B->C - all merge to oldest (A)", func(t *testing.T) {
+		// Input pairs: A->B and B->C
+		// A is oldest, so both B and C should merge into A
+		pairs := []mergePair{
+			{
+				SurvivorID:        "node-A",
+				MergedID:          "node-B",
+				Similarity:        0.99,
+				SurvivorCreatedAt: t1, // oldest
+				MergedCreatedAt:   t2,
+			},
+			{
+				SurvivorID:        "node-B",
+				MergedID:          "node-C",
+				Similarity:        0.98,
+				SurvivorCreatedAt: t2,
+				MergedCreatedAt:   t3, // newest
+			},
+		}
+
+		result := resolveTransitiveMerges(pairs)
+
+		// Should have 2 pairs: A<-B and A<-C (both merge into A)
+		if len(result) != 2 {
+			t.Fatalf("expected 2 merge pairs, got %d", len(result))
+		}
+
+		// Build a map of mergedID -> survivorID for easier verification
+		mergeMap := make(map[string]string)
+		for _, p := range result {
+			mergeMap[p.MergedID] = p.SurvivorID
+		}
+
+		// Both B and C should merge into A
+		if mergeMap["node-B"] != "node-A" {
+			t.Errorf("expected node-B to merge into node-A, got %s", mergeMap["node-B"])
+		}
+		if mergeMap["node-C"] != "node-A" {
+			t.Errorf("expected node-C to merge into node-A, got %s", mergeMap["node-C"])
+		}
+	})
+
+	t.Run("chain with middle oldest - B is oldest in A->B->C chain", func(t *testing.T) {
+		// B is oldest, A and C are newer
+		// Both A and C should merge into B
+		pairs := []mergePair{
+			{
+				SurvivorID:        "node-A",
+				MergedID:          "node-B",
+				Similarity:        0.99,
+				SurvivorCreatedAt: t2, // newer
+				MergedCreatedAt:   t1, // oldest (B)
+			},
+			{
+				SurvivorID:        "node-B",
+				MergedID:          "node-C",
+				Similarity:        0.98,
+				SurvivorCreatedAt: t1, // oldest (B)
+				MergedCreatedAt:   t3, // newest
+			},
+		}
+
+		result := resolveTransitiveMerges(pairs)
+
+		if len(result) != 2 {
+			t.Fatalf("expected 2 merge pairs, got %d", len(result))
+		}
+
+		mergeMap := make(map[string]string)
+		for _, p := range result {
+			mergeMap[p.MergedID] = p.SurvivorID
+		}
+
+		// Both A and C should merge into B (the oldest)
+		if mergeMap["node-A"] != "node-B" {
+			t.Errorf("expected node-A to merge into node-B (oldest), got %s", mergeMap["node-A"])
+		}
+		if mergeMap["node-C"] != "node-B" {
+			t.Errorf("expected node-C to merge into node-B (oldest), got %s", mergeMap["node-C"])
+		}
+	})
+
+	t.Run("multiple disconnected components", func(t *testing.T) {
+		// Component 1: A<->B (A is oldest)
+		// Component 2: C<->D (C is oldest)
+		// Component 3: E<->F (E is oldest)
+		pairs := []mergePair{
+			// Component 1
+			{
+				SurvivorID:        "node-A",
+				MergedID:          "node-B",
+				Similarity:        0.99,
+				SurvivorCreatedAt: t1, // oldest in component 1
+				MergedCreatedAt:   t2,
+			},
+			// Component 2
+			{
+				SurvivorID:        "node-C",
+				MergedID:          "node-D",
+				Similarity:        0.98,
+				SurvivorCreatedAt: t1, // oldest in component 2 (same time as A, but different component)
+				MergedCreatedAt:   t3,
+			},
+			// Component 3
+			{
+				SurvivorID:        "node-F",
+				MergedID:          "node-E",
+				Similarity:        0.97,
+				SurvivorCreatedAt: t5, // newer
+				MergedCreatedAt:   t4, // E is older
+			},
+		}
+
+		result := resolveTransitiveMerges(pairs)
+
+		if len(result) != 3 {
+			t.Fatalf("expected 3 merge pairs, got %d", len(result))
+		}
+
+		mergeMap := make(map[string]string)
+		for _, p := range result {
+			mergeMap[p.MergedID] = p.SurvivorID
+		}
+
+		// Component 1: B merges into A
+		if mergeMap["node-B"] != "node-A" {
+			t.Errorf("expected node-B to merge into node-A, got %s", mergeMap["node-B"])
+		}
+
+		// Component 2: D merges into C
+		if mergeMap["node-D"] != "node-C" {
+			t.Errorf("expected node-D to merge into node-C, got %s", mergeMap["node-D"])
+		}
+
+		// Component 3: F merges into E (E is older)
+		if mergeMap["node-F"] != "node-E" {
+			t.Errorf("expected node-F to merge into node-E (older), got %s", mergeMap["node-F"])
+		}
+	})
+
+	t.Run("longer chain A->B->C->D - all merge to oldest", func(t *testing.T) {
+		// A is oldest, B->C->D forms a chain connected to A
+		pairs := []mergePair{
+			{
+				SurvivorID:        "node-A",
+				MergedID:          "node-B",
+				Similarity:        0.99,
+				SurvivorCreatedAt: t1, // oldest
+				MergedCreatedAt:   t2,
+			},
+			{
+				SurvivorID:        "node-B",
+				MergedID:          "node-C",
+				Similarity:        0.98,
+				SurvivorCreatedAt: t2,
+				MergedCreatedAt:   t3,
+			},
+			{
+				SurvivorID:        "node-C",
+				MergedID:          "node-D",
+				Similarity:        0.97,
+				SurvivorCreatedAt: t3,
+				MergedCreatedAt:   t4,
+			},
+		}
+
+		result := resolveTransitiveMerges(pairs)
+
+		// Should have 3 pairs: all merging into A
+		if len(result) != 3 {
+			t.Fatalf("expected 3 merge pairs, got %d", len(result))
+		}
+
+		mergeMap := make(map[string]string)
+		for _, p := range result {
+			mergeMap[p.MergedID] = p.SurvivorID
+		}
+
+		// All should merge into A (oldest)
+		for _, nodeID := range []string{"node-B", "node-C", "node-D"} {
+			if mergeMap[nodeID] != "node-A" {
+				t.Errorf("expected %s to merge into node-A, got %s", nodeID, mergeMap[nodeID])
+			}
+		}
+	})
+
+	t.Run("equal timestamps use lexicographic order for determinism", func(t *testing.T) {
+		// Both nodes have the same creation time
+		// Should use lexicographic ordering for determinism
+		sameTime := t1
+
+		pairs := []mergePair{
+			{
+				SurvivorID:        "node-B",
+				MergedID:          "node-A",
+				Similarity:        0.99,
+				SurvivorCreatedAt: sameTime,
+				MergedCreatedAt:   sameTime,
+			},
+		}
+
+		result := resolveTransitiveMerges(pairs)
+
+		if len(result) != 1 {
+			t.Fatalf("expected 1 merge pair, got %d", len(result))
+		}
+
+		// With equal times, node-A should be survivor (lexicographically smaller)
+		if result[0].SurvivorID != "node-A" {
+			t.Errorf("expected survivor node-A (lexicographically smaller), got %s", result[0].SurvivorID)
+		}
+		if result[0].MergedID != "node-B" {
+			t.Errorf("expected merged node-B, got %s", result[0].MergedID)
+		}
+	})
+
+	t.Run("similarity scores preserved from original pairs", func(t *testing.T) {
+		pairs := []mergePair{
+			{
+				SurvivorID:        "node-A",
+				MergedID:          "node-B",
+				Similarity:        0.995,
+				SurvivorCreatedAt: t1,
+				MergedCreatedAt:   t2,
+			},
+		}
+
+		result := resolveTransitiveMerges(pairs)
+
+		if len(result) != 1 {
+			t.Fatalf("expected 1 merge pair, got %d", len(result))
+		}
+
+		if result[0].Similarity != 0.995 {
+			t.Errorf("expected similarity 0.995, got %f", result[0].Similarity)
+		}
+	})
+}

@@ -42,6 +42,9 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &req) {
 		return
 	}
+	if !validateRequest(w, &req) {
+		return
+	}
 
 	// Generate embedding from query_text if provided and no embedding given
 	if len(req.QueryEmbedding) == 0 && req.QueryText != "" {
@@ -85,6 +88,9 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	}
 	var req models.IngestRequest
 	if !readJSON(w, r, &req) {
+		return
+	}
+	if !validateRequest(w, &req) {
 		return
 	}
 
@@ -141,6 +147,9 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 	}
 	var req models.BatchIngestRequest
 	if !readJSON(w, r, &req) {
+		return
+	}
+	if !validateRequest(w, &req) {
 		return
 	}
 
@@ -787,6 +796,9 @@ func (s *Server) handleReflect(w http.ResponseWriter, r *http.Request) {
 	}
 	var req models.ReflectRequest
 	if !readJSON(w, r, &req) {
+		return
+	}
+	if !validateRequest(w, &req) {
 		return
 	}
 

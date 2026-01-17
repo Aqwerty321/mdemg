@@ -59,6 +59,15 @@ type Config struct {
 	AnomalyStaleDays        int     // Days after which an update is considered stale (default: 30)
 	AnomalyMaxCheckMs       int     // Maximum time for anomaly checks in ms (default: 100)
 
+	// Scoring hyperparameters for retrieval ranking
+	ScoringAlpha float64 // Vector similarity weight (default: 0.55)
+	ScoringBeta  float64 // Activation weight (default: 0.30)
+	ScoringGamma float64 // Recency weight (default: 0.10)
+	ScoringDelta float64 // Confidence weight (default: 0.05)
+	ScoringPhi   float64 // Hub penalty coefficient (default: 0.08)
+	ScoringKappa float64 // Redundancy penalty coefficient (default: 0.12)
+	ScoringRho   float64 // Recency decay rate per day (default: 0.05)
+
 	// Logging settings
 	LogFormat     string // "text" (default) or "json"
 	LogSkipHealth bool   // Skip logging for /healthz and /readyz endpoints (default: false)
@@ -265,6 +274,58 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("ANOMALY_MAX_CHECK_MS must be >= 1")
 	}
 
+	// Scoring hyperparameters for retrieval ranking
+	// Weights (alpha, beta, gamma, delta) must be in [0, 1]
+	scoringAlpha, err := atof("SCORING_ALPHA", 0.55)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringAlpha < 0 || scoringAlpha > 1 {
+		return Config{}, errors.New("SCORING_ALPHA must be in range [0, 1]")
+	}
+	scoringBeta, err := atof("SCORING_BETA", 0.30)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringBeta < 0 || scoringBeta > 1 {
+		return Config{}, errors.New("SCORING_BETA must be in range [0, 1]")
+	}
+	scoringGamma, err := atof("SCORING_GAMMA", 0.10)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringGamma < 0 || scoringGamma > 1 {
+		return Config{}, errors.New("SCORING_GAMMA must be in range [0, 1]")
+	}
+	scoringDelta, err := atof("SCORING_DELTA", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringDelta < 0 || scoringDelta > 1 {
+		return Config{}, errors.New("SCORING_DELTA must be in range [0, 1]")
+	}
+	scoringPhi, err := atof("SCORING_PHI", 0.08)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringPhi < 0 {
+		return Config{}, errors.New("SCORING_PHI must be >= 0")
+	}
+	scoringKappa, err := atof("SCORING_KAPPA", 0.12)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringKappa < 0 {
+		return Config{}, errors.New("SCORING_KAPPA must be >= 0")
+	}
+	scoringRho, err := atof("SCORING_RHO", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRho < 0 {
+		return Config{}, errors.New("SCORING_RHO must be >= 0")
+	}
+
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "")
 	openaiKey := get("OPENAI_API_KEY", "")
@@ -327,6 +388,13 @@ func FromEnv() (Config, error) {
 		AnomalyOutlierStdDevs:     anomalyOutlierStdDevs,
 		AnomalyStaleDays:          anomalyStaleDays,
 		AnomalyMaxCheckMs:         anomalyMaxCheckMs,
+		ScoringAlpha:              scoringAlpha,
+		ScoringBeta:               scoringBeta,
+		ScoringGamma:              scoringGamma,
+		ScoringDelta:              scoringDelta,
+		ScoringPhi:                scoringPhi,
+		ScoringKappa:              scoringKappa,
+		ScoringRho:                scoringRho,
 		LogFormat:                 logFormat,
 		LogSkipHealth:             logSkipHealth,
 	}, nil

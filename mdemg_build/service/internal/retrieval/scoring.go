@@ -6,11 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"mdemg/internal/config"
 	"mdemg/internal/models"
 )
 
 // ScoreAndRank computes the final score per candidate and returns topK results.
-func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK int) []models.RetrieveResult {
+func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK int, cfg config.Config) []models.RetrieveResult {
 	if topK <= 0 {
 		topK = 20
 	}
@@ -22,14 +23,14 @@ func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK 
 		deg[e.Dst]++
 	}
 
-	// Hyperparameters (start values; move to config later)
-	alpha := 0.55 // vector
-	beta := 0.30  // activation
-	gamma := 0.10 // recency
-	delta := 0.05 // confidence
-	phi := 0.08   // hub penalty
-	kappa := 0.12 // redundancy penalty
-	rho := 0.05   // recency decay per day
+	// Hyperparameters from config (see config.Config for defaults)
+	alpha := cfg.ScoringAlpha // vector similarity weight
+	beta := cfg.ScoringBeta   // activation weight
+	gamma := cfg.ScoringGamma // recency weight
+	delta := cfg.ScoringDelta // confidence weight
+	phi := cfg.ScoringPhi     // hub penalty coefficient
+	kappa := cfg.ScoringKappa // redundancy penalty coefficient
+	rho := cfg.ScoringRho     // recency decay rate per day
 
 	// Redundancy: simple path-prefix clustering
 	prefixCount := map[string]int{}

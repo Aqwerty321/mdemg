@@ -1,7 +1,7 @@
 # MDEMG Development Handoff Document
 
 **Date:** 2026-01-16
-**Status:** Core Features Complete - 10 Tasks Merged (PRs #1-8 + Tasks 7-9)
+**Status:** Core Features Complete - 14 PRs Merged (#1-12)
 
 > **Vision Document:** See [VISION.md](./VISION.md) for the complete architectural philosophy and design principles.
 
@@ -45,6 +45,10 @@
 - ✅ **Reflection Endpoint** - `POST /v1/memory/reflect` for deep context exploration (Task 8, PR #7)
 - ✅ **Anomaly Detection** - Non-blocking duplicate/stale detection on ingest (Task 9)
 - ✅ **Embedding Cache** - LRU cache for embedding results, reduces API calls (PR #8)
+- ✅ **Request Logging** - Structured JSON logging middleware (PR #9, Task 012)
+- ✅ **Configurable Scoring** - 7 tunable hyperparameters via env vars (PR #10, Task 013)
+- ✅ **Memory Stats Endpoint** - `GET /v1/memory/stats` per-space statistics (PR #11, Task 014)
+- ✅ **Memory Archive/Delete** - Soft-delete and hard-delete endpoints (PR #12, Task 015)
 
 ### What's Next (Priority Order)
 1. **Use the system!** - The more memories stored, the more emergent behaviors appear
@@ -97,20 +101,22 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
 | **Embedding generation** | `internal/embeddings/` package with OpenAI and Ollama providers |
 | **End-to-end retrieval** | Tested with Ollama `nomic-embed-text` model |
 
-### 🆕 New in This Session (2026-01-16) - 10 Tasks Merged
+### 🆕 New in This Session (2026-01-16) - 14 PRs Merged
 
-| PR/Task | Feature | Files Added/Modified |
-|---------|---------|---------------------|
-| #1 | **Edge Weight Decay CLI** | `cmd/decay/main.go` (617 lines), tests (443 lines) |
-| #2 | **Hebbian Learning Loop** | `internal/learning/service.go`, unit + integration tests (2079 lines) |
-| #3 | **Integration Tests** | `tests/integration/` - helpers, ingest, retrieval (1754 lines) |
-| #4 | **Graph Health Metrics** | `GET /v1/metrics` endpoint, handler tests (570 lines) |
-| #5 | **Consolidation CLI** | `cmd/consolidate/main.go` (760 lines), tests (829 lines) |
-| #6 | **Semantic Edges on Ingest** | Auto-creates ASSOCIATED_WITH edges (182 lines) |
-| Task 7 | **Batch Ingest Endpoint** | `POST /v1/memory/ingest/batch` - bulk imports up to 100 items |
-| #7 | **Reflection Endpoint** | `POST /v1/memory/reflect` - `internal/retrieval/reflection.go`, tests |
-| Task 9 | **Anomaly Detection** | `internal/anomaly/` - non-blocking duplicate/stale detection (783 lines) |
-| #8 | **Embedding Cache** | `internal/embeddings/cache.go`, `cache_test.go` (1153 lines) - LRU caching |
+| PR | Task | Feature | Key Files |
+|----|------|---------|-----------|
+| #1 | 003 | **Edge Weight Decay CLI** | `cmd/decay/main.go` (617 lines), tests |
+| #2 | 001 | **Hebbian Learning Loop** | `internal/learning/service.go`, tests (2079 lines) |
+| #3 | 002 | **Integration Tests** | `tests/integration/` - helpers, ingest, retrieval |
+| #4 | 006 | **Graph Health Metrics** | `GET /v1/metrics` endpoint, handler tests |
+| #5 | 005 | **Consolidation CLI** | `cmd/consolidate/main.go` (760 lines), tests |
+| #6 | 004 | **Semantic Edges on Ingest** | `internal/retrieval/service.go` (182 lines) |
+| #7 | 007 | **Reflection Endpoint** | `POST /v1/memory/reflect`, `reflection.go` |
+| #8 | - | **Embedding Cache** | `internal/embeddings/cache.go` (1153 lines) |
+| #9 | 012 | **Request Logging Middleware** | `internal/api/middleware.go`, tests |
+| #10 | 013 | **Configurable Scoring** | `internal/config/config.go` - 7 hyperparameters |
+| #11 | 014 | **Memory Stats Endpoint** | `GET /v1/memory/stats`, handler tests |
+| #12 | 015 | **Memory Archive/Delete** | `handlers.go` (+415 lines), tests (+491 lines) |
 
 **Key Implementations:**
 
@@ -159,6 +165,35 @@ MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for
    - Reduces API calls and latency for repeated content
    - Configurable: EMBEDDING_CACHE_ENABLED=true, EMBEDDING_CACHE_SIZE=1000
    - Shows in readyz: `"embedding_provider": "openai:text-embedding-ada-002+cache"`
+
+10. **Request Logging Middleware** (`internal/api/middleware.go`)
+    - Structured JSON logging for all HTTP requests
+    - Logs: method, path, status, duration, request_id
+    - Configurable: LOG_FORMAT=json|text, LOG_SKIP_HEALTH=true|false
+
+11. **Configurable Scoring Hyperparameters** (`internal/config/config.go`)
+    - 7 tunable parameters via environment variables:
+      - `SCORING_ALPHA` (0.55) - Vector similarity weight
+      - `SCORING_BETA` (0.30) - Activation weight
+      - `SCORING_GAMMA` (0.10) - Recency weight
+      - `SCORING_DELTA` (0.05) - Confidence weight
+      - `SCORING_PHI` (0.08) - Hub penalty coefficient
+      - `SCORING_KAPPA` (0.12) - Redundancy penalty
+      - `SCORING_RHO` (0.05) - Recency decay rate/day
+
+12. **Memory Stats Endpoint** (`GET /v1/memory/stats?space_id=<id>`)
+    - Per-space statistics: memory_count, observation_count, memories_by_layer
+    - Embedding coverage, learning activity metrics
+    - Temporal distribution (24h, 7d, 30d counts)
+    - Connectivity stats: avg_degree, max_degree, orphan_count
+    - Health score (0.0-1.0)
+
+13. **Memory Archive/Delete Endpoints**
+    - `POST /v1/memory/nodes/{node_id}/archive` - Soft-delete (sets is_archived=true)
+    - `POST /v1/memory/nodes/{node_id}/unarchive` - Restore archived node
+    - `DELETE /v1/memory/nodes/{node_id}?confirm=true` - Hard-delete (permanent)
+    - `POST /v1/memory/archive/bulk` - Bulk archive multiple nodes
+    - Archived nodes excluded from retrieval results
 
 ---
 
@@ -288,8 +323,11 @@ The MCP server is configured in `~/.cursor/mcp.json`:
   - `TestScoringComponentBreakdown` - Tests isolated node scoring components
   - Fixed `TestScoringDeterminism` tolerance to account for Hebbian learning effects
 
+### 🔄 In Progress (Auto-Claude Tasks)
+- [ ] **Task 016: Request Validation Middleware** - Input validation for all endpoints
+- [ ] **Task 017: Graph Pruning Service** - Remove weak/deprecated edges, merge redundant nodes
+
 ### Priority 4: Future Enhancements
-- [ ] **Graph pruning** - Remove weak/deprecated edges, merge redundant nodes
 - [ ] **Proactive surfacing** - Context suggestions, anomaly alerts
 - [ ] **Agent consulting service** - SME-like guidance API
 
@@ -313,8 +351,11 @@ The MCP server is configured in `~/.cursor/mcp.json`:
 | `internal/config/config.go` | Environment variable parsing |
 | `internal/db/neo4j.go` | Driver creation, schema validation |
 | `internal/api/server.go` | HTTP routes registration |
-| `internal/api/handlers.go` | Request handlers (includes /v1/metrics) |
-| `internal/api/handlers_test.go` | Handler unit tests (NEW) |
+| `internal/api/handlers.go` | Request handlers (retrieve, ingest, stats, archive, metrics) |
+| `internal/api/handlers_test.go` | Handler unit tests |
+| `internal/api/handlers_archive_test.go` | Archive endpoint unit tests (NEW) |
+| `internal/api/middleware.go` | Request logging middleware (NEW) |
+| `internal/api/middleware_test.go` | Middleware unit tests (NEW) |
 | `internal/embeddings/embeddings.go` | Embedder interface + factory |
 | `internal/embeddings/openai.go` | OpenAI embedding provider |
 | `internal/embeddings/ollama.go` | Ollama embedding provider |
@@ -397,6 +438,19 @@ OLLAMA_MODEL=nomic-embed-text
 # Embedding cache
 EMBEDDING_CACHE_ENABLED=true        # Enable LRU cache for embeddings
 EMBEDDING_CACHE_SIZE=1000           # Max cached embeddings (default 1000)
+
+# Scoring hyperparameters
+SCORING_ALPHA=0.55                  # Vector similarity weight
+SCORING_BETA=0.30                   # Activation weight
+SCORING_GAMMA=0.10                  # Recency weight
+SCORING_DELTA=0.05                  # Confidence weight
+SCORING_PHI=0.08                    # Hub penalty coefficient
+SCORING_KAPPA=0.12                  # Redundancy penalty coefficient
+SCORING_RHO=0.05                    # Recency decay rate per day
+
+# Logging
+LOG_FORMAT=text                     # "text" or "json" for structured logs
+LOG_SKIP_HEALTH=false               # Skip logging for /healthz and /readyz
 ```
 
 ---

@@ -1,13 +1,13 @@
 package models
 
 type RetrieveRequest struct {
-	SpaceID        string    `json:"space_id"`
-	QueryText      string    `json:"query_text,omitempty"`
-	QueryEmbedding []float32 `json:"query_embedding,omitempty"`
+	SpaceID        string    `json:"space_id" validate:"required,min=1,max=256"`
+	QueryText      string    `json:"query_text,omitempty" validate:"required_without=QueryEmbedding,omitempty,min=1"`
+	QueryEmbedding []float32 `json:"query_embedding,omitempty" validate:"required_without=QueryText,omitempty,embedding_dims"`
 
-	CandidateK int `json:"candidate_k,omitempty"`
-	TopK       int `json:"top_k,omitempty"`
-	HopDepth   int `json:"hop_depth,omitempty"`
+	CandidateK int `json:"candidate_k,omitempty" validate:"omitempty,min=1,max=1000"`
+	TopK       int `json:"top_k,omitempty" validate:"omitempty,min=1,max=100"`
+	HopDepth   int `json:"hop_depth,omitempty" validate:"omitempty,min=0,max=5"`
 
 	PolicyContext map[string]any `json:"policy_context,omitempty"`
 }
@@ -30,17 +30,17 @@ type RetrieveResponse struct {
 }
 
 type IngestRequest struct {
-	SpaceID     string    `json:"space_id"`
-	Timestamp   string    `json:"timestamp"`
-	Source      string    `json:"source"`
-	Content     any       `json:"content"`
-	Tags        []string  `json:"tags,omitempty"`
+	SpaceID     string    `json:"space_id" validate:"required,min=1,max=256"`
+	Timestamp   string    `json:"timestamp" validate:"required,min=1"`
+	Source      string    `json:"source" validate:"required,min=1,max=64"`
+	Content     any       `json:"content" validate:"required"`
+	Tags        []string  `json:"tags,omitempty" validate:"omitempty,dive,min=1"`
 	NodeID      string    `json:"node_id,omitempty"`
-	Path        string    `json:"path,omitempty"`
+	Path        string    `json:"path,omitempty" validate:"omitempty,max=512"`
 	Name        string    `json:"name,omitempty"`
-	Sensitivity string    `json:"sensitivity,omitempty"`
-	Confidence  *float64  `json:"confidence,omitempty"`
-	Embedding   []float32 `json:"embedding,omitempty"` // Optional: pre-computed embedding
+	Sensitivity string    `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
+	Confidence  *float64  `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
+	Embedding   []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"` // Optional: pre-computed embedding
 }
 
 type IngestResponse struct {
@@ -98,11 +98,11 @@ type ActivityStats struct {
 
 // ReflectRequest - request for deep context exploration via /v1/memory/reflect
 type ReflectRequest struct {
-	SpaceID        string    `json:"space_id"`
-	Topic          string    `json:"topic"`                     // natural language topic (required)
-	TopicEmbedding []float32 `json:"topic_embedding,omitempty"` // pre-computed embedding for topic
-	MaxDepth       int       `json:"max_depth,omitempty"`       // hop depth (default: 3)
-	MaxNodes       int       `json:"max_nodes,omitempty"`       // cap results (default: 50)
+	SpaceID        string    `json:"space_id" validate:"required,min=1"`
+	Topic          string    `json:"topic" validate:"required_without=TopicEmbedding,omitempty,min=1,max=500"`                     // natural language topic (required)
+	TopicEmbedding []float32 `json:"topic_embedding,omitempty" validate:"required_without=Topic,omitempty,embedding_dims"` // pre-computed embedding for topic
+	MaxDepth       int       `json:"max_depth,omitempty" validate:"omitempty,min=1,max=10"`       // hop depth (default: 3)
+	MaxNodes       int       `json:"max_nodes,omitempty" validate:"omitempty,min=1,max=500"`       // cap results (default: 50)
 }
 
 // ReflectResponse - response from deep context exploration
@@ -142,22 +142,22 @@ type GraphContext struct {
 
 // BatchIngestRequest - request for batch ingest endpoint
 type BatchIngestRequest struct {
-	SpaceID      string            `json:"space_id"`
-	Observations []BatchIngestItem `json:"observations"`
+	SpaceID      string            `json:"space_id" validate:"required,min=1"`
+	Observations []BatchIngestItem `json:"observations" validate:"required,min=1,max=100,dive"`
 }
 
 // BatchIngestItem - single observation in a batch ingest request
 type BatchIngestItem struct {
-	Timestamp   string    `json:"timestamp"`
-	Source      string    `json:"source"`
-	Content     any       `json:"content"`
-	Tags        []string  `json:"tags,omitempty"`
+	Timestamp   string    `json:"timestamp" validate:"required,min=1"`
+	Source      string    `json:"source" validate:"required,min=1,max=64"`
+	Content     any       `json:"content" validate:"required"`
+	Tags        []string  `json:"tags,omitempty" validate:"omitempty,dive,min=1"`
 	NodeID      string    `json:"node_id,omitempty"`
-	Path        string    `json:"path,omitempty"`
+	Path        string    `json:"path,omitempty" validate:"omitempty,max=512"`
 	Name        string    `json:"name,omitempty"`
-	Sensitivity string    `json:"sensitivity,omitempty"`
-	Confidence  *float64  `json:"confidence,omitempty"`
-	Embedding   []float32 `json:"embedding,omitempty"`
+	Sensitivity string    `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
+	Confidence  *float64  `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
+	Embedding   []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"`
 }
 
 // BatchIngestResult - result for a single item in batch ingest
@@ -177,4 +177,93 @@ type BatchIngestResponse struct {
 	SuccessCount int                 `json:"success_count"`
 	ErrorCount   int                 `json:"error_count"`
 	Results      []BatchIngestResult `json:"results"`
+}
+
+// StatsResponse - response for GET /v1/memory/stats endpoint
+// Provides comprehensive per-space memory statistics including counts,
+// embedding coverage, learning metrics, and health indicators.
+type StatsResponse struct {
+	SpaceID               string               `json:"space_id"`
+	MemoryCount           int64                `json:"memory_count"`
+	ObservationCount      int64                `json:"observation_count"`
+	MemoriesByLayer       map[int]int64        `json:"memories_by_layer"`
+	EmbeddingCoverage     float64              `json:"embedding_coverage"`      // 0.0 - 1.0
+	AvgEmbeddingDimensions int                 `json:"avg_embedding_dimensions"`
+	LearningActivity      *LearningActivity    `json:"learning_activity"`
+	TemporalDistribution  *TemporalDistribution `json:"temporal_distribution"`
+	Connectivity          *Connectivity        `json:"connectivity"`
+	HealthScore           float64              `json:"health_score"` // 0.0 - 1.0
+	ComputedAt            string               `json:"computed_at"`  // ISO8601 timestamp
+}
+
+// LearningActivity - Hebbian learning metrics from CO_ACTIVATED_WITH edges
+type LearningActivity struct {
+	CoActivatedEdges int64   `json:"co_activated_edges"`
+	AvgWeight        float64 `json:"avg_weight"`
+	MaxWeight        float64 `json:"max_weight"`
+}
+
+// TemporalDistribution - memory creation counts over time periods
+type TemporalDistribution struct {
+	Last24h int64 `json:"last_24h"`
+	Last7d  int64 `json:"last_7d"`
+	Last30d int64 `json:"last_30d"`
+}
+
+// Connectivity - graph connectivity statistics for a space
+type Connectivity struct {
+	AvgDegree   float64 `json:"avg_degree"`
+	MaxDegree   int     `json:"max_degree"`
+	OrphanCount int64   `json:"orphan_count"`
+}
+
+// ArchiveRequest - request for archiving a memory node
+type ArchiveRequest struct {
+	Reason string `json:"reason,omitempty"` // optional reason for archiving
+}
+
+// ArchiveResponse - response from archive endpoint
+type ArchiveResponse struct {
+	NodeID     string `json:"node_id"`
+	Name       string `json:"name"`
+	ArchivedAt string `json:"archived_at"`
+	Reason     string `json:"reason,omitempty"`
+}
+
+// UnarchiveResponse - response from unarchive endpoint
+type UnarchiveResponse struct {
+	NodeID       string `json:"node_id"`
+	Name         string `json:"name"`
+	UnarchivedAt string `json:"unarchived_at"`
+}
+
+// DeleteResponse - response from delete endpoint
+type DeleteResponse struct {
+	NodeID       string `json:"node_id"`
+	DeletedNodes int    `json:"deleted_nodes"`
+	DeletedEdges int    `json:"deleted_edges"`
+}
+
+// BulkArchiveRequest - request for bulk archiving memory nodes
+type BulkArchiveRequest struct {
+	SpaceID string   `json:"space_id"`
+	NodeIDs []string `json:"node_ids"`
+	Reason  string   `json:"reason,omitempty"` // optional reason for archiving
+}
+
+// BulkArchiveResult - result for a single item in bulk archive
+type BulkArchiveResult struct {
+	NodeID     string `json:"node_id"`
+	Status     string `json:"status"` // "success" or "error"
+	ArchivedAt string `json:"archived_at,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
+// BulkArchiveResponse - response for bulk archive endpoint
+type BulkArchiveResponse struct {
+	SpaceID      string              `json:"space_id"`
+	TotalItems   int                 `json:"total_items"`
+	SuccessCount int                 `json:"success_count"`
+	ErrorCount   int                 `json:"error_count"`
+	Results      []BulkArchiveResult `json:"results"`
 }

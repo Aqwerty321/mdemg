@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/anomaly"
@@ -11,6 +12,7 @@ import (
 	"mdemg/internal/embeddings"
 	"mdemg/internal/learning"
 	"mdemg/internal/retrieval"
+	"mdemg/internal/validation"
 )
 
 type Server struct {
@@ -75,7 +77,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/ingest", s.handleIngest)
 	mux.HandleFunc("/v1/memory/ingest/batch", s.handleBatchIngest)
 	mux.HandleFunc("/v1/memory/reflect", s.handleReflect)
+	mux.HandleFunc("/v1/memory/stats", s.handleStats)
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
+	mux.HandleFunc("/v1/memory/archive/bulk", s.handleBulkArchive)
+	mux.HandleFunc("/v1/memory/nodes/", s.handleNodeOperation)
 
 	// Wrap mux with logging middleware
 	logCfg := LogConfig{
@@ -83,6 +88,25 @@ func (s *Server) Routes() http.Handler {
 		SkipHealth: s.cfg.LogSkipHealth,
 	}
 	return LoggingMiddleware(mux, logCfg)
+}
+
+// handleNodeOperation routes requests under /v1/memory/nodes/{node_id}/... to the appropriate handler
+// based on the path suffix and HTTP method:
+//   - POST /v1/memory/nodes/{node_id}/archive   -> handleArchiveNode
+//   - POST /v1/memory/nodes/{node_id}/unarchive -> handleUnarchiveNode
+//   - DELETE /v1/memory/nodes/{node_id}         -> handleDeleteNode
+func (s *Server) handleNodeOperation(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+
+	switch {
+	case strings.HasSuffix(path, "/archive"):
+		s.handleArchiveNode(w, r)
+	case strings.HasSuffix(path, "/unarchive"):
+		s.handleUnarchiveNode(w, r)
+	default:
+		// DELETE /v1/memory/nodes/{node_id} - permanent deletion
+		s.handleDeleteNode(w, r)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -96,6 +120,18 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return false
+	}
+	return true
+}
+
+// validateRequest validates a request struct using the validation package.
+// Returns false and writes an error response if validation fails.
+// Use after readJSON with the same pattern: if !validateRequest(w, &req) { return }
+func validateRequest(w http.ResponseWriter, v any) bool {
+	if err := validation.Validate(v); err != nil {
+		resp := validation.FormatValidationErrors(err)
+		writeJSON(w, http.StatusBadRequest, resp)
 		return false
 	}
 	return true

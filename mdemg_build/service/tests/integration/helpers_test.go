@@ -225,8 +225,8 @@ func CreateTestEmbedding(dims int, seed float32) []float32 {
 }
 
 // DefaultEmbeddingDims is the default embedding dimension for tests.
-// Using 768 to match Ollama nomic-embed-text model.
-const DefaultEmbeddingDims = 768
+// Using 1536 to match the Neo4j vector index (OpenAI ada-002 dimension).
+const DefaultEmbeddingDims = 1536
 
 // CreateQueryEmbedding creates a standard query embedding [1, 0, 0, ...].
 // This is used with CreateControlledEmbedding to achieve specific cosine similarities.

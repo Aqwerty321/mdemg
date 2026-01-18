@@ -12,6 +12,71 @@ MDEMG is an **emergent long-term memory system** designed to serve as the cognit
 
 ---
 
+## The Internal Dialog Analogy
+
+### What MDEMG Is
+
+MDEMG provides coding AI agents and sub-agents with what could be described as the **ANN (Artificial Neural Network) equivalent of an internal dialog**—similar to the experience humans have with biological neural networks.
+
+When humans think through problems, they draw on:
+- Past experiences and how they handled similar situations
+- Domain expertise accumulated over years of specialization
+- Relationships between concepts that aren't universally known
+- The specific context of their work environment
+
+MDEMG gives AI agents this same capability—a persistent "inner voice" of accumulated domain knowledge.
+
+### What MDEMG Does NOT Store
+
+**MDEMG does not store information and concepts that AI agents already possess.** Large language models already have extensive general knowledge—programming languages, algorithms, frameworks, best practices, etc. Storing this in MDEMG would be redundant and wasteful.
+
+### What MDEMG DOES Store
+
+MDEMG holds **specific and relevant information** related to:
+
+1. **Tasks Performed** - What the agent has done, decisions made, problems solved
+2. **Subject Matter Expert (SME) Knowledge** - Specialized, domain-specific expertise
+
+### SME Knowledge Examples
+
+Consider a software engineering team at "Whiskey House" (hypothetical industrial company):
+
+| Role | SME Knowledge in MDEMG |
+|------|------------------------|
+| **Software Engineer** | Whiskey House codebase conventions, deployment procedures, the quirks of their legacy systems, which APIs are deprecated, tribal knowledge about why certain architectural decisions were made |
+| **Process/Controls Engineer** | P&ID relationships (what valve connects to which tank), PLC program specifics (the logic behind specific rungs), process control automation team goals, safety interlock sequences |
+
+This knowledge is:
+- **Not universally available** - You can't Google "Whiskey House Tank 5 level control logic"
+- **Highly contextual** - Makes sense only within the organization's context
+- **Accumulated over time** - Built up through experience and interaction
+- **Organizationally valuable** - Represents institutional knowledge that would otherwise be lost
+
+### TapRoot and Concept Layers
+
+The architecture reflects this purpose:
+
+```
+Concept Layers (n2, n3, n4...)
+    ↑ Increasingly abstract relationships
+    ↑ Emergent patterns and principles
+    ↑ Cross-domain connections
+
+n1_root (first concept layer)
+    ↑ Patterns emerging from observations
+
+n0_root0 (TapRoot level)
+    ↑ Domain-specific SME knowledge
+    ↑ Task execution history
+    ↑ Specific procedural knowledge
+
+[Raw observations from agent work]
+```
+
+The **TapRoot level** stores the concrete, domain-specific knowledge—the "institutional memory" of an organization. The **concept layers** above hold increasingly abstract relationships that emerge as the system learns patterns across observations.
+
+---
+
 ## Core Purpose
 
 ### Primary Functions
@@ -120,26 +185,40 @@ A higher-order capability where MDEMG acts as an **SME (Subject Matter Expert)**
 
 ## What MDEMG Stores
 
-### Content Types (All Equally Important)
+> **Important:** MDEMG stores only domain-specific, organization-specific, and task-specific knowledge. It does NOT duplicate general knowledge that LLMs already possess.
 
-| Category | Examples |
-|----------|----------|
-| **Code Patterns** | Solutions, idioms, reusable structures |
-| **Architectural Decisions** | Why things are built a certain way |
-| **Process Knowledge** | How to do things, workflows, procedures |
-| **Project Context** | Domain-specific terminology, constraints |
-| **Error Patterns** | What went wrong and how it was fixed |
-| **User Preferences** | Coding style, tool preferences, conventions |
-| **Cross-Project Learnings** | Insights that transfer between projects |
+### Content Types (Domain-Specific SME Knowledge)
+
+| Category | Examples | Why It Belongs in MDEMG |
+|----------|----------|-------------------------|
+| **Organizational Code Patterns** | "We always use Repository pattern for data access in this codebase" | Specific to your organization, not universal |
+| **Architectural Decisions & Rationale** | "We chose Redis over Memcached because of X incident in 2024" | Institutional knowledge, would be lost otherwise |
+| **Domain-Specific Procedures** | P&ID sequences, PLC logic explanations, safety interlock documentation | Highly specialized, not available anywhere else |
+| **Project Context** | Which APIs are deprecated, why certain workarounds exist | Tribal knowledge accumulated over time |
+| **Historical Problem/Solution Pairs** | "Last time we saw this error, the root cause was X" | Organization-specific debugging history |
+| **Team Conventions** | PR review expectations, deployment checklists, on-call procedures | Process knowledge unique to this team |
+| **Cross-Project Learnings** | "This pattern from Project A also worked well in Project B" | Connections that only exist within this organization |
+
+### What NOT to Store
+
+| Do NOT Store | Reason |
+|--------------|--------|
+| Python syntax | LLM already knows this |
+| How React hooks work | Universally available documentation |
+| General best practices | Already in training data |
+| Standard library APIs | LLM has this knowledge |
+| Common design patterns | Well-documented elsewhere |
+
+**Rule of thumb:** If you could find it on Stack Overflow or in official documentation, it probably doesn't belong in MDEMG.
 
 ### Observation Sources
 
-- Claude Code conversations
-- Git commits and diffs
-- Code reviews and PR discussions
-- Documentation and comments
-- Error logs and debugging sessions
-- Explicit user annotations
+- Claude Code conversations (capturing context and decisions)
+- Git commits and diffs (what changed and why)
+- Code reviews and PR discussions (institutional feedback)
+- Documentation and comments (domain-specific explanations)
+- Error logs and debugging sessions (organizational problem-solving)
+- Explicit user annotations (deliberate knowledge capture)
 
 ---
 

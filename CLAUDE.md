@@ -11,6 +11,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system built on Neo4j with native vector indexes. It implements a retrieval-augmented memory graph with spreading activation and Hebbian learning.
 
+### Purpose: Internal Dialog for AI Agents
+
+MDEMG provides AI agents with the **ANN equivalent of human internal dialog**. It does NOT store general knowledge that LLMs already possess. Instead, it stores:
+
+- **Task History** - Decisions made, problems solved, work performed
+- **SME Domain Knowledge** - Organization-specific procedures, institutional memory, tribal knowledge
+
+**What to Store:** P&ID relationships, PLC program specifics, codebase conventions, deployment procedures, architectural decision rationale, team-specific workflows.
+
+**What NOT to Store:** Python syntax, React hooks, general best practices—anything available on Stack Overflow or official docs.
+
+> See [VISION.md § The Internal Dialog Analogy](./VISION.md#the-internal-dialog-analogy) for the complete conceptual framework.
+
 ### Core Invariants (Do Not Violate)
 - **Vector index = recall** (fast candidate generation)
 - **Graph = reasoning** (typed edges with evidence)

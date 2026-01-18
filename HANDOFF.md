@@ -79,6 +79,17 @@ pkill -f mdemg-server
 
 MDEMG (Multi-Dimensional Emergent Memory Graph) is a long-term memory system for AI agents built on Neo4j with native vector indexes. It implements retrieval-augmented memory with spreading activation and Hebbian learning.
 
+### The "Internal Dialog" Purpose
+
+MDEMG provides AI agents with the **ANN equivalent of an internal dialog**—similar to what humans experience with biological neural networks. It does **NOT** store general knowledge that LLMs already possess. Instead, it stores:
+
+- **Task History** - What the agent has done, decisions made, problems solved
+- **SME Domain Knowledge** - Organization-specific procedures, institutional memory, tribal knowledge
+
+**Example:** A process engineer's MDEMG might contain P&ID relationships, PLC program specifics, and process control team goals for "Whiskey House"—knowledge that can't be Googled.
+
+> See [VISION.md § The Internal Dialog Analogy](./VISION.md#the-internal-dialog-analogy) for the complete conceptual framework.
+
 ### Core Design Principles (DO NOT VIOLATE)
 - **Vector index = recall** (fast candidate generation via cosine similarity)
 - **Graph = reasoning** (typed edges with evidence weights)

@@ -6,6 +6,8 @@ A long-term memory system for AI coding agents built on Neo4j with native vector
 
 MDEMG provides persistent memory for AI agents running in IDEs like Cursor. It enables agents to:
 - Store observations, patterns, and decisions
+- Maintain an ongoing 'internal' dialog with the main coding agent
+- Intercept 'thoughts' from the coding agenet(s) to review against context specific knowledge maintained in mdemg
 - Recall relevant memories via semantic search
 - Build associative connections between concepts
 - Develop emergent behaviors over time

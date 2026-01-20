@@ -133,7 +133,9 @@ internal/
 
 ## Key Design Notes
 
-- **Embeddings are external**: The service expects `query_embedding` (retrieve) and `embedding` (ingest) to be provided; it does not generate embeddings.
-- **APOC optional**: `internal/retrieval/retrieval.go` uses `apoc.math.clamp`; replace with manual Cypher if APOC unavailable.
-- **Vector index dimensions**: Default is 1536 (OpenAI ada-002); modify `V0003__vector_indexes.cypher` for other models.
+- **Embeddings are integrated**: The service supports pluggable embedding generation (OpenAI/Ollama) with LRU caching.
+- **Default Model**: OpenAI `text-embedding-3-small` (1536 dims) is recommended for production.
+- **APOC optional**: `internal/retrieval/retrieval.go.bak` uses `apoc.math.clamp`; the current implementation uses native Cypher.
+- **Vector index dimensions**: Default is 1536; modify `V0003__vector_indexes.cypher` if using Ollama (768).
 - **Activation is transient**: Never persist per-query activation values; only write learning deltas (CO_ACTIVATED_WITH edges).
+- **Unified Envelope**: All API responses wrap data in a `{"data": ...}` envelope.

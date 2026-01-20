@@ -36,7 +36,7 @@ EMBEDDING_PROVIDER=openai
 
 # OpenAI Configuration (when EMBEDDING_PROVIDER=openai)
 OPENAI_API_KEY=sk-...                # Required for OpenAI
-OPENAI_MODEL=text-embedding-ada-002  # Embedding model (1536 dims)
+OPENAI_MODEL=text-embedding-3-small   # Embedding model (1536 dims, recommended)
 OPENAI_ENDPOINT=https://api.openai.com/v1
 
 # Ollama Configuration (when EMBEDDING_PROVIDER=ollama)
@@ -55,7 +55,7 @@ EMBEDDING_CACHE_ENABLED=true         # Enable LRU cache (default true)
 EMBEDDING_CACHE_SIZE=1000            # Max cached embeddings (default 1000)
 ```
 
-When enabled, readyz shows: `"embedding_provider": "openai:text-embedding-ada-002+cache"`
+When enabled, readyz shows: `"embedding_provider": "openai:text-embedding-3-small+cache"`
 
 ---
 
@@ -215,7 +215,7 @@ LISTEN_ADDR=:8082
 # Embedding Provider
 EMBEDDING_PROVIDER=openai
 OPENAI_API_KEY=sk-proj-...
-OPENAI_MODEL=text-embedding-ada-002
+OPENAI_MODEL=text-embedding-3-small
 OPENAI_ENDPOINT=https://api.openai.com/v1
 
 # Embedding Cache

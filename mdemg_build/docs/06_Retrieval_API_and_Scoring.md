@@ -46,17 +46,19 @@
 ### Response
 ```json
 {
-  "results": [
-    {
-      "node_id": "abc-123",
-      "path": "/concepts/auth",
-      "name": "Authentication System",
-      "summary": "OAuth2 implementation...",
-      "score": 0.85,
-      "vector_sim": 0.92,
-      "activation": 0.78
-    }
-  ]
+  "data": {
+    "results": [
+      {
+        "node_id": "abc-123",
+        "path": "/concepts/auth",
+        "name": "Authentication System",
+        "summary": "OAuth2 implementation...",
+        "score": 0.85,
+        "vector_sim": 0.92,
+        "activation": 0.78
+      }
+    ]
+  }
 }
 ```
 
@@ -84,12 +86,14 @@
 ### Response
 ```json
 {
-  "node_id": "abc-123",
-  "obs_id": "obs-456",
-  "created_edges": [
-    {"target": "def-789", "type": "ASSOCIATED_WITH", "weight": 0.85}
-  ],
-  "anomalies": []
+  "data": {
+    "node_id": "abc-123",
+    "obs_id": "obs-456",
+    "created_edges": [
+      {"target": "def-789", "type": "ASSOCIATED_WITH", "weight": 0.85}
+    ],
+    "anomalies": []
+  }
 }
 ```
 
@@ -131,14 +135,16 @@ Bulk ingest up to 100 observations in a single request.
 ### Response (HTTP 200 or 207 for partial success)
 ```json
 {
-  "space_id": "ide-agent",
-  "total": 2,
-  "succeeded": 2,
-  "failed": 0,
-  "results": [
-    {"index": 0, "status": "success", "node_id": "abc-123", "obs_id": "obs-1"},
-    {"index": 1, "status": "success", "node_id": "def-456", "obs_id": "obs-2"}
-  ]
+  "data": {
+    "space_id": "ide-agent",
+    "total": 2,
+    "succeeded": 2,
+    "failed": 0,
+    "results": [
+      {"index": 0, "status": "success", "node_id": "abc-123", "obs_id": "obs-1"},
+      {"index": 1, "status": "success", "node_id": "def-456", "obs_id": "obs-2"}
+    ]
+  }
 }
 ```
 
@@ -175,31 +181,33 @@ Deep context exploration using 3-stage traversal for comprehensive topic underst
 ### Response
 ```json
 {
-  "topic": "authentication patterns",
-  "stages": {
-    "seed": {"count": 10, "duration_ms": 45},
-    "expand": {"count": 35, "duration_ms": 120},
-    "abstract": {"count": 8, "duration_ms": 30}
-  },
-  "nodes": [
-    {
-      "node_id": "abc-123",
-      "path": "/concepts/oauth",
-      "name": "OAuth2 Pattern",
-      "layer": 1,
-      "stage": "seed",
-      "score": 0.92
-    }
-  ],
-  "insights": {
-    "clusters": [
-      {"theme": "Token Management", "node_ids": ["abc", "def", "ghi"]}
+  "data": {
+    "topic": "authentication patterns",
+    "stages": {
+      "seed": {"count": 10, "duration_ms": 45},
+      "expand": {"count": 35, "duration_ms": 120},
+      "abstract": {"count": 8, "duration_ms": 30}
+    },
+    "nodes": [
+      {
+        "node_id": "abc-123",
+        "path": "/concepts/oauth",
+        "name": "OAuth2 Pattern",
+        "layer": 1,
+        "stage": "seed",
+        "score": 0.92
+      }
     ],
-    "patterns": ["Frequent OAuth + JWT co-occurrence"],
-    "knowledge_gaps": ["No memories about refresh token rotation"]
-  },
-  "total_nodes": 53,
-  "duration_ms": 195
+    "insights": {
+      "clusters": [
+        {"theme": "Token Management", "node_ids": ["abc", "def", "ghi"]}
+      ],
+      "patterns": ["Frequent OAuth + JWT co-occurrence"],
+      "knowledge_gaps": ["No memories about refresh token rotation"]
+    },
+    "total_nodes": 53,
+    "duration_ms": 195
+  }
 }
 ```
 
@@ -224,28 +232,30 @@ Returns graph health metrics and statistics.
 ### Response
 ```json
 {
-  "total_nodes": 1250,
-  "total_edges": 3400,
-  "nodes_by_layer": {
-    "0": 1100,
-    "1": 120,
-    "2": 25,
-    "3": 5
-  },
-  "edges_by_type": {
-    "ASSOCIATED_WITH": 1500,
-    "CO_ACTIVATED_WITH": 1200,
-    "HAS_OBSERVATION": 500,
-    "ABSTRACTS_TO": 200
-  },
-  "hub_nodes": [
-    {"node_id": "abc", "name": "Common Pattern", "degree": 45}
-  ],
-  "orphan_count": 12,
-  "avg_edge_weight": 0.34,
-  "recent_activity": {
-    "nodes_created_24h": 15,
-    "edges_created_24h": 42
+  "data": {
+    "total_nodes": 1250,
+    "total_edges": 3400,
+    "nodes_by_layer": {
+      "0": 1100,
+      "1": 120,
+      "2": 25,
+      "3": 5
+    },
+    "edges_by_type": {
+      "ASSOCIATED_WITH": 1500,
+      "CO_ACTIVATED_WITH": 1200,
+      "HAS_OBSERVATION": 500,
+      "ABSTRACTS_TO": 200
+    },
+    "hub_nodes": [
+      {"node_id": "abc", "name": "Common Pattern", "degree": 45}
+    ],
+    "orphan_count": 12,
+    "avg_edge_weight": 0.34,
+    "recent_activity": {
+      "nodes_created_24h": 15,
+      "edges_created_24h": 42
+    }
   }
 }
 ```
@@ -258,7 +268,11 @@ Returns graph health metrics and statistics.
 `GET /healthz`
 
 ```json
-{"status": "ok"}
+{
+  "data": {
+    "status": "ok"
+  }
+}
 ```
 
 ### Readiness Probe
@@ -266,10 +280,12 @@ Returns graph health metrics and statistics.
 
 ```json
 {
-  "status": "ready",
-  "neo4j": "connected",
-  "schema_version": 4,
-  "embedding_provider": "openai:text-embedding-ada-002+cache"
+  "data": {
+    "status": "ready",
+    "neo4j": "connected",
+    "schema_version": 4,
+    "embedding_provider": "openai:text-embedding-3-small+cache"
+  }
 }
 ```
 

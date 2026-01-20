@@ -18,10 +18,12 @@ CREATE VECTOR INDEX memNodeEmbedding IF NOT EXISTS
 FOR (n:MemoryNode)
 ON n.embedding
 OPTIONS { indexConfig: {
-  `vector.dimensions`: 1536,
+  `vector.dimensions`: 1536,  // text-embedding-3-small (Recommended)
   `vector.similarity_function`: 'cosine'
 }};
 ```
+
+**Note:** If using Ollama with `nomic-embed-text`, use `768` dimensions.
 
 ## C) Query the vector index
 ```cypher
@@ -33,11 +35,14 @@ ORDER BY score DESC;
 ```
 
 ## D) Generating embeddings with the Neo4j GenAI plugin
-### Single value encode + store
+### Single value encode + store (OpenAI)
 ```cypher
 MATCH (n:MemoryNode {space_id:$spaceId, node_id:$nodeId})
 WITH n, (n.name || ' ' || coalesce(n.description,'') || ' ' || coalesce(n.summary,'')) AS text
-WITH n, genai.vector.encode(text, 'OpenAI', { token: $openaiToken }) AS v
+WITH n, genai.vector.encode(text, 'OpenAI', { 
+  token: $openaiToken, 
+  model: 'text-embedding-3-small' 
+}) AS v
 CALL db.create.setNodeVectorProperty(n, 'embedding', v)
 RETURN n.node_id, size(n.embedding) AS dims;
 ```
@@ -51,7 +56,10 @@ UNWIND range(0, total-1, batchSize) AS batchStart
 CALL (nodes, batchStart, batchSize) {
   WITH [x IN nodes[batchStart .. batchStart + batchSize]
         | x.name || ': ' || coalesce(x.summary,'')] AS batch
-  CALL genai.vector.encodeBatch(batch, 'OpenAI', { token: $openaiToken }) YIELD index, vector
+  CALL genai.vector.encodeBatch(batch, 'OpenAI', { 
+    token: $openaiToken,
+    model: 'text-embedding-3-small'
+  }) YIELD index, vector
   CALL db.create.setNodeVectorProperty(nodes[batchStart + index], 'embedding', vector)
 } IN CONCURRENT TRANSACTIONS OF 1 ROW;
 ```

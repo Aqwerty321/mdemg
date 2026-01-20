@@ -58,22 +58,24 @@ This is the **reference service skeleton** for the MDEMG system. It is intention
 ### Retrieve response (shape)
 ```json
 {
-  "results": [
-    {
-      "node_id": "...",
-      "path": "...",
-      "name": "...",
-      "summary": "...",
-      "score": 0.812,
-      "vector_sim": 0.77,
-      "activation": 0.61,
-      "explanation": {
-        "top_contributors": [
-          {"src_node_id":"...","rel_type":"ASSOCIATED_WITH","w_eff":0.42,"src_activation":0.55}
-        ]
+  "data": {
+    "results": [
+      {
+        "node_id": "...",
+        "path": "...",
+        "name": "...",
+        "summary": "...",
+        "score": 0.812,
+        "vector_sim": 0.77,
+        "activation": 0.61,
+        "explanation": {
+          "top_contributors": [
+            {"src_node_id":"...","rel_type":"ASSOCIATED_WITH","w_eff":0.42,"src_activation":0.55}
+          ]
+        }
       }
-    }
-  ]
+    ]
+  }
 }
 ```
 

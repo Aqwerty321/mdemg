@@ -14,10 +14,10 @@ MDEMG provides persistent memory for AI agents running in IDEs like Cursor. It e
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        Cursor IDE                            │
+│                    aci-claude-go (CLI/TUI)                  │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
-│  │ Claude Agent │◄──►│  MCP Client  │◄──►│ MDEMG MCP    │  │
-│  │              │    │              │    │   Server     │  │
+│  │ Claude Agent │◄──►│ Memory Adaptr│◄──►│ MDEMG Client │  │
+│  │ (Go Coder)   │    │ (internal)   │    │  (pkg/mdemg) │  │
 │  └──────────────┘    └──────────────┘    └──────┬───────┘  │
 └─────────────────────────────────────────────────┼──────────┘
                                                   │
@@ -30,12 +30,13 @@ MDEMG provides persistent memory for AI agents running in IDEs like Cursor. It e
                     └───────────────────────────────────────┘
 ```
 
-## Core Design Principles
+## Integration with aci-claude-go
 
-- **Vector index = recall** - Fast candidate generation via cosine similarity
-- **Graph = reasoning** - Typed edges with evidence weights
-- **Runtime = activation physics** - Spreading activation computed in-memory
-- **DB writes = learning deltas only** - No per-request activation writes
+MDEMG is the primary long-term memory layer for the **aci-claude-go** autonomous framework. It facilitates:
+- **Internal Dialog Persistence**: Chronological thought threading across agents and sessions.
+- **Cross-Session Learning**: Automatic semantic retrieval of past decisions and patterns.
+- **Autonomous Self-Reflection**: System-triggered analysis of learned patterns to identify architectural drift.
+- **Subject Matter Expertise**: Acting as a cognitive substrate for the Planner, Coder, and QA agents.
 
 ## Quick Start
 
@@ -66,8 +67,14 @@ ollama pull nomic-embed-text
 ./start-mdemg.sh
 ```
 
-### MCP Integration (Cursor)
+## MCP Integration (aci-claude-go / Cursor)
 
+MDEMG provides an MCP server for seamless integration.
+
+**For aci-claude-go:**
+The framework utilizes `pkg/mdemg` directly via the `internal/agent/Memory` interface.
+
+**For Cursor IDE:**
 Add to `~/.cursor/mcp.json`:
 ```json
 {

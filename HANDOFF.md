@@ -9,9 +9,12 @@
 
 ## 🚀 RESUME DEVELOPMENT - START HERE
 
+### Framework Role
+MDEMG is the **long-term memory engine** for [aci-claude-go](https://github.com/reh3376/aci-claude-go). It provides the autonomous collective with a persistent **Internal Dialog** and facilitates **Conceptual Threading** across agents.
+
 ### Before Coding
 1. **Configure embedding provider** in `mdemg_build/service/.env`:
-   - OpenAI: Set `EMBEDDING_PROVIDER=openai` and `OPENAI_API_KEY=sk-...`
+   - OpenAI: Set `EMBEDDING_PROVIDER=openai` and `OPENAI_API_KEY=sk-...` (Required for `text-embedding-3-small` used by aci-claude-go)
    - Ollama: Set `EMBEDDING_PROVIDER=ollama` (local, no API key needed)
 
 2. **Start the infrastructure:**
@@ -24,31 +27,26 @@
 3. **Verify everything is working:**
    ```bash
    curl -s http://localhost:8082/readyz | jq
-   # Should show: {"status":"ready","embedding_provider":"openai:text-embedding-ada-002+cache",...}
+   # Should show: {"status":"ready","embedding_provider":"openai:text-embedding-3-small+cache",...}
    ```
-
-4. **If Cursor was restarted**, the MCP tools (`memory_store`, `memory_recall`, etc.) should be available. Test with `memory_status`.
 
 ### What's Working
 - ✅ Neo4j graph database with vector indexes (1536-dim for OpenAI, 768-dim for Ollama)
 - ✅ Go service with embedding generation (OpenAI or Ollama) + LRU caching
 - ✅ Full retrieval pipeline: vector recall → graph expansion → spreading activation → scoring
-- ✅ MCP server with 5 memory tools for agent integration
-- ✅ Ingest and retrieve endpoints with auto-embedding
+- ✅ **Internal Dialog Implementation** - Chronicling agent thoughts as linked memory nodes (aci-claude-go PR #50)
+- ✅ **Autonomous Self-Reflection** - System-wide pattern identification triggered by session completion (PR #7)
+- ✅ **Unified API Response Envelope** - Enforced `{ "data": ..., "error": ... }` structure across all endpoints.
 - ✅ **Hebbian Learning** - `ApplyCoactivation()` creates CO_ACTIVATED_WITH edges (PR #2)
 - ✅ **Semantic Edges on Ingest** - Auto-creates ASSOCIATED_WITH edges to similar nodes (PR #6)
 - ✅ **Edge Weight Decay CLI** - `cmd/decay` for memory maintenance (PR #1)
 - ✅ **Consolidation CLI** - `cmd/consolidate` for cluster detection and abstraction promotion (PR #5)
 - ✅ **Metrics Endpoint** - `GET /v1/metrics` for graph health monitoring (PR #4)
-- ✅ **Integration Tests** - Comprehensive test suite for retrieval pipeline (PR #3)
-- ✅ **Batch Ingest Endpoint** - `POST /v1/memory/ingest/batch` for bulk imports (Task 7)
-- ✅ **Reflection Endpoint** - `POST /v1/memory/reflect` for deep context exploration (Task 8, PR #7)
-- ✅ **Anomaly Detection** - Non-blocking duplicate/stale detection on ingest (Task 9)
-- ✅ **Embedding Cache** - LRU cache for embedding results, reduces API calls (PR #8)
-- ✅ **Request Logging** - Structured JSON logging middleware (PR #9, Task 012)
-- ✅ **Configurable Scoring** - 7 tunable hyperparameters via env vars (PR #10, Task 013)
 - ✅ **Memory Stats Endpoint** - `GET /v1/memory/stats` per-space statistics (PR #11, Task 014)
 - ✅ **Memory Archive/Delete** - Soft-delete and hard-delete endpoints (PR #12, Task 015)
+- ✅ **Embedding Cache** - LRU cache for embedding results, reduces API calls (PR #8)
+- ✅ **Request Validation Middleware** - Centralized validation using `go-playground/validator/v10` (PR #13)
+- ✅ **Graph Pruning CLI** - `cmd/prune` for removing weak edges and merging redundant nodes (PR #14)
 
 ### What's Next (Priority Order)
 1. **Use the system!** - The more memories stored, the more emergent behaviors appear

@@ -89,28 +89,34 @@ Recommended:
 
 ## Integration Modes
 
-MDEMG operates as a **full active participant** in the development workflow:
+MDEMG operates as a **full active participant** in the autonomous development workflow:
 
-### 1. Background Service
-- Always running, similar to claude-mem
-- API available for agent queries
-- Continuous learning from observations
+### 1. aci-claude-go Native Integration
+- The primary consumer of MDEMG services.
+- Uses `internal/orchestrator` to coordinate memory ingestion and retrieval.
+- Facilitates **Internal Dialog** persistence across multi-agent sessions.
+- Triggers **Autonomous Self-Reflection** after subtask completion.
 
-### 2. Event-Driven Hooks
-- Git commits trigger memory updates
-- File saves capture context
-- Session events (start/end) trigger reflection
+### 2. Background Service
+- Always running, similar to claude-mem.
+- API available for agent queries and TUI dashboard stats.
+- Continuous learning from observations gathered during coding sessions.
 
-### 3. Proactive Surfacing
+### 3. Event-Driven Hooks
+- Git worktree transitions trigger memory updates.
+- Spec status changes (planning -> completed) trigger consolidation.
+- Session lifecycle events (start/end) trigger higher-order reflection.
+
+### 4. Proactive Surfacing
 
 | Mode | Behavior |
 |------|----------|
-| **Context Suggestions** | When working on code, surface related patterns/decisions |
-| **Periodic Reflection** | Synthesize insights at session start/end |
-| **Anomaly Detection** | Alert when current work contradicts stored knowledge |
-| **Conflict Resolution** | Identify when new info conflicts with existing beliefs |
+| **Context Suggestions** | When working on code, surface related patterns/decisions from MDEMG. |
+| **Periodic Reflection** | Synthesize insights at session start/end to maintain conceptual continuity. |
+| **Anomaly Detection** | Alert when current implementation diverges from stored requirements (Drift Detection). |
+| **Subject Matter Expertise** | Provide the "SME substrate" for the Planner, Coder, and QA agents. |
 
-### 4. Agent Consulting Service
+### 5. Agent Consulting Service
 
 A higher-order capability where MDEMG acts as an **SME (Subject Matter Expert)** for coding agents:
 
@@ -119,17 +125,11 @@ A higher-order capability where MDEMG acts as an **SME (Subject Matter Expert)**
 - **Concept synthesis**: "This relates to the higher-level principle of..."
 - **Risk awareness**: "Previous attempts at this approach encountered..."
 
-## What MDEMG Stores
+## Key Data Structures (aci-claude-go)
 
-| Category | Examples |
-|----------|----------|
-| **Code Patterns** | Solutions, idioms, reusable structures |
-| **Architectural Decisions** | Why things are built a certain way |
-| **Process Knowledge** | How to do things, workflows, procedures |
-| **Project Context** | Domain-specific terminology, constraints |
-| **Error Patterns** | What went wrong and how it was fixed |
-| **User Preferences** | Coding style, tool preferences, conventions |
-| **Cross-Project Learnings** | Insights that transfer between projects |
+- **InternalDialog**: A chronological thread of agent thoughts stored as linked `MemoryNode` entities.
+- **SessionInsights**: Structured outcomes of agent sessions including discoveries, what worked, and what failed.
+- **CodebaseDiscoveries**: Map of files understood and patterns identified by agents.
 
 ## Technical Invariants (DO NOT VIOLATE)
 
@@ -137,3 +137,6 @@ A higher-order capability where MDEMG acts as an **SME (Subject Matter Expert)**
 - **Graph = reasoning** (typed edges with evidence)
 - **Runtime = activation physics** (computed in-memory, NOT persisted)
 - **DB writes = learning deltas only** (bounded, no per-request activation writes)
+- **Conceptual Continuity**: Internal Dialog must be preserved across session handoffs.
+- **Unified Surface**: All API responses must follow the aci-claude-go `{ "data": ..., "error": ... }` envelope standard.
+- **Space Isolation**: Memories are partitioned by `space_id` (typically the project base name).

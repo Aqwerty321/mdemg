@@ -16,6 +16,13 @@ type MemoryNode struct {
 	Sensitivity string    `json:"sensitivity,omitempty"`
 	Tags        []string  `json:"tags,omitempty"`
 	Embedding   []float64 `json:"embedding,omitempty"`
+
+	// Hidden layer support (V0005)
+	MessagePassEmbedding []float64  `json:"message_pass_embedding,omitempty"`
+	LastForwardPass      *time.Time `json:"last_forward_pass,omitempty"`
+	LastBackwardPass     *time.Time `json:"last_backward_pass,omitempty"`
+	AggregationCount     int        `json:"aggregation_count,omitempty"`
+	StabilityScore       float64    `json:"stability_score,omitempty"`
 }
 
 type Observation struct {

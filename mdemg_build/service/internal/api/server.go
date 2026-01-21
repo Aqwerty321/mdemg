@@ -10,6 +10,7 @@ import (
 	"mdemg/internal/anomaly"
 	"mdemg/internal/config"
 	"mdemg/internal/embeddings"
+	"mdemg/internal/hidden"
 	"mdemg/internal/learning"
 	"mdemg/internal/retrieval"
 	"mdemg/internal/validation"
@@ -22,6 +23,7 @@ type Server struct {
 	learner         *learning.Service
 	embedder        embeddings.Embedder
 	anomalyDetector *anomaly.Service
+	hiddenLayer     *hidden.Service
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext) *Server {
@@ -66,7 +68,14 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext) *Server {
 		log.Printf("Anomaly detection enabled (duplicate threshold: %.2f, timeout: %dms)", anomalyCfg.DuplicateThreshold, anomalyCfg.MaxCheckMs)
 	}
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom}
+	// Initialize hidden layer service
+	hid := hidden.NewService(cfg, driver)
+	if cfg.HiddenLayerEnabled {
+		log.Printf("Hidden layer enabled (eps: %.2f, minSamples: %d, maxHidden: %d)",
+			cfg.HiddenLayerClusterEps, cfg.HiddenLayerMinSamples, cfg.HiddenLayerMaxHidden)
+	}
+
+	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid}
 }
 
 func (s *Server) Routes() http.Handler {
@@ -81,6 +90,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
 	mux.HandleFunc("/v1/memory/archive/bulk", s.handleBulkArchive)
 	mux.HandleFunc("/v1/memory/nodes/", s.handleNodeOperation)
+	mux.HandleFunc("/v1/memory/consolidate", s.handleConsolidate)
 
 	// Wrap mux with logging middleware
 	logCfg := LogConfig{

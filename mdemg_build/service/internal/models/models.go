@@ -267,3 +267,23 @@ type BulkArchiveResponse struct {
 	ErrorCount   int                 `json:"error_count"`
 	Results      []BulkArchiveResult `json:"results"`
 }
+
+// ConsolidateRequest - request for POST /v1/memory/consolidate
+// Triggers hidden layer creation and message passing operations.
+type ConsolidateRequest struct {
+	SpaceID       string `json:"space_id" validate:"required,min=1,max=256"`
+	SkipClustering bool   `json:"skip_clustering,omitempty"` // Skip DBSCAN clustering, only run message passing
+	SkipForward   bool   `json:"skip_forward,omitempty"`    // Skip forward pass
+	SkipBackward  bool   `json:"skip_backward,omitempty"`   // Skip backward pass
+}
+
+// ConsolidateResponse - response from consolidate endpoint
+type ConsolidateResponse struct {
+	SpaceID             string  `json:"space_id"`
+	HiddenNodesCreated  int     `json:"hidden_nodes_created"`
+	HiddenNodesUpdated  int     `json:"hidden_nodes_updated"`
+	ConceptNodesUpdated int     `json:"concept_nodes_updated"`
+	EdgesStrengthened   int     `json:"edges_strengthened"`
+	DurationMs          float64 `json:"duration_ms"`
+	Enabled             bool    `json:"enabled"` // Whether hidden layer is enabled
+}

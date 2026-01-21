@@ -1,7 +1,7 @@
 # MDEMG Development Handoff Document
 
-**Date:** 2026-01-16
-**Status:** Core Features Complete - 16 PRs Merged (#1-14)
+**Date:** 2026-01-21
+**Status:** Core Features Complete + Hidden Layer API - 16 PRs Merged (#1-14)
 
 > **Vision Document:** See [VISION.md](./VISION.md) for the complete architectural philosophy and design principles.
 
@@ -47,6 +47,7 @@ MDEMG is the **long-term memory engine** for [aci-claude-go](https://github.com/
 - ✅ **Embedding Cache** - LRU cache for embedding results, reduces API calls (PR #8)
 - ✅ **Request Validation Middleware** - Centralized validation using `go-playground/validator/v10` (PR #13)
 - ✅ **Graph Pruning CLI** - `cmd/prune` for removing weak edges and merging redundant nodes (PR #14)
+- ✅ **Hidden Layer API** - `POST /v1/memory/consolidate` for DBSCAN clustering + message passing (2026-01-21)
 
 ### What's Next (Priority Order)
 1. **Use the system!** - The more memories stored, the more emergent behaviors appear
@@ -66,6 +67,11 @@ curl -s http://localhost:8082/v1/memory/retrieve \
 # Check Neo4j graph
 docker exec mdemg-neo4j cypher-shell -u neo4j -p testpassword \
   "MATCH (n:MemoryNode) RETURN n.name, n.path LIMIT 10"
+
+# Run hidden layer consolidation
+curl -s http://localhost:8082/v1/memory/consolidate \
+  -H 'content-type: application/json' \
+  -d '{"space_id":"ide-agent"}' | jq
 
 # Stop service
 pkill -f mdemg-server
@@ -219,6 +225,15 @@ MDEMG provides AI agents with the **ANN equivalent of an internal dialog**—sim
     - Protection rules: pinned edges, high evidence, abstraction chains
     - CLI: `go run ./cmd/prune --space-id <id> --dry-run`
 
+16. **Hidden Layer Service** (`internal/hidden/`)
+    - DBSCAN clustering of base layer nodes to discover emergent patterns
+    - Hidden nodes (layer 1) created from cluster centroids
+    - GraphSAGE-style message passing with forward/backward passes
+    - Configurable via 9 `HIDDEN_LAYER_*` environment variables
+    - API: `POST /v1/memory/consolidate` with skip flags
+    - Unit tests: `clustering_test.go`, `service_test.go`
+    - Integration tests: `tests/integration/hidden_test.go`
+
 ---
 
 ## Quick Start Commands
@@ -355,6 +370,15 @@ All 17 Auto-Claude tasks have been implemented and merged. The system now includ
 - 8 API endpoints with validation and logging
 - Comprehensive test suites (unit + integration)
 
+### Priority 3: Hidden Layer & Emergence (2026-01-21)
+- [x] **Hidden Layer API** - `POST /v1/memory/consolidate` endpoint
+- [x] **DBSCAN Clustering** - `internal/hidden/clustering.go` with cosine distance
+- [x] **Message Passing** - Forward and backward pass for embedding aggregation
+- [x] **Unit Tests** - `clustering_test.go`, `service_test.go`
+- [x] **Integration Tests** - `tests/integration/hidden_test.go`
+- [ ] **Automatic triggers** - Consolidation on session end or threshold
+- [ ] **Layer promotion** - Dynamic promotion to concept layers (layer 2+)
+
 ### Priority 4: Future Enhancements
 - [ ] **Proactive surfacing** - Context suggestions, anomaly alerts
 - [ ] **Agent consulting service** - SME-like guidance API
@@ -402,7 +426,13 @@ All 17 Auto-Claude tasks have been implemented and merged. The system now includ
 | `internal/validation/validator.go` | Request validation (NEW) |
 | `internal/validation/errors.go` | Validation error types (NEW) |
 | `internal/models/models.go` | Request/response types |
+| `internal/hidden/types.go` | Hidden layer node types (NEW) |
+| `internal/hidden/clustering.go` | DBSCAN clustering algorithm (NEW) |
+| `internal/hidden/service.go` | Hidden layer operations (NEW) |
+| `internal/hidden/clustering_test.go` | Clustering unit tests (NEW) |
+| `internal/hidden/service_test.go` | Hidden service unit tests (NEW) |
 | `tests/integration/` | Integration test suite (NEW) |
+| `tests/integration/hidden_test.go` | Hidden layer integration tests (NEW) |
 
 ### MCP Server (`mdemg_build/mcp-server/`)
 | File | Purpose |
@@ -482,6 +512,17 @@ SCORING_RHO=0.05                    # Recency decay rate per day
 # Logging
 LOG_FORMAT=text                     # "text" or "json" for structured logs
 LOG_SKIP_HEALTH=false               # Skip logging for /healthz and /readyz
+
+# Hidden Layer (graph convolution)
+HIDDEN_LAYER_ENABLED=true           # Enable hidden layer processing (default: true)
+HIDDEN_LAYER_CLUSTER_EPS=0.3        # DBSCAN epsilon - max cosine distance for neighborhood
+HIDDEN_LAYER_MIN_SAMPLES=3          # DBSCAN min samples to form cluster
+HIDDEN_LAYER_MAX_HIDDEN=100         # Max hidden nodes per consolidation run
+HIDDEN_LAYER_FORWARD_ALPHA=0.6      # Weight of current embedding in forward pass
+HIDDEN_LAYER_FORWARD_BETA=0.4       # Weight of aggregated embedding in forward pass
+HIDDEN_LAYER_BACKWARD_SELF=0.2      # Weight of self in backward pass
+HIDDEN_LAYER_BACKWARD_BASE=0.5      # Weight of base signal in backward pass
+HIDDEN_LAYER_BACKWARD_CONC=0.3      # Weight of concept signal in backward pass
 ```
 
 ---

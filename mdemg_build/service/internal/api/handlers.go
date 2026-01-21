@@ -829,6 +829,83 @@ func (s *Server) handleReflect(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// handleConsolidate handles POST /v1/memory/consolidate
+// Triggers hidden layer creation via DBSCAN clustering and runs message passing (forward + backward passes)
+func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req models.ConsolidateRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if !validateRequest(w, &req) {
+		return
+	}
+
+	// Check if hidden layer is enabled
+	if !s.cfg.HiddenLayerEnabled {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"data": models.ConsolidateResponse{
+				SpaceID: req.SpaceID,
+				Enabled: false,
+			},
+		})
+		return
+	}
+
+	// Run full consolidation (or partial based on skip flags)
+	var resp models.ConsolidateResponse
+	resp.SpaceID = req.SpaceID
+	resp.Enabled = true
+
+	start := time.Now()
+
+	// Step 1: Create hidden nodes from orphan base data (unless skipped)
+	if !req.SkipClustering {
+		created, err := s.hiddenLayer.CreateHiddenNodes(r.Context(), req.SpaceID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"error": fmt.Sprintf("failed to create hidden nodes: %v", err),
+			})
+			return
+		}
+		resp.HiddenNodesCreated = created
+	}
+
+	// Step 2: Forward pass (unless skipped)
+	if !req.SkipForward {
+		fwdResult, err := s.hiddenLayer.ForwardPass(r.Context(), req.SpaceID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"error": fmt.Sprintf("failed in forward pass: %v", err),
+			})
+			return
+		}
+		resp.HiddenNodesUpdated = fwdResult.HiddenNodesUpdated
+		resp.ConceptNodesUpdated = fwdResult.ConceptNodesUpdated
+	}
+
+	// Step 3: Backward pass (unless skipped)
+	if !req.SkipBackward {
+		bwdResult, err := s.hiddenLayer.BackwardPass(r.Context(), req.SpaceID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"error": fmt.Sprintf("failed in backward pass: %v", err),
+			})
+			return
+		}
+		// Add to existing count if forward pass was also run
+		resp.HiddenNodesUpdated += bwdResult.HiddenNodesUpdated
+		resp.EdgesStrengthened = bwdResult.EdgesStrengthened
+	}
+
+	resp.DurationMs = float64(time.Since(start).Milliseconds())
+
+	writeJSON(w, http.StatusOK, map[string]any{"data": resp})
+}
+
 // contentToText converts the content field to a string for embedding
 func contentToText(content any) string {
 	switch v := content.(type) {

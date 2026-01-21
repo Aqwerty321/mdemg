@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/config"
+	"mdemg/internal/hidden"
 )
 
 // consolidateConfig holds CLI and environment configuration for the consolidation job
@@ -19,10 +22,27 @@ type consolidateConfig struct {
 	Neo4jUser string
 	Neo4jPass string
 
-	// Consolidation parameters
+	// Legacy consolidation parameters (CO_ACTIVATED_WITH based)
 	MinClusterSize  int     // default: 3
 	WeightThreshold float64 // default: 0.5
 	MaxPromotions   int     // default: 50
+
+	// Hidden layer parameters
+	HiddenLayerEnabled    bool    // Run hidden layer operations
+	HiddenClusterEps      float64 // DBSCAN epsilon
+	HiddenMinSamples      int     // DBSCAN min samples
+	HiddenMaxNodes        int     // Max hidden nodes to create
+	HiddenForwardAlpha    float64 // Forward pass alpha
+	HiddenForwardBeta     float64 // Forward pass beta
+	HiddenBackwardSelf    float64 // Backward pass self weight
+	HiddenBackwardBase    float64 // Backward pass base weight
+	HiddenBackwardConcept float64 // Backward pass concept weight
+
+	// Operation modes
+	LegacyMode   bool // Run legacy CO_ACTIVATED_WITH consolidation
+	ForwardOnly  bool // Only run forward pass (hidden layer)
+	BackwardOnly bool // Only run backward pass (hidden layer)
+	ClusterOnly  bool // Only run clustering (hidden layer)
 
 	// Processing options
 	DryRun  bool
@@ -54,9 +74,26 @@ func main() {
 		log.Fatalf("failed to connect to neo4j: %v", err)
 	}
 
-	// Run the consolidation job
-	if err := runConsolidationJob(ctx, driver, cfg); err != nil {
-		log.Fatalf("consolidation job failed: %v", err)
+	// Determine which operations to run
+	if cfg.LegacyMode {
+		// Run legacy CO_ACTIVATED_WITH based consolidation
+		if err := runLegacyConsolidationJob(ctx, driver, cfg); err != nil {
+			log.Fatalf("legacy consolidation job failed: %v", err)
+		}
+	}
+
+	if cfg.HiddenLayerEnabled {
+		// Run hidden layer operations
+		if err := runHiddenLayerJob(ctx, driver, cfg); err != nil {
+			log.Fatalf("hidden layer job failed: %v", err)
+		}
+	}
+
+	if !cfg.LegacyMode && !cfg.HiddenLayerEnabled {
+		fmt.Println("No operations selected. Use --hidden-layer and/or --legacy flags.")
+		fmt.Println()
+		flag.Usage()
+		os.Exit(1)
 	}
 }
 
@@ -64,10 +101,29 @@ func main() {
 func parseConfig() (consolidateConfig, error) {
 	var cfg consolidateConfig
 
-	// CLI flags with defaults
-	flag.IntVar(&cfg.MinClusterSize, "min-cluster-size", 3, "Minimum number of nodes to form a cluster")
-	flag.Float64Var(&cfg.WeightThreshold, "weight-threshold", 0.5, "Minimum CO_ACTIVATED_WITH weight to consider")
-	flag.IntVar(&cfg.MaxPromotions, "max-promotions", 50, "Maximum number of abstraction nodes to create")
+	// Legacy consolidation flags
+	flag.IntVar(&cfg.MinClusterSize, "min-cluster-size", 3, "Minimum number of nodes to form a cluster (legacy)")
+	flag.Float64Var(&cfg.WeightThreshold, "weight-threshold", 0.5, "Minimum CO_ACTIVATED_WITH weight (legacy)")
+	flag.IntVar(&cfg.MaxPromotions, "max-promotions", 50, "Maximum abstraction nodes to create (legacy)")
+
+	// Hidden layer flags
+	flag.BoolVar(&cfg.HiddenLayerEnabled, "hidden-layer", false, "Enable hidden layer operations")
+	flag.Float64Var(&cfg.HiddenClusterEps, "hidden-eps", 0.3, "DBSCAN epsilon (max distance)")
+	flag.IntVar(&cfg.HiddenMinSamples, "hidden-min-samples", 3, "DBSCAN minimum samples per cluster")
+	flag.IntVar(&cfg.HiddenMaxNodes, "hidden-max-nodes", 100, "Maximum hidden nodes to create")
+	flag.Float64Var(&cfg.HiddenForwardAlpha, "hidden-fwd-alpha", 0.6, "Forward pass: weight of current embedding")
+	flag.Float64Var(&cfg.HiddenForwardBeta, "hidden-fwd-beta", 0.4, "Forward pass: weight of aggregated embedding")
+	flag.Float64Var(&cfg.HiddenBackwardSelf, "hidden-bwd-self", 0.2, "Backward pass: self weight")
+	flag.Float64Var(&cfg.HiddenBackwardBase, "hidden-bwd-base", 0.5, "Backward pass: base signal weight")
+	flag.Float64Var(&cfg.HiddenBackwardConcept, "hidden-bwd-concept", 0.3, "Backward pass: concept signal weight")
+
+	// Operation mode flags
+	flag.BoolVar(&cfg.LegacyMode, "legacy", false, "Run legacy CO_ACTIVATED_WITH consolidation")
+	flag.BoolVar(&cfg.ForwardOnly, "forward-only", false, "Only run forward pass (hidden layer)")
+	flag.BoolVar(&cfg.BackwardOnly, "backward-only", false, "Only run backward pass (hidden layer)")
+	flag.BoolVar(&cfg.ClusterOnly, "cluster-only", false, "Only run clustering (hidden layer)")
+
+	// Common flags
 	flag.BoolVar(&cfg.DryRun, "dry-run", true, "Preview mode - no modifications (default: true)")
 	flag.StringVar(&cfg.SpaceID, "space-id", "", "Space ID to process (REQUIRED)")
 
@@ -95,15 +151,30 @@ func parseConfig() (consolidateConfig, error) {
 		return consolidateConfig{}, errors.New("--space-id is required")
 	}
 
-	// Validate flag values
-	if cfg.MinClusterSize < 2 {
-		return consolidateConfig{}, errors.New("min-cluster-size must be at least 2")
+	// Validate legacy parameters
+	if cfg.LegacyMode {
+		if cfg.MinClusterSize < 2 {
+			return consolidateConfig{}, errors.New("min-cluster-size must be at least 2")
+		}
+		if cfg.WeightThreshold < 0 || cfg.WeightThreshold > 1 {
+			return consolidateConfig{}, errors.New("weight-threshold must be between 0 and 1")
+		}
+		if cfg.MaxPromotions <= 0 {
+			return consolidateConfig{}, errors.New("max-promotions must be positive")
+		}
 	}
-	if cfg.WeightThreshold < 0 || cfg.WeightThreshold > 1 {
-		return consolidateConfig{}, errors.New("weight-threshold must be between 0 and 1")
-	}
-	if cfg.MaxPromotions <= 0 {
-		return consolidateConfig{}, errors.New("max-promotions must be positive")
+
+	// Validate hidden layer parameters
+	if cfg.HiddenLayerEnabled {
+		if cfg.HiddenClusterEps <= 0 || cfg.HiddenClusterEps > 1 {
+			return consolidateConfig{}, errors.New("hidden-eps must be in range (0, 1]")
+		}
+		if cfg.HiddenMinSamples < 2 {
+			return consolidateConfig{}, errors.New("hidden-min-samples must be at least 2")
+		}
+		if cfg.HiddenMaxNodes < 1 {
+			return consolidateConfig{}, errors.New("hidden-max-nodes must be positive")
+		}
 	}
 
 	return cfg, nil
@@ -117,6 +188,184 @@ func newDriver(cfg consolidateConfig) (neo4j.DriverWithContext, error) {
 	}
 	return driver, nil
 }
+
+// runHiddenLayerJob executes hidden layer operations using the hidden service
+func runHiddenLayerJob(ctx context.Context, driver neo4j.DriverWithContext, cfg consolidateConfig) error {
+	fmt.Println("\n========================================")
+	fmt.Println("Hidden Layer Operations")
+	fmt.Println("========================================")
+
+	if cfg.DryRun {
+		fmt.Println("Mode: DRY RUN (preview only)")
+	} else {
+		fmt.Println("Mode: LIVE (changes will be applied)")
+	}
+	fmt.Printf("Space: %s\n", cfg.SpaceID)
+	fmt.Printf("Cluster Eps: %.2f\n", cfg.HiddenClusterEps)
+	fmt.Printf("Min Samples: %d\n", cfg.HiddenMinSamples)
+	fmt.Printf("Max Hidden Nodes: %d\n", cfg.HiddenMaxNodes)
+
+	// Build config for hidden service
+	svcCfg := config.Config{
+		Neo4jURI:                cfg.Neo4jURI,
+		Neo4jUser:               cfg.Neo4jUser,
+		Neo4jPass:               cfg.Neo4jPass,
+		HiddenLayerEnabled:      !cfg.DryRun, // Disable writes in dry-run
+		HiddenLayerClusterEps:   cfg.HiddenClusterEps,
+		HiddenLayerMinSamples:   cfg.HiddenMinSamples,
+		HiddenLayerMaxHidden:    cfg.HiddenMaxNodes,
+		HiddenLayerForwardAlpha: cfg.HiddenForwardAlpha,
+		HiddenLayerForwardBeta:  cfg.HiddenForwardBeta,
+		HiddenLayerBackwardSelf: cfg.HiddenBackwardSelf,
+		HiddenLayerBackwardBase: cfg.HiddenBackwardBase,
+		HiddenLayerBackwardConc: cfg.HiddenBackwardConcept,
+	}
+
+	svc := hidden.NewService(svcCfg, driver)
+
+	// Determine operations
+	runClustering := !cfg.ForwardOnly && !cfg.BackwardOnly
+	runForward := !cfg.ClusterOnly && !cfg.BackwardOnly
+	runBackward := !cfg.ClusterOnly && !cfg.ForwardOnly
+
+	if cfg.DryRun {
+		// Dry run: show what would happen
+		fmt.Println("\nDry run - showing potential operations:")
+		if runClustering {
+			count, err := countOrphanBaseNodes(ctx, driver, cfg.SpaceID)
+			if err != nil {
+				return fmt.Errorf("count orphan nodes: %w", err)
+			}
+			fmt.Printf("  - Orphan base nodes available for clustering: %d\n", count)
+			if count >= cfg.HiddenMinSamples {
+				fmt.Printf("  - Would potentially create up to %d hidden nodes\n", min(count/cfg.HiddenMinSamples, cfg.HiddenMaxNodes))
+			}
+		}
+		if runForward {
+			hiddenCount, conceptCount, err := countLayerNodes(ctx, driver, cfg.SpaceID)
+			if err != nil {
+				return fmt.Errorf("count layer nodes: %w", err)
+			}
+			fmt.Printf("  - Hidden nodes to update (forward pass): %d\n", hiddenCount)
+			fmt.Printf("  - Concept nodes to update (forward pass): %d\n", conceptCount)
+		}
+		if runBackward {
+			hiddenCount, _, err := countLayerNodes(ctx, driver, cfg.SpaceID)
+			if err != nil {
+				return fmt.Errorf("count layer nodes: %w", err)
+			}
+			fmt.Printf("  - Hidden nodes to update (backward pass): %d\n", hiddenCount)
+		}
+		fmt.Println("\nRun with --dry-run=false to apply changes.")
+		return nil
+	}
+
+	// Live run
+	fmt.Println("\nExecuting operations...")
+
+	if runClustering {
+		fmt.Println("\nStep 1: Creating hidden nodes from orphan base data...")
+		created, err := svc.CreateHiddenNodes(ctx, cfg.SpaceID)
+		if err != nil {
+			return fmt.Errorf("create hidden nodes: %w", err)
+		}
+		fmt.Printf("  Hidden nodes created: %d\n", created)
+	}
+
+	if runForward {
+		fmt.Println("\nStep 2: Running forward pass...")
+		result, err := svc.ForwardPass(ctx, cfg.SpaceID)
+		if err != nil {
+			return fmt.Errorf("forward pass: %w", err)
+		}
+		fmt.Printf("  Hidden nodes updated: %d\n", result.HiddenNodesUpdated)
+		fmt.Printf("  Concept nodes updated: %d\n", result.ConceptNodesUpdated)
+		fmt.Printf("  Duration: %v\n", result.Duration)
+	}
+
+	if runBackward {
+		fmt.Println("\nStep 3: Running backward pass...")
+		result, err := svc.BackwardPass(ctx, cfg.SpaceID)
+		if err != nil {
+			return fmt.Errorf("backward pass: %w", err)
+		}
+		fmt.Printf("  Hidden nodes updated: %d\n", result.HiddenNodesUpdated)
+		fmt.Printf("  Duration: %v\n", result.Duration)
+	}
+
+	fmt.Println("\nHidden layer operations completed successfully.")
+	return nil
+}
+
+// countOrphanBaseNodes counts base nodes without a GENERALIZES edge to hidden layer
+func countOrphanBaseNodes(ctx context.Context, driver neo4j.DriverWithContext, spaceID string) (int, error) {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `
+MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})
+WHERE NOT (b)-[:GENERALIZES]->(:MemoryNode {layer: 1})
+  AND b.embedding IS NOT NULL
+RETURN count(b) AS cnt`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			cnt, _ := res.Record().Get("cnt")
+			return asInt(cnt), res.Err()
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return 0, err
+	}
+	return result.(int), nil
+}
+
+// countLayerNodes counts hidden (layer 1) and concept (layer >= 2) nodes
+func countLayerNodes(ctx context.Context, driver neo4j.DriverWithContext, spaceID string) (int, int, error) {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `
+MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE n.layer >= 1
+RETURN n.layer AS layer, count(n) AS cnt`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		hiddenCount := 0
+		conceptCount := 0
+		for res.Next(ctx) {
+			rec := res.Record()
+			layer, _ := rec.Get("layer")
+			cnt, _ := rec.Get("cnt")
+			l := asInt(layer)
+			c := asInt(cnt)
+			if l == 1 {
+				hiddenCount = c
+			} else if l >= 2 {
+				conceptCount += c
+			}
+		}
+		return []int{hiddenCount, conceptCount}, res.Err()
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+	counts := result.([]int)
+	return counts[0], counts[1], nil
+}
+
+// ============================================================================
+// Legacy consolidation code (CO_ACTIVATED_WITH based)
+// ============================================================================
 
 // consolidateStats tracks statistics for the consolidation job
 type consolidateStats struct {
@@ -158,8 +407,12 @@ type cluster struct {
 	Layer   int
 }
 
-// runConsolidationJob executes the cluster detection and abstraction promotion
-func runConsolidationJob(ctx context.Context, driver neo4j.DriverWithContext, cfg consolidateConfig) error {
+// runLegacyConsolidationJob executes the cluster detection and abstraction promotion
+func runLegacyConsolidationJob(ctx context.Context, driver neo4j.DriverWithContext, cfg consolidateConfig) error {
+	fmt.Println("\n========================================")
+	fmt.Println("Legacy Consolidation (CO_ACTIVATED_WITH)")
+	fmt.Println("========================================")
+
 	// Print header
 	printHeader(cfg)
 
@@ -296,9 +549,9 @@ func printHeader(cfg consolidateConfig) {
 
 // printStats outputs the job statistics
 func printStats(stats consolidateStats, dryRun bool) {
-	fmt.Println("\n========================================")
-	fmt.Println("Statistics")
-	fmt.Println("========================================")
+	fmt.Println("\n----------------------------------------")
+	fmt.Println("Legacy Consolidation Statistics")
+	fmt.Println("----------------------------------------")
 
 	// Main counts
 	fmt.Printf("Clusters found:          %d\n", stats.clustersFound)
@@ -361,15 +614,10 @@ func truncateID(id string) string {
 }
 
 // queryClusterCandidates fetches nodes with sufficient high-weight neighbors at the same layer.
-// Each returned candidate has ≥ (minSize - 1) neighbors with CO_ACTIVATED_WITH weight ≥ threshold.
-// This is the first step in cluster detection - nodes are later grouped into actual clusters.
 func queryClusterCandidates(ctx context.Context, driver neo4j.DriverWithContext, cfg consolidateConfig) ([]clusterCandidate, error) {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
-	// Find nodes with enough high-weight neighbors at same layer
-	// The query returns nodes where each has at least (minSize-1) neighbors with weight >= threshold
-	// This means when combined with the node itself, we have >= minSize nodes in potential cluster
 	cypher := `
 MATCH (a:MemoryNode)-[r:CO_ACTIVATED_WITH]-(b:MemoryNode)
 WHERE a.space_id = $spaceId
@@ -386,7 +634,7 @@ ORDER BY size(neighbors) DESC`
 	params := map[string]any{
 		"spaceId":      cfg.SpaceID,
 		"threshold":    cfg.WeightThreshold,
-		"minNeighbors": cfg.MinClusterSize - 1, // need minSize-1 neighbors to form cluster of minSize
+		"minNeighbors": cfg.MinClusterSize - 1,
 	}
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -425,53 +673,36 @@ ORDER BY size(neighbors) DESC`
 	return result.([]clusterCandidate), nil
 }
 
-// buildClusters groups cluster candidates into non-overlapping clusters using greedy first-come assignment.
-// Each node can only belong to one cluster. Candidates are processed in order (highest neighbor count first,
-// as returned by queryClusterCandidates). For each unassigned candidate, we form a cluster from the candidate
-// plus any of its unassigned neighbors. Clusters smaller than minSize are discarded.
+// buildClusters groups cluster candidates into non-overlapping clusters
 func buildClusters(candidates []clusterCandidate, minSize int) []cluster {
-	// Build a map of candidate node IDs to their data for quick lookup
 	candidateMap := make(map[string]clusterCandidate)
 	for _, c := range candidates {
 		candidateMap[c.NodeID] = c
 	}
 
-	// Track which nodes have been assigned to a cluster
 	assigned := make(map[string]bool)
-
-	// Result clusters
 	var clusters []cluster
 
-	// Process candidates in order (already sorted by neighbor count descending)
 	for _, candidate := range candidates {
-		// Skip if this node is already assigned to a cluster
 		if assigned[candidate.NodeID] {
 			continue
 		}
 
-		// Build cluster starting from this candidate
 		var members []clusterMember
-
-		// Add the candidate itself
 		members = append(members, clusterMember{
 			NodeID:    candidate.NodeID,
 			Embedding: candidate.Embedding,
 		})
 
-		// Add unassigned neighbors
 		for _, neighborID := range candidate.NeighborIDs {
 			if assigned[neighborID] {
 				continue
 			}
 
-			// Get neighbor's embedding from candidateMap if available
 			var neighborEmbedding []float64
 			if neighborCandidate, exists := candidateMap[neighborID]; exists {
 				neighborEmbedding = neighborCandidate.Embedding
 			}
-			// Note: If neighbor is not in candidateMap, it means it didn't have
-			// enough neighbors to be a candidate itself, but we still include it
-			// in this cluster. Its embedding may be nil.
 
 			members = append(members, clusterMember{
 				NodeID:    neighborID,
@@ -479,17 +710,14 @@ func buildClusters(candidates []clusterCandidate, minSize int) []cluster {
 			})
 		}
 
-		// Only keep clusters that meet minimum size requirement
 		if len(members) < minSize {
 			continue
 		}
 
-		// Mark all members as assigned
 		for _, member := range members {
 			assigned[member.NodeID] = true
 		}
 
-		// Add cluster to results
 		clusters = append(clusters, cluster{
 			Members: members,
 			Layer:   candidate.Layer,
@@ -499,12 +727,12 @@ func buildClusters(candidates []clusterCandidate, minSize int) []cluster {
 	return clusters
 }
 
-// asStringSlice safely converts interface{} to []string
+// Helper type conversion functions
+
 func asStringSlice(v any) []string {
 	if v == nil {
 		return nil
 	}
-	// Neo4j returns arrays as []interface{} or []any
 	if arr, ok := v.([]any); ok {
 		result := make([]string, 0, len(arr))
 		for _, item := range arr {
@@ -512,14 +740,12 @@ func asStringSlice(v any) []string {
 		}
 		return result
 	}
-	// Direct string slice (rare but possible)
 	if arr, ok := v.([]string); ok {
 		return arr
 	}
 	return nil
 }
 
-// asString safely converts interface{} to string
 func asString(v any) string {
 	if v == nil {
 		return ""
@@ -530,7 +756,6 @@ func asString(v any) string {
 	return fmt.Sprintf("%v", v)
 }
 
-// asFloat64 safely converts interface{} to float64
 func asFloat64(v any) float64 {
 	if v == nil {
 		return 0.0
@@ -547,7 +772,6 @@ func asFloat64(v any) float64 {
 	}
 }
 
-// asInt safely converts interface{} to int
 func asInt(v any) int {
 	if v == nil {
 		return 0
@@ -564,7 +788,23 @@ func asInt(v any) int {
 	}
 }
 
-// asBool safely converts interface{} to bool
+func asFloat64Slice(v any) []float64 {
+	if v == nil {
+		return nil
+	}
+	if arr, ok := v.([]any); ok {
+		result := make([]float64, 0, len(arr))
+		for _, item := range arr {
+			result = append(result, asFloat64(item))
+		}
+		return result
+	}
+	if arr, ok := v.([]float64); ok {
+		return arr
+	}
+	return nil
+}
+
 func asBool(v any) bool {
 	if v == nil {
 		return false
@@ -575,45 +815,21 @@ func asBool(v any) bool {
 	return false
 }
 
-// asFloat64Slice safely converts interface{} to []float64 for embeddings
-func asFloat64Slice(v any) []float64 {
-	if v == nil {
-		return nil
-	}
-	// Neo4j returns arrays as []interface{} or []any
-	if arr, ok := v.([]any); ok {
-		result := make([]float64, 0, len(arr))
-		for _, item := range arr {
-			result = append(result, asFloat64(item))
-		}
-		return result
-	}
-	// Direct float64 slice (rare but possible)
-	if arr, ok := v.([]float64); ok {
-		return arr
-	}
-	return nil
-}
-
 // abstractionResult holds the result of creating an abstraction node
 type abstractionResult struct {
 	NodeID      string
 	MemberCount int
 }
 
-// createAbstraction creates a new MemoryNode at layer+1 and ABSTRACTS_TO edges from cluster members.
-// Returns the new abstraction node's ID and the count of edges created.
-// This function performs actual database writes - only call when dryRun is false.
+// createAbstraction creates a new MemoryNode at layer+1 and ABSTRACTS_TO edges
 func createAbstraction(ctx context.Context, driver neo4j.DriverWithContext, cfg consolidateConfig, c cluster, embedding []float64) (*abstractionResult, error) {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	// Generate name and summary from cluster members
 	name := generateAbstractionName(c.Members)
 	summary := fmt.Sprintf("Cluster abstraction of %d nodes at layer %d", len(c.Members), c.Layer)
 	newLayer := c.Layer + 1
 
-	// Collect member node IDs
 	memberIDs := make([]string, 0, len(c.Members))
 	for _, m := range c.Members {
 		memberIDs = append(memberIDs, m.NodeID)
@@ -629,10 +845,6 @@ func createAbstraction(ctx context.Context, driver neo4j.DriverWithContext, cfg 
 	}
 
 	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		// Cypher query creates abstraction node and ABSTRACTS_TO edges:
-		// - CREATE for the new abstraction node with all required properties
-		// - UNWIND + MATCH to find each cluster member
-		// - CREATE for ABSTRACTS_TO edges with required properties
 		cypher := `
 CREATE (abs:MemoryNode {
   space_id: $spaceId,
@@ -662,7 +874,6 @@ RETURN abs.node_id AS absNodeId, count(m) AS memberCount`
 			return nil, err
 		}
 
-		// Expect exactly one result record
 		if res.Next(ctx) {
 			rec := res.Record()
 			nodeID, _ := rec.Get("absNodeId")
@@ -677,7 +888,6 @@ RETURN abs.node_id AS absNodeId, count(m) AS memberCount`
 			return nil, err
 		}
 
-		// No result returned - shouldn't happen if query is correct
 		return nil, errors.New("no result returned from abstraction creation query")
 	})
 
@@ -688,22 +898,18 @@ RETURN abs.node_id AS absNodeId, count(m) AS memberCount`
 }
 
 // generateAbstractionName creates a descriptive name for the abstraction node
-// based on cluster member node IDs, truncating if too long
 func generateAbstractionName(members []clusterMember) string {
 	if len(members) == 0 {
 		return "Abstraction: (empty)"
 	}
 
-	// Collect node IDs
 	ids := make([]string, 0, len(members))
 	for _, m := range members {
 		ids = append(ids, m.NodeID)
 	}
 
-	// Join IDs with commas
 	joined := strings.Join(ids, ", ")
 
-	// Truncate if too long (max ~60 chars for readability)
 	const maxLen = 60
 	if len(joined) > maxLen {
 		joined = joined[:maxLen-3] + "..."
@@ -712,14 +918,12 @@ func generateAbstractionName(members []clusterMember) string {
 	return fmt.Sprintf("Abstraction: [%s]", joined)
 }
 
-// averageEmbeddings computes the centroid (element-wise average) of multiple embedding vectors.
-// Returns nil if embeddings is empty. Skips embeddings with mismatched dimensions.
+// averageEmbeddings computes the centroid of multiple embedding vectors
 func averageEmbeddings(embeddings [][]float64) []float64 {
 	if len(embeddings) == 0 {
 		return nil
 	}
 
-	// Find the first non-nil, non-empty embedding to determine dimensions
 	var dim int
 	for _, emb := range embeddings {
 		if len(emb) > 0 {
@@ -735,7 +939,6 @@ func averageEmbeddings(embeddings [][]float64) []float64 {
 	validCount := 0
 
 	for _, emb := range embeddings {
-		// Skip nil, empty, or mismatched dimension embeddings
 		if len(emb) != dim {
 			continue
 		}
@@ -745,16 +948,35 @@ func averageEmbeddings(embeddings [][]float64) []float64 {
 		validCount++
 	}
 
-	// If no valid embeddings were found, return nil
 	if validCount == 0 {
 		return nil
 	}
 
-	// Divide by count to get average
 	count := float64(validCount)
 	for i := range result {
 		result[i] /= count
 	}
 
 	return result
+}
+
+// min returns the smaller of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// getEnvInt gets an integer from environment variable with default
+func getEnvInt(key string, defaultVal int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal
+	}
+	i, err := strconv.Atoi(v)
+	if err != nil {
+		return defaultVal
+	}
+	return i
 }

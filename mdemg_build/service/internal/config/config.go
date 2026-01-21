@@ -71,6 +71,17 @@ type Config struct {
 	// Logging settings
 	LogFormat     string // "text" (default) or "json"
 	LogSkipHealth bool   // Skip logging for /healthz and /readyz endpoints (default: false)
+
+	// Hidden layer settings (V0005)
+	HiddenLayerEnabled       bool    // Feature toggle for hidden layer processing (default: true)
+	HiddenLayerClusterEps    float64 // DBSCAN epsilon - max distance for neighborhood (default: 0.3)
+	HiddenLayerMinSamples    int     // DBSCAN min samples to form cluster (default: 3)
+	HiddenLayerMaxHidden     int     // Max hidden nodes to create per consolidation run (default: 100)
+	HiddenLayerForwardAlpha  float64 // Weight of current embedding in forward pass (default: 0.6)
+	HiddenLayerForwardBeta   float64 // Weight of aggregated embedding in forward pass (default: 0.4)
+	HiddenLayerBackwardSelf  float64 // Weight of self in backward pass (default: 0.2)
+	HiddenLayerBackwardBase  float64 // Weight of base signal in backward pass (default: 0.5)
+	HiddenLayerBackwardConc  float64 // Weight of concept signal in backward pass (default: 0.3)
 }
 
 func FromEnv() (Config, error) {
@@ -198,7 +209,7 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("LEARNING_WMIN must be < LEARNING_WMAX")
 	}
 
-	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES")
+	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES,GENERALIZES")
 	parts := strings.Split(allowed, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
@@ -351,6 +362,50 @@ func FromEnv() (Config, error) {
 	}
 	logSkipHealth := getBool("LOG_SKIP_HEALTH", false)
 
+	// Hidden layer settings (V0005)
+	hiddenEnabled := getBool("HIDDEN_LAYER_ENABLED", true)
+	hiddenClusterEps, err := atof("HIDDEN_LAYER_CLUSTER_EPS", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	if hiddenClusterEps <= 0 || hiddenClusterEps > 1 {
+		return Config{}, errors.New("HIDDEN_LAYER_CLUSTER_EPS must be in range (0, 1]")
+	}
+	hiddenMinSamples, err := atoi("HIDDEN_LAYER_MIN_SAMPLES", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if hiddenMinSamples < 2 {
+		return Config{}, errors.New("HIDDEN_LAYER_MIN_SAMPLES must be >= 2")
+	}
+	hiddenMaxHidden, err := atoi("HIDDEN_LAYER_MAX_HIDDEN", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	if hiddenMaxHidden < 1 {
+		return Config{}, errors.New("HIDDEN_LAYER_MAX_HIDDEN must be >= 1")
+	}
+	hiddenForwardAlpha, err := atof("HIDDEN_LAYER_FORWARD_ALPHA", 0.6)
+	if err != nil {
+		return Config{}, err
+	}
+	hiddenForwardBeta, err := atof("HIDDEN_LAYER_FORWARD_BETA", 0.4)
+	if err != nil {
+		return Config{}, err
+	}
+	hiddenBackwardSelf, err := atof("HIDDEN_LAYER_BACKWARD_SELF", 0.2)
+	if err != nil {
+		return Config{}, err
+	}
+	hiddenBackwardBase, err := atof("HIDDEN_LAYER_BACKWARD_BASE", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	hiddenBackwardConc, err := atof("HIDDEN_LAYER_BACKWARD_CONC", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -397,5 +452,14 @@ func FromEnv() (Config, error) {
 		ScoringRho:                scoringRho,
 		LogFormat:                 logFormat,
 		LogSkipHealth:             logSkipHealth,
+		HiddenLayerEnabled:        hiddenEnabled,
+		HiddenLayerClusterEps:     hiddenClusterEps,
+		HiddenLayerMinSamples:     hiddenMinSamples,
+		HiddenLayerMaxHidden:      hiddenMaxHidden,
+		HiddenLayerForwardAlpha:   hiddenForwardAlpha,
+		HiddenLayerForwardBeta:    hiddenForwardBeta,
+		HiddenLayerBackwardSelf:   hiddenBackwardSelf,
+		HiddenLayerBackwardBase:   hiddenBackwardBase,
+		HiddenLayerBackwardConc:   hiddenBackwardConc,
 	}, nil
 }

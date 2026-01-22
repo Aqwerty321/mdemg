@@ -61,7 +61,12 @@ func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK 
 		if r > 1 {
 			r = 1
 		}
-		h := math.Log(1.0 + float64(deg[c.NodeID]))
+
+		// Hub penalty: exempt concern/hidden/concept nodes (layer > 0) since they're designed as hubs
+		h := 0.0
+		if c.Layer == 0 {
+			h = math.Log(1.0 + float64(deg[c.NodeID]))
+		}
 		d := float64(prefixCount[prefixOf(c.Path)]-1) // 0 if unique
 
 		s := alpha*c.VectorSim + beta*a + gamma*r + delta*c.Confidence - phi*h - kappa*d

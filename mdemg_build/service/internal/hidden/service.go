@@ -1198,18 +1198,19 @@ RETURN c.node_id AS nodeId`
 	}
 
 	// Create the concern node and edges in a single transaction
+	// Works with or without embeddings - computes centroid only if embeddings exist
 	createCypher := `
-// First, collect all nodes with this concern tag and compute centroid
 MATCH (n:MemoryNode {space_id: $spaceId, layer: 0})
-WHERE $concern IN n.tags AND n.embedding IS NOT NULL
-WITH collect(n) AS members, collect(n.embedding) AS embeddings
+WHERE $concern IN n.tags
+WITH collect(n) AS members,
+     [m IN collect(n) WHERE m.embedding IS NOT NULL | m.embedding] AS embeddings
 WHERE size(members) > 0
-// Compute centroid (element-wise mean)
 WITH members, embeddings,
-     [i IN range(0, size(embeddings[0])-1) |
-       reduce(sum = 0.0, emb IN embeddings | sum + emb[i]) / size(embeddings)
-     ] AS centroid
-// Create concern node
+     CASE WHEN size(embeddings) > 0 THEN
+       [i IN range(0, size(embeddings[0])-1) |
+         reduce(sum = 0.0, emb IN embeddings | sum + emb[i]) / size(embeddings)
+       ]
+     ELSE null END AS centroid
 CREATE (c:MemoryNode {
   space_id: $spaceId,
   node_id: randomUUID(),
@@ -1226,7 +1227,6 @@ CREATE (c:MemoryNode {
   updated_at: datetime(),
   version: 1
 })
-// Create IMPLEMENTS_CONCERN edges from all members
 WITH c, members
 UNWIND members AS m
 CREATE (m)-[:IMPLEMENTS_CONCERN {

@@ -125,13 +125,14 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 }
 
 type Candidate struct {
-	NodeID string
-	Path string
-	Name string
-	Summary string
-	UpdatedAt time.Time
+	NodeID     string
+	Path       string
+	Name       string
+	Summary    string
+	UpdatedAt  time.Time
 	Confidence float64
-	VectorSim float64
+	VectorSim  float64
+	Layer      int // 0=base, 1=hidden/concern, 2+=concept
 }
 
 // SimilarNode represents a node returned from vector similarity search
@@ -161,6 +162,7 @@ RETURN node.node_id AS node_id,
        coalesce(node.summary,'') AS summary,
        coalesce(node.confidence,0.6) AS confidence,
        coalesce(node.updated_at, datetime()) AS updated_at,
+       coalesce(node.layer, 0) AS layer,
        score AS score
 ORDER BY score DESC`
 		res, err := tx.Run(ctx, cypher, params)
@@ -176,15 +178,17 @@ ORDER BY score DESC`
 			sum, _ := rec.Get("summary")
 			conf, _ := rec.Get("confidence")
 			upd, _ := rec.Get("updated_at")
+			layer, _ := rec.Get("layer")
 			sc, _ := rec.Get("score")
 
 			ct := Candidate{
-				NodeID: fmt.Sprint(nid),
-				Path: fmt.Sprint(path),
-				Name: fmt.Sprint(name),
-				Summary: fmt.Sprint(sum),
+				NodeID:     fmt.Sprint(nid),
+				Path:       fmt.Sprint(path),
+				Name:       fmt.Sprint(name),
+				Summary:    fmt.Sprint(sum),
 				Confidence: toFloat64(conf, 0.6),
-				VectorSim: toFloat64(sc, 0),
+				VectorSim:  toFloat64(sc, 0),
+				Layer:      toInt(layer, 0),
 			}
 			// neo4j returns time as neo4j.LocalDateTime or time.Time depending on driver
 			switch v := upd.(type) {
@@ -661,6 +665,19 @@ func toFloat64(v any, def float64) float64 {
 		return float64(x)
 	case int:
 		return float64(x)
+	default:
+		return def
+	}
+}
+
+func toInt(v any, def int) int {
+	switch x := v.(type) {
+	case int64:
+		return int(x)
+	case int:
+		return x
+	case float64:
+		return int(x)
 	default:
 		return def
 	}

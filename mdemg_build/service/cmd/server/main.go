@@ -35,6 +35,8 @@ func main() {
 		Addr:              cfg.ListenAddr,
 		Handler:           srv.Routes(),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       time.Duration(cfg.HTTPReadTimeout) * time.Second,
+		WriteTimeout:      time.Duration(cfg.HTTPWriteTimeout) * time.Second,
 	}
 
 	log.Printf("listening on %s", cfg.ListenAddr)

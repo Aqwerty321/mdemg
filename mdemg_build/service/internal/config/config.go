@@ -50,7 +50,11 @@ type Config struct {
 	SemanticEdgeInitialWeight float64 // Initial edge weight (default: 0.5)
 
 	// Batch ingest settings
-	BatchIngestMaxItems int // Maximum items per batch request (default: 100)
+	BatchIngestMaxItems int // Maximum items per batch request (default: 500)
+
+	// HTTP server timeouts
+	HTTPReadTimeout  int // Read timeout in seconds (default: 600)
+	HTTPWriteTimeout int // Write timeout in seconds (default: 600)
 
 	// Anomaly detection settings
 	AnomalyDetectionEnabled bool    // Feature toggle (default: true)
@@ -74,9 +78,12 @@ type Config struct {
 
 	// Hidden layer settings (V0005)
 	HiddenLayerEnabled       bool    // Feature toggle for hidden layer processing (default: true)
-	HiddenLayerClusterEps    float64 // DBSCAN epsilon - max distance for neighborhood (default: 0.3)
+	HiddenLayerClusterEps    float64 // DBSCAN epsilon - max distance for neighborhood (default: 0.1)
 	HiddenLayerMinSamples    int     // DBSCAN min samples to form cluster (default: 3)
 	HiddenLayerMaxHidden     int     // Max hidden nodes to create per consolidation run (default: 100)
+	HiddenLayerMaxClusterSize int    // Max members per cluster before splitting (default: 200)
+	HiddenLayerPathGroupDepth int    // Path segments for pre-grouping (default: 2)
+	HiddenLayerBatchSize     int     // Batch size for clustering (0 = no limit, default: 0)
 	HiddenLayerForwardAlpha  float64 // Weight of current embedding in forward pass (default: 0.6)
 	HiddenLayerForwardBeta   float64 // Weight of aggregated embedding in forward pass (default: 0.4)
 	HiddenLayerBackwardSelf  float64 // Weight of self in backward pass (default: 0.2)
@@ -246,12 +253,28 @@ func FromEnv() (Config, error) {
 	}
 
 	// Batch ingest settings
-	batchMaxItems, err := atoi("BATCH_INGEST_MAX_ITEMS", 100)
+	batchMaxItems, err := atoi("BATCH_INGEST_MAX_ITEMS", 500)
 	if err != nil {
 		return Config{}, err
 	}
-	if batchMaxItems < 1 || batchMaxItems > 1000 {
-		return Config{}, errors.New("BATCH_INGEST_MAX_ITEMS must be in range [1, 1000]")
+	if batchMaxItems < 1 || batchMaxItems > 2000 {
+		return Config{}, errors.New("BATCH_INGEST_MAX_ITEMS must be in range [1, 2000]")
+	}
+
+	// HTTP server timeouts
+	httpReadTimeout, err := atoi("HTTP_READ_TIMEOUT", 600)
+	if err != nil {
+		return Config{}, err
+	}
+	if httpReadTimeout < 1 {
+		return Config{}, errors.New("HTTP_READ_TIMEOUT must be >= 1")
+	}
+	httpWriteTimeout, err := atoi("HTTP_WRITE_TIMEOUT", 600)
+	if err != nil {
+		return Config{}, err
+	}
+	if httpWriteTimeout < 1 {
+		return Config{}, errors.New("HTTP_WRITE_TIMEOUT must be >= 1")
 	}
 
 	// Anomaly detection settings
@@ -364,7 +387,7 @@ func FromEnv() (Config, error) {
 
 	// Hidden layer settings (V0005)
 	hiddenEnabled := getBool("HIDDEN_LAYER_ENABLED", true)
-	hiddenClusterEps, err := atof("HIDDEN_LAYER_CLUSTER_EPS", 0.3)
+	hiddenClusterEps, err := atof("HIDDEN_LAYER_CLUSTER_EPS", 0.1)
 	if err != nil {
 		return Config{}, err
 	}
@@ -384,6 +407,27 @@ func FromEnv() (Config, error) {
 	}
 	if hiddenMaxHidden < 1 {
 		return Config{}, errors.New("HIDDEN_LAYER_MAX_HIDDEN must be >= 1")
+	}
+	hiddenBatchSize, err := atoi("HIDDEN_LAYER_BATCH_SIZE", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	if hiddenBatchSize < 0 {
+		return Config{}, errors.New("HIDDEN_LAYER_BATCH_SIZE must be >= 0")
+	}
+	hiddenMaxClusterSize, err := atoi("HIDDEN_LAYER_MAX_CLUSTER_SIZE", 200)
+	if err != nil {
+		return Config{}, err
+	}
+	if hiddenMaxClusterSize < 10 {
+		return Config{}, errors.New("HIDDEN_LAYER_MAX_CLUSTER_SIZE must be >= 10")
+	}
+	hiddenPathGroupDepth, err := atoi("HIDDEN_LAYER_PATH_GROUP_DEPTH", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	if hiddenPathGroupDepth < 1 || hiddenPathGroupDepth > 5 {
+		return Config{}, errors.New("HIDDEN_LAYER_PATH_GROUP_DEPTH must be in range [1, 5]")
 	}
 	hiddenForwardAlpha, err := atof("HIDDEN_LAYER_FORWARD_ALPHA", 0.6)
 	if err != nil {
@@ -438,6 +482,8 @@ func FromEnv() (Config, error) {
 		SemanticEdgeMinSimilarity: semEdgeMinSim,
 		SemanticEdgeInitialWeight: semEdgeInitWeight,
 		BatchIngestMaxItems:       batchMaxItems,
+		HTTPReadTimeout:           httpReadTimeout,
+		HTTPWriteTimeout:          httpWriteTimeout,
 		AnomalyDetectionEnabled:   anomalyEnabled,
 		AnomalyDuplicateThreshold: anomalyDupThreshold,
 		AnomalyOutlierStdDevs:     anomalyOutlierStdDevs,
@@ -456,6 +502,9 @@ func FromEnv() (Config, error) {
 		HiddenLayerClusterEps:     hiddenClusterEps,
 		HiddenLayerMinSamples:     hiddenMinSamples,
 		HiddenLayerMaxHidden:      hiddenMaxHidden,
+		HiddenLayerMaxClusterSize: hiddenMaxClusterSize,
+		HiddenLayerPathGroupDepth: hiddenPathGroupDepth,
+		HiddenLayerBatchSize:      hiddenBatchSize,
 		HiddenLayerForwardAlpha:   hiddenForwardAlpha,
 		HiddenLayerForwardBeta:    hiddenForwardBeta,
 		HiddenLayerBackwardSelf:   hiddenBackwardSelf,

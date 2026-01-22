@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -887,7 +888,36 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 		resp.ConceptNodesUpdated = fwdResult.ConceptNodesUpdated
 	}
 
-	// Step 3: Backward pass (unless skipped)
+	// Step 3: Multi-layer concept clustering (unless skipped)
+	// Build concept layers: hidden (L1) → concepts (L2, L3, etc.)
+	if !req.SkipClustering {
+		maxLayers := 5 // Limit hierarchy depth
+		for targetLayer := 2; targetLayer <= maxLayers; targetLayer++ {
+			conceptCreated, err := s.hiddenLayer.CreateConceptNodes(r.Context(), req.SpaceID, targetLayer)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{
+					"error": fmt.Sprintf("failed to create concept nodes layer %d: %v", targetLayer, err),
+				})
+				return
+			}
+			if conceptCreated == 0 {
+				break // No more clusters to form at this level
+			}
+			resp.ConceptNodesCreated += conceptCreated
+
+			// Run forward pass to update new concept embeddings
+			fwdResult, err := s.hiddenLayer.ForwardPass(r.Context(), req.SpaceID)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{
+					"error": fmt.Sprintf("failed in forward pass after layer %d: %v", targetLayer, err),
+				})
+				return
+			}
+			resp.ConceptNodesUpdated += fwdResult.ConceptNodesUpdated
+		}
+	}
+
+	// Step 4: Backward pass (unless skipped)
 	if !req.SkipBackward {
 		bwdResult, err := s.hiddenLayer.BackwardPass(r.Context(), req.SpaceID)
 		if err != nil {
@@ -900,6 +930,14 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 		resp.HiddenNodesUpdated += bwdResult.HiddenNodesUpdated
 		resp.EdgesStrengthened = bwdResult.EdgesStrengthened
 	}
+
+	// Step 5: Generate summaries for hidden and concept nodes
+	summariesUpdated, err := s.hiddenLayer.GenerateSummaries(r.Context(), req.SpaceID)
+	if err != nil {
+		// Log but don't fail - summaries are nice-to-have
+		log.Printf("warning: failed to generate summaries: %v", err)
+	}
+	resp.SummariesGenerated = summariesUpdated
 
 	resp.DurationMs = float64(time.Since(start).Milliseconds())
 

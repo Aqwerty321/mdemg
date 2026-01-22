@@ -18,10 +18,13 @@ type HiddenNode struct {
 }
 
 // BaseNode represents a node in the base data layer (layer 0)
+// Also used for intermediate layer nodes during clustering
 type BaseNode struct {
-	NodeID    string
-	SpaceID   string
-	Embedding []float64
+	NodeID               string
+	SpaceID              string
+	Path                 string    // File path for grouping
+	Embedding            []float64
+	MessagePassEmbedding []float64 // Used when clustering higher layers
 }
 
 // ConceptNode represents a node in the concept layer (layer 2+)
@@ -65,6 +68,7 @@ type BackwardPassResult struct {
 // ConsolidationResult holds the combined results of a full consolidation run
 type ConsolidationResult struct {
 	HiddenNodesCreated  int
+	ConceptNodesCreated map[int]int // layer -> count of concepts created
 	ForwardPass         *ForwardPassResult
 	BackwardPass        *BackwardPassResult
 	TotalDuration       time.Duration

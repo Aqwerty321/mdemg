@@ -24,13 +24,14 @@ func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK 
 	}
 
 	// Hyperparameters from config (see config.Config for defaults)
-	alpha := cfg.ScoringAlpha // vector similarity weight
-	beta := cfg.ScoringBeta   // activation weight
-	gamma := cfg.ScoringGamma // recency weight
-	delta := cfg.ScoringDelta // confidence weight
-	phi := cfg.ScoringPhi     // hub penalty coefficient
-	kappa := cfg.ScoringKappa // redundancy penalty coefficient
-	rho := cfg.ScoringRho     // recency decay rate per day
+	alpha := cfg.ScoringAlpha       // vector similarity weight
+	beta := cfg.ScoringBeta         // activation weight
+	gamma := cfg.ScoringGamma       // recency weight
+	delta := cfg.ScoringDelta       // confidence weight
+	phi := cfg.ScoringPhi           // hub penalty coefficient
+	kappa := cfg.ScoringKappa       // redundancy penalty coefficient
+	rho := cfg.ScoringRho           // recency decay rate per day
+	configBoost := cfg.ScoringConfigBoost // config node boost multiplier
 
 	// Redundancy: simple path-prefix clustering
 	prefixCount := map[string]int{}
@@ -71,6 +72,11 @@ func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK 
 
 		s := alpha*c.VectorSim + beta*a + gamma*r + delta*c.Confidence - phi*h - kappa*d
 
+		// Apply config boost for configuration nodes
+		if hasTag(c.Tags, "config") {
+			s *= configBoost
+		}
+
 		items = append(items, models.RetrieveResult{
 			NodeID: c.NodeID,
 			Path: c.Path,
@@ -87,4 +93,14 @@ func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK 
 		items = items[:topK]
 	}
 	return items
+}
+
+// hasTag checks if a tag slice contains a specific tag
+func hasTag(tags []string, tag string) bool {
+	for _, t := range tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
 }

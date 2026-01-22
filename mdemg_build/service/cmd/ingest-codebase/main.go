@@ -96,14 +96,59 @@ var concernPatterns = map[string][]string{
 
 // NestJS decorator patterns that indicate cross-cutting concerns
 var decoratorConcerns = map[string]string{
-	"@Guard":       "authorization",
-	"@UseGuards":   "authorization",
-	"@Interceptor": "cross-cutting",
+	"@Guard":           "authorization",
+	"@UseGuards":       "authorization",
+	"@Interceptor":     "cross-cutting",
 	"@UseInterceptors": "cross-cutting",
-	"@Filter":      "error-handling",
-	"@UseFilters":  "error-handling",
-	"@Catch":       "error-handling",
-	"@Injectable":  "service",
+	"@Filter":          "error-handling",
+	"@UseFilters":      "error-handling",
+	"@Catch":           "error-handling",
+	"@Injectable":      "service",
+}
+
+// Configuration file patterns for detection
+var configFilePatterns = []string{
+	".config.ts", ".config.js", ".config.json", ".config.yaml", ".config.yml",
+	"config.ts", "config.js", "config.json", "config.yaml", "config.yml",
+	".env.example", ".env.sample", ".env.template",
+	"tsconfig.json", "package.json", "nest-cli.json", "angular.json",
+	"webpack.config", "vite.config", "rollup.config", "jest.config",
+	"pyproject.toml", "setup.cfg", "setup.py", "requirements.txt",
+	"go.mod", "go.sum", "Makefile", "Dockerfile", "docker-compose",
+}
+
+// Configuration directory patterns
+var configDirPatterns = []string{
+	"/config/", "/configuration/", "/configs/", "/settings/",
+	"/env/", "/environments/",
+}
+
+// isConfigFile checks if a file path indicates a configuration file
+func isConfigFile(filePath string) bool {
+	lowerPath := strings.ToLower(filePath)
+
+	// Check directory patterns
+	for _, pattern := range configDirPatterns {
+		if strings.Contains(lowerPath, pattern) {
+			return true
+		}
+	}
+
+	// Check file patterns
+	for _, pattern := range configFilePatterns {
+		if strings.HasSuffix(lowerPath, pattern) || strings.Contains(filepath.Base(lowerPath), pattern) {
+			return true
+		}
+	}
+
+	// Check for Config suffix in filename (e.g., AppConfig.ts, DatabaseConfig.py)
+	base := filepath.Base(filePath)
+	baseLower := strings.ToLower(base)
+	if strings.Contains(baseLower, "config") && !strings.Contains(baseLower, "test") {
+		return true
+	}
+
+	return false
 }
 
 type IngestStats struct {
@@ -298,6 +343,27 @@ func walkCodebase(root string, excludeSet map[string]bool) ([]CodeElement, error
 			return nil
 		}
 
+		// Process JSON/YAML config files
+		if strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
+			if isConfigFile(path) {
+				configElement := parseConfigFile(root, path)
+				if configElement != nil {
+					elements = append(elements, *configElement)
+				}
+			}
+			return nil
+		}
+
+		// Process env example files
+		if strings.Contains(filepath.Base(path), ".env.") && !strings.HasSuffix(path, ".env") {
+			// .env.example, .env.sample, .env.template, etc.
+			envElement := parseEnvFile(root, path)
+			if envElement != nil {
+				elements = append(elements, *envElement)
+			}
+			return nil
+		}
+
 		return nil
 	})
 
@@ -324,12 +390,21 @@ func parseGoFile(fset *token.FileSet, root, path string) []CodeElement {
 	tags := []string{"package", pkgName}
 	tags = append(tags, concerns...)
 
+	// Check if this is a configuration file
+	kind := "package"
+	contentDesc := fmt.Sprintf("Package %s in file %s", pkgName, relPath)
+	if isConfigFile(relPath) {
+		tags = append(tags, "config")
+		kind = "config"
+		contentDesc = fmt.Sprintf("Configuration package %s in file %s", pkgName, relPath)
+	}
+
 	// Add package-level element
 	elements = append(elements, CodeElement{
 		Name:     pkgName,
-		Kind:     "package",
+		Kind:     kind,
 		Path:     "/" + relPath,
-		Content:  fmt.Sprintf("Package %s in file %s", pkgName, relPath),
+		Content:  contentDesc,
 		Package:  pkgName,
 		FilePath: relPath,
 		Tags:     tags,
@@ -447,6 +522,14 @@ func parseTypeScriptFile(root, path string) []CodeElement {
 	tags := []string{lang, fileKind}
 	tags = append(tags, concerns...)
 
+	// Check if this is a configuration file
+	if isConfigFile(relPath) {
+		tags = append(tags, "config")
+		fileKind = "config"
+		// Enhance summary for config files
+		summary.WriteString("Configuration file. ")
+	}
+
 	// Add file-level element
 	elements = append(elements, CodeElement{
 		Name:     fileName,
@@ -540,10 +623,18 @@ func parsePythonFile(root, path string) []CodeElement {
 	tags := []string{"python", "module"}
 	tags = append(tags, concerns...)
 
+	// Check if this is a configuration file
+	pyKind := "python-module"
+	if isConfigFile(relPath) {
+		tags = append(tags, "config")
+		pyKind = "config"
+		summary.WriteString("Configuration file. ")
+	}
+
 	// Add file-level element
 	elements = append(elements, CodeElement{
 		Name:     fileName,
-		Kind:     "python-module",
+		Kind:     pyKind,
 		Path:     "/" + relPath,
 		Content:  summary.String(),
 		Package:  "python",
@@ -644,6 +735,118 @@ func detectConcerns(filePath, content string) []string {
 	return concerns
 }
 
+// parseConfigFile extracts configuration from JSON/YAML files
+func parseConfigFile(root, path string) *CodeElement {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+
+	relPath, _ := filepath.Rel(root, path)
+	name := filepath.Base(path)
+	contentStr := string(content)
+
+	// Truncate if too long
+	if len(contentStr) > 4000 {
+		contentStr = contentStr[:4000] + "... [truncated]"
+	}
+
+	// Build summary based on file type
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("Configuration file: %s. ", name))
+
+	// Try to extract top-level keys for JSON
+	if strings.HasSuffix(path, ".json") {
+		keys := findAllMatches(contentStr, `"(\w+)":\s*[{\[\"]`)
+		if len(keys) > 0 {
+			if len(keys) > 10 {
+				keys = keys[:10]
+			}
+			summary.WriteString(fmt.Sprintf("Configuration keys: %s. ", strings.Join(uniqueStrings(keys), ", ")))
+		}
+	}
+
+	// For YAML, extract top-level keys
+	if strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
+		keys := findAllMatches(contentStr, `^(\w+):`)
+		if len(keys) > 0 {
+			if len(keys) > 10 {
+				keys = keys[:10]
+			}
+			summary.WriteString(fmt.Sprintf("Configuration sections: %s. ", strings.Join(uniqueStrings(keys), ", ")))
+		}
+	}
+
+	summary.WriteString(contentStr)
+
+	concerns := detectConcerns(relPath, contentStr)
+	tags := []string{"config", "configuration"}
+	tags = append(tags, concerns...)
+
+	return &CodeElement{
+		Name:     name,
+		Kind:     "config",
+		Path:     "/" + relPath,
+		Content:  summary.String(),
+		Package:  "config",
+		FilePath: relPath,
+		Tags:     tags,
+		Concerns: concerns,
+	}
+}
+
+// parseEnvFile extracts environment variable definitions from .env.* files
+func parseEnvFile(root, path string) *CodeElement {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+
+	relPath, _ := filepath.Rel(root, path)
+	name := filepath.Base(path)
+	contentStr := string(content)
+
+	// Extract environment variable names (excluding values for security)
+	envVars := findAllMatches(contentStr, `^([A-Z][A-Z0-9_]*)=`)
+
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("Environment configuration file: %s. ", name))
+	summary.WriteString(fmt.Sprintf("Defines %d environment variables. ", len(envVars)))
+
+	if len(envVars) > 0 {
+		if len(envVars) > 20 {
+			envVars = envVars[:20]
+			summary.WriteString(fmt.Sprintf("Variables: %s (and more). ", strings.Join(envVars, ", ")))
+		} else {
+			summary.WriteString(fmt.Sprintf("Variables: %s. ", strings.Join(envVars, ", ")))
+		}
+	}
+
+	// Include comments as they often document the variables
+	comments := findAllMatches(contentStr, `^#\s*(.+)`)
+	if len(comments) > 0 {
+		if len(comments) > 5 {
+			comments = comments[:5]
+		}
+		summary.WriteString(fmt.Sprintf("Documentation: %s ", strings.Join(comments, "; ")))
+	}
+
+	concerns := detectConcerns(relPath, contentStr)
+	tags := []string{"config", "environment", "env-vars"}
+	tags = append(tags, concerns...)
+
+	return &CodeElement{
+		Name:     name,
+		Kind:     "config",
+		Path:     "/" + relPath,
+		Content:  summary.String(),
+		Package:  "config",
+		FilePath: relPath,
+		Tags:     tags,
+		Concerns: concerns,
+	}
+}
+
 func parseMarkdownFile(root, path string) *CodeElement {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -664,9 +867,16 @@ func parseMarkdownFile(root, path string) *CodeElement {
 	tags := []string{"documentation", "markdown"}
 	tags = append(tags, concerns...)
 
+	// Check if this is a configuration doc file
+	mdKind := "documentation"
+	if isConfigFile(relPath) {
+		tags = append(tags, "config")
+		mdKind = "config"
+	}
+
 	return &CodeElement{
 		Name:     name,
-		Kind:     "documentation",
+		Kind:     mdKind,
 		Path:     "/" + relPath,
 		Content:  contentStr,
 		Package:  "docs",

@@ -64,13 +64,14 @@ type Config struct {
 	AnomalyMaxCheckMs       int     // Maximum time for anomaly checks in ms (default: 100)
 
 	// Scoring hyperparameters for retrieval ranking
-	ScoringAlpha float64 // Vector similarity weight (default: 0.55)
-	ScoringBeta  float64 // Activation weight (default: 0.30)
-	ScoringGamma float64 // Recency weight (default: 0.10)
-	ScoringDelta float64 // Confidence weight (default: 0.05)
-	ScoringPhi   float64 // Hub penalty coefficient (default: 0.08)
-	ScoringKappa float64 // Redundancy penalty coefficient (default: 0.12)
-	ScoringRho   float64 // Recency decay rate per day (default: 0.05)
+	ScoringAlpha       float64 // Vector similarity weight (default: 0.55)
+	ScoringBeta        float64 // Activation weight (default: 0.30)
+	ScoringGamma       float64 // Recency weight (default: 0.10)
+	ScoringDelta       float64 // Confidence weight (default: 0.05)
+	ScoringPhi         float64 // Hub penalty coefficient (default: 0.08)
+	ScoringKappa       float64 // Redundancy penalty coefficient (default: 0.12)
+	ScoringRho         float64 // Recency decay rate per day (default: 0.05)
+	ScoringConfigBoost float64 // Score multiplier for config nodes (default: 1.15)
 
 	// Logging settings
 	LogFormat     string // "text" (default) or "json"
@@ -359,6 +360,13 @@ func FromEnv() (Config, error) {
 	if scoringRho < 0 {
 		return Config{}, errors.New("SCORING_RHO must be >= 0")
 	}
+	scoringConfigBoost, err := atof("SCORING_CONFIG_BOOST", 1.15)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringConfigBoost < 1.0 {
+		return Config{}, errors.New("SCORING_CONFIG_BOOST must be >= 1.0")
+	}
 
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "")
@@ -496,6 +504,7 @@ func FromEnv() (Config, error) {
 		ScoringPhi:                scoringPhi,
 		ScoringKappa:              scoringKappa,
 		ScoringRho:                scoringRho,
+		ScoringConfigBoost:        scoringConfigBoost,
 		LogFormat:                 logFormat,
 		LogSkipHealth:             logSkipHealth,
 		HiddenLayerEnabled:        hiddenEnabled,

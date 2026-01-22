@@ -132,7 +132,8 @@ type Candidate struct {
 	UpdatedAt  time.Time
 	Confidence float64
 	VectorSim  float64
-	Layer      int // 0=base, 1=hidden/concern, 2+=concept
+	Layer      int      // 0=base, 1=hidden/concern, 2+=concept
+	Tags       []string // Tags for scoring boosts (e.g., "config")
 }
 
 // SimilarNode represents a node returned from vector similarity search
@@ -163,6 +164,7 @@ RETURN node.node_id AS node_id,
        coalesce(node.confidence,0.6) AS confidence,
        coalesce(node.updated_at, datetime()) AS updated_at,
        coalesce(node.layer, 0) AS layer,
+       coalesce(node.tags, []) AS tags,
        score AS score
 ORDER BY score DESC`
 		res, err := tx.Run(ctx, cypher, params)
@@ -179,6 +181,7 @@ ORDER BY score DESC`
 			conf, _ := rec.Get("confidence")
 			upd, _ := rec.Get("updated_at")
 			layer, _ := rec.Get("layer")
+			tagsAny, _ := rec.Get("tags")
 			sc, _ := rec.Get("score")
 
 			ct := Candidate{
@@ -189,6 +192,7 @@ ORDER BY score DESC`
 				Confidence: toFloat64(conf, 0.6),
 				VectorSim:  toFloat64(sc, 0),
 				Layer:      toInt(layer, 0),
+				Tags:       toStringSlice(tagsAny),
 			}
 			// neo4j returns time as neo4j.LocalDateTime or time.Time depending on driver
 			switch v := upd.(type) {
@@ -680,6 +684,26 @@ func toInt(v any, def int) int {
 		return int(x)
 	default:
 		return def
+	}
+}
+
+func toStringSlice(v any) []string {
+	if v == nil {
+		return nil
+	}
+	switch x := v.(type) {
+	case []string:
+		return x
+	case []any:
+		result := make([]string, 0, len(x))
+		for _, item := range x {
+			if s, ok := item.(string); ok {
+				result = append(result, s)
+			}
+		}
+		return result
+	default:
+		return nil
 	}
 }
 

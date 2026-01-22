@@ -379,6 +379,17 @@ All 17 Auto-Claude tasks have been implemented and merged. The system now includ
 - [ ] **Automatic triggers** - Consolidation on session end or threshold
 - [ ] **Layer promotion** - Dynamic promotion to concept layers (layer 2+)
 
+### Priority 3.5: P2 Improvements (2026-01-22)
+- [x] **P1: Cross-Cutting Concern Nodes** - Detects logging, auth, error handling patterns
+- [x] **Track 4.1: Config File Detection** - Identifies config/settings files during ingest
+- [x] **Track 4.2: Config Score Boost** - Boosts config nodes in retrieval scoring
+- [x] **Track 4.3: Config Summary Node** - Creates aggregated config node during consolidation (111 edges)
+- [x] **Track 3.1: Comparison Nodes** - Groups similar modules by naming patterns (24 nodes, 90 edges)
+- [ ] **Track 3.2: Comparison Summaries** - LLM-generated summaries for comparison nodes
+
+### Outstanding Technical Debt
+- [ ] **Dynamic Port Configuration** - `ingest-codebase` tool defaults to hardcoded port 8082. For open source portability, all TCP ports should be configurable via environment variables or flags. See `mdemg_build/service/cmd/ingest-codebase/`.
+
 ### Priority 4: Future Enhancements
 - [ ] **Proactive surfacing** - Context suggestions, anomaly alerts
 - [ ] **Agent consulting service** - SME-like guidance API

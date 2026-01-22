@@ -1754,6 +1754,9 @@ func (s *Service) createComparisonNodeWithEdges(ctx context.Context, spaceID str
 		compName += fmt.Sprintf("-and-%d-more", len(moduleNames)-3)
 	}
 
+	// Generate rich summary using pattern analysis (Track 3.2)
+	summary := generateComparisonSummary(modules)
+
 	// Create comparison node and COMPARED_IN edges
 	createCypher := `
 CREATE (c:MemoryNode {
@@ -1766,7 +1769,7 @@ CREATE (c:MemoryNode {
   message_pass_embedding: $centroid,
   aggregation_count: $moduleCount,
   stability_score: 1.0,
-  summary: 'Architectural comparison of ' + toString($moduleCount) + ' related modules: ' + $moduleNamesStr,
+  summary: $summary,
   tags: ['comparison', 'architecture'],
   created_at: datetime(),
   updated_at: datetime(),
@@ -1786,12 +1789,12 @@ RETURN c.node_id AS nodeId, count(m) AS edgeCount`
 
 	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, createCypher, map[string]any{
-			"spaceId":        spaceID,
-			"compName":       compName,
-			"centroid":       centroid,
-			"moduleCount":    len(modules),
-			"moduleIds":      moduleIDs,
-			"moduleNamesStr": strings.Join(moduleNames, ", "),
+			"spaceId":     spaceID,
+			"compName":    compName,
+			"centroid":    centroid,
+			"moduleCount": len(modules),
+			"moduleIds":   moduleIDs,
+			"summary":     summary,
 		})
 		if err != nil {
 			return nil, err
@@ -1819,6 +1822,228 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// generateComparisonSummary creates a rich, pattern-based summary for comparison nodes
+// Analyzes module names to identify architectural patterns and relationships
+func generateComparisonSummary(modules []ModuleNode) string {
+	if len(modules) == 0 {
+		return "Empty comparison group"
+	}
+
+	// Extract names for analysis
+	names := make([]string, len(modules))
+	for i, m := range modules {
+		names[i] = m.Name
+	}
+
+	// Find the common base pattern
+	baseName := findCommonBase(names)
+
+	// Identify variant prefixes/suffixes
+	variants := identifyVariants(names, baseName)
+
+	// Find common path (domain/subsystem)
+	domain := extractDomain(modules)
+
+	// Build the summary
+	var summary strings.Builder
+
+	// Lead with the relationship type
+	summary.WriteString(fmt.Sprintf("Architectural variants of %s", baseName))
+
+	// Add domain context if found
+	if domain != "" {
+		summary.WriteString(fmt.Sprintf(" in %s", domain))
+	}
+
+	summary.WriteString(". ")
+
+	// Describe the variants
+	if len(variants) > 0 {
+		summary.WriteString("Includes ")
+		for i, v := range variants {
+			if i > 0 {
+				if i == len(variants)-1 {
+					summary.WriteString(" and ")
+				} else {
+					summary.WriteString(", ")
+				}
+			}
+			summary.WriteString(describeVariant(v))
+		}
+		summary.WriteString(" implementations.")
+	}
+
+	// Add pattern insight
+	pattern := detectArchitecturalPattern(variants)
+	if pattern != "" {
+		summary.WriteString(" ")
+		summary.WriteString(pattern)
+	}
+
+	return summary.String()
+}
+
+// findCommonBase extracts the common base name from a list of module names
+func findCommonBase(names []string) string {
+	if len(names) == 0 {
+		return "module"
+	}
+
+	// Find the shortest name as likely base
+	shortest := names[0]
+	for _, n := range names[1:] {
+		clean := cleanModuleName(n)
+		if len(clean) < len(cleanModuleName(shortest)) {
+			shortest = n
+		}
+	}
+
+	// Clean and use as base
+	base := cleanModuleName(shortest)
+	if base == "" {
+		return "module"
+	}
+	return base
+}
+
+// cleanModuleName removes common suffixes like Module, Service, Controller
+func cleanModuleName(name string) string {
+	suffixes := []string{"Module", "Service", "Controller", "Provider", "Handler", "Manager"}
+	result := name
+	for _, suffix := range suffixes {
+		if strings.HasSuffix(result, suffix) {
+			result = result[:len(result)-len(suffix)]
+			break
+		}
+	}
+	return result
+}
+
+// identifyVariants extracts the variant prefixes from module names
+func identifyVariants(names []string, baseName string) []string {
+	variants := make([]string, 0, len(names))
+	baseLower := strings.ToLower(baseName)
+
+	for _, name := range names {
+		clean := cleanModuleName(name)
+		cleanLower := strings.ToLower(clean)
+
+		// Extract the prefix/variant part
+		if cleanLower == baseLower {
+			variants = append(variants, "base")
+		} else if strings.HasSuffix(cleanLower, baseLower) {
+			prefix := clean[:len(clean)-len(baseName)]
+			if prefix != "" {
+				variants = append(variants, prefix)
+			}
+		} else {
+			// Use the whole name as variant
+			variants = append(variants, clean)
+		}
+	}
+	return variants
+}
+
+// extractDomain extracts the common domain/subsystem from module paths
+func extractDomain(modules []ModuleNode) string {
+	if len(modules) == 0 {
+		return ""
+	}
+
+	// Extract path components
+	pathCounts := make(map[string]int)
+	for _, m := range modules {
+		if m.Path == "" {
+			continue
+		}
+		parts := strings.Split(m.Path, "/")
+		for _, part := range parts {
+			if part != "" && !strings.HasPrefix(part, ".") {
+				pathCounts[part]++
+			}
+		}
+	}
+
+	// Find most common meaningful path component
+	var domain string
+	maxCount := 0
+	skipWords := map[string]bool{
+		"src": true, "lib": true, "pkg": true, "internal": true,
+		"modules": true, "services": true, "components": true,
+	}
+
+	for part, count := range pathCounts {
+		if count > maxCount && !skipWords[part] && len(part) > 2 {
+			domain = part
+			maxCount = count
+		}
+	}
+	return domain
+}
+
+// describeVariant returns a human-readable description of a variant type
+func describeVariant(variant string) string {
+	lowerVariant := strings.ToLower(variant)
+
+	descriptions := map[string]string{
+		"base":     "base/standard",
+		"delta":    "incremental/delta",
+		"full":     "full/complete",
+		"partial":  "partial/subset",
+		"async":    "asynchronous",
+		"sync":     "synchronous",
+		"batch":    "batch processing",
+		"stream":   "streaming",
+		"mock":     "mock/test",
+		"stub":     "stub/placeholder",
+		"default":  "default",
+		"custom":   "custom/specialized",
+		"legacy":   "legacy/deprecated",
+		"v2":       "version 2",
+		"new":      "new/updated",
+		"extended": "extended",
+		"simple":   "simplified",
+		"advanced": "advanced",
+		"core":     "core/essential",
+		"enhanced": "enhanced",
+	}
+
+	if desc, ok := descriptions[lowerVariant]; ok {
+		return desc
+	}
+	return variant
+}
+
+// detectArchitecturalPattern identifies common architectural patterns from variants
+func detectArchitecturalPattern(variants []string) string {
+	variantSet := make(map[string]bool)
+	for _, v := range variants {
+		variantSet[strings.ToLower(v)] = true
+	}
+
+	// Check for specific patterns
+	if variantSet["delta"] && (variantSet["full"] || variantSet["base"]) {
+		return "Pattern: Delta synchronization with full/incremental modes for efficient data transfer."
+	}
+	if variantSet["async"] && variantSet["sync"] {
+		return "Pattern: Dual sync/async implementations for flexibility in blocking/non-blocking contexts."
+	}
+	if variantSet["batch"] && (variantSet["stream"] || variantSet["single"]) {
+		return "Pattern: Batch and individual processing modes for throughput optimization."
+	}
+	if variantSet["mock"] || variantSet["stub"] {
+		return "Pattern: Includes test doubles for unit testing support."
+	}
+	if variantSet["legacy"] && (variantSet["base"] || variantSet["new"]) {
+		return "Pattern: Migration path with legacy support alongside current implementation."
+	}
+	if variantSet["simple"] && variantSet["advanced"] {
+		return "Pattern: Tiered complexity with simple and advanced implementations."
+	}
+
+	return ""
 }
 
 // Helper functions for type conversion

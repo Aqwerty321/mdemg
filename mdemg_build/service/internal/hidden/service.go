@@ -3,6 +3,7 @@ package hidden
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -1052,6 +1053,13 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 		fmt.Printf("warning: failed to create config nodes: %v\n", err)
 	}
 
+	// Step 1d: Create comparison nodes for similar modules (P2 Track 3)
+	_, err = s.CreateComparisonNodes(ctx, spaceID)
+	if err != nil {
+		// Log but don't fail - comparison nodes are an enhancement
+		fmt.Printf("warning: failed to create comparison nodes: %v\n", err)
+	}
+
 	// Step 2: Forward pass (update embeddings up the hierarchy)
 	fwdResult, err := s.ForwardPass(ctx, spaceID)
 	if err != nil {
@@ -1415,6 +1423,402 @@ RETURN c.node_id AS nodeId, size(members) AS edgeCount`
 type ConfigNodeResult struct {
 	ConfigNodeCreated bool
 	EdgesCreated      int
+}
+
+// ComparisonNodeResult tracks comparison node creation for similar modules
+type ComparisonNodeResult struct {
+	ComparisonNodesCreated int
+	EdgesCreated           int
+	ModulesCompared        int
+}
+
+// CreateComparisonNodes creates comparison nodes for similar modules (P2 Track 3)
+// This helps answer questions like "What is the purpose of having both X and Y?"
+func (s *Service) CreateComparisonNodes(ctx context.Context, spaceID string) (*ComparisonNodeResult, error) {
+	if !s.cfg.HiddenLayerEnabled {
+		return &ComparisonNodeResult{}, nil
+	}
+
+	result := &ComparisonNodeResult{}
+
+	// Step 1: Find module-like base nodes (files with Module, Service, Controller patterns)
+	modules, err := s.fetchModuleNodes(ctx, spaceID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch module nodes: %w", err)
+	}
+
+	if len(modules) < 2 {
+		return result, nil // Need at least 2 modules to compare
+	}
+
+	// Step 2: Group modules by similarity (name pattern and embedding)
+	groups := s.groupSimilarModules(modules)
+
+	// Step 3: Create comparison nodes for each group
+	for _, group := range groups {
+		if len(group) < 2 {
+			continue
+		}
+
+		created, edges, err := s.createComparisonNodeWithEdges(ctx, spaceID, group)
+		if err != nil {
+			return result, fmt.Errorf("create comparison node: %w", err)
+		}
+		if created {
+			result.ComparisonNodesCreated++
+			result.EdgesCreated += edges
+			result.ModulesCompared += len(group)
+		}
+	}
+
+	return result, nil
+}
+
+// ModuleNode represents a module-like base node for comparison detection
+type ModuleNode struct {
+	NodeID    string
+	Name      string
+	Path      string
+	Embedding []float64
+}
+
+// fetchModuleNodes retrieves base layer nodes that look like modules/services
+func (s *Service) fetchModuleNodes(ctx context.Context, spaceID string) ([]ModuleNode, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Find nodes whose names suggest they are modules, services, or controllers
+	cypher := `
+MATCH (n:MemoryNode {space_id: $spaceId, layer: 0})
+WHERE n.name IS NOT NULL
+  AND (n.name CONTAINS 'Module' OR n.name CONTAINS 'Service' OR n.name CONTAINS 'Controller'
+       OR n.name CONTAINS 'Provider' OR n.name CONTAINS 'Handler' OR n.name CONTAINS 'Manager')
+  AND n.embedding IS NOT NULL
+RETURN n.node_id AS nodeId, n.name AS name, n.path AS path, n.embedding AS embedding
+ORDER BY n.name`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+
+		var modules []ModuleNode
+		for res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("nodeId")
+			name, _ := rec.Get("name")
+			path, _ := rec.Get("path")
+			embedding, _ := rec.Get("embedding")
+
+			modules = append(modules, ModuleNode{
+				NodeID:    asString(nodeID),
+				Name:      asString(name),
+				Path:      asString(path),
+				Embedding: asFloat64Slice(embedding),
+			})
+		}
+		return modules, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]ModuleNode), nil
+}
+
+// groupSimilarModules groups modules by naming patterns
+// Looks for pairs/groups of modules with names differing by a prefix (e.g., SyncModule vs DeltaSyncModule)
+func (s *Service) groupSimilarModules(modules []ModuleNode) [][]ModuleNode {
+	// Build a map of base names -> modules
+	baseToModules := make(map[string][]ModuleNode)
+	for _, m := range modules {
+		base := extractModuleBaseName(m.Name)
+		if len(base) >= 4 {
+			baseToModules[base] = append(baseToModules[base], m)
+		}
+	}
+
+	// Find modules where one name is a suffix of another (e.g., "sync" contained in "deltasync")
+	groups := make(map[string][]ModuleNode)
+	baseNames := make([]string, 0, len(baseToModules))
+	for base := range baseToModules {
+		baseNames = append(baseNames, base)
+	}
+
+	for i, base1 := range baseNames {
+		for j := i + 1; j < len(baseNames); j++ {
+			base2 := baseNames[j]
+			// Check if one is a suffix of the other (with at least 4 char overlap)
+			if len(base1) >= 4 && len(base2) >= 4 {
+				if strings.HasSuffix(base2, base1) || strings.HasSuffix(base1, base2) {
+					// Create a group key from the shorter base
+					key := base1
+					if len(base2) < len(base1) {
+						key = base2
+					}
+					// Add modules from both bases
+					for _, m := range baseToModules[base1] {
+						found := false
+						for _, existing := range groups[key] {
+							if existing.NodeID == m.NodeID {
+								found = true
+								break
+							}
+						}
+						if !found {
+							groups[key] = append(groups[key], m)
+						}
+					}
+					for _, m := range baseToModules[base2] {
+						found := false
+						for _, existing := range groups[key] {
+							if existing.NodeID == m.NodeID {
+								found = true
+								break
+							}
+						}
+						if !found {
+							groups[key] = append(groups[key], m)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Convert to slice and filter to groups with 2-6 members (focused comparisons)
+	result := make([][]ModuleNode, 0, len(groups))
+	for _, group := range groups {
+		if len(group) >= 2 && len(group) <= 6 {
+			result = append(result, group)
+		}
+	}
+
+	return result
+}
+
+// extractParentDir extracts the parent directory from a file path
+func extractParentDir(path string) string {
+	if path == "" {
+		return ""
+	}
+	// Find last slash
+	lastSlash := strings.LastIndex(path, "/")
+	if lastSlash <= 0 {
+		return ""
+	}
+	return path[:lastSlash]
+}
+
+// extractModuleBaseName extracts the base name from a module name
+// e.g., "DeltaSyncModule" -> "sync", "UserService" -> "user"
+func extractModuleBaseName(name string) string {
+	// Remove common suffixes
+	suffixes := []string{"Module", "Service", "Controller", "Provider", "Handler", "Manager"}
+	base := name
+	for _, suffix := range suffixes {
+		if len(base) > len(suffix) && base[len(base)-len(suffix):] == suffix {
+			base = base[:len(base)-len(suffix)]
+			break
+		}
+	}
+	// Convert to lowercase for comparison
+	return strings.ToLower(base)
+}
+
+// sharesSimilarBase checks if two base names share a significant common substring
+func sharesSimilarBase(base1, base2 string) bool {
+	if base1 == "" || base2 == "" {
+		return false
+	}
+	// Check if one contains the other
+	if strings.Contains(base1, base2) || strings.Contains(base2, base1) {
+		return true
+	}
+	// Check for common prefix of at least 3 chars
+	minLen := len(base1)
+	if len(base2) < minLen {
+		minLen = len(base2)
+	}
+	if minLen >= 3 {
+		for i := 3; i <= minLen; i++ {
+			if base1[:i] == base2[:i] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// commonBase returns the longest common substring between two base names
+func commonBase(base1, base2 string) string {
+	if strings.Contains(base1, base2) {
+		return base2
+	}
+	if strings.Contains(base2, base1) {
+		return base1
+	}
+	// Find longest common prefix
+	minLen := len(base1)
+	if len(base2) < minLen {
+		minLen = len(base2)
+	}
+	for i := minLen; i >= 3; i-- {
+		if base1[:i] == base2[:i] {
+			return base1[:i]
+		}
+	}
+	return ""
+}
+
+// comparisonNodeExists checks if a comparison node already exists for a group
+func (s *Service) comparisonNodeExists(ctx context.Context, spaceID string, moduleIDs []string) (bool, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Check if any comparison node links to ALL modules in this group
+	cypher := `
+MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'comparison'})
+WHERE ALL(moduleId IN $moduleIds WHERE
+      (c)<-[:COMPARED_IN]-(:MemoryNode {node_id: moduleId}))
+RETURN count(c) > 0 AS exists`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":   spaceID,
+			"moduleIds": moduleIDs,
+		})
+		if err != nil {
+			return false, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			exists, _ := rec.Get("exists")
+			return exists.(bool), nil
+		}
+		return false, res.Err()
+	})
+
+	if err != nil {
+		return false, err
+	}
+	return result.(bool), nil
+}
+
+// createComparisonNodeWithEdges creates a comparison node and COMPARED_IN edges
+func (s *Service) createComparisonNodeWithEdges(ctx context.Context, spaceID string, modules []ModuleNode) (bool, int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Extract module IDs and names for the query
+	moduleIDs := make([]string, len(modules))
+	moduleNames := make([]string, len(modules))
+	for i, m := range modules {
+		moduleIDs[i] = m.NodeID
+		moduleNames[i] = m.Name
+	}
+
+	// Check if comparison node already exists
+	exists, err := s.comparisonNodeExists(ctx, spaceID, moduleIDs)
+	if err != nil {
+		return false, 0, err
+	}
+	if exists {
+		return false, 0, nil
+	}
+
+	// Compute centroid embedding for the comparison node
+	var centroid []float64
+	count := 0
+	for _, m := range modules {
+		if len(m.Embedding) > 0 {
+			if centroid == nil {
+				centroid = make([]float64, len(m.Embedding))
+			}
+			for i, v := range m.Embedding {
+				centroid[i] += v
+			}
+			count++
+		}
+	}
+	if count > 0 {
+		for i := range centroid {
+			centroid[i] /= float64(count)
+		}
+	}
+
+	// Generate comparison name from module names
+	compName := "comparison:" + strings.Join(moduleNames[:min(len(moduleNames), 3)], "-vs-")
+	if len(moduleNames) > 3 {
+		compName += fmt.Sprintf("-and-%d-more", len(moduleNames)-3)
+	}
+
+	// Create comparison node and COMPARED_IN edges
+	createCypher := `
+CREATE (c:MemoryNode {
+  space_id: $spaceId,
+  node_id: randomUUID(),
+  name: $compName,
+  layer: 1,
+  role_type: 'comparison',
+  embedding: $centroid,
+  message_pass_embedding: $centroid,
+  aggregation_count: $moduleCount,
+  stability_score: 1.0,
+  summary: 'Architectural comparison of ' + toString($moduleCount) + ' related modules: ' + $moduleNamesStr,
+  tags: ['comparison', 'architecture'],
+  created_at: datetime(),
+  updated_at: datetime(),
+  version: 1
+})
+WITH c
+UNWIND $moduleIds AS moduleId
+MATCH (m:MemoryNode {space_id: $spaceId, node_id: moduleId})
+CREATE (m)-[:COMPARED_IN {
+  space_id: $spaceId,
+  edge_id: randomUUID(),
+  weight: 1.0,
+  created_at: datetime(),
+  updated_at: datetime()
+}]->(c)
+RETURN c.node_id AS nodeId, count(m) AS edgeCount`
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, createCypher, map[string]any{
+			"spaceId":        spaceID,
+			"compName":       compName,
+			"centroid":       centroid,
+			"moduleCount":    len(modules),
+			"moduleIds":      moduleIDs,
+			"moduleNamesStr": strings.Join(moduleNames, ", "),
+		})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			edgeCount, _ := rec.Get("edgeCount")
+			return asInt(edgeCount), nil
+		}
+		return 0, res.Err()
+	})
+
+	if err != nil {
+		return false, 0, err
+	}
+	if result.(int) == 0 {
+		return false, 0, nil
+	}
+	return true, result.(int), nil
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // Helper functions for type conversion

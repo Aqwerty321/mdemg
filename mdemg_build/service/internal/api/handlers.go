@@ -899,6 +899,18 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Step 1d: Create comparison nodes for similar modules (P2 Track 3)
+	if !req.SkipClustering {
+		compResult, err := s.hiddenLayer.CreateComparisonNodes(r.Context(), req.SpaceID)
+		if err != nil {
+			// Log but don't fail - comparison nodes are an enhancement
+			log.Printf("warning: failed to create comparison nodes: %v", err)
+		} else if compResult != nil && compResult.ComparisonNodesCreated > 0 {
+			resp.ComparisonNodesCreated = compResult.ComparisonNodesCreated
+			resp.ComparisonEdgesCreated = compResult.EdgesCreated
+		}
+	}
+
 	// Step 2: Forward pass (unless skipped)
 	if !req.SkipForward {
 		fwdResult, err := s.hiddenLayer.ForwardPass(r.Context(), req.SpaceID)

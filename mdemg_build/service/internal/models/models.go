@@ -286,9 +286,11 @@ type ConsolidateResponse struct {
 	ConceptNodesUpdated int     `json:"concept_nodes_updated"`
 	ConcernNodesCreated int     `json:"concern_nodes_created"`      // Number of cross-cutting concern nodes created (P1)
 	ConcernEdgesCreated int     `json:"concern_edges_created"`      // Number of IMPLEMENTS_CONCERN edges created
-	ConfigNodeCreated   bool    `json:"config_node_created"`        // Whether config summary node was created (P2)
-	ConfigEdgesCreated  int     `json:"config_edges_created"`       // Number of IMPLEMENTS_CONFIG edges created
-	SummariesGenerated  int     `json:"summaries_generated"`        // Number of summaries generated
+	ConfigNodeCreated       bool    `json:"config_node_created"`        // Whether config summary node was created (P2)
+	ConfigEdgesCreated      int     `json:"config_edges_created"`       // Number of IMPLEMENTS_CONFIG edges created
+	ComparisonNodesCreated  int     `json:"comparison_nodes_created"`   // Number of comparison nodes created (P2 Track 3)
+	ComparisonEdgesCreated  int     `json:"comparison_edges_created"`   // Number of COMPARED_IN edges created
+	SummariesGenerated      int     `json:"summaries_generated"`        // Number of summaries generated
 	EdgesStrengthened   int     `json:"edges_strengthened"`
 	DurationMs          float64 `json:"duration_ms"`
 	Enabled             bool    `json:"enabled"` // Whether hidden layer is enabled

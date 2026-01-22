@@ -55,10 +55,30 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	}
 
 	// 1) Vector recall
-	cands, err := s.vectorRecall(ctx, req.SpaceID, req.QueryEmbedding, candK)
+	vectorCands, err := s.vectorRecall(ctx, req.SpaceID, req.QueryEmbedding, candK)
 	if err != nil {
 		return models.RetrieveResponse{}, err
 	}
+
+	// 1b) Hybrid retrieval: BM25 search + RRF fusion (if enabled and query text provided)
+	var cands []Candidate
+	bm25Count := 0
+	if s.cfg.HybridRetrievalEnabled && req.QueryText != "" {
+		bm25Results, bm25Err := s.BM25Search(ctx, req.SpaceID, req.QueryText, s.cfg.BM25TopK)
+		if bm25Err != nil {
+			// Log warning but continue with vector-only results
+			log.Printf("WARN: BM25 search failed, using vector-only: %v", bm25Err)
+			cands = vectorCands
+		} else {
+			bm25Count = len(bm25Results)
+			// Fuse vector and BM25 results using RRF
+			fused := ReciprocalRankFusion(vectorCands, bm25Results, s.cfg.VectorWeight, s.cfg.BM25Weight)
+			cands = ConvertFusedToCandidates(fused)
+		}
+	} else {
+		cands = vectorCands
+	}
+
 	if len(cands) == 0 {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: []models.RetrieveResult{}}, nil
 	}
@@ -108,17 +128,54 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	// 3) Activation physics
 	act := SpreadingActivation(cands, edges, 2, 0.15)
 
-	// 4) Final ranking (pass query text for path-based boosting)
-	results := ScoreAndRank(cands, act, edges, topK, s.cfg, req.QueryText)
+	// 4) Initial ranking (pass query text for path-based boosting)
+	// Request more candidates for re-ranking if enabled
+	initialTopK := topK
+	if s.cfg.RerankEnabled && req.QueryText != "" {
+		initialTopK = s.cfg.RerankTopN
+	}
+	results := ScoreAndRank(cands, act, edges, initialTopK, s.cfg, req.QueryText)
+
+	// 5) LLM Re-ranking (if enabled and query text provided)
+	var rerankLatencyMs float64
+	var rerankTokens int
+	if s.cfg.RerankEnabled && req.QueryText != "" && len(results) > 0 {
+		rerankResult, rerankErr := s.Rerank(ctx, RerankRequest{
+			Query:      req.QueryText,
+			Candidates: results,
+			TopN:       s.cfg.RerankTopN,
+			ReturnK:    topK,
+		})
+		if rerankErr != nil {
+			// Log warning but continue with initial results
+			log.Printf("WARN: LLM rerank failed, using initial results: %v", rerankErr)
+		} else {
+			results = rerankResult.Results
+			rerankLatencyMs = rerankResult.LatencyMs
+			rerankTokens = rerankResult.TokensUsed
+		}
+	}
+
+	// Truncate to topK if needed
+	if len(results) > topK {
+		results = results[:topK]
+	}
 
 	resp := models.RetrieveResponse{
 		SpaceID: req.SpaceID,
 		Results: results,
 		Debug: map[string]any{
-			"candidate_k": candK,
-			"seed_n": seedN,
-			"edges_fetched": len(edges),
-			"hop_depth": hopDepth,
+			"candidate_k":       candK,
+			"seed_n":            seedN,
+			"edges_fetched":     len(edges),
+			"hop_depth":         hopDepth,
+			"hybrid_enabled":    s.cfg.HybridRetrievalEnabled,
+			"vector_count":      len(vectorCands),
+			"bm25_count":        bm25Count,
+			"fused_count":       len(cands),
+			"rerank_enabled":    s.cfg.RerankEnabled,
+			"rerank_latency_ms": rerankLatencyMs,
+			"rerank_tokens":     rerankTokens,
 		},
 	}
 	return resp, nil

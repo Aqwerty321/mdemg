@@ -91,6 +91,20 @@ type Config struct {
 	HiddenLayerBackwardSelf  float64 // Weight of self in backward pass (default: 0.2)
 	HiddenLayerBackwardBase  float64 // Weight of base signal in backward pass (default: 0.5)
 	HiddenLayerBackwardConc  float64 // Weight of concept signal in backward pass (default: 0.3)
+
+	// Hybrid retrieval settings (V0006)
+	HybridRetrievalEnabled bool    // Enable hybrid vector+BM25 retrieval (default: true)
+	BM25TopK               int     // Candidates from BM25 search (default: 100)
+	BM25Weight             float64 // Weight of BM25 in RRF fusion (default: 0.3)
+	VectorWeight           float64 // Weight of vector in RRF fusion (default: 0.7)
+
+	// LLM Re-ranking settings (V0006)
+	RerankEnabled   bool    // Enable LLM re-ranking (default: false)
+	RerankProvider  string  // LLM provider for rerank (openai/ollama)
+	RerankModel     string  // Model for re-ranking (default: gpt-4o-mini)
+	RerankTopN      int     // Candidates to re-rank (default: 30)
+	RerankWeight    float64 // Weight of rerank score in final (default: 0.4)
+	RerankTimeoutMs int     // Timeout for rerank call in ms (default: 3000)
 }
 
 func FromEnv() (Config, error) {
@@ -466,6 +480,56 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// Hybrid retrieval settings (V0006)
+	hybridEnabled := getBool("HYBRID_RETRIEVAL_ENABLED", true)
+	bm25TopK, err := atoi("BM25_TOP_K", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	if bm25TopK < 1 {
+		return Config{}, errors.New("BM25_TOP_K must be >= 1")
+	}
+	bm25Weight, err := atof("BM25_WEIGHT", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	if bm25Weight < 0 || bm25Weight > 1 {
+		return Config{}, errors.New("BM25_WEIGHT must be in range [0, 1]")
+	}
+	vectorWeight, err := atof("VECTOR_WEIGHT", 0.7)
+	if err != nil {
+		return Config{}, err
+	}
+	if vectorWeight < 0 || vectorWeight > 1 {
+		return Config{}, errors.New("VECTOR_WEIGHT must be in range [0, 1]")
+	}
+
+	// LLM Re-ranking settings (V0006)
+	rerankEnabled := getBool("RERANK_ENABLED", false)
+	rerankProvider := get("RERANK_PROVIDER", "openai")
+	rerankModel := get("RERANK_MODEL", "gpt-4o-mini")
+	rerankTopN, err := atoi("RERANK_TOP_N", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	if rerankTopN < 5 {
+		return Config{}, errors.New("RERANK_TOP_N must be >= 5")
+	}
+	rerankWeight, err := atof("RERANK_WEIGHT", 0.4)
+	if err != nil {
+		return Config{}, err
+	}
+	if rerankWeight < 0 || rerankWeight > 1 {
+		return Config{}, errors.New("RERANK_WEIGHT must be in range [0, 1]")
+	}
+	rerankTimeoutMs, err := atoi("RERANK_TIMEOUT_MS", 3000)
+	if err != nil {
+		return Config{}, err
+	}
+	if rerankTimeoutMs < 100 {
+		return Config{}, errors.New("RERANK_TIMEOUT_MS must be >= 100")
+	}
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -528,5 +592,15 @@ func FromEnv() (Config, error) {
 		HiddenLayerBackwardSelf:   hiddenBackwardSelf,
 		HiddenLayerBackwardBase:   hiddenBackwardBase,
 		HiddenLayerBackwardConc:   hiddenBackwardConc,
+		HybridRetrievalEnabled:    hybridEnabled,
+		BM25TopK:                  bm25TopK,
+		BM25Weight:                bm25Weight,
+		VectorWeight:              vectorWeight,
+		RerankEnabled:             rerankEnabled,
+		RerankProvider:            rerankProvider,
+		RerankModel:               rerankModel,
+		RerankTopN:                rerankTopN,
+		RerankWeight:              rerankWeight,
+		RerankTimeoutMs:           rerankTimeoutMs,
 	}, nil
 }

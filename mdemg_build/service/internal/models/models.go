@@ -282,9 +282,11 @@ type ConsolidateResponse struct {
 	SpaceID             string  `json:"space_id"`
 	HiddenNodesCreated  int     `json:"hidden_nodes_created"`
 	HiddenNodesUpdated  int     `json:"hidden_nodes_updated"`
-	ConceptNodesCreated int     `json:"concept_nodes_created"` // Number of concept layer nodes created (L2+)
+	ConceptNodesCreated int     `json:"concept_nodes_created"`      // Number of concept layer nodes created (L2+)
 	ConceptNodesUpdated int     `json:"concept_nodes_updated"`
-	SummariesGenerated  int     `json:"summaries_generated"` // Number of summaries generated
+	ConcernNodesCreated int     `json:"concern_nodes_created"`      // Number of cross-cutting concern nodes created (P1)
+	ConcernEdgesCreated int     `json:"concern_edges_created"`      // Number of IMPLEMENTS_CONCERN edges created
+	SummariesGenerated  int     `json:"summaries_generated"`        // Number of summaries generated
 	EdgesStrengthened   int     `json:"edges_strengthened"`
 	DurationMs          float64 `json:"duration_ms"`
 	Enabled             bool    `json:"enabled"` // Whether hidden layer is enabled

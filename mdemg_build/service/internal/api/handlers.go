@@ -875,6 +875,18 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 		resp.HiddenNodesCreated = created
 	}
 
+	// Step 1b: Create concern nodes for cross-cutting patterns (P1 improvement)
+	if !req.SkipClustering {
+		concernResult, err := s.hiddenLayer.CreateConcernNodes(r.Context(), req.SpaceID)
+		if err != nil {
+			// Log but don't fail - concern nodes are an enhancement
+			log.Printf("warning: failed to create concern nodes: %v", err)
+		} else if concernResult != nil {
+			resp.ConcernNodesCreated = concernResult.ConcernNodesCreated
+			resp.ConcernEdgesCreated = concernResult.EdgesCreated
+		}
+	}
+
 	// Step 2: Forward pass (unless skipped)
 	if !req.SkipForward {
 		fwdResult, err := s.hiddenLayer.ForwardPass(r.Context(), req.SpaceID)

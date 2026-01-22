@@ -1038,6 +1038,13 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	}
 	result.HiddenNodesCreated = hiddenCreated
 
+	// Step 1b: Create concern nodes for cross-cutting patterns (P1 improvement)
+	_, err = s.CreateConcernNodes(ctx, spaceID)
+	if err != nil {
+		// Log but don't fail - concern nodes are an enhancement
+		fmt.Printf("warning: failed to create concern nodes: %v\n", err)
+	}
+
 	// Step 2: Forward pass (update embeddings up the hierarchy)
 	fwdResult, err := s.ForwardPass(ctx, spaceID)
 	if err != nil {
@@ -1074,6 +1081,186 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 
 	result.TotalDuration = time.Since(start)
 	return result, nil
+}
+
+// CreateConcernNodes creates dedicated nodes for cross-cutting concerns
+// based on "concern:*" tags in the base data layer.
+// This addresses P1 in the development roadmap - improving retrieval for
+// ACL, RBAC, authentication, error-handling, and other cross-cutting patterns.
+func (s *Service) CreateConcernNodes(ctx context.Context, spaceID string) (*ConcernNodeResult, error) {
+	if !s.cfg.HiddenLayerEnabled {
+		return &ConcernNodeResult{}, nil
+	}
+
+	result := &ConcernNodeResult{
+		Concerns: make([]string, 0),
+	}
+
+	// Step 1: Find all unique concerns from tags
+	concerns, err := s.fetchUniqueConcerns(ctx, spaceID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch unique concerns: %w", err)
+	}
+
+	if len(concerns) == 0 {
+		return result, nil
+	}
+
+	result.Concerns = concerns
+
+	// Step 2: For each concern, create a ConcernNode and edges
+	for _, concern := range concerns {
+		created, edges, err := s.createConcernNodeWithEdges(ctx, spaceID, concern)
+		if err != nil {
+			return result, fmt.Errorf("create concern node %s: %w", concern, err)
+		}
+		if created {
+			result.ConcernNodesCreated++
+			result.EdgesCreated += edges
+		}
+	}
+
+	return result, nil
+}
+
+// fetchUniqueConcerns finds all unique "concern:*" tags in the space
+func (s *Service) fetchUniqueConcerns(ctx context.Context, spaceID string) ([]string, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `
+MATCH (n:MemoryNode {space_id: $spaceId, layer: 0})
+WHERE n.tags IS NOT NULL
+UNWIND n.tags AS tag
+WITH tag WHERE tag STARTS WITH 'concern:'
+RETURN DISTINCT tag AS concern
+ORDER BY concern`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+
+		var concerns []string
+		for res.Next(ctx) {
+			rec := res.Record()
+			concern, _ := rec.Get("concern")
+			if concern != nil {
+				concerns = append(concerns, asString(concern))
+			}
+		}
+		return concerns, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]string), nil
+}
+
+// createConcernNodeWithEdges creates a ConcernNode and IMPLEMENTS_CONCERN edges
+// Returns (created, edgeCount, error)
+func (s *Service) createConcernNodeWithEdges(ctx context.Context, spaceID, concern string) (bool, int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Extract concern type from "concern:authentication" -> "authentication"
+	concernType := concern
+	if len(concern) > 8 && concern[:8] == "concern:" {
+		concernType = concern[8:]
+	}
+
+	// Check if concern node already exists
+	checkCypher := `
+MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'concern', name: $concernName})
+RETURN c.node_id AS nodeId`
+
+	existing, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, checkCypher, map[string]any{
+			"spaceId":     spaceID,
+			"concernName": concern,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			return true, nil
+		}
+		return false, res.Err()
+	})
+	if err != nil {
+		return false, 0, err
+	}
+	if existing.(bool) {
+		// Already exists, skip
+		return false, 0, nil
+	}
+
+	// Create the concern node and edges in a single transaction
+	createCypher := `
+// First, collect all nodes with this concern tag and compute centroid
+MATCH (n:MemoryNode {space_id: $spaceId, layer: 0})
+WHERE $concern IN n.tags AND n.embedding IS NOT NULL
+WITH collect(n) AS members, collect(n.embedding) AS embeddings
+WHERE size(members) > 0
+// Compute centroid (element-wise mean)
+WITH members, embeddings,
+     [i IN range(0, size(embeddings[0])-1) |
+       reduce(sum = 0.0, emb IN embeddings | sum + emb[i]) / size(embeddings)
+     ] AS centroid
+// Create concern node
+CREATE (c:MemoryNode {
+  space_id: $spaceId,
+  node_id: randomUUID(),
+  name: $concernName,
+  concern_type: $concernType,
+  layer: 1,
+  role_type: 'concern',
+  embedding: centroid,
+  message_pass_embedding: centroid,
+  aggregation_count: size(members),
+  stability_score: 1.0,
+  summary: 'Cross-cutting concern: ' + $concernType + ' (' + toString(size(members)) + ' implementations)',
+  created_at: datetime(),
+  updated_at: datetime(),
+  version: 1
+})
+// Create IMPLEMENTS_CONCERN edges from all members
+WITH c, members
+UNWIND members AS m
+CREATE (m)-[:IMPLEMENTS_CONCERN {
+  space_id: $spaceId,
+  edge_id: randomUUID(),
+  weight: 1.0,
+  concern_type: $concernType,
+  created_at: datetime(),
+  updated_at: datetime()
+}]->(c)
+RETURN c.node_id AS nodeId, size(members) AS edgeCount`
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, createCypher, map[string]any{
+			"spaceId":     spaceID,
+			"concern":     concern,
+			"concernName": concern,
+			"concernType": concernType,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			edgeCount, _ := rec.Get("edgeCount")
+			return asInt(edgeCount), nil
+		}
+		return 0, res.Err()
+	})
+
+	if err != nil {
+		return false, 0, err
+	}
+	return true, result.(int), nil
 }
 
 // Helper functions for type conversion

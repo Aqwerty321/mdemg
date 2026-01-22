@@ -81,3 +81,21 @@ type Edge struct {
 	Type     string
 	Weight   float64
 }
+
+// ConcernNode represents a cross-cutting concern node (role_type='concern')
+// These are created based on tags like "concern:authentication", "concern:authorization"
+type ConcernNode struct {
+	NodeID      string
+	SpaceID     string
+	Name        string    // e.g., "concern:authentication"
+	ConcernType string    // e.g., "authentication"
+	Embedding   []float64 // Centroid of all implementing nodes
+	MemberCount int
+}
+
+// ConcernNodeResult holds the results of concern node creation
+type ConcernNodeResult struct {
+	ConcernNodesCreated int
+	EdgesCreated        int
+	Concerns            []string // List of concerns found
+}

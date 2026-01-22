@@ -19,20 +19,19 @@ func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda floa
 		lambda = 0.9
 	}
 
-	// Seed: top-2 candidates (bounded) seeded from vector similarity
-	seedN := 2
-	if len(cands) < seedN {
-		seedN = len(cands)
-	}
-	for i := 0; i < seedN; i++ {
-		v := cands[i].VectorSim
+	// Seed: ALL candidates seeded from vector similarity
+	// This enables Hebbian learning by ensuring all returned nodes have activation values.
+	// Previously only top-2 were seeded, causing most nodes to have 0 activation
+	// and failing the learning threshold filter (see LEARNING_EDGES_ANALYSIS.md).
+	for _, c := range cands {
+		v := c.VectorSim
 		if v < 0 {
 			v = 0
 		}
 		if v > 1 {
 			v = 1
 		}
-		act[cands[i].NodeID] = v
+		act[c.NodeID] = v
 	}
 
 	// Build incoming lists

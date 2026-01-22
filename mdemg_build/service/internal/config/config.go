@@ -72,6 +72,7 @@ type Config struct {
 	ScoringKappa       float64 // Redundancy penalty coefficient (default: 0.12)
 	ScoringRho         float64 // Recency decay rate per day (default: 0.05)
 	ScoringConfigBoost float64 // Score multiplier for config nodes (default: 1.15)
+	ScoringPathBoost   float64 // Boost coefficient for path-matching nodes (default: 0.15)
 
 	// Logging settings
 	LogFormat     string // "text" (default) or "json"
@@ -367,6 +368,13 @@ func FromEnv() (Config, error) {
 	if scoringConfigBoost < 1.0 {
 		return Config{}, errors.New("SCORING_CONFIG_BOOST must be >= 1.0")
 	}
+	scoringPathBoost, err := atof("SCORING_PATH_BOOST", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringPathBoost < 0 {
+		return Config{}, errors.New("SCORING_PATH_BOOST must be >= 0")
+	}
 
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "")
@@ -505,6 +513,7 @@ func FromEnv() (Config, error) {
 		ScoringKappa:              scoringKappa,
 		ScoringRho:                scoringRho,
 		ScoringConfigBoost:        scoringConfigBoost,
+		ScoringPathBoost:          scoringPathBoost,
 		LogFormat:                 logFormat,
 		LogSkipHealth:             logSkipHealth,
 		HiddenLayerEnabled:        hiddenEnabled,

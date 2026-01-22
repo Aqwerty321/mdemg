@@ -108,8 +108,8 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	// 3) Activation physics
 	act := SpreadingActivation(cands, edges, 2, 0.15)
 
-	// 4) Final ranking
-	results := ScoreAndRank(cands, act, edges, topK, s.cfg)
+	// 4) Final ranking (pass query text for path-based boosting)
+	results := ScoreAndRank(cands, act, edges, topK, s.cfg, req.QueryText)
 
 	resp := models.RetrieveResponse{
 		SpaceID: req.SpaceID,

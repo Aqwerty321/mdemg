@@ -541,6 +541,97 @@ Monitor for these signs of healthy emergence:
 
 ---
 
+## Dynamic Edge and Node Types (L4-H4-L5)
+
+### Design Philosophy
+
+Upper layers (L4+) need **richer semantics** than lower layers. Rather than using fixed relationship types like `ASSOCIATED_WITH`, we **infer** relationship and concept types from structural analysis and embedding geometry.
+
+### Dynamic Edge Types
+
+| Type | Inference Criteria | Example |
+|------|-------------------|---------|
+| `ANALOGOUS_TO` | High cosine sim (≥0.7) + same layer | "Auth flow" ↔ "Payment flow" |
+| `CONTRASTS_WITH` | Low sim (≤0.3) + high co-activation | "Sync" ↔ "Async" processing |
+| `COMPOSES_WITH` | High co-activation + moderate sim | "Caching" + "Rate limiting" |
+| `TENSIONS_WITH` | Frequently compared, opposing metrics | "Performance" ↔ "Maintainability" |
+| `SPECIALIZES` | Lower layer + high similarity | "JWT Auth" → "Auth Pattern" |
+| `GENERALIZES_TO` | Higher layer + high similarity | "Auth Pattern" → "Security" |
+| `EMERGES_FROM` | L5 node ← multiple L4 patterns | Emergent formation marker |
+| `BRIDGES` | Connects 3+ distinct domains | Cross-cutting connector |
+| `INFLUENCES` | Default soft relationship | Moderate structural connection |
+
+### Edge Type Inference Algorithm
+
+```go
+func InferEdgeType(source, target UpperLayerNode, coActivation float64) DynamicEdgeType {
+    sim := cosineSimilarity(source.Embedding, target.Embedding)
+    layerDist := abs(source.Layer - target.Layer)
+
+    switch {
+    case sim >= 0.7 && layerDist == 0:
+        return EdgeAnalogous  // Same layer, very similar
+    case sim <= 0.3 && coActivation >= 0.5:
+        return EdgeContrasts  // Different but co-accessed
+    case coActivation >= 0.5 && sim >= 0.4:
+        return EdgeComposes   // Work together
+    case layerDist > 0 && sim >= 0.5:
+        if source.Layer > target.Layer {
+            return EdgeGeneralizes
+        }
+        return EdgeSpecializes
+    default:
+        return EdgeInfluences
+    }
+}
+```
+
+### Dynamic Node Types
+
+| Type | Inference Criteria | Meaning |
+|------|-------------------|---------|
+| `principle` | High stability + deep aggregation | Guiding architectural principle |
+| `pattern` | Multiple children + high diversity | Recurring design pattern |
+| `constraint` | Limiting relationships | Design constraint or rule |
+| `bridge` | 3+ cross-domain links | Connects disparate domains |
+| `hub` | High degree (≥10) | Central connecting concept |
+| `emergent` | Low stability (<0.5) | Newly forming concept |
+| `established` | High stability (≥0.8) | Mature, stable concept |
+| `tension` | Represents tradeoffs | Design tradeoff node |
+| `synthesis` | Combines multiple patterns | Unified abstraction |
+
+### Node Type Inference Algorithm
+
+```go
+func InferNodeType(metrics NodeMetrics) DynamicNodeType {
+    totalDegree := metrics.InDegree + metrics.OutDegree
+
+    switch {
+    case metrics.CrossDomainLinks >= 3:
+        return NodeBridge
+    case totalDegree >= 10:
+        return NodeHub
+    case metrics.StabilityScore >= 0.8 && metrics.AggregationDepth >= 2:
+        return NodePrinciple
+    case metrics.StabilityScore >= 0.8:
+        return NodeEstablished
+    case metrics.InDegree >= 3 && metrics.ChildDiversity >= 0.5:
+        return NodePattern
+    case metrics.StabilityScore < 0.5:
+        return NodeEmergent
+    default:
+        return NodePattern
+    }
+}
+```
+
+### Implementation Files
+
+- `internal/hidden/types.go`: Type definitions, thresholds, metrics
+- `internal/hidden/service.go`: `InferEdgeType()`, `InferNodeType()`, `ClassifyUpperLayerNodes()`, `CreateDynamicEdges()`
+
+---
+
 ## Future Work: Inter-Layer Hidden Aggregators
 
 ### Current Architecture

@@ -2121,3 +2121,437 @@ func asFloat64Slice(v any) []float64 {
 	}
 	return nil
 }
+
+// =============================================================================
+// DYNAMIC EDGE AND NODE TYPE INFERENCE FOR UPPER LAYERS (L4-H4-L5)
+// =============================================================================
+
+// InferEdgeType determines the dynamic edge type between two upper-layer nodes
+// based on embedding geometry, structural position, and co-activation patterns
+func (s *Service) InferEdgeType(source, target UpperLayerNode, coActivation float64) *EdgeInference {
+	thresholds := DefaultInferenceThresholds()
+
+	// Calculate metrics
+	metrics := EdgeMetrics{
+		CosineSimilarity: cosineSimilarity(source.Embedding, target.Embedding),
+		CoActivation:     coActivation,
+		LayerDistance:    abs(source.Layer - target.Layer),
+	}
+
+	// Infer type based on metrics
+	var inferredType DynamicEdgeType
+	var confidence float64
+	var evidence string
+
+	switch {
+	// High similarity + same layer = ANALOGOUS_TO
+	case metrics.CosineSimilarity >= thresholds.AnalogousMinSim && metrics.LayerDistance == 0:
+		inferredType = EdgeAnalogous
+		confidence = metrics.CosineSimilarity
+		evidence = fmt.Sprintf("High embedding similarity (%.2f) at same layer suggests analogous concepts", metrics.CosineSimilarity)
+
+	// Low similarity + high co-activation = CONTRASTS_WITH (often accessed together but different)
+	case metrics.CosineSimilarity <= thresholds.ContrastsMaxSim && metrics.CoActivation >= thresholds.ComposesMinCoact:
+		inferredType = EdgeContrasts
+		confidence = metrics.CoActivation * (1 - metrics.CosineSimilarity)
+		evidence = fmt.Sprintf("Low similarity (%.2f) but high co-activation (%.2f) suggests contrasting approaches", metrics.CosineSimilarity, metrics.CoActivation)
+
+	// High co-activation + moderate similarity = COMPOSES_WITH
+	case metrics.CoActivation >= thresholds.ComposesMinCoact && metrics.CosineSimilarity >= 0.4 && metrics.CosineSimilarity < thresholds.AnalogousMinSim:
+		inferredType = EdgeComposes
+		confidence = metrics.CoActivation
+		evidence = fmt.Sprintf("High co-activation (%.2f) with moderate similarity suggests composition", metrics.CoActivation)
+
+	// Layer difference with similarity = SPECIALIZES or GENERALIZES_TO
+	case metrics.LayerDistance > 0 && metrics.CosineSimilarity >= 0.5:
+		if source.Layer > target.Layer {
+			inferredType = EdgeGeneralizes
+			evidence = fmt.Sprintf("Higher layer node generalizes lower layer concept (layer %d → %d)", source.Layer, target.Layer)
+		} else {
+			inferredType = EdgeSpecializes
+			evidence = fmt.Sprintf("Lower layer node specializes higher layer concept (layer %d → %d)", source.Layer, target.Layer)
+		}
+		confidence = metrics.CosineSimilarity
+
+	// Moderate similarity = INFLUENCES (default soft relationship)
+	default:
+		inferredType = EdgeInfluences
+		confidence = 0.5
+		evidence = "Default relationship - moderate structural connection"
+	}
+
+	return &EdgeInference{
+		SourceID:     source.NodeID,
+		TargetID:     target.NodeID,
+		InferredType: inferredType,
+		Confidence:   confidence,
+		Evidence:     evidence,
+		Metrics:      metrics,
+	}
+}
+
+// InferNodeType determines the dynamic node type for an upper-layer concept
+// based on structural position, connectivity, and embedding stability
+func (s *Service) InferNodeType(ctx context.Context, spaceID, nodeID string, layer int) (*NodeInference, error) {
+	thresholds := DefaultInferenceThresholds()
+
+	// Fetch node metrics from graph
+	metrics, err := s.fetchNodeMetrics(ctx, spaceID, nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch node metrics: %w", err)
+	}
+
+	// Infer type based on metrics
+	var inferredType DynamicNodeType
+	var confidence float64
+	var evidence string
+
+	totalDegree := metrics.InDegree + metrics.OutDegree
+
+	switch {
+	// High cross-domain links = BRIDGE
+	case metrics.CrossDomainLinks >= thresholds.BridgeMinDomains:
+		inferredType = NodeBridge
+		confidence = float64(metrics.CrossDomainLinks) / float64(maxInt(totalDegree, 1))
+		evidence = fmt.Sprintf("Connects %d distinct domains - acts as a bridge concept", metrics.CrossDomainLinks)
+
+	// High degree = HUB
+	case totalDegree >= thresholds.HubMinDegree:
+		inferredType = NodeHub
+		confidence = minFloat(1.0, float64(totalDegree)/float64(thresholds.HubMinDegree*2))
+		evidence = fmt.Sprintf("High connectivity (degree %d) - central hub concept", totalDegree)
+
+	// High stability + high aggregation = PRINCIPLE
+	case metrics.StabilityScore >= thresholds.EstablishedMinStab && metrics.AggregationDepth >= 2:
+		inferredType = NodePrinciple
+		confidence = metrics.StabilityScore
+		evidence = fmt.Sprintf("Stable (%.2f) with deep aggregation (%d layers) - guiding principle", metrics.StabilityScore, metrics.AggregationDepth)
+
+	// High stability = ESTABLISHED
+	case metrics.StabilityScore >= thresholds.EstablishedMinStab:
+		inferredType = NodeEstablished
+		confidence = metrics.StabilityScore
+		evidence = fmt.Sprintf("High embedding stability (%.2f) - established concept", metrics.StabilityScore)
+
+	// Multiple children with diversity = PATTERN
+	case metrics.InDegree >= 3 && metrics.ChildDiversity >= 0.5:
+		inferredType = NodePattern
+		confidence = metrics.ChildDiversity
+		evidence = fmt.Sprintf("Diverse children (%.2f diversity) suggest recurring pattern", metrics.ChildDiversity)
+
+	// Low stability = EMERGENT
+	case metrics.StabilityScore < 0.5:
+		inferredType = NodeEmergent
+		confidence = 1.0 - metrics.StabilityScore
+		evidence = fmt.Sprintf("Low stability (%.2f) - newly emergent concept", metrics.StabilityScore)
+
+	// Default = PATTERN
+	default:
+		inferredType = NodePattern
+		confidence = 0.5
+		evidence = "Default classification as architectural pattern"
+	}
+
+	return &NodeInference{
+		NodeID:       nodeID,
+		InferredType: inferredType,
+		Confidence:   confidence,
+		Evidence:     evidence,
+		Metrics:      *metrics,
+	}, nil
+}
+
+// fetchNodeMetrics retrieves structural metrics for a node from the graph
+func (s *Service) fetchNodeMetrics(ctx context.Context, spaceID, nodeID string) (*NodeMetrics, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `
+MATCH (n:MemoryNode {space_id: $spaceId, node_id: $nodeId})
+OPTIONAL MATCH (n)<-[inEdge]-()
+OPTIONAL MATCH (n)-[outEdge]->()
+OPTIONAL MATCH (n)<-[:ABSTRACTS_TO*1..3]-(child:MemoryNode)
+WITH n,
+     count(DISTINCT inEdge) AS inDegree,
+     count(DISTINCT outEdge) AS outDegree,
+     count(DISTINCT child) AS childCount,
+     collect(DISTINCT split(child.path, '/')[0]) AS childDomains
+RETURN inDegree, outDegree, childCount,
+       size(childDomains) AS crossDomainLinks,
+       COALESCE(n.stability_score, 0.5) AS stabilityScore,
+       n.layer AS layer`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+			"nodeId":  nodeID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			inDegree, _ := rec.Get("inDegree")
+			outDegree, _ := rec.Get("outDegree")
+			childCount, _ := rec.Get("childCount")
+			crossDomainLinks, _ := rec.Get("crossDomainLinks")
+			stabilityScore, _ := rec.Get("stabilityScore")
+			layer, _ := rec.Get("layer")
+
+			// Calculate child diversity (unique types / total children)
+			childDiversity := 0.0
+			if asInt(childCount) > 0 {
+				childDiversity = float64(asInt(crossDomainLinks)) / float64(asInt(childCount))
+				if childDiversity > 1.0 {
+					childDiversity = 1.0
+				}
+			}
+
+			return &NodeMetrics{
+				InDegree:         asInt(inDegree),
+				OutDegree:        asInt(outDegree),
+				CrossDomainLinks: asInt(crossDomainLinks),
+				StabilityScore:   asFloat64(stabilityScore),
+				AggregationDepth: asInt(layer),
+				ChildDiversity:   childDiversity,
+			}, nil
+		}
+		return nil, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return &NodeMetrics{StabilityScore: 0.5}, nil
+	}
+	return result.(*NodeMetrics), nil
+}
+
+// ClassifyUpperLayerNodes classifies all nodes at L4+ with dynamic types
+func (s *Service) ClassifyUpperLayerNodes(ctx context.Context, spaceID string) (int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Fetch all L4+ nodes without classification
+	fetchCypher := `
+MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE n.layer >= 4 AND (n.node_type IS NULL OR n.node_type = '')
+RETURN n.node_id AS nodeId, n.layer AS layer
+LIMIT 100`
+
+	nodes, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, fetchCypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		var nodes []struct {
+			NodeID string
+			Layer  int
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("nodeId")
+			layer, _ := rec.Get("layer")
+			nodes = append(nodes, struct {
+				NodeID string
+				Layer  int
+			}{asString(nodeID), asInt(layer)})
+		}
+		return nodes, res.Err()
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	nodeList := nodes.([]struct {
+		NodeID string
+		Layer  int
+	})
+
+	classified := 0
+	for _, node := range nodeList {
+		inference, err := s.InferNodeType(ctx, spaceID, node.NodeID, node.Layer)
+		if err != nil {
+			continue // Skip on error, don't fail entire operation
+		}
+
+		// Update node with inferred type
+		updateCypher := `
+MATCH (n:MemoryNode {space_id: $spaceId, node_id: $nodeId})
+SET n.node_type = $nodeType,
+    n.type_confidence = $confidence,
+    n.type_evidence = $evidence,
+    n.type_inferred_at = datetime()
+RETURN n.node_id`
+
+		_, err = sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			_, err := tx.Run(ctx, updateCypher, map[string]any{
+				"spaceId":    spaceID,
+				"nodeId":     node.NodeID,
+				"nodeType":   string(inference.InferredType),
+				"confidence": inference.Confidence,
+				"evidence":   inference.Evidence,
+			})
+			return nil, err
+		})
+
+		if err == nil {
+			classified++
+		}
+	}
+
+	return classified, nil
+}
+
+// CreateDynamicEdges creates edges with inferred types for upper layer relationships
+func (s *Service) CreateDynamicEdges(ctx context.Context, spaceID string) (int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Find pairs of L4+ nodes that should be connected but aren't
+	findPairsCypher := `
+MATCH (a:MemoryNode {space_id: $spaceId}), (b:MemoryNode {space_id: $spaceId})
+WHERE a.layer >= 4 AND b.layer >= 4
+  AND a.node_id < b.node_id
+  AND NOT (a)-[:DYNAMIC_EDGE]-(b)
+  AND a.embedding IS NOT NULL AND b.embedding IS NOT NULL
+WITH a, b,
+     gds.similarity.cosine(a.embedding, b.embedding) AS sim
+WHERE sim > 0.3
+RETURN a.node_id AS sourceId, b.node_id AS targetId,
+       a.embedding AS sourceEmb, b.embedding AS targetEmb,
+       a.layer AS sourceLayer, b.layer AS targetLayer,
+       sim
+ORDER BY sim DESC
+LIMIT 50`
+
+	pairs, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, findPairsCypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		var pairs []struct {
+			Source UpperLayerNode
+			Target UpperLayerNode
+			Sim    float64
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			sourceId, _ := rec.Get("sourceId")
+			targetId, _ := rec.Get("targetId")
+			sourceEmb, _ := rec.Get("sourceEmb")
+			targetEmb, _ := rec.Get("targetEmb")
+			sourceLayer, _ := rec.Get("sourceLayer")
+			targetLayer, _ := rec.Get("targetLayer")
+			sim, _ := rec.Get("sim")
+
+			pairs = append(pairs, struct {
+				Source UpperLayerNode
+				Target UpperLayerNode
+				Sim    float64
+			}{
+				Source: UpperLayerNode{
+					NodeID:    asString(sourceId),
+					Layer:     asInt(sourceLayer),
+					Embedding: asFloat64Slice(sourceEmb),
+				},
+				Target: UpperLayerNode{
+					NodeID:    asString(targetId),
+					Layer:     asInt(targetLayer),
+					Embedding: asFloat64Slice(targetEmb),
+				},
+				Sim: asFloat64(sim),
+			})
+		}
+		return pairs, res.Err()
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	pairList := pairs.([]struct {
+		Source UpperLayerNode
+		Target UpperLayerNode
+		Sim    float64
+	})
+
+	created := 0
+	for _, pair := range pairList {
+		inference := s.InferEdgeType(pair.Source, pair.Target, pair.Sim)
+
+		createCypher := `
+MATCH (a:MemoryNode {space_id: $spaceId, node_id: $sourceId})
+MATCH (b:MemoryNode {space_id: $spaceId, node_id: $targetId})
+CREATE (a)-[r:DYNAMIC_EDGE {
+  space_id: $spaceId,
+  edge_id: randomUUID(),
+  edge_type: $edgeType,
+  weight: $confidence,
+  confidence: $confidence,
+  evidence: $evidence,
+  created_at: datetime(),
+  inferred_at: datetime()
+}]->(b)
+RETURN r.edge_id`
+
+		_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			_, err := tx.Run(ctx, createCypher, map[string]any{
+				"spaceId":    spaceID,
+				"sourceId":   inference.SourceID,
+				"targetId":   inference.TargetID,
+				"edgeType":   string(inference.InferredType),
+				"confidence": inference.Confidence,
+				"evidence":   inference.Evidence,
+			})
+			return nil, err
+		})
+
+		if err == nil {
+			created++
+		}
+	}
+
+	return created, nil
+}
+
+// Helper functions for inference
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func minFloat(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func asFloat64(v any) float64 {
+	if v == nil {
+		return 0
+	}
+	switch n := v.(type) {
+	case float64:
+		return n
+	case int64:
+		return float64(n)
+	case int:
+		return float64(n)
+	default:
+		return 0
+	}
+}

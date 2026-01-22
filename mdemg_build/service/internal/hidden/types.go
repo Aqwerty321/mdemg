@@ -99,3 +99,142 @@ type ConcernNodeResult struct {
 	EdgesCreated        int
 	Concerns            []string // List of concerns found
 }
+
+// =============================================================================
+// DYNAMIC EDGE AND NODE TYPES FOR UPPER LAYERS (L4-H4-L5)
+// =============================================================================
+// Upper layers need richer semantics than lower layers. Rather than fixed types,
+// we infer relationship and concept types from structural and embedding analysis.
+
+// DynamicEdgeType represents inferred edge types for upper layer relationships
+type DynamicEdgeType string
+
+const (
+	// Structural relationships (inferred from embedding geometry)
+	EdgeAnalogous    DynamicEdgeType = "ANALOGOUS_TO"    // Parallel vectors across domains
+	EdgeContrasts    DynamicEdgeType = "CONTRASTS_WITH"  // Orthogonal/opposing approaches
+	EdgeComposes     DynamicEdgeType = "COMPOSES_WITH"   // Combines to form larger pattern
+	EdgeTensions     DynamicEdgeType = "TENSIONS_WITH"   // Design tradeoff relationship
+	EdgeInfluences   DynamicEdgeType = "INFLUENCES"      // Soft architectural dependency
+	EdgeSpecializes  DynamicEdgeType = "SPECIALIZES"     // More specific variant
+	EdgeGeneralizes  DynamicEdgeType = "GENERALIZES_TO"  // More abstract variant
+
+	// Emergent relationships (discovered during consolidation)
+	EdgeEmergesFrom  DynamicEdgeType = "EMERGES_FROM"    // Indicates emergent formation
+	EdgeBridges      DynamicEdgeType = "BRIDGES"         // Connects disparate domains
+	EdgeUnifies      DynamicEdgeType = "UNIFIES"         // Represents common abstraction
+)
+
+// DynamicNodeType represents inferred node types for upper layer concepts
+type DynamicNodeType string
+
+const (
+	// Structural node types (inferred from graph position)
+	NodePrinciple   DynamicNodeType = "principle"    // High-level guiding concept
+	NodePattern     DynamicNodeType = "pattern"      // Recurring architectural pattern
+	NodeConstraint  DynamicNodeType = "constraint"   // Limiting/guiding constraint
+	NodeBridge      DynamicNodeType = "bridge"       // Connects disparate domains
+	NodeHub         DynamicNodeType = "hub"          // Central connecting concept
+
+	// Emergent node types (discovered during analysis)
+	NodeEmergent    DynamicNodeType = "emergent"     // Newly formed concept
+	NodeEstablished DynamicNodeType = "established"  // Stable, mature concept
+	NodeTension     DynamicNodeType = "tension"      // Represents a tradeoff
+	NodeSynthesis   DynamicNodeType = "synthesis"    // Combines multiple patterns
+)
+
+// EdgeInference contains the result of inferring an edge type between two nodes
+type EdgeInference struct {
+	SourceID     string
+	TargetID     string
+	InferredType DynamicEdgeType
+	Confidence   float64         // 0.0 - 1.0
+	Evidence     string          // Human-readable explanation
+	Metrics      EdgeMetrics     // Raw metrics used for inference
+}
+
+// EdgeMetrics holds the raw measurements used to infer edge types
+type EdgeMetrics struct {
+	CosineSimilarity float64 // Embedding similarity
+	PathOverlap      float64 // Domain path similarity
+	CoActivation     float64 // Hebbian co-activation strength
+	LayerDistance    int     // Layers apart
+	DomainDistance   float64 // Cross-domain metric
+}
+
+// NodeInference contains the result of inferring a node type for upper layer concepts
+type NodeInference struct {
+	NodeID       string
+	InferredType DynamicNodeType
+	Confidence   float64         // 0.0 - 1.0
+	Evidence     string          // Human-readable explanation
+	Metrics      NodeMetrics     // Raw metrics used for inference
+}
+
+// NodeMetrics holds the raw measurements used to infer node types
+type NodeMetrics struct {
+	InDegree          int     // Incoming edges
+	OutDegree         int     // Outgoing edges
+	CrossDomainLinks  int     // Links to different domains
+	StabilityScore    float64 // How stable the embedding is
+	AggregationDepth  int     // How many layers of children
+	ChildDiversity    float64 // Diversity of child node types
+}
+
+// InferenceThresholds configures the thresholds for type inference
+type InferenceThresholds struct {
+	// Edge type thresholds
+	AnalogousMinSim      float64 // Min cosine sim for ANALOGOUS_TO (default: 0.7)
+	ContrastsMaxSim      float64 // Max cosine sim for CONTRASTS_WITH (default: 0.3)
+	ComposesMinCoact     float64 // Min co-activation for COMPOSES_WITH (default: 0.5)
+	BridgesMinDomains    int     // Min distinct domains for BRIDGES (default: 3)
+
+	// Node type thresholds
+	HubMinDegree         int     // Min degree to be a hub (default: 10)
+	BridgeMinDomains     int     // Min domains to be a bridge (default: 3)
+	EstablishedMinStab   float64 // Min stability for established (default: 0.8)
+	EmergentMaxAge       int     // Max consolidation cycles for emergent (default: 3)
+}
+
+// DefaultInferenceThresholds returns sensible defaults for type inference
+func DefaultInferenceThresholds() InferenceThresholds {
+	return InferenceThresholds{
+		AnalogousMinSim:    0.7,
+		ContrastsMaxSim:    0.3,
+		ComposesMinCoact:   0.5,
+		BridgesMinDomains:  3,
+		HubMinDegree:       10,
+		BridgeMinDomains:   3,
+		EstablishedMinStab: 0.8,
+		EmergentMaxAge:     3,
+	}
+}
+
+// UpperLayerEdge represents an edge in the upper layers with dynamic typing
+type UpperLayerEdge struct {
+	EdgeID       string
+	SourceID     string
+	TargetID     string
+	SpaceID      string
+	EdgeType     DynamicEdgeType // Inferred type
+	Weight       float64
+	Confidence   float64 // Confidence in the type inference
+	Evidence     string  // Why this type was inferred
+	CreatedAt    time.Time
+	InferredAt   time.Time // When the type was last inferred
+}
+
+// UpperLayerNode represents a node in L4-H4-L5 with dynamic typing
+type UpperLayerNode struct {
+	NodeID       string
+	SpaceID      string
+	Layer        int
+	Name         string
+	NodeType     DynamicNodeType // Inferred type
+	Embedding    []float64
+	Confidence   float64 // Confidence in the type inference
+	Evidence     string  // Why this type was inferred
+	Stability    float64 // Embedding stability over time
+	CreatedAt    time.Time
+	InferredAt   time.Time // When the type was last inferred
+}

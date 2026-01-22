@@ -392,8 +392,35 @@ All 17 Auto-Claude tasks have been implemented and merged. The system now includ
 - [x] **Adaptive MinSamples** - Smaller clusters allowed at upper layers: `max(2, base - layer)`
 - [x] **Relaxed MaxClusterSize** - Upper layers can have broad concepts (removed aggressive shrinking)
 - [x] **No Early Termination** - System tries ALL 5 layers regardless of intermediate results
+- [x] **Dynamic Edge Types** - Edge types inferred from embedding geometry (ANALOGOUS_TO, CONTRASTS_WITH, etc.)
+- [x] **Dynamic Node Types** - Node types inferred from structural position (principle, pattern, bridge, hub, etc.)
 - [ ] **Inter-layer Hidden Aggregators** - Explicit hidden nodes between each concept layer
 - [ ] **Layer-specific Summary Generation** - Different summary styles for different abstraction levels
+
+**Dynamic Type Inference (in `internal/hidden/service.go`):**
+- `InferEdgeType()` - Classifies relationships between L4+ nodes
+- `InferNodeType()` - Classifies node role based on metrics
+- `ClassifyUpperLayerNodes()` - Batch classify all L4+ nodes
+- `CreateDynamicEdges()` - Create edges with inferred types
+
+**Dynamic Edge Categories:**
+| Type | Criteria |
+|------|----------|
+| ANALOGOUS_TO | High similarity (≥0.7), same layer |
+| CONTRASTS_WITH | Low similarity (≤0.3), high co-activation |
+| COMPOSES_WITH | High co-activation, moderate similarity |
+| SPECIALIZES/GENERALIZES | Cross-layer relationships |
+| BRIDGES | Connects 3+ domains |
+
+**Dynamic Node Categories:**
+| Type | Criteria |
+|------|----------|
+| principle | High stability + deep aggregation |
+| pattern | Diverse children, recurring structure |
+| bridge | 3+ cross-domain links |
+| hub | High degree (≥10 connections) |
+| emergent | Low stability (<0.5) |
+| established | High stability (≥0.8) |
 
 **Implementation Details (in `internal/hidden/service.go:CreateConceptNodes`):**
 ```go

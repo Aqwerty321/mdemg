@@ -430,6 +430,11 @@ RETURN count(c) AS updated`
 //  2. Split oversized clusters using name-prefix grouping (secondary organization)
 //  3. Name clusters based on dominant patterns (descriptive, not prescriptive)
 //  4. Small clusters stay intact - emergent cross-cutting patterns
+//
+// ADAPTIVE CONSTRAINTS (loosen as layers increase):
+//  - Epsilon increases with layer (allows more distant concepts to cluster)
+//  - MinSamples decreases with layer (smaller emergent groups allowed)
+//  - MaxClusterSize stays generous (concepts can be broad)
 func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, targetLayer int) (int, error) {
 	if !s.cfg.HiddenLayerEnabled {
 		return 0, nil
@@ -446,8 +451,24 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 		return 0, fmt.Errorf("fetch orphan layer %d nodes: %w", sourceLayer, err)
 	}
 
-	if len(sourceNodes) < s.cfg.HiddenLayerMinSamples {
-		return 0, nil // Not enough data to cluster
+	// Calculate ADAPTIVE parameters - constraints loosen as we go up
+	// Higher layers represent more abstract concepts that should cluster more freely
+	layerFactor := float64(targetLayer - 1) // 1 for L2, 2 for L3, etc.
+
+	// Epsilon grows with layer: base * (1 + 0.4*layer) → L2: 1.4x, L3: 1.8x, L4: 2.2x, L5: 2.6x
+	adaptiveEps := s.cfg.HiddenLayerClusterEps * (1.0 + 0.4*layerFactor)
+	if adaptiveEps > 0.6 {
+		adaptiveEps = 0.6 // Cap at 0.6 to maintain some semantic coherence
+	}
+
+	// MinSamples shrinks with layer: base - layer (min 2) → allows smaller emergent clusters at top
+	adaptiveMinSamples := s.cfg.HiddenLayerMinSamples - int(layerFactor)
+	if adaptiveMinSamples < 2 {
+		adaptiveMinSamples = 2 // Minimum 2 nodes to form a cluster
+	}
+
+	if len(sourceNodes) < adaptiveMinSamples {
+		return 0, nil // Not enough data to cluster at this layer
 	}
 
 	// Step 2: Filter to nodes with embeddings, use message_pass_embedding if available
@@ -463,13 +484,13 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 		}
 	}
 
-	if len(validNodes) < s.cfg.HiddenLayerMinSamples {
+	if len(validNodes) < adaptiveMinSamples {
 		return 0, nil
 	}
 
-	// Step 3: Run DBSCAN on ALL nodes (embedding-first clustering)
+	// Step 3: Run DBSCAN with ADAPTIVE parameters
 	embeddings := extractEmbeddings(validNodes)
-	labels := DBSCAN(embeddings, s.cfg.HiddenLayerClusterEps, s.cfg.HiddenLayerMinSamples)
+	labels := DBSCAN(embeddings, adaptiveEps, adaptiveMinSamples)
 	clusters, _ := GroupByCluster(validNodes, labels)
 
 	// Step 4: Get existing concept node count for unique naming
@@ -478,10 +499,12 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 		return 0, fmt.Errorf("count existing layer %d nodes: %w", targetLayer, err)
 	}
 
-	// Calculate max concept cluster size (smaller for higher layers)
-	maxConceptSize := s.cfg.HiddenLayerMaxClusterSize / (targetLayer * 2)
-	if maxConceptSize < 10 {
-		maxConceptSize = 10
+	// Max cluster size stays generous - don't artificially limit concept breadth
+	// Higher layers can have broader concepts (gradual reduction only)
+	maxConceptSize := s.cfg.HiddenLayerMaxClusterSize
+	if targetLayer >= 4 {
+		// Only slight reduction at very high layers to prevent mega-clusters
+		maxConceptSize = maxConceptSize * 3 / 4
 	}
 
 	// Step 5: Process each natural cluster
@@ -495,8 +518,8 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 
 		// For clusters within size limit, keep them intact (emergent patterns)
 		if len(members) <= maxConceptSize {
-			if len(members) < s.cfg.HiddenLayerMinSamples {
-				continue
+			if len(members) < adaptiveMinSamples {
+				continue // Use adaptive threshold, not fixed
 			}
 
 			centroid := ComputeCentroid(extractEmbeddings(members))
@@ -1068,22 +1091,25 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	result.ForwardPass = fwdResult
 
 	// Step 3: Multi-layer concept clustering (L1 → L2, L2 → L3, etc.)
-	// Continue creating concept layers until no more clusters can be formed
-	maxLayers := 5 // Limit hierarchy depth to prevent infinite loops
+	// Try ALL layers - don't break early. Upper layers have looser constraints
+	// and may form clusters even if intermediate layers don't.
+	// This allows emergent concepts to form at any level of abstraction.
+	maxLayers := 5
 	for targetLayer := 2; targetLayer <= maxLayers; targetLayer++ {
 		conceptCreated, err := s.CreateConceptNodes(ctx, spaceID, targetLayer)
 		if err != nil {
 			return nil, fmt.Errorf("create concept nodes layer %d: %w", targetLayer, err)
 		}
-		if conceptCreated == 0 {
-			break // No more clusters to form at this level
-		}
-		result.ConceptNodesCreated[targetLayer] = conceptCreated
+		// Don't break on zero - upper layers may still form clusters
+		// due to adaptive (looser) constraints
+		if conceptCreated > 0 {
+			result.ConceptNodesCreated[targetLayer] = conceptCreated
 
-		// Run forward pass again to update new concept embeddings
-		_, err = s.ForwardPass(ctx, spaceID)
-		if err != nil {
-			return nil, fmt.Errorf("forward pass after layer %d: %w", targetLayer, err)
+			// Run forward pass to update new concept embeddings
+			_, err = s.ForwardPass(ctx, spaceID)
+			if err != nil {
+				return nil, fmt.Errorf("forward pass after layer %d: %w", targetLayer, err)
+			}
 		}
 	}
 

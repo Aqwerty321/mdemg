@@ -926,8 +926,9 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 
 	// Step 3: Multi-layer concept clustering (unless skipped)
 	// Build concept layers: hidden (L1) → concepts (L2, L3, etc.)
+	// Try ALL layers - upper layers have adaptive (looser) constraints for emergence
 	if !req.SkipClustering {
-		maxLayers := 5 // Limit hierarchy depth
+		maxLayers := 5
 		for targetLayer := 2; targetLayer <= maxLayers; targetLayer++ {
 			conceptCreated, err := s.hiddenLayer.CreateConceptNodes(r.Context(), req.SpaceID, targetLayer)
 			if err != nil {
@@ -936,20 +937,20 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-			if conceptCreated == 0 {
-				break // No more clusters to form at this level
-			}
-			resp.ConceptNodesCreated += conceptCreated
+			// Don't break on zero - upper layers may still form clusters
+			if conceptCreated > 0 {
+				resp.ConceptNodesCreated += conceptCreated
 
-			// Run forward pass to update new concept embeddings
-			fwdResult, err := s.hiddenLayer.ForwardPass(r.Context(), req.SpaceID)
-			if err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{
-					"error": fmt.Sprintf("failed in forward pass after layer %d: %v", targetLayer, err),
-				})
-				return
+				// Run forward pass to update new concept embeddings
+				fwdResult, err := s.hiddenLayer.ForwardPass(r.Context(), req.SpaceID)
+				if err != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]any{
+						"error": fmt.Sprintf("failed in forward pass after layer %d: %v", targetLayer, err),
+					})
+					return
+				}
+				resp.ConceptNodesUpdated += fwdResult.ConceptNodesUpdated
 			}
-			resp.ConceptNodesUpdated += fwdResult.ConceptNodesUpdated
 		}
 	}
 

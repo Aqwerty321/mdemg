@@ -240,6 +240,70 @@ A higher-order capability where MDEMG acts as an **SME (Subject Matter Expert)**
 
 ---
 
+## Emergent Layer Architecture
+
+### Multi-Layer Hierarchy
+
+MDEMG uses a 5-layer hierarchy where **constraints loosen as layers increase**, enabling emergent concept formation at higher levels of abstraction:
+
+```
+L5 (Emergent Concepts)    ← Very loose: eps=0.26, minSamples=2
+    ↑ Message Passing
+L4 (Abstract Concepts)    ← Loose: eps=0.22, minSamples=2
+    ↑ Message Passing
+L3 (Domain Concepts)      ← Moderate: eps=0.18, minSamples=2
+    ↑ Message Passing
+L2 (Concrete Concepts)    ← Tighter: eps=0.14, minSamples=3
+    ↑ Message Passing
+L1 (Hidden Aggregators)   ← Base: eps=0.10, minSamples=3
+    ↑ DBSCAN Clustering
+L0 (Base Observations)    ← Raw ingested data
+```
+
+### Adaptive Clustering Parameters
+
+**Design principle:** Higher layers represent more abstract concepts that should cluster more freely.
+
+| Parameter | Formula | Rationale |
+|-----------|---------|-----------|
+| **Epsilon** | `base_eps * (1 + 0.4 * layer)` | Abstract concepts are semantically farther apart but still related |
+| **MinSamples** | `max(2, base_min - layer)` | Smaller emergent groups allowed at higher abstraction levels |
+| **MaxClusterSize** | Generous (no aggressive shrinking) | Concepts can be broad at upper layers |
+
+### Why Loose Constraints at Upper Layers?
+
+1. **Lower layers** (L0-L1): Cluster tightly-related code elements (same file, same function pattern)
+2. **Middle layers** (L2-L3): Group related concepts across files/modules (service patterns, data flows)
+3. **Upper layers** (L4-L5): Emerge broad architectural patterns, cross-cutting concerns, system-wide behaviors
+
+**Example emergence:**
+- L0: Individual service methods
+- L1: Hidden node grouping related methods
+- L2: "Authentication Service" concept
+- L3: "Security Infrastructure" pattern
+- L4: "Cross-Cutting Concerns" abstraction
+- L5: "System Architecture Principles" emergence
+
+### Message Passing Between Layers
+
+Each layer transition includes GraphSAGE-style message passing:
+
+```
+Forward Pass:  new_emb = α * self_emb + β * mean(neighbor_embs)
+Backward Pass: updates flow down from abstract to concrete
+```
+
+This enables:
+- Information propagation up (concrete → abstract)
+- Context propagation down (abstract → concrete)
+- Emergent representations refined through iteration
+
+### No Early Termination
+
+The system tries **ALL 5 layers** even if intermediate layers produce no clusters. Due to adaptive constraints, upper layers may cluster successfully even when middle layers don't.
+
+---
+
 ## Development Roadmap
 
 ### Phase 1: Core Infrastructure ✅ COMPLETE

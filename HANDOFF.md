@@ -385,7 +385,31 @@ All 17 Auto-Claude tasks have been implemented and merged. The system now includ
 - [x] **Track 4.2: Config Score Boost** - Boosts config nodes in retrieval scoring
 - [x] **Track 4.3: Config Summary Node** - Creates aggregated config node during consolidation (111 edges)
 - [x] **Track 3.1: Comparison Nodes** - Groups similar modules by naming patterns (24 nodes, 90 edges)
-- [ ] **Track 3.2: Comparison Summaries** - LLM-generated summaries for comparison nodes
+- [x] **Track 3.2: Comparison Summaries** - Pattern-based rich summaries for comparison nodes
+
+### Priority 3.6: Emergent Multi-Layer Architecture (2026-01-22)
+- [x] **Adaptive Epsilon** - Clustering threshold loosens at higher layers: `eps * (1 + 0.4 * layer)`
+- [x] **Adaptive MinSamples** - Smaller clusters allowed at upper layers: `max(2, base - layer)`
+- [x] **Relaxed MaxClusterSize** - Upper layers can have broad concepts (removed aggressive shrinking)
+- [x] **No Early Termination** - System tries ALL 5 layers regardless of intermediate results
+- [ ] **Inter-layer Hidden Aggregators** - Explicit hidden nodes between each concept layer
+- [ ] **Layer-specific Summary Generation** - Different summary styles for different abstraction levels
+
+**Implementation Details (in `internal/hidden/service.go:CreateConceptNodes`):**
+```go
+// Adaptive parameters - loosen as layers increase
+layerFactor := float64(targetLayer - 1)
+adaptiveEps := s.cfg.HiddenLayerClusterEps * (1.0 + 0.4*layerFactor)  // L2: 1.4x, L3: 1.8x, L4: 2.2x, L5: 2.6x
+adaptiveMinSamples := s.cfg.HiddenLayerMinSamples - int(layerFactor)  // Shrinks by 1 per layer
+```
+
+**Current Layer Distribution (whk-wms):**
+- L0: 8932 base nodes (raw code elements)
+- L1: 132 hidden nodes (DBSCAN clusters)
+- L2: 9 concept nodes
+- L3: 2 concept nodes
+
+**Design Goal:** Upper layers (L4, L5) should emerge as data accumulates, representing complex cross-domain concepts.
 
 ### Outstanding Technical Debt
 - [ ] **Dynamic Port Configuration** - `ingest-codebase` tool defaults to hardcoded port 8082. For open source portability, all TCP ports should be configurable via environment variables or flags. See `mdemg_build/service/cmd/ingest-codebase/`.

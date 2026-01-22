@@ -99,6 +99,34 @@ This test compared two approaches for answering 100 complex questions about a la
 
 ---
 
+## Token Usage Comparison
+
+### MDEMG Agent Token Usage
+| Metric | Value |
+|--------|-------|
+| API Calls | 108 |
+| Output Tokens | 2,443 |
+| Peak Context Size | ~131K tokens |
+| Total Cache Creation | ~1.05M tokens |
+| Output File Size | 628 KB |
+
+### Baseline Agent Token Usage
+| Metric | Value |
+|--------|-------|
+| API Calls | 17 |
+| Output Tokens | 169 |
+| Peak Context Size | ~53K tokens |
+| Total Cache Creation | ~81K tokens |
+| Output File Size | 186 KB |
+
+### Token Usage Analysis
+- **MDEMG used ~13x more total tokens** than Baseline to complete 100 questions vs 0 independent answers
+- **MDEMG peak context (~131K)** was 2.5x larger than Baseline (~53K) - demonstrating ability to process more context efficiently via bounded API retrieval
+- **Baseline stalled at 17 API calls** due to permission/resource constraints, never answering questions independently
+- The higher token usage for MDEMG reflects actual productive work (100 completed answers) vs Baseline's failed attempts
+
+---
+
 ## MDEMG Retrieval Analysis
 
 ### Score Distribution (Top Result per Query)

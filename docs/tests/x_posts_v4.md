@@ -122,3 +122,12 @@ Demo: **[github link]**
 - **0.5-0.6**: 33 (33%)
 - **0.4-0.5**: 31 (31%)
 - **< 0.4**: 0 (0%)
+
+### Token Usage (Phase 2)
+| Metric | MDEMG | Baseline |
+|--------|-------|----------|
+| API Calls | 108 | 17 |
+| Output Tokens | 2,443 | 169 |
+| Peak Context | ~131K | ~53K |
+| Cache Creation | ~1.05M | ~81K |
+| Questions Answered | 100 | 0 (stalled) |

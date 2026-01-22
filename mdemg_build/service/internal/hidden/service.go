@@ -1045,6 +1045,13 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 		fmt.Printf("warning: failed to create concern nodes: %v\n", err)
 	}
 
+	// Step 1c: Create config summary node (P2 Track 4.3)
+	_, err = s.CreateConfigNodes(ctx, spaceID)
+	if err != nil {
+		// Log but don't fail - config nodes are an enhancement
+		fmt.Printf("warning: failed to create config nodes: %v\n", err)
+	}
+
 	// Step 2: Forward pass (update embeddings up the hierarchy)
 	fwdResult, err := s.ForwardPass(ctx, spaceID)
 	if err != nil {
@@ -1261,6 +1268,153 @@ RETURN c.node_id AS nodeId, size(members) AS edgeCount`
 		return false, 0, err
 	}
 	return true, result.(int), nil
+}
+
+// CreateConfigNodes creates a dedicated summary node for configuration files
+// based on "config" tag in the base data layer.
+// This addresses P2 Track 4.3 - improving retrieval for configuration-related queries.
+func (s *Service) CreateConfigNodes(ctx context.Context, spaceID string) (*ConfigNodeResult, error) {
+	if !s.cfg.HiddenLayerEnabled {
+		return &ConfigNodeResult{}, nil
+	}
+
+	result := &ConfigNodeResult{}
+
+	// Check if config node already exists
+	exists, err := s.configNodeExists(ctx, spaceID)
+	if err != nil {
+		return nil, fmt.Errorf("check config node exists: %w", err)
+	}
+	if exists {
+		return result, nil // Already exists
+	}
+
+	// Create the config summary node and edges
+	created, edges, err := s.createConfigNodeWithEdges(ctx, spaceID)
+	if err != nil {
+		return nil, fmt.Errorf("create config node: %w", err)
+	}
+
+	if created {
+		result.ConfigNodeCreated = true
+		result.EdgesCreated = edges
+	}
+
+	return result, nil
+}
+
+// configNodeExists checks if a config summary node already exists
+func (s *Service) configNodeExists(ctx context.Context, spaceID string) (bool, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `
+MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'config'})
+RETURN count(c) > 0 AS exists`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return false, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			exists, _ := rec.Get("exists")
+			return exists.(bool), nil
+		}
+		return false, res.Err()
+	})
+
+	if err != nil {
+		return false, err
+	}
+	return result.(bool), nil
+}
+
+// createConfigNodeWithEdges creates a ConfigNode and IMPLEMENTS_CONFIG edges
+func (s *Service) createConfigNodeWithEdges(ctx context.Context, spaceID string) (bool, int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Create the config node and edges in a single transaction
+	// Also extracts config file categories for the summary
+	createCypher := `
+MATCH (n:MemoryNode {space_id: $spaceId, layer: 0})
+WHERE 'config' IN n.tags
+WITH collect(n) AS members,
+     [m IN collect(n) WHERE m.embedding IS NOT NULL | m.embedding] AS embeddings,
+     collect(DISTINCT
+       CASE
+         WHEN n.path CONTAINS 'docker' THEN 'docker'
+         WHEN n.path CONTAINS '.env' THEN 'environment'
+         WHEN n.path CONTAINS 'package.json' OR n.path CONTAINS 'tsconfig' THEN 'package'
+         WHEN n.path CONTAINS 'config' THEN 'app-config'
+         ELSE 'other'
+       END
+     ) AS categories
+WHERE size(members) > 0
+WITH members, embeddings, categories,
+     CASE WHEN size(embeddings) > 0 THEN
+       [i IN range(0, size(embeddings[0])-1) |
+         reduce(sum = 0.0, emb IN embeddings | sum + emb[i]) / size(embeddings)
+       ]
+     ELSE null END AS centroid
+CREATE (c:MemoryNode {
+  space_id: $spaceId,
+  node_id: randomUUID(),
+  name: 'configuration',
+  layer: 1,
+  role_type: 'config',
+  embedding: centroid,
+  message_pass_embedding: centroid,
+  aggregation_count: size(members),
+  stability_score: 1.0,
+  summary: 'Configuration summary: ' + toString(size(members)) + ' config files. Categories: ' +
+           reduce(s = '', cat IN categories | s + CASE WHEN s = '' THEN '' ELSE ', ' END + cat),
+  tags: ['config', 'configuration-summary'],
+  created_at: datetime(),
+  updated_at: datetime(),
+  version: 1
+})
+WITH c, members
+UNWIND members AS m
+CREATE (m)-[:IMPLEMENTS_CONFIG {
+  space_id: $spaceId,
+  edge_id: randomUUID(),
+  weight: 1.0,
+  created_at: datetime(),
+  updated_at: datetime()
+}]->(c)
+RETURN c.node_id AS nodeId, size(members) AS edgeCount`
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, createCypher, map[string]any{
+			"spaceId": spaceID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			edgeCount, _ := rec.Get("edgeCount")
+			return asInt(edgeCount), nil
+		}
+		return 0, res.Err()
+	})
+
+	if err != nil {
+		return false, 0, err
+	}
+	if result.(int) == 0 {
+		return false, 0, nil // No config files found
+	}
+	return true, result.(int), nil
+}
+
+// ConfigNodeResult tracks config node creation
+type ConfigNodeResult struct {
+	ConfigNodeCreated bool
+	EdgesCreated      int
 }
 
 // Helper functions for type conversion

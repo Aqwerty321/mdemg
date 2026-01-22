@@ -887,6 +887,18 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Step 1c: Create config summary node (P2 Track 4.3)
+	if !req.SkipClustering {
+		configResult, err := s.hiddenLayer.CreateConfigNodes(r.Context(), req.SpaceID)
+		if err != nil {
+			// Log but don't fail - config nodes are an enhancement
+			log.Printf("warning: failed to create config nodes: %v", err)
+		} else if configResult != nil && configResult.ConfigNodeCreated {
+			resp.ConfigNodeCreated = true
+			resp.ConfigEdgesCreated = configResult.EdgesCreated
+		}
+	}
+
 	// Step 2: Forward pass (unless skipped)
 	if !req.SkipForward {
 		fwdResult, err := s.hiddenLayer.ForwardPass(r.Context(), req.SpaceID)

@@ -7,12 +7,16 @@ import (
 	"os"
 	"time"
 
+	"github.com/joho/godotenv"
 	"mdemg/internal/api"
 	"mdemg/internal/config"
 	"mdemg/internal/db"
 )
 
 func main() {
+	// Load .env file if present (silently ignore if not found)
+	_ = godotenv.Load()
+
 	cfg, err := config.FromEnv()
 	if err != nil {
 		log.Fatal(err)

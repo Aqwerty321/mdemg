@@ -13,7 +13,7 @@ This test compared two approaches for answering 100 complex questions about a la
 1. **MDEMG (Memory Graph)**: External persistent memory with semantic retrieval
 2. **Baseline**: Direct file access and search
 
-**Result**: MDEMG demonstrated clear advantages in reliability and consistency. The MDEMG agent successfully completed all 100 questions using the retrieval API, while the baseline agent encountered permission/resource constraints and could not independently search the codebase.
+**Result**: MDEMG demonstrated clear advantages in reliability and consistency. The MDEMG agent successfully completed all 100 questions using the retrieval API with an **average retrieval score of 0.567**, while the baseline agent encountered permission/resource constraints and could not independently search the codebase.
 
 ---
 

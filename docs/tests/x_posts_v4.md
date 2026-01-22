@@ -57,6 +57,7 @@ Tested MDEMG vs baseline (direct file search) on **100 complex codebase question
 | Consistency | Every query succeeds | Resource-limited |
 
 Retrieval quality (100 questions):
+- **Avg retrieval score: 0.567** (composite of vector similarity + graph traversal)
 - **69%** high confidence (score > 0.5)
 - **36%** very high confidence (score > 0.6)
 - **0%** below threshold (all queries returned useful context)
@@ -72,7 +73,8 @@ Codebase ingestion is working: **MDEMG** builds persistent memory from large rep
 
 Test results on 3,288-file / 792K LOC codebase:
 - 100% query completion via retrieval API
-- 69% high-confidence retrievals
+- **0.567 avg retrieval score** across 100 questions
+- 69% high-confidence retrievals (score > 0.5)
 - Baseline approach stalled (resource constraints)
 
 I want to **quantify it properly**—scaling curves + ablations + benchmarks on **repeat-question rate, decision persistence, and regression rate**—but I'm compute-limited.

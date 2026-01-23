@@ -297,6 +297,36 @@ This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 
 
 **Goal**: Enable MDEMG to return symbol-level evidence, not just file paths.
 
+---
+
+### Graph Architecture for Symbols
+
+```
+TapRoot (space_id: "vscode-scale")
+    │
+    ├── MemoryNode (file: "storage.ts", layer: 0)
+    │       │ properties: path, name, summary, embedding[1536]
+    │       │
+    │       └── DEFINED_IN ←── SymbolNode (const: DEFAULT_FLUSH_INTERVAL)
+    │                           │ properties: name, type, value, line_number
+    │                           │ embedding[1536] (from name + doc_comment)
+    │                           │
+    │                           └── REFERENCES ──→ SymbolNode (StorageService)
+    │
+    └── MemoryNode (file: "sidebarPart.ts", layer: 0)
+            │
+            └── DEFINED_IN ←── SymbolNode (property: minimumWidth)
+                                properties: name="minimumWidth", value="170"
+```
+
+**Key Integration Points**:
+1. `cmd/ingest-codebase` - Add symbol extraction step after file processing
+2. `internal/retrieval/service.go` - Add symbol search to Retrieve()
+3. `internal/models/models.go` - Add Symbol types to request/response
+4. `api/proto/mdemg-module.proto` - Extend Observation with symbol fields
+
+---
+
 **Benchmark Evidence**:
 | Query | MDEMG Returns | Ground Truth | Gap |
 |-------|---------------|--------------|-----|
@@ -307,13 +337,17 @@ This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 
 ---
 
 ### Deliverable 8.1: Symbol Parser Infrastructure
-**Priority**: P0 | **Effort**: 3-4 days | **Status**: ⏳ PENDING
+**Priority**: P0 | **Effort**: 3-4 days | **Status**: ✅ COMPLETE
 
 #### 8.1.1 Tree-Sitter Integration
-- [ ] Add `github.com/smacker/go-tree-sitter` dependency
-- [ ] Add language grammars: TypeScript, JavaScript, Go, Python, Rust
-- [ ] Create `internal/symbols/parser.go` with unified `ParseFile(path, lang) []Symbol` interface
-- [ ] Handle parse errors gracefully (skip unparseable files, log warnings)
+- [x] Add `github.com/smacker/go-tree-sitter` dependency
+- [x] Add language grammars: TypeScript, JavaScript, Go, Python (Rust pending)
+- [x] Create `internal/symbols/parser.go` with unified `ParseFile(path, lang) []Symbol` interface
+- [x] Create `internal/symbols/types.go` with Symbol, FileSymbols, ParserConfig types
+- [x] Handle parse errors gracefully (skip unparseable files, log warnings)
+- [x] Expression evaluation: "60 * 1000" → "60000"
+- [x] Doc comment extraction (JSDoc, GoDoc, docstrings)
+- [x] **Tested**: 451 symbols from 49 Go files in MDEMG codebase
 
 #### 8.1.2 Symbol Types to Extract
 
@@ -459,13 +493,15 @@ SYMBOL_EMBED_DOC_COMMENTS=true          # Generate embeddings for doc comments
 - [ ] Implement deduplication: update existing symbols on re-ingest
 
 #### 8.3.4 File Changes
-| File | Changes |
-|------|---------|
-| `internal/symbols/parser.go` | NEW - Tree-sitter parsing |
-| `internal/symbols/extractor.go` | NEW - Symbol extraction logic |
-| `internal/symbols/types.go` | NEW - Symbol types |
-| `cmd/ingest-codebase/main.go` | Add symbol extraction step |
-| `internal/retrieval/service.go` | Add symbol ingest methods |
+| File | Status | Changes |
+|------|--------|---------|
+| `internal/symbols/types.go` | ✅ DONE | Symbol, FileSymbols, ParserConfig types |
+| `internal/symbols/parser.go` | ✅ DONE | Tree-sitter parsing for TS/JS/Go/Python |
+| `internal/symbols/parser_test.go` | ✅ DONE | 12 unit tests |
+| `internal/symbols/store.go` | ⏳ TODO | Neo4j storage for SymbolNodes |
+| `cmd/ingest-codebase/main.go` | ⏳ TODO | Add symbol extraction step |
+| `internal/retrieval/service.go` | ⏳ TODO | Add symbol search methods |
+| `internal/models/models.go` | ⏳ TODO | Add SymbolResult types |
 
 ---
 
@@ -545,8 +581,36 @@ Rebalanced: α = 0.40, β = 0.20, γ = 0.10, δ = 0.05, ε = 0.25
 
 ---
 
-### Deliverable 8.5: Symbol Search Endpoint
+### Deliverable 8.5: Symbol Search Endpoint & Proto Integration
 **Priority**: P2 | **Effort**: 1-2 days | **Status**: ⏳ PENDING
+
+#### 8.5.0 Proto Updates (`api/proto/mdemg-module.proto`)
+Extend the proto definition to support symbols in module ingestion:
+
+```protobuf
+// Add to Observation message
+message Observation {
+    // ... existing fields ...
+    repeated Symbol symbols = 10;  // Symbols extracted from this content
+}
+
+// New Symbol message
+message Symbol {
+    string name = 1;               // "DEFAULT_FLUSH_INTERVAL"
+    string symbol_type = 2;        // "const", "function", "class"
+    string value = 3;              // "60000" for constants
+    int32 line_number = 4;         // 42
+    int32 end_line = 5;            // 42
+    bool exported = 6;             // true
+    string doc_comment = 7;        // JSDoc/GoDoc comment
+    string signature = 8;          // For functions
+    string parent = 9;             // Parent class/module
+    string snippet = 10;           // Source context
+}
+```
+
+This allows ingestion modules (like future code-parser modules) to return symbols directly.
+
 
 #### 8.5.1 New Endpoint: `GET /v1/memory/symbols`
 Dedicated symbol search for IDE integration and direct queries.
@@ -589,11 +653,11 @@ GET /v1/memory/symbols?space_id=vscode&name=DEFAULT_*&type=const&limit=20
 ---
 
 ### Deliverable 8.6: Testing & Validation
-**Priority**: P1 | **Effort**: 2 days | **Status**: ⏳ PENDING
+**Priority**: P1 | **Effort**: 2 days | **Status**: 🔶 PARTIAL
 
 #### 8.6.1 Unit Tests
-- [ ] `internal/symbols/parser_test.go` - Tree-sitter parsing for each language
-- [ ] `internal/symbols/extractor_test.go` - Symbol extraction logic
+- [x] `internal/symbols/parser_test.go` - Tree-sitter parsing for each language (12 tests)
+- [ ] `internal/symbols/store_test.go` - Neo4j storage operations
 - [ ] `internal/retrieval/symbol_search_test.go` - Symbol search modes
 
 #### 8.6.2 Integration Tests
@@ -620,12 +684,32 @@ Run the 15 evidence-locked questions from VS Code benchmark:
 
 ### Implementation Timeline
 
-| Week | Deliverable | Tasks |
-|------|-------------|-------|
-| **Week 1** | 8.1, 8.2 | Tree-sitter integration, schema migration |
-| **Week 2** | 8.3 | Ingestion pipeline integration, batch processing |
-| **Week 3** | 8.4 | Hybrid retrieval, scoring formula update |
-| **Week 4** | 8.5, 8.6 | Symbol endpoint, testing, VS Code re-benchmark |
+| Week | Deliverable | Tasks | Status |
+|------|-------------|-------|--------|
+| **Week 1** | 8.1 | Tree-sitter integration, parser, types | ✅ DONE |
+| **Week 1-2** | 8.2 | V0007 migration, Neo4j schema, store.go | ⏳ NEXT |
+| **Week 2** | 8.3 | Ingestion pipeline, cmd/ingest-codebase | ⏳ TODO |
+| **Week 3** | 8.4 | Hybrid retrieval, scoring formula update | ⏳ TODO |
+| **Week 4** | 8.5, 8.6 | Symbol endpoint, testing, VS Code re-benchmark | ⏳ TODO |
+
+### Current Progress Summary
+
+**✅ Completed (Deliverable 8.1)**:
+- `internal/symbols/types.go` - Symbol, FileSymbols, ParserConfig structs
+- `internal/symbols/parser.go` - Tree-sitter integration for TS/JS/Go/Python
+- `internal/symbols/parser_test.go` - 12 passing unit tests
+- **Validated**: 451 symbols extracted from 49 Go files in MDEMG codebase
+
+**⏳ Next Steps (Deliverable 8.2)**:
+1. Create `migrations/V0007__symbol_indexes.cypher`
+2. Create `internal/symbols/store.go` with Neo4j CRUD operations
+3. Wire into `cmd/ingest-codebase/main.go`
+
+**📋 Remaining (Deliverables 8.3-8.6)**:
+- Integrate with batch ingest API
+- Add symbol search to retrieval pipeline
+- Create `/v1/memory/symbols` endpoint
+- Re-run VS Code V4 benchmark
 
 ---
 

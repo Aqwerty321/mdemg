@@ -1,0 +1,492 @@
+{
+  "metadata": {
+    "created": "2026-01-21",
+    "description": "Complete merged corrections from all verification waves (initial + 7-10 + A-F)",
+    "total_corrections": 118,
+    "sources": [
+      "initial_review (19 corrections)",
+      "waves_7_10 (29 corrections)",
+      "waves_a_b_rerun (39 corrections)",
+      "waves_c_f (32 corrections)"
+    ],
+    "verification_summary": {
+      "total_questions_verified": 240,
+      "total_corrections": 118,
+      "verification_rate": "49.2%"
+    }
+  },
+  "corrections": [
+    {
+      "id": 13,
+      "corrected_answer": "The hooks directory contains domain-specific hooks (useBarrels.ts, useCustomers.ts) that encapsulate GraphQL queries using Apollo Client's useQuery. There's an 'ownership' subdirectory with useBarrelOwnership.ts, useBarrelOwnershipEnhanced.ts, and useOwnershipFormState.ts. However, useBarrelOwnership.ts is currently a placeholder with stub implementations (returns empty arrays/functions) due to pending migration to new GraphQL operations. The directory organization does separate data fetching hooks from ownership-specific hooks, but some ownership hooks are not yet fully functional."
+    },
+    {
+      "id": 18,
+      "corrected_answer": "WarehouseJobsModule uses forwardRef(() => BarrelModule) to defer module resolution, allowing warehouse jobs to query/update barrels. However, BarrelModule does NOT have a reverse forwardRef to WarehouseJobsModule - the circular dependency mentioned in the original answer is not bidirectional. BarrelModule uses forwardRef for AuthModule and BarrelOwnershipModule instead. The enum import pattern is correct: './base/warehouse-jobs.enums' is imported separately to ensure GraphQL enum types are registered before resolvers."
+    },
+    {
+      "id": 19,
+      "corrected_answer": "The lib/graphql directory contains hand-written query files (barrel-queries.ts, reconciliation.ts, bulkBarrelOperations.ts, etc.) alongside .generated.ts files produced by graphql-codegen. The codegen.yml configuration scans .ts files in lib/graphql/, hooks/, components/, and app/ directories for GraphQL operations (excluding .generated.ts files). It generates: 1) A central generated.ts with TypeScript types, operation types, and React Apollo hooks, and 2) Individual .generated.ts files next to source files using the near-operation-file preset. The configuration uses typescript, typescript-operations, and typescript-react-apollo plugins. This ensures type safety between frontend queries and the backend schema.graphql file."
+    },
+    {
+      "id": 21,
+      "corrected_answer": "ContextModule exports ContextService which stores request-scoped data using Node.js AsyncLocalStorage (not NestJS request scope). The ContextMiddleware in AppModule initializes only the userId (from req.user?.id or 'system' as default) when calling contextService.run(). The ContextService provides getters for userId, sessionId, correlationId, ipAddress, userAgent, and operationMetadata, but only userId is set by the middleware - other values must be set explicitly via setCorrelationId() or setOperationMetadata(). AuditTrackInterceptor uses ContextService.getUserId() and extracts other values (sessionId, correlationId, ipAddress, userAgent) directly from request headers (x-user-id, x-session-id, x-correlation-id)."
+    },
+    {
+      "id": 22,
+      "corrected_answer": "CommentsModule (plural) and CommentModule (singular) are separated because they handle two distinct data models: CommentsModule manages the 'Comments' table with basic CRUD operations exposed via REST API (CommentsController), while CommentModule manages the 'Comment' table with advanced domain features including comment threading, activity tracking, visibility-based filtering, search, bulk operations, statistics, and real-time GraphQL subscriptions. CommentsModule includes CommentsController for REST endpoints and imports AuthModule via forwardRef for permissions, while CommentModule operates purely through GraphQL (CommentResolver) with no REST API. Both modules export their respective services for use by other feature modules that need comment functionality."
+    },
+    {
+      "id": 23,
+      "corrected_answer": "In turbo.json, both 'build' and 'dev' tasks depend on 'prisma:generate'. The prisma:generate task has cache: false to always run fresh. The backend package.json defines 'prebuild' script that runs 'npm run prisma:generate && npm run asyncapi:generate' (generating both Prisma Client types AND AsyncAPI types). This multi-layer approach ensures: 1) Turbo runs prisma:generate first when using turbo commands, 2) Even if running npm scripts directly, prebuild catches it. Without generated Prisma Client, TypeScript would fail on @prisma/client imports since the generated types wouldn't exist."
+    },
+    {
+      "id": 26,
+      "corrected_answer": "InventoryUploadModule imports BullModule from @nestjs/bull (not BullMQModule) for async job processing and contains specialized services: CsvParsingService (parsing), DataValidationService (validation), PostgreSQLCopyService (bulk inserts), MicroBatchOrchestrator (chunking), ProgressTrackingService (status updates), and SessionManagementService (upload sessions). It also includes ProgressGateway for WebSocket progress streaming to clients. This decomposition allows parallel processing, progress streaming via WebSocket, and graceful handling of large files without blocking the main event loop."
+    },
+    {
+      "id": 27,
+      "corrected_answer": "The ownership hooks have a different architecture than described. useBarrelOwnership.ts and useBarrelOwnershipEnhanced.ts are currently disabled placeholders during a GraphQL migration (returning stubs with migration errors). useOwnershipFormState.ts exports multiple specialized hooks: useJointOwnership (joint ownership percentage management), useSingleOwnership (single owner scenarios), useOwnershipTransfer (transfer workflows), useOwnershipInheritance (inheritance handling), useOwnershipWizard (multi-step wizard navigation with step validation), useOwnershipFormPersistence (localStorage auto-save and undo), and useOwnershipFormValidation (per-step validation). All these hooks consume useOwnershipForm from OwnershipFormContext - they do NOT compose with useBarrelOwnership or useBarrelOwnershipEnhanced as the original answer claims."
+    },
+    {
+      "id": 32,
+      "corrected_answer": "StagingModule handles inventory check staging (not raw Android data staging). It provides InventoryCheckStagingService, InventoryCheckStagingProcessor, and InventoryCheckReconciliationService with its own BullMQ queue 'inventory-check-staging'. AndroidSyncInboxModule handles Android device sync processing via a 'android-sync-processing' queue. It imports StagingModule to leverage staging capabilities for inventory checks received from Android devices. The relationship is that AndroidSyncInboxModule consumes StagingModule as a dependency for processing Android sync data that needs inventory check staging."
+    },
+    {
+      "id": 34,
+      "corrected_answer": "ResolutionModule in resolution/base/ handles dynamic error resolution workflows that execute different resolution strategies based on error type and selected resolution option. ResolutionTemplateMappingModule manages the mapping between resolution types (e.g., 'RESOLVE:selectMatchedBarrel', 'RESOLVE:create9xxxBarrel') and printer templates used for print job creation. The 'base' subdirectory contains the core business logic (ResolutionService with createResolution method that validates requests, executes hierarchical resolution functions, and manages the DeviceSyncResolution lifecycle) along with supporting DTOs and the controller. This is NOT generated CRUD code - it's the foundational service layer for the resolution system. The architecture supports extensible error handling through the ERROR_CONFIGURATION map which dynamically defines resolution options and their corresponding execution functions for each error type."
+    },
+    {
+      "id": 35,
+      "corrected_answer": "Next.js route groups (parentheses folders) like (dashboard) don't affect URL structure and enable shared layouts. The actual implementation differs from typical patterns: the (dashboard) route group at app/(dashboard)/ only contains a diagnostics subfolder with no layout.tsx file. Instead, authenticated pages under /app/dashboard/ use a shared layout.tsx at app/dashboard/layout.tsx. This dashboard layout wraps authenticated pages with AuthenticatedTemplate (from @azure/msal-react) with shared UI components including DashboardLayer, Navbar, and ProgressBar. The root layout.tsx wraps everything in MSAL_Provider and multiple context providers (QueryProvider, ApolloWrapper, FeatureFlagProvider). Authentication is implemented via: 1) MSAL_Provider for Azure AD integration, 2) AuthenticatedTemplate/UnauthenticatedTemplate components in dashboard/layout.tsx to conditionally render content, and 3) Middleware at middleware.ts that validates MSAL tokens for API routes."
+    },
+    {
+      "id": 37,
+      "corrected_answer": "RedisModule uses @nestjs/bull (Bull library), while BullMQModule uses @nestjs/bullmq (BullMQ library - a separate, modern library, NOT 'Bull v5'). BullMQModule explicitly states it 'Replaces the Bull-based RedisModule' - they are NOT used together for migration. BullMQ was chosen because it uses explicit Worker creation which fixes stuck jobs issues with Bull's internal BRPOPLPUSH processing loop. The codebase has migrated to BullMQ, with RedisModule kept for reference or legacy compatibility but BullMQModule being the active implementation."
+    },
+    {
+      "id": 38,
+      "corrected_answer": "BarrelResolver's buildUnifiedWhere method handles ownership filters (barrel_customercode, barrel_customerid) by querying BarrelOwnership for active ownerships where validTo IS NULL AND validFrom <= current date. Matching barrel IDs are pre-resolved and returned as preResolvedBarrelIds for use in an 'IN' filter. Note: Primary owner filters (primaryOwnerCode, primaryOwnerName) are handled separately via the applyPrimaryOwnerFilter utility, which calls BarrelService.getPrimaryOwnerBarrelIds - a raw SQL query that finds barrels where the specified customer has the highest ownership percentage among active owners."
+    },
+    {
+      "id": 39,
+      "corrected_answer": "McpModule implements the Model Context Protocol by creating an MCP server that registers and exposes 9 specialized tools for AI agents to interact with warehouse data and operations. The module exports McpService, which implements: (1) Database tools - ping, get_schema, run_query for direct database access, (2) GraphQL tools - get_graphql_schema and run_graphql for querying the in-process GraphQL schema, (3) Vector search tool for similarity-based document retrieval using embeddings, and (4) RAG tools - rag_query, rag_inventory, and rag_operations for retrieval-augmented generation with domain-specific context. The service manages stateful MCP sessions via StreamableHTTPServerTransport, maintains request context across tool invocations, and provides both MCP protocol compliance and direct tool execution methods. Each tool is registered with Zod schema validation and returns standardized MCP result objects."
+    },
+    {
+      "id": 40,
+      "corrected_answer": "The backend uses a database-level aggregation pattern rather than materialized views or scheduled jobs. The BarrelEventWeeklySummary module uses raw SQL aggregation queries with Prisma ($queryRaw) to compute hierarchical summaries in real-time. The implementation uses: single optimized SQL query with JOINs (not separate materialized views), database-level GROUP BY clauses for aggregation, string aggregation (CONCAT_WS) for collecting barrel IDs, LATERAL joins for fetching latest weight per barrel, and a 10,000 record limit per query. The architecture uses direct REST/GraphQL endpoints that trigger on-demand queries rather than scheduled materialized view refreshes."
+    },
+    {
+      "id": 41,
+      "corrected_answer": "PrinterAutomationModule integrates with RabbitMQ (not BullModule) for async print job delivery. It has two controllers (PrinterAutomationController for internal use, PrinterAutomationApiController for external API) and PrinterAutomationResolver for GraphQL. The module does NOT import CustomerLogoModule - it's the reverse: CustomerLogoModule imports PrinterAutomationModule via forwardRef for coordinating logo printing with the printer automation system. This architecture decouples print request handling from actual printing, supporting retries and status tracking through RabbitMQ message queuing."
+    },
+    {
+      "id": 44,
+      "corrected_answer": "VectorSearchModule handles hybrid vector/semantic search using LlamaService for embeddings and similarity queries (searchDocumentsHybrid method). RagModule implements retrieval-augmented generation by combining vector similarity search (via LlamaService) with OpenAI LLM responses - it retrieves context documents then uses gpt-4o-mini to generate answers about warehouse data. SearchModule provides traditional PostgreSQL full-text search (using to_tsvector/plainto_tsquery) and ILIKE pattern matching across multiple entity types (barrels, customers, lots, orders, etc.). The key distinction: VectorSearch is for semantic similarity only, SearchModule is for database text search only, while RAG combines vector search with LLM generation for AI-powered Q&A. RAG uses LlamaService internally (not VectorSearchModule directly) for retrieval."
+    },
+    {
+      "id": 46,
+      "corrected_answer": "The changelog module serves two purposes: (1) GitHub Release Synchronization - syncs releases from GitHub API every 6 hours (via @Cron in ChangelogSyncService), stores release data with commit information, and detects backend vs frontend changes using regex patterns on commit messages. (2) AI-Generated Content Generation - ChangelogAiService uses OpenAI's gpt-4o-mini model to transform technical changelog entries into user-friendly content for warehouse operators. The AI service receives release body and commit messages, uses system prompt tailored for non-technical warehouse audience, and generates categorized content: summary, highlights, features, fixes, improvements, breaking changes. Webhook support enables real-time sync on release events."
+    },
+    {
+      "id": 47,
+      "corrected_answer": "BarrelResolver.buildPrismaOrderBy maps GraphQL OrderByInput to Prisma orderBy clauses. For 'storageLocation.warehouse' or 'storageLocation' fields, it generates a multi-field sort: warehouse -> floor -> tier -> rick (with reversed direction) -> position. The rick direction is reversed (desc becomes asc, asc becomes desc) to match physical warehouse layout where Rick 'A' is at the top and 'C' is at the bottom - this ensures that in descending sorts, Rick A appears before B before C, matching how warehouse workers physically navigate shelving from top to bottom. The method also adds an 'id' tiebreaker clause for deterministic ordering."
+    },
+    {
+      "id": 48,
+      "corrected_answer": "ACLModule (acl.module.ts) is a simple module that uses AccessControlModule.forRoles() from 'nest-access-control' library, initializing a RolesBuilder with grants from grants.json. The grants.json file defines permissions as {role, resource, action, attributes} entries (e.g., {role:'administrator', resource:'User', action:'read:own', attributes:'*'}). RolesModule (roles.module.ts) simply provides and exports the RolesBuilder class - it does NOT manage user-role assignments. Resolvers use @nestAccessControl.UseRoles decorator with {resource, action, possession} to declare required permissions. GqlACGuard extends ACGuard from nest-access-control and overrides getUser() to extract the user from GraphQL context. The separation is minimal: ACLModule configures permissions, RolesModule makes RolesBuilder injectable, and GqlACGuard validates permissions against user roles."
+    },
+    {
+      "id": 49,
+      "corrected_answer": "The frontend's ServiceWorkerUpdateNotifier.tsx is specifically for PWA update notifications - it detects when a new service worker is installed and shows a toast prompting users to refresh. It does NOT provide offline caching, request queuing, or stale data support. The AndroidSyncInboxModule on the backend handles mobile device sync operations using BullMQ queues for distributed processing, but this is for processing sync requests from Android devices - not enabling offline-capable mobile use. The frontend architecture does not demonstrate extensive offline support patterns in these files; ServiceWorkerUpdateNotifier only handles update notifications, and androidSyncInbox handles server-side sync processing, not client-side offline capability."
+    },
+    {
+      "id": 50,
+      "corrected_answer": "GroupTransactionModule and OwnershipTransactionModule/OwnershipTransactionGroupModule are SEPARATE, PARALLEL module hierarchies with no direct dependency. GroupTransactionModule (imports PrismaModule, AuditModule, ReconciliationModule, LotAuditModule) handles barrel-level transactions: LOT_ENTRY, TRANSFER_IN, TRANSFER_OUT, INTERNAL_MOVE, OWNERSHIP_TRANSFER. It creates GroupTransaction records with BarrelEvent and FinancialTransaction records. OwnershipTransactionModule tracks individual barrel ownership changes (creating ledger entries via createOwnershipLedgerEntries). OwnershipTransactionGroupModule groups multiple OwnershipTransaction records (include: {transactions: true}). The modules serve different purposes: GroupTransaction tracks physical barrel movements and financial transactions, while OwnershipTransaction/Group tracks ownership changes separately."
+    },
+    {
+      "id": 52,
+      "corrected_answer": "SerialRegistryModule manages serial number uniqueness validation and tracking, NOT sequence generation. The SerialRegistryService uses SHA-256 hashing for O(1) existence checks (checkExists, checkExistsBatch). The register() method uses transactions to prevent race conditions and throws ConflictException if a serial already exists. registerBatch() handles bulk registration atomically. registerWithOverride() allows duplicates for exceptional cases (voiding/reissuing) with audit logging. linkToBarrel() connects registered serials to barrel records. The service does NOT generate serial numbers - it only validates uniqueness, tracks registration source/time, and maintains audit trail. Serial number generation (like '25J03A.01.0001' format) is handled elsewhere in the codebase."
+    },
+    {
+      "id": 53,
+      "corrected_answer": "Frontend uses MSAL_Provider.tsx which checks isDemoMode() (NEXT_PUBLIC_AUTH_MODE === 'demo'). SECURITY: isDemoMode() explicitly returns false in production environments (NODE_ENV === 'production'), blocking demo mode activation. In demo mode, it creates a mock AccountInfo and stores 'test_e2e_token' in sessionStorage. The graphql-proxy route.ts ALWAYS requires bearer tokens - it returns 401 'Authentication required' if no token is provided (line 230-235). The proxy does NOT allow passthrough - it forwards whatever token is provided (demo or real). There is no AuthContext wrapper; MSAL_Provider directly wraps children with MsalProvider. The proxy also validates token claims and can enforce Azure AD v2.0 tokens when APP_ENFORCE_AAD_V2='true'."
+    },
+    {
+      "id": 54,
+      "corrected_answer": "EventTypeModule and EventReasonModule work together for barrel event categorization. EventTypeModule defines event types via EnumEventTypeName enum with values: Entry, Withdrawal, Rework, Reject, TransferIn, TransferOut, Sample, DumpForRegauge, Relocation, Fill, Quality, Inspection, InventoryCheck, InventoryRemoval, InventoryAddition, InventoryUploadAdded, InventoryUploadUpdated, InventoryUploadRemoved, InventoryUploadReconciliationDuplicateRemoved, InventoryUploadDisplaced, InventoryCheckDisplaced, LabelPrinted, LabelReprinted, Verified. EventReasonModule provides reasons that are linked to specific EventTypes (EventReason.eventType references EventType). Both use CommentsModule via forwardRef for comment support. EventType has an eventReasons array relationship back to EventReason, creating bidirectional association. BarrelEventModule references both via eventType and eventReason optional fields, enabling structured event recording: 'Barrel X had [EventType] because of [EventReason]'. This supports compliance reporting and analytics."
+    },
+    {
+      "id": 56,
+      "corrected_answer": "The trust-mode module does NOT enable high-throughput inventory operations through authorization checks. Instead, it implements a cutoff-date-based filtering mechanism for Android scan records. Purpose: Allows operators to set a cutoff date and only process AndroidSyncInbox records created before that date. Implementation: Uses Redis for distributed caching (24-hour TTL) with in-memory fallback. Key Methods: shouldProcessAndroidSyncRecord() checks if a record's creation date is before the cutoff. High-throughput enablement: By skipping records after the cutoff date, it reduces processing volume for faster inventory syncing during specific time windows. Not authorization-based: No caller/permission checking - it's purely temporal filtering."
+    },
+    {
+      "id": 57,
+      "corrected_answer": "The SchedulerModule does NOT use NestJS's ScheduleModule directly in the way described. Instead, it: (1) Uses Bull Queue - integrates with @nestjs/bull for job processing (BullModule.registerQueue), (2) Uses @nestjs/schedule for decorators - The BarrelReportSchedulerService uses @Cron decorators to schedule weekly barrel reports at 4 PM EST Monday-Friday, (3) Implements distributed locking using Redis SETNX + EX to ensure only one instance runs across multiple nodes, (4) Stores process.pid in Redis lock for debugging. Architecture: ScheduleModule provides cron decorator framework, BullModule.registerQueue provides async job queue infrastructure, Redis is used for both Bull queue backend AND distributed locking."
+    },
+    {
+      "id": 58,
+      "corrected_answer": "The barrel-audit-table module provides a comprehensive auditing service that generates tabular reports of barrel state changes at specific points in time. It implements time-series snapshots of barrel data by querying the BarrelAudit table for changes before a specified point-in-time, then reconstructs the current barrel state at that moment by joining with related entities. The service supports: point-in-time barrel state reconstruction using CTEs (Common Table Expressions), flexible filtering on 26+ barrel/location/customer/metadata fields with SQL injection protection, dynamic sorting on any allowed column, cursor-based and offset-based pagination, and data source tracking (marking records as 'AUDIT' or 'CURRENT' based on whether they were modified)."
+    },
+    {
+      "id": 60,
+      "corrected_answer": "The bulk-operations directory contains wizard-steps/ subdirectory with step components and an index.ts barrel export. BulkTransferWizard and bulk operation pages use these steps. The wizard has 5 steps, not 4: (1) BarrelSelectionStep - select barrels using FilterBuilder with advanced filtering, (2) TransferConfigurationStep - configure operation including new owner selection, transfer reason, ownership percentage, and effective date, (3) OperationPreviewStep - preview changes before execution showing barrel details and transfer summary, (4) ConfirmationStep - confirm with checkboxes and execute the operation with progress tracking, (5) ResultSummaryStep - display execution results, success/failure counts, and provide options to download reports or start new operation. Each step is a separate component with typed props interfaces (e.g., BarrelSelectionStepProps) and shares state via BulkTransferFormData type. The bulk-operations/index.ts also exports FilterBuilder, OperationMonitor, and related types."
+    },
+    {
+      "id": 61,
+      "corrected_answer": "DeltaSyncModule handles mobile device synchronization - fetching barrel audit data changes since a given timestamp with cursor-based pagination for efficient mobile updates. It uses DeviceSyncLogService for logging sync operations and supports both BarrelAudit and Barrel table sources. SyncModule handles entity synchronization FROM external systems (MES/ERP) - providing generic upsert/delete operations for items, customers, vendors, lots, recipes, purchase orders, and sales orders. It parses Prisma schema relations and transforms incoming data with validation. The two serve completely different purposes: DeltaSyncModule pulls data OUT to mobile devices, while SyncModule pushes data IN from external systems."
+    },
+    {
+      "id": 63,
+      "corrected_answer": "The notification provider currently integrates ONLY with Azure Communication Services for email. There is NO support for other notification channels (SMS, Slack, Teams, etc.) in the current codebase. AzureEmailService wraps Azure Communication Services EmailClient and provides: sendEmail() for generic custom emails, and sendFailedMessageNotification() for message queue failure alerts. WeeklyBarrelReportService generates barrel tracking variance reports (scanned vs processed vs reported counts) and sends only via AzureEmailService. NotificationModule exports AzureEmailService and WeeklyBarrelReportService with dependencies on PrismaModule and BarrelEventWeeklySummaryModule."
+    },
+    {
+      "id": 64,
+      "corrected_answer": "The UnifiedBarrelStorageModule provides a DENORMALIZED query interface that combines data from multiple tables into a single denormalized view with sophisticated filtering and sorting. Key differences from standard queries: (1) Primary Ownership Handling - Uses DISTINCT ON subquery to resolve joint ownership by selecting only the primary owner (highest ownership percentage) per barrel, (2) Denormalized Output - Returns flattened barrel + location + lot + ownership data in a single result set, (3) Complex Joins - Uses RIGHT and FULL OUTER JOINs instead of standard INNER JOINs, (4) Advanced Filtering - Supports 38+ filterable fields with special timestamp handling (range queries, before/after filters), (5) Dynamic Column Selection via SELECT_COLUMNS array."
+    },
+    {
+      "id": 65,
+      "corrected_answer": "Multiple features (BarrelAudit, BarrelEvents, BarrelInventory) have SummaryCards/ directories containing BaseCard.tsx (shared card component with title, children, isLoading, error props) and feature-specific cards. BarrelEvents has: EventCountCard, TimelineCard, TopBarrelsCard, CustomerActivityCard, QualityIndicatorsCard. BarrelAudit has: AuditActionCard, AuditStatsCard, AuditTimelineCard, RecentAuditsCard. BaseCard provides consistent styling (rounded-lg border, card background, shadow) and handles loading/error states. The index.tsx barrel files export the BarrelEventsSummarySection component and individual cards for flexibility."
+    },
+    {
+      "id": 67,
+      "corrected_answer": "AggregatedStorageEntriesModule provides server-side aggregation of barrel storage entries specifically for TTB compliance reporting. It solves the problem of client-side aggregation missing data from paginated barrel events. Features include: aggregation by lot number, event category (entry, withdrawal, transfer_in, dump), and configurable time period (daily, weekly, monthly); optional grouping by customer and/or whiskey type; efficient pagination at the aggregated entry level; and event IDs for drill-down functionality. The resolver provides GraphQL access via the 'aggregatedStorageEntries' query with filter, pagination, and sort arguments."
+    },
+    {
+      "id": 68,
+      "corrected_answer": "The Table-new directory supports different table configurations through component composition and specialization: (1) Specialized Table Components - Contains BarrelInventoryTableWithSelection.tsx, BarrelReceiptsTable.tsx, WarehouseDetailsTableWithSelection.tsx, PurchaseOrderCard.tsx. (2) Configuration via Sub-directories - /free-barrels/, /openLocationsTable/, /BarrelInventoryComponents/, /Actions/. (3) Table Customization Mechanisms - Dynamic Column Configuration via TableHeaderBarrelInventory.tsx with AVAILABLE_SORT_KEYS array, Hierarchical Sorting for storage location columns, Advanced Filtering via lazy-loaded FilterBuilder component, Feature Flags integration (useFeatureFlag hook), URL-based State Management for sort order, pagination, filters. (4) Dynamic Imports - Uses Next.js dynamic() for code-splitting. The 'new' suffix indicates component specialization/composition, not replacement."
+    },
+    {
+      "id": 69,
+      "corrected_answer": "The secretsManager module does NOT currently integrate with Azure Key Vault. Instead: (1) Current Implementation - SecretsManagerServiceBase uses NestJS ConfigService to retrieve secrets from environment variables. getSecret<T>(key) simply calls configService.get(key). (2) No Caching Mechanism - No TTL caching exists, no LRU cache implementation. Each call directly queries ConfigService. (3) Azure Configuration Present but Unused - .env.example shows Azure environment variables (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, etc.) but these are NOT used by SecretsManagerService. Azure AD is implemented in AzureAdService (authentication) but separate from secrets management. (4) Architecture - Minimal wrapper around NestJS ConfigService with no provider pattern for alternative implementations."
+    },
+    {
+      "id": 70,
+      "corrected_answer": "The health check system has two distinct implementations. Backend HealthModule (NestJS) provides a custom health check implementation (NOT using TerminusModule) at the /_health endpoint with: queue health monitoring (/_health/queue), queue management operations (cleanup, pause, resume), feature flag status (/_health/feature-flags/enabled), and cache statistics (/_health/cache-stats) for storage locations, event types, event reasons, and finance caches. It imports InventoryUploadModule, StorageLocationModule, EventTypeModule, EventReasonModule, and FinanceModule. The frontend health endpoint (/api/health/route.ts) is a simple Next.js API route returning: status ('healthy'/'unhealthy'), timestamp, uptime, version, environment, and memory usage metrics (rss, heapTotal, heapUsed, external). It requires no authentication for load balancer and monitoring system access."
+    },
+    {
+      "id": 72,
+      "corrected_answer": "WarehouseJobsModule handles warehouse job CRUD operations via WarehouseJobsService and WarehouseJobsController, with a dependency on BarrelModule. WarehouseJobLocatorModule handles job progress tracking and location calculations - NOT barrel locating for picking/moving. Its WarehouseJobLocatorService provides: calculateTotalLocations() for computing total locations in a warehouse range, getWarehouseStructures() for warehouse configuration, validateJobLocationRange() for validating range strings (format: warehouse=X.floor=Y.tier=Z.rick=W.position=V), getJobProgress() for tracking scanned barrels vs total locations with progress percentage, and getBatchJobProgress() for batch progress queries. It calculates job completion metrics based on warehouse location ranges rather than locating specific barrels for warehouse operations."
+    },
+    {
+      "id": 74,
+      "corrected_answer": "BarrelSnapshotModule provides ON-DEMAND point-in-time inventory queries, NOT periodic snapshots. The service reconstructs historical barrel state by querying the BarrelAudit table and using complex CTEs with ROW_NUMBER() OVER (PARTITION BY barrel ORDER BY changedAt DESC) to find the barrel state at any given pointInTime parameter. It does NOT run scheduled jobs via SchedulerModule - it performs real-time reconstruction from audit logs when queried. The module is still separate from BarrelModule and supports finance reporting through on-demand historical queries."
+    },
+    {
+      "id": 75,
+      "corrected_answer": "BarrelAggregatesModule provides server-side aggregation queries that execute ON-DEMAND, not pre-computed statistics. The module uses efficient PostgreSQL GROUP BY queries with direct SQL and chunked processing (ID_CHUNK_SIZE = 5000) to prevent memory issues. Endpoints include: barrelCountBySize, barrelCountByPeriod, barrelCountByOem, barrelCountByRecipe, inventoryByRecipe, and inventoryAggregates. Results are computed at query time with proper authorization (non-privileged users must provide customer scoping). This improves dashboard performance by pushing aggregation to the database rather than loading millions of records client-side."
+    },
+    {
+      "id": 76,
+      "corrected_answer": "The frontend package.json includes @react-three/fiber, @react-three/drei, @react-three/postprocessing, and three.js for 3D rendering. This enables 3D warehouse visualization via components in /components/scene/ including WarehouseScene.tsx (main 3D canvas), BarrelInstances.tsx (barrel rendering), WarehouseShell.tsx (warehouse structure), HeatmapLayer.tsx (sensor data), and Tooltip.tsx (hover info). The WarehouseScene uses Canvas with OrbitControls, Environment, and post-processing effects (Bloom, SSAO). The DragnDrop component (/components/DragnDrop/index.tsx) is UNRELATED to 3D - it's a simple weekly schedule widget using HTML5 drag-and-drop for assigning schedules to days."
+    },
+    {
+      "id": 77,
+      "corrected_answer": "Device sync errors span: DeviceSyncErrorModule (entity storage with DeviceSyncErrorService/Controller), DeviceSyncErrorManagementModule (error processing with DeviceSyncErrorReprocessorService and EnhancedErrorLoggerService), and AndroidSyncInboxModule (receiving sync data). There is NO separate ResolutionModule - error resolution is handled by DeviceSyncErrorReprocessorService methods (reprocessErrors, bulkResolve, markForRetry). The flow: mobile sends data -> AndroidSyncInbox receives -> validation fails -> error stored in DeviceSyncError -> DeviceSyncErrorReprocessorService handles reprocessing/resolution. Frontend error display is in app/dashboard/jobs/[id] with error-context-utils.ts."
+    },
+    {
+      "id": 80,
+      "corrected_answer": "IndexingModule handles vector document indexing for RAG/semantic search capabilities (NOT Elasticsearch or traditional database indexes). It uses BullMQ for job scheduling and LlamaModule for vector embeddings. The service indexes database tables (Barrel, Lot, StorageLocation, BarrelEvent, Customer) into vector documents via LlamaService.upsertDocumentsBatch. Combined with VectorSearchModule (which provides VectorSearchResolver using LlamaModule), this creates a RAG search stack: IndexingModule converts records to vector embeddings -> VectorSearch provides semantic search queries. It does NOT do database index optimization - it specifically generates text content and vector embeddings for AI-powered semantic search."
+    },
+    {
+      "id": 82,
+      "corrected_answer": "LoggerModule integrates nestjs-pino for structured JSON logging via PinoLoggerModule.forRootAsync(). The LoggerConfiguration function (logger.config.ts) configures pino-http with: configurable log levels (fatal, error, warn, info, debug, trace via LOG_LEVEL env), optional pino-pretty transport for development (via PINO_PRETTY env), sensitive key redaction (via SENSITIVE_KEYS env), request/response logging control (via LOG_REQUEST env), and service name mixin. The module is registered globally in AppModule. Note: The implementation uses pino-http (not direct PinoLogger injection in services), and only supports console transport (no file or external service transports are configured)."
+    },
+    {
+      "id": 84,
+      "corrected_answer": "BarrelFillScheduleModule manages fill schedules based on week/year with links to ScheduleDay entities. BarrelFillRunModule tracks actual fill runs linked to specific Lots (via lotId) and customers. The key distinction is that BarrelFillSchedule is week/year-based scheduling linked to ScheduleDay, while BarrelFillRun tracks execution per Lot (with a unique constraint on lotId). Note: There is no direct foreign key relationship between BarrelFillRun and BarrelFillSchedule - they are separate tracking mechanisms where schedules are calendar-based and runs are lot-based."
+    },
+    {
+      "id": 85,
+      "corrected_answer": "The app/dashboard/configuration directory contains subdirectories for different configuration areas: barrel-oem-codes/, customer-logos/, holding-locations/, manhour-by-day/, printer-automation/, and rickhouse/. Each has page.tsx and potentially edit/new subdirectories for CRUD operations. This organization groups related settings while the page-client.tsx pattern separates server and client components for Next.js. The modular structure allows adding new configuration areas without affecting existing ones."
+    },
+    {
+      "id": 88,
+      "corrected_answer": "ManhourConfigurationModule provides CRUD operations for labor hour configurations through ManhourConfigurationService, ManhourConfigurationController, and ManhourConfigurationResolver (GraphQL). Similarly, StaffScheduleModule provides CRUD operations for staff schedules through its own service, controller, and resolver. Both modules extend base modules (ManhourConfigurationModuleBase and StaffScheduleModuleBase) and integrate with AuthModule for authentication. While both relate to workforce management, they are independent modules without direct code-level integration between them."
+    },
+    {
+      "id": 91,
+      "corrected_answer": "WhiskeyTypeModule manages whiskey type classifications with TTB compliance support (via isTTBDefinition and self-referencing hierarchy). The actual hierarchy is NOT WhiskeyType -> Recipe -> Lot -> Barrel. Instead, Lot has PARALLEL relations to both WhiskeyType (via whiskeyTypeId) and Recipe (via recipeId), with Barrel linking to Lot. The correct model is: WhiskeyType -> Lot <- Recipe, then Lot -> Barrel. WhiskeyType and Recipe are independent classification systems that both feed into Lot."
+    },
+    {
+      "id": 93,
+      "corrected_answer": "The components/Charts directory contains specialized chart components: BarrelsPerManhourChart.tsx (a backward-compatibility re-export of PersonnelHoursChart), ParetoChart.tsx (Pareto/80-20 analysis using recharts), BoxPlotTemplateChart.tsx (statistical box plots using @nivo/boxplot), PersonnelHoursChart.tsx (displays barrels filled, barrels per manhour, and total personnel hours using recharts). The charts use recharts and @nivo/boxplot libraries, NOT chart.js (chart.js is used elsewhere in the app for other components). Each chart is reusable with props for data and configuration."
+    },
+    {
+      "id": 94,
+      "corrected_answer": "SampleModule manages barrel sampling for quality control. Sample links to: barrel (via getBarrel), StorageLocation (via getLocation, not a separate SampleLocation), and SampleType (via getSampleType). It also has barrelEvents relationship. SampleTypeModule (types of samples) and SampleLocationModule (a separate table for sample destination locations, distinct from StorageLocation) exist as related modules. The workflow involves creating sample records linked to barrels, specifying sample type, and tracking the storage location. This enables sample chain of custody and quality testing correlation for spirit production."
+    },
+    {
+      "id": 95,
+      "corrected_answer": "WeightLogModule tracks barrel weight over time. The barrel.resolver.ts exposes a `weightLogs` field (not 'currentWeight' and 'weightHistory') through GraphQL that returns an array of WeightLog records. There is an `updateBarrelWeight` mutation that finds a barrel by barcode, creates or updates a WeightLog entry with the new weight value. Weight logs are linked to barrels via barrelId. The implementation uses transactions to ensure data consistency when updating barrel weights."
+    },
+    {
+      "id": 96,
+      "corrected_answer": "TransferModule handles transfer operations and links to Customer, Warehouse, Lots, and Comments (not directly to OwnershipTransaction). TransferReasonModule provides categorical reasons for transfers and has a direct relationship with OwnershipTransaction via findOwnershipTransactions method. The separation allows standardized reason codes for reporting and transfer validation. It is TransferReasonModule (not TransferModule combined with OwnershipTransaction) that creates the audit trail - TransferReason links to OwnershipTransaction, which tracks ownership changes."
+    },
+    {
+      "id": 180,
+      "corrected_answer": "Complete flow: 1) AndroidSyncProcessor receives job from 'android-sync-processing' BullMQ queue; 2) process() method dequeues and extracts deviceName/inboxId; 3) Calls fetchRecordFromInbox() which uses PrismaService.$readOnlyTransaction to call AndroidSyncInboxService.findById(); 4) TrustModeConfigService.shouldProcessAndroidSyncRecord() checks processing eligibility based on Trust Mode cutoff; 5) CachedEventTypeService.findEventTypeByName() provides event type from cache; 6) BarrelEventService.createBarrelEventWithLocationAndLocationCheck() creates event; 7) PrismaService.$serializableTransaction or $androidSyncTransaction handles transaction with retry logic; 8) AndroidSyncErrorLoggerService.logError() logs errors outside transaction; 9) AndroidSyncInboxService.markAsSynced() marks record complete. Note: CachedLotVariationService, CachedEventReasonService, CachedStorageLocationService are warmed at startup but not called per-record in main flow. AuditService is NOT used in this processor. ~8-9 services coordinated."
+    },
+    {
+      "id": 182,
+      "corrected_answer": "OwnershipTransactionService.createOwnershipTransaction: 1) Creates OwnershipTransaction record with included relations (barrel, fromCustomer, toCustomer, transferReason); 2) Calls createOwnershipLedgerEntries(tx, ownershipTransaction, {...}) within same transaction for atomicity; 3) The utility creates a GroupTransaction record (type: OWNERSHIP_TRANSFER, status: COMPLETED) tracking affected barrels and metadata; 4) Creates FinancialTransaction entries with direction OUT for fromCustomer (role: 'FROM') and direction IN for toCustomer (role: 'TO'); 5) Handles null customer cases by creating UNASSIGNED entries to maintain double-entry balance; 6) All operations within same transaction ensure ledger consistency. This enables financial tracking of ownership movements with complete audit trail via metadata (ownershipPercentage, transferReasonId, notes)."
+    },
+    {
+      "id": 186,
+      "corrected_answer": "GroupTransactionService constructor (lines 127-132): 1) PrismaService - database operations, transactions; 2) AuditService - creates audit logs for all transaction operations; 3) ReconciliationService - handles discrepancy detection and resolution; 4) LotAuditService - tracks lot-level quantity changes. AuditService depends on: PrismaService, ContextService, PubSubService (NOT PubSubProvider). ReconciliationService depends on: PrismaService, AuditService, ContextService. LotAuditService depends on only PrismaService. This tree shows GroupTransactionService as a high-level coordinator that leverages specialized services for audit, reconciliation, and lot tracking."
+    },
+    {
+      "id": 190,
+      "corrected_answer": "In getTransfersForReconciliation(): 1) PrismaService fetches transfers with primaryGroupTransactions include; 2) For each transfer: extracts groupTransaction.affectedBarrelIds.length as currentBarrelCount; 3) Gets expectedBarrelCount from transfer.quantity; 4) Calculates reconciliationStatus: NOT_RECONCILED (currentBarrelCount === 0, regardless of expected), PARTIALLY_RECONCILED (currentBarrelCount > 0 AND currentBarrelCount < expectedBarrelCount), FULLY_RECONCILED (all other cases including when currentBarrelCount >= expectedBarrelCount); 5) needsReconciliation = currentBarrelCount === 0 && expectedBarrelCount > 0. No additional services involved - calculation is self-contained using data already fetched. This enables: reconciliation dashboard filtering, prioritization of unreconciled transfers."
+    },
+    {
+      "id": 192,
+      "corrected_answer": "In bulk transfer methods (bulkTransferOwnership, bulkUpdateOwnership, bulkEstablishJointOwnership): 1) Creates GroupTransaction via createTransactionGroup() with type OWNERSHIP_TRANSFER or ADJUSTMENT; 2) GroupTransaction stores: executedBy, executionDate, notes, metadata with filter criteria, and affectedBarrelIds (initially empty); 3) Individual transfers reference groupId in createOwnershipTransaction() which creates OwnershipTransaction audit records; 4) After processing, the relationship is maintained through the groupId reference in individual transactions. This enables: grouping related transfers for audit, rollback capability, reporting on bulk operations, correlation between OwnershipTransaction records and GroupTransaction. Note: totalBarrels field was removed from GroupTransaction model."
+    },
+    {
+      "id": 193,
+      "corrected_answer": "periodBreakdownEventInclude uses Prisma.validator<Prisma.BarrelEventInclude>() for type-safe include definition: includes barrel.barrelOwnerships (latest ownership record with customer id, ordered by createdAt desc, take 1), barrel.location.warehouse, eventType.name, groupTransaction.transactionType. This precise include: 1) Avoids over-fetching by selecting specific fields; 2) Gets nested data in single query via Prisma's join optimization; 3) Provides data needed for categorizeTransaction() which uses eventType.name, groupTransaction.transactionType, and WarehouseJobs.jobType; 4) Type is inferred via Prisma.BarrelEventGetPayload<{ include: typeof periodBreakdownEventInclude }>. Used in period breakdown queries at line 1260 for finance reports."
+    },
+    {
+      "id": 195,
+      "corrected_answer": "In createBarrelWithOwnership(): totalPercentage = owners.reduce((sum, o) => sum + o.ownershipPercentage, 0); if (Math.abs(totalPercentage - 100) > OWNERSHIP_SUM_TOLERANCE) throws Error. OWNERSHIP_SUM_TOLERANCE is exactly 0.001 (defined in constants.ts), which handles: IEEE 754 floating-point representation issues (e.g., 33.33 + 33.33 + 33.34 may not equal exactly 100), user input rounding, JSON serialization precision loss. This allows percentages like 33.333... to work correctly while still catching obvious errors like sum of 95% or 105%. The same validation is also used in the bulkUpdateOwnership flow at line 820."
+    },
+    {
+      "id": 196,
+      "corrected_answer": "In createReconciliation() when input.requiresApproval: 1) After creating ReconciliationRecord, calls the private createApprovalRequest() method (within ReconciliationService, lines 1536-1558) with parameters { reconciliationRecordId, requestType: 'RECONCILIATION', title, description, requestedBy, priority, estimatedImpact, requestData }; 2) createApprovalRequest() creates an ApprovalRequest record via prisma.approvalRequest.create() linked to the ReconciliationRecord; 3) AuditService logs the reconciliation record creation. Note: NotificationService is NOT involved - approvers are not notified automatically. The approval workflow then involves: approvers reviewing via UI, ApprovalRequest status updates, and final resolution updating ReconciliationRecord. Services involved: ReconciliationService (contains createApprovalRequest as private method), AuditService."
+    },
+    {
+      "id": 200,
+      "corrected_answer": "Complete flow: 1) InventoryUploadService.createUploadSession() creates session; 2) Controller saves file, calls queueProcessing() to add job to 'inventory-processing' queue; 3) InventoryProcessingProcessor dequeues and calls processInventorySession(); 4) DataValidationService.validateSession() performs comprehensive validation; 5) processBatch() calls PostgreSQL function process_inventory_batch() which handles barrel creation/updates internally in the database; 6) BarrelProcessingService.processBarrelsForSession() orchestrates via SQL function process_barrel_operations(); 7) ProgressTrackingService tracks session progress; 8) AuditService logs operations at each phase; 9) TrustModeProcessingService handles trust mode if enabled; 10) BarrelEventHelperService creates BarrelEvents for operations. Note: Barrel creation happens via SQL functions, not direct BarrelService.createBarrelWithOwnership() calls. The MicroBatchOrchestrator is a separate processing pathway."
+    },
+    {
+      "id": 202,
+      "corrected_answer": "The system uses OWNERSHIP_SUM_TOLERANCE = 0.001 defined in barrel/constants.ts for floating-point comparison tolerance. However, the actual validation logic varies: 1) In createOwnership(), the system checks currentTotal + newPercentage > 100 with no tolerance; 2) In establishJointOwnership(), totalPercentage !== 100 is checked with exact equality; 3) In validateOwnershipUpdates() for bulk operations, Math.abs(totalPercentage - 100) > 0.01 is used (0.01 tolerance, not 0.001). The OWNERSHIP_SUM_TOLERANCE constant exists but is not consistently used across all validation paths."
+    },
+    {
+      "id": 219,
+      "corrected_answer": "ReconciliationService.createReconciliation() calculates impactLevel using calculateImpactLevel(discrepancies). Each DiscrepancyDetail has severity: 'HIGH', 'MEDIUM', or 'LOW'. The impact level (EnumImpactLevel: LOW, MEDIUM, HIGH) is determined by: 1) If any HIGH severity discrepancies exist, returns HIGH. 2) If total discrepancy count > 3, returns MEDIUM. 3) Otherwise returns LOW. For GroupTransaction or OwnershipTransactionGroup entities with barrel reconciliation data, the service can automatically apply barrel adjustments (add/remove barrels). Failed barrel reconciliation updates status to PENDING with error context but doesn't fail the entire reconciliation creation."
+    },
+    {
+      "id": 225,
+      "corrected_answer": "EnumEventTypeName defines event categories: Entry, Withdrawal, Rework, Reject, TransferIn, TransferOut, Sample, DumpForRegauge, Relocation, Fill, Quality, Inspection, InventoryCheck, InventoryRemoval, InventoryAddition, InventoryUploadAdded, InventoryUploadUpdated, InventoryUploadRemoved, InventoryUploadReconciliationDuplicateRemoved, InventoryUploadDisplaced, InventoryCheckDisplaced, Verified, LabelPrinted, LabelReprinted. Each BarrelEvent records: barrelId, eventTime, createdBy, result, groupTransactionId (optional). EnumBarrelEventSystemStatus (Pending, Accepted, Rejected, Confirmed, PendingDeletion) allows event state management. Events form complete audit trail for regulatory compliance (TTB). GroupTransactionService.executeLotEntry() creates BarrelEvent for each barrel in the transaction."
+    },
+    {
+      "id": 229,
+      "corrected_answer": "EnumInventoryUploadStatus tracks session state with values: uploading, uploaded, processing, completed, failed. EnumInventoryProcessingStatus tracks record state with values: pending, processing, success, error, skipped, validated, processed, trust_mode_skipped. DataValidationService orchestrates validation phases (storage locations, business entities via SQL functions, duplicate barrels) with skip options via ValidationOptions. Failed records are marked with 'error' status and errorMessage; sessions proceed through validation phases but there is no 'CREATED', 'VALIDATING', 'VALIDATED', 'CANCELLED' or 'PROCESSING' states - the actual states are lowercase (uploading, uploaded, processing, completed, failed)."
+    },
+    {
+      "id": 231,
+      "corrected_answer": "GroupTransaction supports two tracking modes via TransactionTrackingMode enum: 1) BARREL_LEVEL (default) - affectedBarrelIds array populated with individual barrel IDs. BarrelEvent created for each barrel. Used for barrel-specific operations. 2) LOT_LEVEL - affectedBarrelIds is empty ([]). Uses CreateLotLevelTransferInput with quantity and unitType from FinancialUnitType enum (PROOF_GALLONS, WINE_GALLONS, BARRELS, COUNT, OTHER). LotLevelTransactionMetadata (interface in service, not a DB model) stores trackingMode, lotNumber, quantityChange, unitType, beforeQuantities, afterQuantities. The GroupTransaction model stores lotQuantityUnits and lotQuantityUnitType directly. Both modes create FinancialTransaction records for accounting."
+    },
+    {
+      "id": 233,
+      "corrected_answer": "When createReconciliation() is called with requiresApproval=true, it creates an ApprovalRequest linked to the ReconciliationRecord via createApprovalRequest(). ApprovalRequest has: requestType (set to 'RECONCILIATION'), title, description, requestedBy, priority, estimatedImpact, requestData (contains reconciliationId and discrepancies). The status is tracked by EnumApprovalRequestStatus (PENDING, APPROVED, REJECTED, CANCELLED, EXPIRED). ApprovalResponse tracks individual approver decisions with EnumApprovalResponseStatus (PENDING, APPROVED, REJECTED, DELEGATED). ApprovalComment allows discussion on the request. The ApprovalRequest model tracks requiredApprovals and currentApprovals for multi-approver workflows."
+    },
+    {
+      "id": 238,
+      "corrected_answer": "EnumLotWhiskeyType enum classifies lot contents: AmericanSingleMalt, CornBourbon, CornWhiskey, RyeBourbon, RyeWhiskey, WheatedBourbon, WheatWhiskey. Lot.WhiskeyType is a relation to the WhiskeyType table (not the enum directly), allowing custom whiskey types with code, name, description, and category fields. LotService.transformLotForMES() uses mapWhiskeyTypeCodeToEnum() to convert the WhiskeyType.code to the MES enum value for system integration. The WhiskeyType model supports TTB hierarchies via isTTBDefinition and ttbWhiskeyType self-relation. Classification affects TTB reporting and MES integration."
+    },
+    {
+      "id": 240,
+      "corrected_answer": "EnumBulkOperationStatus tracks multi-record operations: PENDING, RUNNING, COMPLETED, FAILED, CANCELLED, PARTIAL_SUCCESS. BulkOperation model records: operationType, status, targetEntityType, targetEntityIds, operationData (Json), totalRecords, processedCount, successCount, failedCount, results (Json[]), errors (Json[]), startedAt, completedAt, executedBy, correlationId. Used by reconciliation batch operations. BulkOwnershipOperationResponse (separate from BulkOperation) returns totalRequested, successfulUpdates, failedUpdates, successes array, errors array, operationId, completedAt for bulk ownership transfers. These are distinct structures - BulkOperation is a database model while BulkOwnershipOperationResponse is a GraphQL response type."
+    },
+    {
+      "id": 249,
+      "corrected_answer": "EnumSampleTypeTypeResultType at schema.prisma defines only TWO values: Boolean, Numeric. The actual implementation uses a simpler type system where sample result types are categorized as either Boolean (binary pass/fail) or Numeric (continuous value measurement). Sample analysis results are tracked separately in the Sample.sampleResult field (Boolean) and Sample.sampleValue field (Float), not through result type categorization. This differs from a predicted status-based approach (Pass, Fail, Pending, etc.)."
+    },
+    {
+      "id": 253,
+      "corrected_answer": "Resolution services provide serial number suggestions for error correction: predict-next-9xxx-serial.dto.ts handles 9xxx-series temporary serials (e.g., 24E01A.01.9001 with nextNumber 9001-9999 range). suggest-serial-number.dto.ts returns SerialNumberSuggestionDto with suggestedSerial, confidence score (0-100), confidenceLevel (high/medium/low), lotAnalysis with barrelCount and percentage, reasoning, alternatives with multiple suggestions, and adjacentBarrels for visualization. The BarrelMatchingService matches scanned data against existing barrels considering: lot variations via LotVariationService and distance weights. The prediction algorithm uses weights defined in prediction-weights.dto.ts: adjacentLotsWithSequence (60%), currentJobLots (20%), horizontalPositionLots (20%)."
+    },
+    {
+      "id": 255,
+      "corrected_answer": "EnumPrinterStatus: ONLINE, OFFLINE, BUSY, ERROR. EnumAutomationPrintJobStatus: PENDING, PROCESSING, COMPLETED (deprecated), PENDING_PRINT, PRINTED, FAILED, CANCELLED. Printer model tracks physical printers with status. AutomationPrintJob tracks label print requests. LabelPrinted and LabelReprinted events (EnumEventTypeName) are recorded for audit trail. printer.dto.ts, printer-config-sync.dto.ts, printer-full-sync.dto.ts manage printer configuration. This enables: automated label printing on barrel fill, reprint on demand, tracking of printed vs unprinted barrels for compliance."
+    },
+    {
+      "id": 258,
+      "corrected_answer": "EnumLotAuditAction: Create, Increase, Decrease, Adjustment - tracks changes to Lot records with quantity-focused actions. LotAuditService (injected into GroupTransactionService) records lot-level changes. EnumBarrelAuditAction (Create, Update, Delete) mirrors for barrel changes. Audit actions recorded with: lotId, action, changedBy, changedAt, quantity snapshots (bblTotal, totalPGs, totalWGs), deltaUnits, deltaUnitType, groupTransactionId, transferId, notes. Lot audits are critical for: TTB compliance (federal regulations require complete lot history), customer reporting, production traceability. All lot modifications (bblTotal, status, quantities) generate audit records."
+    },
+    {
+      "id": 260,
+      "corrected_answer": "EnumFeedbackType defines: FEATURE_REQUEST, BUG_REPORT, IMPROVEMENT (not 'Bug', 'Feature', 'Improvement'). feedback.dto.ts (CreateFeedbackRequestDto) defines feedback submission with type, title (5-200 chars), description, authorId, authorEmail, authorName, changelogEntryId, and structured fields (FeatureRequestFieldsDto, BugReportFieldsDto, ImprovementFieldsDto). Feedback collected from web interface with author identification. Feedback may trigger: changelog entries (via changelogEntryId link), linear issue creation (linearIssueId field). Anonymous feedback is NOT explicitly supported - all author fields are required."
+    },
+    {
+      "id": 263,
+      "corrected_answer": "trust-mode-config.dto.ts defines a specific 'Trust Android Scans Mode' configuration with: enabled (boolean toggle), cutoffDate (ISO date for AndroidSyncInbox records), and optional description. This mode affects how the system handles Android device scan data, not general validation strictness. Separate ValidationOptions in DataValidationService (skipStorageValidation, skipEntityValidation, skipIntegrityValidation) control validation behavior. Auto-lot creation is handled by validate_business_entities_with_auto_lot_creation() PostgreSQL function, independent of trust mode settings."
+    },
+    {
+      "id": 267,
+      "corrected_answer": "inventory-adjustment.dto.ts defines InventoryUnitType enum with BARRELS, PROOF_GALLONS, WINE_GALLONS, COUNT (similar to but distinct from FinancialUnitType in Prisma schema which has PROOF_GALLONS, WINE_GALLONS, BARRELS, COUNT, OTHER). FinancialTransactionSource enum in schema.prisma includes MANUAL_ADJUSTMENT and PHYSICAL_COUNT for adjustments. InventorySourceType enum in the DTO also includes DAMAGE_WRITE_OFF and FOUND_INVENTORY. InventoryDirection (IN/OUT) tracks adjustment direction. CreateInventoryAdjustmentDto includes AdjustmentType enum (CORRECTION, RECONCILIATION, DAMAGE, FOUND, ROLLBACK), required reason documentation, optional approvedBy field, and metadata for audit trail. InventoryAdjustmentMetadata interface supports additional context including rollback information."
+    },
+    {
+      "id": 269,
+      "corrected_answer": "search-result.dto.ts defines typed search result classes for each entity: BarrelSearchResult (id, serialNumber, cooperageCode, warehouseNumber, lotNumber), CustomerSearchResult (id, name, code, globalId), LotSearchResult (id, lotNumber, recipeName, whiskeyTypeName), SalesOrderSearchResult, PurchaseOrderSearchResult, StorageLocationSearchResult, UserSearchResult, VendorSearchResult, JobSearchResult. SearchResultsDto aggregates all entity results with totalResults count and partialFailures array. SearchService implements PostgreSQL full-text search using to_tsvector/plainto_tsquery for some entities and ILIKE pattern matching for others (barrels, lots, jobs). Results are ranked using ts_rank for relevance. No relevanceScore, entityType, displayName, or matchedField fields exist in the actual DTOs - these are typed per-entity classes, not a unified format."
+    },
+    {
+      "id": 272,
+      "corrected_answer": "chat-history.dto.ts defines conversation storage with ChatMessageRole enum: USER, ASSISTANT (no 'System' role). Messages stored with: id, createdAt, role (USER|ASSISTANT), content, metadata. Conversations with: id, createdAt, updatedAt, userId, title (optional, 255 char max), lastMessageAt, metadata, soft-delete support (deletedAt field). Chat history used by AI agent for context. Agent module (agent-chat.dto.ts, agent-stream-events.dto.ts) handles AI interactions with ConversationMessageDto (role: 'user'|'assistant'), AgentChatRequestDto for requests, and AgentStartEvent/AgentCancelEvent for WebSocket streaming. Message metadata includes response time, agent iterations, token usage, tools used."
+    },
+    {
+      "id": 273,
+      "corrected_answer": "purchase-order-line-item.dto.ts defines line items with fields: lineItemQuantity, lineItemItemName, lineItemRate, lineItemDescription, itemId, itemNumber, itemClass, itemGroup, vendorName. purchase-order-with-line-items.dto.ts extends PurchaseOrder with lineItemDetails array. purchase-order-with-receipt.dto.ts tracks receiving with orderedQuantity and receivedQuantity per line item, plus productGroup. EnumPurchaseOrderStatus tracks overall order progress (Planned, Committed, Initiated, InProgress, Complete). This enables: vendor management, receiving verification, cost tracking."
+    },
+    {
+      "id": 274,
+      "corrected_answer": "android-sync-diagnostics.dto.ts is a query filter DTO with startDate, endDate, deviceName, eventType, operator, and groupSimilar parameters for filtering diagnostic queries. device-sync-error-diagnostics.dto.ts (in deviceSyncError module) filters by errorLevel, status, and inboxDeviceName. AndroidSyncInboxService provides: getTotalRecords(), getUnsyncedRecords(), getTransactionTimeoutRecords(), getTimeoutErrorStats(). Timeout error stats include: totalTimeoutErrors, uniqueDevices, errorsByDevice. testTransactionTimeout() validates timeout configuration. These diagnostics enable: proactive error detection, device health monitoring, sync queue management."
+    },
+    {
+      "id": 275,
+      "corrected_answer": "WhiskeyType entity (separate from enum) allows custom types. create-whiskey-type.dto.ts, update-whiskey-type.dto.ts manage CRUD with fields: code (max 10 chars, unique), name, description, category, active (default true), isTTBDefinition (default false), and ttbWhiskeyTypeId (for parent category references). Lot.whiskeyTypeId references WhiskeyType.id. mapWhiskeyTypeCodeToEnum() in lot service converts code to EnumLotWhiskeyType for MES sync (e.g., 'RB' -> 'RyeBourbon'). This design allows: custom whiskey types per distillery, TTB compliance tracking, hierarchical type categories, standard types for reporting, and backward compatibility with enum-based systems."
+    },
+    {
+      "id": 276,
+      "corrected_answer": "barrel-pivot-filter.dto.ts defines filters: date ranges (entryDateStart, entryDateEnd), customers (customerIds), lots (lotNumbers), and recipes. NOTE: it does NOT include dispositions or locations filters. barrel-pivot-response.dto.ts returns aggregated pivot data with groupBy method, totalCount, and groups array. Pivot enables: cross-tabulation of barrel attributes, trend analysis, comparison reporting. Audit dashboard (audit-filter.dto.ts) provides: operation type/entity type filtering, user activity (userId), session/correlation ID tracking, date range filtering, and search functionality. Both systems support pagination and export capabilities."
+    },
+    {
+      "id": 277,
+      "corrected_answer": "aggregated-storage-entries-response.dto.ts returns paginated storage entries for TTB compliance reporting. aggregated-storage-entry.dto.ts defines per-entry metrics including: periodStart/End, lotNumber, eventCategory (ENTRY, WITHDRAWAL, TRANSFER_IN, DUMP), barrelCount, proofGallons. breakdown.dto.ts provides breakdowns by customer (StorageCustomerBreakdown), whiskey type (StorageWhiskeyTypeBreakdown), and recipe (StorageRecipeBreakdown). NOTE: This is NOT about warehouse locations, occupied positions, or capacity planning - it's specifically for TTB storage compliance aggregation by time period, lot, and event category."
+    },
+    {
+      "id": 280,
+      "corrected_answer": "lot-with-barrel-count.dto.ts returns lots with a computed barrelCount field, described as 'Number of barrels in storage owned by the customer in this lot'. It includes: id, lotNumber, barrelCount. NOTE: lot-with-whiskey-type.dto.ts is NOT a reporting DTO for type classification - it's actually LotCreateWithWhiskeyTypeDto and LotUpdateWithWhiskeyTypeDto for creating/updating lots with whiskeyTypeId and barrelOemCodeId relations. The barrel count represents customer-owned barrels in storage for that lot."
+    },
+    {
+      "id": 281,
+      "corrected_answer": "barrels-filled-aggregate.dto.ts provides fill metrics for labor planning with fields: date, barrelsFilled, configuredHours, personnelOnStaff, totalConfiguredHours (configuredHours * personnelOnStaff), barrelsPerManhour (efficiency metric), and configurationId. barrels-filled-query.dto.ts defines query parameters: startDate, endDate, and groupBy (day/week/month via GroupByType enum). ManhourConfiguration model in schema.prisma contains: hourlyRate, hours, isActive, effectiveDate, expirationDate, weekStart. ManhourConfiguration is referenced in EnumAuditEntityType for tracking changes. Aggregates enable: labor efficiency calculation via barrelsPerManhour metric, personnel tracking via personnelOnStaff and totalConfiguredHours fields."
+    },
+    {
+      "id": 282,
+      "corrected_answer": "create-logo.dto.ts (REST) and CreateCustomerLogoInput (GraphQL in customer-logo.dto.ts) manage logo creation with: customerId, name, description, filename, dataBase64 (Base64 encoded image), mimeType, isCurrent. update-logo.dto.ts and UpdateCustomerLogoInput manage updates with: name, description, dataBase64, isActive, isCurrent. CustomerLogoDto defines logo entity with sync-related fields: syncStatus (EnumLogoSyncStatus), backendId, backendFilePath, backendFilename, lastSyncAt, lastSyncError. EnumLogoSyncStatus values: PENDING, SYNCED, FAILED, DELETED. EnumLogoSyncAction values: CREATE, UPDATE, DELETE, GET, GET_CURRENT. EnumLogoSyncRequestStatus values: PENDING, SENT, ACKNOWLEDGED, FAILED, RETRYING. CustomerLogoSyncRequestDto tracks sync requests with: correlationId, action, logoId, customerGlobalId, status, attempts, maxAttempts, lastAttemptAt, acknowledgedAt, errorMessage. LogoSyncResultOutput returns: correlationId, success, message."
+    },
+    {
+      "id": 283,
+      "corrected_answer": "GetAggregatedStagingRecordsDto provides query parameters for filtering staging records: status (InventoryCheckStagingStatus enum: PENDING, PROCESSING, READY, APPROVED, REJECTED, COMMITTED, ERROR), hasIssues (boolean string), issueTypes (comma-separated list like 'InventoryCheck:BarrelNoLabel,InventoryCheck:OrphanBarrelPrior'), issueFilterLogic (AND/OR via IssueFilterLogic enum), issueLevels (comma-separated EnumDeviceSyncErrorLevel values like 'CRITICAL,ERROR,WARN'). ProcessBarrelFillJobDto defines barrel fill job processing with BarrelFillJobItemInput array containing: serialNumber, fillDate, locationPath, fillWeight, harvestTime, harvestedBy, entryTime, entryBy, typeSize, toast, char. ProcessBarrelFillJobResponse returns: jobId, lotNumber, barrelsCreated, barrelIds."
+    },
+    {
+      "id": 284,
+      "corrected_answer": "upload-csv.dto.ts defines CSV upload with: file (Multer file), customerId (optional), uploadedBy (required), trustAndroidScansMode (boolean), androidScansCutoffDate (ISO 8601 date when trust mode enabled), trustModeDescription (optional), reconciliationMode (marks barrels not in CSV as Rejected with PendingDeletion status). ValidationResult interface provides: isValid, errors[], warnings[], fileInfo (originalName, size, mimeType, encoding). DataValidationService.validateSchemaCompliance() uses SchemaValidationService with Zod schemas. CSV rows map to fields: Notes, Customer, Warehouse, Floor, Tier, Rick, Position, Lot# (LotNumber), Mashbill, Barrel# (BarrelNumber). Validation phases: 1) Schema compliance via Zod (InventoryRowSchema validates field formats/types). 2) Database validation (warehouse/holding location existence via validateWarehouseOrHoldingLocation). 3) Business entity validation via validateBusinessEntities() (lot numbers, customers with auto lot creation). 4) Data integrity via checkDataIntegrity() (duplicate barrel detection). 5) Business rules via validateBusinessRules() (duplicate lot/barrel in batch, customer existence). Invalid rows tracked via InventoryUploadStaging.processingStatus='error' with errorMessage; valid rows proceed to processing."
+    },
+    {
+      "id": 285,
+      "corrected_answer": "bulk-update-barrel.dto.ts defines fields for bulk barrel operations: barrelIds (array of barrel IDs to update), locationId (optional new location), status (optional new EnumBarrelStatus), dispositionId (optional new disposition), notes (optional update notes), and performedBy (user performing the update). The DTO uses class-validator decorators for validation: @IsArray(), @IsUUID() for barrelIds, @IsOptional() for optional fields. Bulk updates are processed in a transaction to ensure atomicity."
+    },
+    {
+      "id": 286,
+      "corrected_answer": "approve-record.dto.ts defines the approval workflow DTO with: recordId (UUID of record to approve), approvalStatus (enum: APPROVED, REJECTED, PENDING_REVIEW), approverNotes (optional string for approval comments), approvedBy (UUID of approving user), and approvedAt (optional timestamp, defaults to current time). The DTO validates that approvalStatus is one of the allowed enum values."
+    },
+    {
+      "id": 288,
+      "corrected_answer": "The resolution module handles device sync error correction through a configurable workflow system. ERROR_CONFIGURATION maps error types to allowed resolution options (ACCEPT, RESOLVE, ACKNOWLEDGE, REJECT). Each option has defined resolution functions that execute specific business logic. ResolutionService.createResolution() validates the request, executes the appropriate resolution function chain, creates DeviceSyncResolution records, and updates error status to RESOLVED. The module does NOT handle general application errors - it's specifically for device sync data discrepancies."
+    },
+    {
+      "id": 336,
+      "corrected_answer": "Location components include: LocationService for CRUD operations, LocationResolver for GraphQL endpoints, LocationController for REST endpoints. The location hierarchy uses parentId for self-referential tree structure. StorageLocation is a separate entity representing physical storage positions within a Location, with fields for rack, level, position. The answer incorrectly implied a single location model - there are two distinct entities: Location (warehouse/building/area) and StorageLocation (specific barrel positions)."
+    },
+    {
+      "id": 405,
+      "corrected_answer": "The application does NOT implement distributed tracing. There is no OpenTelemetry, Jaeger, or similar tracing infrastructure. Request correlation is handled via correlationId generated per-request in ContextMiddleware and passed through services via AsyncLocalStorage. AuditService logs include correlationId for linking related operations, but this is not distributed tracing - it's request-scoped correlation within a single service instance."
+    },
+    {
+      "id": 408,
+      "corrected_answer": "Azure AD authentication uses @nestjs/passport with passport-azure-ad BearerStrategy. The strategy validates JWT tokens from Azure AD B2C, extracts user claims, and calls UserRegistrationService.findOrCreateFromAzureProfile() to sync user data. The guard (DefaultAuthGuard) activates the 'azure-ad' strategy. There is NO automatic role mapping from Azure AD groups - roles are managed internally in the User model."
+    },
+    {
+      "id": 410,
+      "corrected_answer": "Prisma connection pooling uses the default configuration from the DATABASE_URL connection string. There is no explicit pool size configuration in the codebase. The connection_limit parameter can be set in the connection string (e.g., ?connection_limit=10) but no custom PrismaClient configuration overrides this. The application does NOT implement custom connection pool monitoring or dynamic pool sizing."
+    },
+    {
+      "id": 421,
+      "corrected_answer": "The context middleware (context.middlware.ts - note the typo in filename) only sets userId from req.user?.id, defaulting to 'system'. It does NOT set a full RequestContext object. The middleware uses ContextService.run() with AsyncLocalStorage to propagate the userId through the request lifecycle. There is no sessionId, correlationId, or other context fields set by this middleware."
+    },
+    {
+      "id": 427,
+      "corrected_answer": "The audit query service implements basic pagination using skip/take and date filtering via dateFrom/dateTo parameters. It does NOT implement cursor-based pagination, query optimization for large datasets, or batch processing. The service uses standard Prisma findMany with where clauses. The answer overstated the optimization capabilities."
+    },
+    {
+      "id": 450,
+      "corrected_answer": "Security headers do NOT differ between development and production environments. The SecurityHeadersMiddleware applies the same headers universally: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Strict-Transport-Security, Content-Security-Policy. There is no environment-based conditional logic in the middleware implementation."
+    },
+    {
+      "id": 452,
+      "corrected_answer": "The application does NOT implement server-side token refresh. Azure AD token refresh is handled entirely client-side by MSAL.js. The backend only validates incoming tokens - if a token is expired, the request fails with 401 and the client must handle refresh. There is no token refresh endpoint or server-side refresh logic."
+    },
+    {
+      "id": 461,
+      "corrected_answer": "The role system uses flat RBAC without inheritance. RolesGuard checks if user.roles array includes any of the required roles specified in @Roles() decorator. There is no role hierarchy (e.g., ADMIN doesn't automatically include USER permissions). Each role must be explicitly granted, and endpoints must list all allowed roles."
+    },
+    {
+      "id": 464,
+      "corrected_answer": "LaunchDarkly integration uses single-context targeting, not multi-context. The context includes kind: 'user', key (userId), and custom attributes (email, environment). There is no organization context or multi-context evaluation. Feature flags are evaluated per-user only."
+    },
+    {
+      "id": 466,
+      "corrected_answer": "TimeoutInterceptor is HTTP-specific, implementing NestInterceptor. It wraps handler execution with RxJS timeout operator. It is NOT GraphQL-specific - it applies to both REST and GraphQL requests when configured. The interceptor is not globally registered; it must be applied per-controller or per-method using @UseInterceptors()."
+    },
+    {
+      "id": 468,
+      "corrected_answer": "The integrity tracking system monitors data quality and consistency metrics, NOT cryptographic tamper detection. It tracks: missing required fields, orphaned records, referential integrity violations, and data anomalies. There are no cryptographic hashes, Merkle trees, or blockchain-style integrity verification. The 'integrity' refers to database referential integrity and data quality."
+    },
+    {
+      "id": 469,
+      "corrected_answer": "The HttpExceptionFilter (HttpExceptions.filter.ts) is specifically a Prisma exception filter that catches PrismaClientKnownRequestError and PrismaClientValidationError, NOT a general HTTP exceptions filter. For REST, it uses response.status(statusCode).send(errorResponse). The response format is { message, statusCode } without timestamp or path fields. For GraphQL, it throws HttpException with the original exception as cause. The business-logic-error-handler.ts provides error categorization specifically for resolution operations (RESOURCE_NOT_FOUND, RESOURCE_CONFLICT, PERMISSION_ERROR, VALIDATION_ERROR, DATABASE_CONSTRAINT_ERROR, EXTERNAL_SERVICE_ERROR, UNKNOWN_ERROR) and throws BadRequestException for single-error scenarios. It does not provide general REST/GraphQL error consistency. GraphQL errors are handled separately through Apollo Server's error formatting."
+    },
+    {
+      "id": 472,
+      "corrected_answer": "On the backend, FeatureFlagsService initializes the LaunchDarkly SDK with LaunchDarkly.init() and waits for initialization via waitForInitialization(). There is no explicit streaming connection handling or flag change subscription implemented in the service - it simply evaluates flags on-demand using client.variation(). On the frontend, the mock client (used when LAUNCHDARKLY_CLIENT_ID is not set) supports 'change' event subscriptions via an eventListeners Map, emitting events when identify() is called. The identifyFeatureFlagUser() function dispatches a 'featureflag:identified' CustomEvent via window.dispatchEvent(). Cache clearing in development clears localStorage keys starting with 'ld:' on initialization. There is no periodic polling implemented in the code."
+    },
+    {
+      "id": 473,
+      "corrected_answer": "The ERROR_CONFIGURATION does NOT have an ESCALATE resolution path. The valid allowedResolutions are: ACCEPT, RESOLVE, ACKNOWLEDGE, and REJECT. There is no ESCALATED status defined. For errors requiring team review, the configuration uses options like 'RESOLVE:elevateToEntTeam' (which calls notifyEntTeam function) or 'ACKNOWLEDGE:acknowledgeAndQueueFollowUp' (which calls createOrConnectAFollowUpJob and updateStatusInResolutionToReview functions). The subsequentJob parameter in ResolutionFunctionParams supports newJobData.assignedUserNames for team assignment and newJobData.jobType for job categorization. The status change is typically to 'REVIEW' via updateStatusInResolutionToReview, not 'ESCALATED'."
+    },
+    {
+      "id": 474,
+      "corrected_answer": "ThrottlerStorageRedisProvider creates Redis-backed storage using ThrottlerStorageRedisService from @nest-lab/throttler-storage-redis library (not custom Redis atomic operations). The storage is initialized with an ioredis client configured with REDIS_URL or individual REDIS_HOST/REDIS_PORT/REDIS_PASSWORD environment variables. In development, test, e2e environments, or when JEST_WORKER_ID is set or DISABLE_REDIS_THROTTLER=true, getStorage() returns undefined (not false), causing ThrottlerModule to use default in-memory storage. In AppModule, ThrottlerModule.forRootAsync() configures three throttler tiers: 'short' (10 req/sec), 'medium' (50 req/10sec), 'long' (200 req/min), using storage: storageProvider.getStorage(). The GqlThrottlerGuard is registered as APP_GUARD to handle both REST and GraphQL contexts."
+    },
+    {
+      "id": 476,
+      "corrected_answer": "The AuditService injects PubSubService and publishes audit events for real-time distribution. Each audit log creation triggers a publish to 'auditLogAdded' channel (not 'audit:created') with the log entry data in a GraphQL subscription format: { auditLogAdded: { edges: [{node, cursor}], pageInfo } }. The PubSubService uses graphql-subscriptions PubSub (in-memory), NOT Redis. This enables GraphQL subscriptions to relay audit events to connected clients. Sensitive audit data is sanitized before storage via sanitizeForAudit() which removes fields like password, token, secret, apiKey. This enables real-time monitoring without polling the database, though cross-instance distribution requires additional Redis configuration not present in the current implementation."
+    },
+    {
+      "id": 477,
+      "corrected_answer": "Several patterns protect sensitive data: 1) Error categorization in business-logic-error-handler.ts categorizes errors into types (RESOURCE_NOT_FOUND, RESOURCE_CONFLICT, PERMISSION_ERROR, VALIDATION_ERROR, DATABASE_CONSTRAINT_ERROR, EXTERNAL_SERVICE_ERROR, UNKNOWN_ERROR) but still includes detailed error messages in output. 2) AuditService.sanitizeForAudit() removes sensitive fields: password, passwordHash, salt, token, secret, apiKey, privateKey from beforeState/afterState. 3) Frontend sanitizeContextForLogging() removes PII from LaunchDarkly context by only exposing kind, key, anonymous, and environment fields. 4) The error handler uses structured logging with context objects containing errorId, errorType, resolutionOption, userId, warehouseJobId."
+    },
+    {
+      "id": 479,
+      "corrected_answer": "The frontend uses a registry pattern for type-safe flag access. registry.ts defines individual BaseFeatureFlag objects with key, name, description, defaultValue, category, and tags properties. FeatureFlagKey is typed as 'keyof typeof featureFlagRegistry' which creates a union type of all valid flag keys. getFeatureFlagDefinition(key) returns the BaseFeatureFlag metadata for each flag. TypeScript enforces that only registered flags can be used with getFeatureFlag(). The FeatureFlagResult type includes isEnabled, flagKey, source ('launchdarkly' | 'override' | 'default'), and optional error. New flags are added by: 1) Creating a BaseFeatureFlag definition, 2) Adding to featureFlagRegistry object. The pattern enables IDE autocomplete for flag names."
+    },
+    {
+      "id": 480,
+      "corrected_answer": "AuditService provides getEntityAuditHistory(entityType, entityId, options) (not getEntityHistory) which queries all audit logs for that entity. Options include skip, take, and orderBy for pagination and sorting. Each entry contains beforeState and afterState, allowing reconstruction of the entity's complete history. changedFields array (automatically calculated via AuditService.getChangedFields()) identifies which fields changed in each update. getAuditLogsByCorrelation(correlationId) links related entity changes from a single operation, returning logs in chronological order. The stored data supports point-in-time reconstruction and change timeline analysis, though these are not explicitly implemented as separate methods."
+    },
+    {
+      "id": 483,
+      "corrected_answer": "The middleware order and default 'system' userId behavior are accurate. However, the claim that 'Guards running later can update context if needed using contextService.setUserId()' is not verified. The ContextService uses an AsyncLocalStorage pattern with a 'run()' method that wraps the request lifecycle - there is no evidence of a 'setUserId()' method in the provided files. The context is set once when the middleware executes via contextService.run({ userId }, callback) and cannot be updated mid-request by guards."
+    },
+    {
+      "id": 490,
+      "corrected_answer": "ComplianceReportingService generates financial audit reports by calling AuditService.generateAuditReport() with configurable filters (startDate, endDate, entityType). It aggregates data into: 1) ComplianceMetrics summary with totalOperations, successRate, errorRate, criticalErrors, dataIntegrityScore, complianceScore, and riskLevel, 2) dataIntegrityChecks with passed/failed/warnings counts. Report types include 'financial_transactions', 'inventory_changes', 'ownership_transfers', and 'comprehensive'. Output formats support CSV and JSON (excel falls back to CSV). The service has scheduled report generation via @Cron decorators for daily (2AM) and weekly (Sunday 3AM) reports. It does NOT support PDF format, and does not have executive summary, user activity breakdown, security events, or data access patterns sections as separate report sections."
+    },
+    {
+      "id": 492,
+      "corrected_answer": "The categorizeError() function in business-logic-error-handler.ts enables intelligent error routing by pattern-matching error messages to 6 categories: RESOURCE_NOT_FOUND (triggers data creation or lookup workflows), RESOURCE_CONFLICT (suggests retry or different parameters), VALIDATION_ERROR (returns immediately to user with guidance), DATABASE_CONSTRAINT_ERROR (indicates concurrent modification requiring refresh), PERMISSION_ERROR (routes to access request workflow), EXTERNAL_SERVICE_ERROR (triggers retry with backoff). DeviceSyncErrorReprocessorService uses error categorization for reprocessability assessment via nonReprocessableTypes (4 types requiring manual data fix) and reprocessableTypes (6 types that can be automatically retried). This automation reduces manual triage and routes errors to appropriate handlers using array-based categorization, not a centralized ERROR_CONFIGURATION constant."
+    },
+    {
+      "id": 494,
+      "corrected_answer": "The AuditService supports data retention through: 1) Query methods accepting dateFrom/dateTo for date-range filtering via AuditLogQueryOptions interface, 2) cleanupOldAuditLogs(retentionDays = 365) method that DELETES (not archives) audit logs older than the specified retention period using prisma.auditLog.deleteMany(). The ComplianceReportingService has a separate cleanupOldReports() scheduled task that deletes old report files based on AUDIT_REPORTS_RETENTION_DAYS environment variable (default 90 days). There is NO batch archival to cold storage, NO hash chain integrity maintenance during cleanup, and NO configurable retention periods per operationType or entityType - the retention is a single global value."
+    },
+    {
+      "id": 495,
+      "corrected_answer": "ResolutionFunctionParams includes serialRegistryService as an optional injected dependency for serial number management. However, the answer incorrectly describes the specific functionality. The actual SerialRegistryService provides: 1) register() - to register new serial numbers with conflict detection, 2) checkExists() - O(1) hash-based existence check, 3) linkToBarrel() - to link registered serials to barrels, 4) registerWithOverride() - for exceptional duplicate cases. The BarrelMatchingService.ensureUniqueSerialNumber() checks if a suggested serial exists in the Barrel table (not serial registry) and generates a new semantic serial if it does. It does NOT coordinate with SerialRegistryService - it uses the Barrel table directly via tx.barrel.findFirst(). The registry does NOT track serial usage patterns for analytics and gap detection."
+    },
+    {
+      "id": 498,
+      "corrected_answer": "The @AuditTrack() decorator accepts AuditTrackOptions with these actual fields: enabled (boolean, defaults to true), operation (custom operation name, defaults to method name), entityType (entity type override), trackChanges (whether to track before/after states, defaults to true), correlationIdGenerator (custom correlation ID generator function), and metadata (additional metadata as Record<string, any>). The answer incorrectly lists: 'operationType' (not a field - it's auto-determined), 'auditFields' (does not exist), 'sensitiveFields' (does not exist - redaction is hardcoded in sanitizeArgs()). The interceptor reads metadata via Reflector and merges with runtime context (userId, correlationId, sessionId, ipAddress, userAgent)."
+    },
+    {
+      "id": 500,
+      "corrected_answer": "The actual request flow based on app.module.ts is: 1) SecurityHeadersMiddleware sets security headers (configured first in middleware chain), 2) ContextMiddleware initializes AsyncLocalStorage context, 3) GqlThrottlerGuard (global APP_GUARD) handles rate limiting for both REST and GraphQL - NOT 'early in the flow' but as a global guard, 4) DefaultAuthGuard validates Azure AD token (uses 'azure-ad' strategy, NOT 'UserRegistrationService' for role sync - the strategy handles that), 5) RolesGuard checks user roles against @Roles() requirements (used per-method), 6) AclValidateRequestInterceptor and AclFilterResponseInterceptor exist for request/response filtering, 7) TimeoutInterceptor exists but is NOT globally applied - it's used per-controller/method, 8) AuditTrackInterceptor captures beforeState/afterState when @AuditTrack decorator is present, 9) Handler executes with ContextService access. There is NO HttpExceptionsFilter in the codebase. FeatureFlagsModule is imported but not shown as injected at request level."
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+{
+  "metadata": {
+    "created": "2026-01-21",
+    "description": "Corrections from Waves C-F verification (batches 21-60)",
+    "waves": {
+      "C": {"batches": "21-30", "verified": 21, "corrections": 19},
+      "D": {"batches": "31-40", "verified": 22, "corrections": 18},
+      "E": {"batches": "41-50", "verified": 28, "corrections": 12},
+      "F": {"batches": "51-60", "verified": 21, "corrections": 19}
+    },
+    "total_corrections": 68
+  },
+  "corrections": [
+    {
+      "id": 180,
+      "corrected_answer": "Complete flow: 1) AndroidSyncProcessor receives job from 'android-sync-processing' BullMQ queue; 2) process() method dequeues and extracts deviceName/inboxId; 3) Calls fetchRecordFromInbox() which uses PrismaService.$readOnlyTransaction to call AndroidSyncInboxService.findById(); 4) TrustModeConfigService.shouldProcessAndroidSyncRecord() checks processing eligibility based on Trust Mode cutoff; 5) CachedEventTypeService.findEventTypeByName() provides event type from cache; 6) BarrelEventService.createBarrelEventWithLocationAndLocationCheck() creates event; 7) PrismaService.$serializableTransaction or $androidSyncTransaction handles transaction with retry logic; 8) AndroidSyncErrorLoggerService.logError() logs errors outside transaction; 9) AndroidSyncInboxService.markAsSynced() marks record complete. Note: CachedLotVariationService, CachedEventReasonService, CachedStorageLocationService are warmed at startup but not called per-record in main flow. AuditService is NOT used in this processor. ~8-9 services coordinated."
+    },
+    {
+      "id": 182,
+      "corrected_answer": "OwnershipTransactionService.createOwnershipTransaction: 1) Creates OwnershipTransaction record with included relations (barrel, fromCustomer, toCustomer, transferReason); 2) Calls createOwnershipLedgerEntries(tx, ownershipTransaction, {...}) within same transaction for atomicity; 3) The utility creates a GroupTransaction record (type: OWNERSHIP_TRANSFER, status: COMPLETED) tracking affected barrels and metadata; 4) Creates FinancialTransaction entries with direction OUT for fromCustomer (role: 'FROM') and direction IN for toCustomer (role: 'TO'); 5) Handles null customer cases by creating UNASSIGNED entries to maintain double-entry balance; 6) All operations within same transaction ensure ledger consistency. This enables financial tracking of ownership movements with complete audit trail via metadata (ownershipPercentage, transferReasonId, notes)."
+    },
+    {
+      "id": 186,
+      "corrected_answer": "GroupTransactionService constructor (lines 127-132): 1) PrismaService - database operations, transactions; 2) AuditService - creates audit logs for all transaction operations; 3) ReconciliationService - handles discrepancy detection and resolution; 4) LotAuditService - tracks lot-level quantity changes. AuditService depends on: PrismaService, ContextService, PubSubService (NOT PubSubProvider). ReconciliationService depends on: PrismaService, AuditService, ContextService. LotAuditService depends on only PrismaService. This tree shows GroupTransactionService as a high-level coordinator that leverages specialized services for audit, reconciliation, and lot tracking."
+    },
+    {
+      "id": 190,
+      "corrected_answer": "In getTransfersForReconciliation(): 1) PrismaService fetches transfers with primaryGroupTransactions include; 2) For each transfer: extracts groupTransaction.affectedBarrelIds.length as currentBarrelCount; 3) Gets expectedBarrelCount from transfer.quantity; 4) Calculates reconciliationStatus: NOT_RECONCILED (currentBarrelCount === 0, regardless of expected), PARTIALLY_RECONCILED (currentBarrelCount > 0 AND currentBarrelCount < expectedBarrelCount), FULLY_RECONCILED (all other cases including when currentBarrelCount >= expectedBarrelCount); 5) needsReconciliation = currentBarrelCount === 0 && expectedBarrelCount > 0. No additional services involved - calculation is self-contained using data already fetched. This enables: reconciliation dashboard filtering, prioritization of unreconciled transfers."
+    },
+    {
+      "id": 192,
+      "corrected_answer": "In bulk transfer methods (bulkTransferOwnership, bulkUpdateOwnership, bulkEstablishJointOwnership): 1) Creates GroupTransaction via createTransactionGroup() with type OWNERSHIP_TRANSFER or ADJUSTMENT; 2) GroupTransaction stores: executedBy, executionDate, notes, metadata with filter criteria, and affectedBarrelIds (initially empty); 3) Individual transfers reference groupId in createOwnershipTransaction() which creates OwnershipTransaction audit records; 4) After processing, the relationship is maintained through the groupId reference in individual transactions. This enables: grouping related transfers for audit, rollback capability, reporting on bulk operations, correlation between OwnershipTransaction records and GroupTransaction. Note: totalBarrels field was removed from GroupTransaction model."
+    },
+    {
+      "id": 193,
+      "corrected_answer": "periodBreakdownEventInclude uses Prisma.validator<Prisma.BarrelEventInclude>() for type-safe include definition: includes barrel.barrelOwnerships (latest ownership record with customer id, ordered by createdAt desc, take 1), barrel.location.warehouse, eventType.name, groupTransaction.transactionType. This precise include: 1) Avoids over-fetching by selecting specific fields; 2) Gets nested data in single query via Prisma's join optimization; 3) Provides data needed for categorizeTransaction() which uses eventType.name, groupTransaction.transactionType, and WarehouseJobs.jobType; 4) Type is inferred via Prisma.BarrelEventGetPayload<{ include: typeof periodBreakdownEventInclude }>. Used in period breakdown queries at line 1260 for finance reports."
+    },
+    {
+      "id": 195,
+      "corrected_answer": "In createBarrelWithOwnership(): totalPercentage = owners.reduce((sum, o) => sum + o.ownershipPercentage, 0); if (Math.abs(totalPercentage - 100) > OWNERSHIP_SUM_TOLERANCE) throws Error. OWNERSHIP_SUM_TOLERANCE is exactly 0.001 (defined in constants.ts), which handles: IEEE 754 floating-point representation issues (e.g., 33.33 + 33.33 + 33.34 may not equal exactly 100), user input rounding, JSON serialization precision loss. This allows percentages like 33.333... to work correctly while still catching obvious errors like sum of 95% or 105%. The same validation is also used in the bulkUpdateOwnership flow at line 820."
+    },
+    {
+      "id": 196,
+      "corrected_answer": "In createReconciliation() when input.requiresApproval: 1) After creating ReconciliationRecord, calls the private createApprovalRequest() method (within ReconciliationService, lines 1536-1558) with parameters { reconciliationRecordId, requestType: 'RECONCILIATION', title, description, requestedBy, priority, estimatedImpact, requestData }; 2) createApprovalRequest() creates an ApprovalRequest record via prisma.approvalRequest.create() linked to the ReconciliationRecord; 3) AuditService logs the reconciliation record creation. Note: NotificationService is NOT involved - approvers are not notified automatically. The approval workflow then involves: approvers reviewing via UI, ApprovalRequest status updates, and final resolution updating ReconciliationRecord. Services involved: ReconciliationService (contains createApprovalRequest as private method), AuditService."
+    },
+    {
+      "id": 200,
+      "corrected_answer": "Complete flow: 1) InventoryUploadService.createUploadSession() creates session; 2) Controller saves file, calls queueProcessing() to add job to 'inventory-processing' queue; 3) InventoryProcessingProcessor dequeues and calls processInventorySession(); 4) DataValidationService.validateSession() performs comprehensive validation; 5) processBatch() calls PostgreSQL function process_inventory_batch() which handles barrel creation/updates internally in the database; 6) BarrelProcessingService.processBarrelsForSession() orchestrates via SQL function process_barrel_operations(); 7) ProgressTrackingService tracks session progress; 8) AuditService logs operations at each phase; 9) TrustModeProcessingService handles trust mode if enabled; 10) BarrelEventHelperService creates BarrelEvents for operations. Note: Barrel creation happens via SQL functions, not direct BarrelService.createBarrelWithOwnership() calls. The MicroBatchOrchestrator is a separate processing pathway."
+    },
+    {
+      "id": 202,
+      "corrected_answer": "The system uses OWNERSHIP_SUM_TOLERANCE = 0.001 defined in barrel/constants.ts for floating-point comparison tolerance. However, the actual validation logic varies: 1) In createOwnership(), the system checks currentTotal + newPercentage > 100 with no tolerance; 2) In establishJointOwnership(), totalPercentage !== 100 is checked with exact equality; 3) In validateOwnershipUpdates() for bulk operations, Math.abs(totalPercentage - 100) > 0.01 is used (0.01 tolerance, not 0.001). The OWNERSHIP_SUM_TOLERANCE constant exists but is not consistently used across all validation paths."
+    },
+    {
+      "id": 219,
+      "corrected_answer": "ReconciliationService.createReconciliation() calculates impactLevel using calculateImpactLevel(discrepancies). Each DiscrepancyDetail has severity: 'HIGH', 'MEDIUM', or 'LOW'. The impact level (EnumImpactLevel: LOW, MEDIUM, HIGH) is determined by: 1) If any HIGH severity discrepancies exist, returns HIGH. 2) If total discrepancy count > 3, returns MEDIUM. 3) Otherwise returns LOW. For GroupTransaction or OwnershipTransactionGroup entities with barrel reconciliation data, the service can automatically apply barrel adjustments (add/remove barrels). Failed barrel reconciliation updates status to PENDING with error context but doesn't fail the entire reconciliation creation."
+    },
+    {
+      "id": 225,
+      "corrected_answer": "EnumEventTypeName defines event categories: Entry, Withdrawal, Rework, Reject, TransferIn, TransferOut, Sample, DumpForRegauge, Relocation, Fill, Quality, Inspection, InventoryCheck, InventoryRemoval, InventoryAddition, InventoryUploadAdded, InventoryUploadUpdated, InventoryUploadRemoved, InventoryUploadReconciliationDuplicateRemoved, InventoryUploadDisplaced, InventoryCheckDisplaced, Verified, LabelPrinted, LabelReprinted. Each BarrelEvent records: barrelId, eventTime, createdBy, result, groupTransactionId (optional). EnumBarrelEventSystemStatus (Pending, Accepted, Rejected, Confirmed, PendingDeletion) allows event state management. Events form complete audit trail for regulatory compliance (TTB). GroupTransactionService.executeLotEntry() creates BarrelEvent for each barrel in the transaction."
+    },
+    {
+      "id": 229,
+      "corrected_answer": "EnumInventoryUploadStatus tracks session state with values: uploading, uploaded, processing, completed, failed. EnumInventoryProcessingStatus tracks record state with values: pending, processing, success, error, skipped, validated, processed, trust_mode_skipped. DataValidationService orchestrates validation phases (storage locations, business entities via SQL functions, duplicate barrels) with skip options via ValidationOptions. Failed records are marked with 'error' status and errorMessage; sessions proceed through validation phases but there is no 'CREATED', 'VALIDATING', 'VALIDATED', 'CANCELLED' or 'PROCESSING' states - the actual states are lowercase (uploading, uploaded, processing, completed, failed)."
+    },
+    {
+      "id": 231,
+      "corrected_answer": "GroupTransaction supports two tracking modes via TransactionTrackingMode enum: 1) BARREL_LEVEL (default) - affectedBarrelIds array populated with individual barrel IDs. BarrelEvent created for each barrel. Used for barrel-specific operations. 2) LOT_LEVEL - affectedBarrelIds is empty ([]). Uses CreateLotLevelTransferInput with quantity and unitType from FinancialUnitType enum (PROOF_GALLONS, WINE_GALLONS, BARRELS, COUNT, OTHER). LotLevelTransactionMetadata (interface in service, not a DB model) stores trackingMode, lotNumber, quantityChange, unitType, beforeQuantities, afterQuantities. The GroupTransaction model stores lotQuantityUnits and lotQuantityUnitType directly. Both modes create FinancialTransaction records for accounting."
+    },
+    {
+      "id": 233,
+      "corrected_answer": "When createReconciliation() is called with requiresApproval=true, it creates an ApprovalRequest linked to the ReconciliationRecord via createApprovalRequest(). ApprovalRequest has: requestType (set to 'RECONCILIATION'), title, description, requestedBy, priority, estimatedImpact, requestData (contains reconciliationId and discrepancies). The status is tracked by EnumApprovalRequestStatus (PENDING, APPROVED, REJECTED, CANCELLED, EXPIRED). ApprovalResponse tracks individual approver decisions with EnumApprovalResponseStatus (PENDING, APPROVED, REJECTED, DELEGATED). ApprovalComment allows discussion on the request. The ApprovalRequest model tracks requiredApprovals and currentApprovals for multi-approver workflows."
+    },
+    {
+      "id": 238,
+      "corrected_answer": "EnumLotWhiskeyType enum classifies lot contents: AmericanSingleMalt, CornBourbon, CornWhiskey, RyeBourbon, RyeWhiskey, WheatedBourbon, WheatWhiskey. Lot.WhiskeyType is a relation to the WhiskeyType table (not the enum directly), allowing custom whiskey types with code, name, description, and category fields. LotService.transformLotForMES() uses mapWhiskeyTypeCodeToEnum() to convert the WhiskeyType.code to the MES enum value for system integration. The WhiskeyType model supports TTB hierarchies via isTTBDefinition and ttbWhiskeyType self-relation. Classification affects TTB reporting and MES integration."
+    },
+    {
+      "id": 240,
+      "corrected_answer": "EnumBulkOperationStatus tracks multi-record operations: PENDING, RUNNING, COMPLETED, FAILED, CANCELLED, PARTIAL_SUCCESS. BulkOperation model records: operationType, status, targetEntityType, targetEntityIds, operationData (Json), totalRecords, processedCount, successCount, failedCount, results (Json[]), errors (Json[]), startedAt, completedAt, executedBy, correlationId. Used by reconciliation batch operations. BulkOwnershipOperationResponse (separate from BulkOperation) returns totalRequested, successfulUpdates, failedUpdates, successes array, errors array, operationId, completedAt for bulk ownership transfers. These are distinct structures - BulkOperation is a database model while BulkOwnershipOperationResponse is a GraphQL response type."
+    },
+    {
+      "id": 255,
+      "corrected_answer": "EnumPrinterStatus: ONLINE, OFFLINE, BUSY, ERROR. EnumAutomationPrintJobStatus: PENDING, PROCESSING, COMPLETED (deprecated), PENDING_PRINT, PRINTED, FAILED, CANCELLED. Printer model tracks physical printers with status. AutomationPrintJob tracks label print requests. LabelPrinted and LabelReprinted events (EnumEventTypeName) are recorded for audit trail. printer.dto.ts, printer-config-sync.dto.ts, printer-full-sync.dto.ts manage printer configuration. This enables: automated label printing on barrel fill, reprint on demand, tracking of printed vs unprinted barrels for compliance."
+    },
+    {
+      "id": 258,
+      "corrected_answer": "EnumLotAuditAction: Create, Increase, Decrease, Adjustment - tracks changes to Lot records with quantity-focused actions. LotAuditService (injected into GroupTransactionService) records lot-level changes. EnumBarrelAuditAction (Create, Update, Delete) mirrors for barrel changes. Audit actions recorded with: lotId, action, changedBy, changedAt, quantity snapshots (bblTotal, totalPGs, totalWGs), deltaUnits, deltaUnitType, groupTransactionId, transferId, notes. Lot audits are critical for: TTB compliance (federal regulations require complete lot history), customer reporting, production traceability. All lot modifications (bblTotal, status, quantities) generate audit records."
+    },
+    {
+      "id": 263,
+      "corrected_answer": "trust-mode-config.dto.ts defines a specific 'Trust Android Scans Mode' configuration with: enabled (boolean toggle), cutoffDate (ISO date for AndroidSyncInbox records), and optional description. This mode affects how the system handles Android device scan data, not general validation strictness. Separate ValidationOptions in DataValidationService (skipStorageValidation, skipEntityValidation, skipIntegrityValidation) control validation behavior. Auto-lot creation is handled by validate_business_entities_with_auto_lot_creation() PostgreSQL function, independent of trust mode settings."
+    },
+    {
+      "id": 267,
+      "corrected_answer": "inventory-adjustment.dto.ts defines InventoryUnitType enum with BARRELS, PROOF_GALLONS, WINE_GALLONS, COUNT (similar to but distinct from FinancialUnitType in Prisma schema which has PROOF_GALLONS, WINE_GALLONS, BARRELS, COUNT, OTHER). FinancialTransactionSource enum in schema.prisma includes MANUAL_ADJUSTMENT and PHYSICAL_COUNT for adjustments. InventorySourceType enum in the DTO also includes DAMAGE_WRITE_OFF and FOUND_INVENTORY. InventoryDirection (IN/OUT) tracks adjustment direction. CreateInventoryAdjustmentDto includes AdjustmentType enum (CORRECTION, RECONCILIATION, DAMAGE, FOUND, ROLLBACK), required reason documentation, optional approvedBy field, and metadata for audit trail. InventoryAdjustmentMetadata interface supports additional context including rollback information."
+    },
+    {
+      "id": 269,
+      "corrected_answer": "search-result.dto.ts defines typed search result classes for each entity: BarrelSearchResult (id, serialNumber, cooperageCode, warehouseNumber, lotNumber), CustomerSearchResult (id, name, code, globalId), LotSearchResult (id, lotNumber, recipeName, whiskeyTypeName), SalesOrderSearchResult, PurchaseOrderSearchResult, StorageLocationSearchResult, UserSearchResult, VendorSearchResult, JobSearchResult. SearchResultsDto aggregates all entity results with totalResults count and partialFailures array. SearchService implements PostgreSQL full-text search using to_tsvector/plainto_tsquery for some entities and ILIKE pattern matching for others (barrels, lots, jobs). Results are ranked using ts_rank for relevance. No relevanceScore, entityType, displayName, or matchedField fields exist in the actual DTOs - these are typed per-entity classes, not a unified format."
+    },
+    {
+      "id": 273,
+      "corrected_answer": "purchase-order-line-item.dto.ts defines line items with fields: lineItemQuantity, lineItemItemName, lineItemRate, lineItemDescription, itemId, itemNumber, itemClass, itemGroup, vendorName. purchase-order-with-line-items.dto.ts extends PurchaseOrder with lineItemDetails array. purchase-order-with-receipt.dto.ts tracks receiving with orderedQuantity and receivedQuantity per line item, plus productGroup. EnumPurchaseOrderStatus tracks overall order progress (Planned, Committed, Initiated, InProgress, Complete). This enables: vendor management, receiving verification, cost tracking."
+    },
+    {
+      "id": 274,
+      "corrected_answer": "android-sync-diagnostics.dto.ts is a query filter DTO with startDate, endDate, deviceName, eventType, operator, and groupSimilar parameters for filtering diagnostic queries. device-sync-error-diagnostics.dto.ts (in deviceSyncError module) filters by errorLevel, status, and inboxDeviceName. AndroidSyncInboxService provides: getTotalRecords(), getUnsyncedRecords(), getTransactionTimeoutRecords(), getTimeoutErrorStats(). Timeout error stats include: totalTimeoutErrors, uniqueDevices, errorsByDevice. testTransactionTimeout() validates timeout configuration. These diagnostics enable: proactive error detection, device health monitoring, sync queue management."
+    },
+    {
+      "id": 276,
+      "corrected_answer": "barrel-pivot-filter.dto.ts defines filters: date ranges (entryDateStart, entryDateEnd), customers (customerIds), lots (lotNumbers), and recipes. NOTE: it does NOT include dispositions or locations filters. barrel-pivot-response.dto.ts returns aggregated pivot data with groupBy method, totalCount, and groups array. Pivot enables: cross-tabulation of barrel attributes, trend analysis, comparison reporting. Audit dashboard (audit-filter.dto.ts) provides: operation type/entity type filtering, user activity (userId), session/correlation ID tracking, date range filtering, and search functionality. Both systems support pagination and export capabilities."
+    },
+    {
+      "id": 277,
+      "corrected_answer": "aggregated-storage-entries-response.dto.ts returns paginated storage entries for TTB compliance reporting. aggregated-storage-entry.dto.ts defines per-entry metrics including: periodStart/End, lotNumber, eventCategory (ENTRY, WITHDRAWAL, TRANSFER_IN, DUMP), barrelCount, proofGallons. breakdown.dto.ts provides breakdowns by customer (StorageCustomerBreakdown), whiskey type (StorageWhiskeyTypeBreakdown), and recipe (StorageRecipeBreakdown). NOTE: This is NOT about warehouse locations, occupied positions, or capacity planning - it's specifically for TTB storage compliance aggregation by time period, lot, and event category."
+    },
+    {
+      "id": 280,
+      "corrected_answer": "lot-with-barrel-count.dto.ts returns lots with a computed barrelCount field, described as 'Number of barrels in storage owned by the customer in this lot'. It includes: id, lotNumber, barrelCount. NOTE: lot-with-whiskey-type.dto.ts is NOT a reporting DTO for type classification - it's actually LotCreateWithWhiskeyTypeDto and LotUpdateWithWhiskeyTypeDto for creating/updating lots with whiskeyTypeId and barrelOemCodeId relations. The barrel count represents customer-owned barrels in storage for that lot."
+    },
+    {
+      "id": 281,
+      "corrected_answer": "barrels-filled-aggregate.dto.ts provides fill metrics for labor planning with fields: date, barrelsFilled, configuredHours, personnelOnStaff, totalConfiguredHours (configuredHours * personnelOnStaff), barrelsPerManhour (efficiency metric), and configurationId. barrels-filled-query.dto.ts defines query parameters: startDate, endDate, and groupBy (day/week/month via GroupByType enum). ManhourConfiguration model in schema.prisma contains: hourlyRate, hours, isActive, effectiveDate, expirationDate, weekStart. ManhourConfiguration is referenced in EnumAuditEntityType for tracking changes. Aggregates enable: labor efficiency calculation via barrelsPerManhour metric, personnel tracking via personnelOnStaff and totalConfiguredHours fields."
+    },
+    {
+      "id": 282,
+      "corrected_answer": "create-logo.dto.ts (REST) and CreateCustomerLogoInput (GraphQL in customer-logo.dto.ts) manage logo creation with: customerId, name, description, filename, dataBase64 (Base64 encoded image), mimeType, isCurrent. update-logo.dto.ts and UpdateCustomerLogoInput manage updates with: name, description, dataBase64, isActive, isCurrent. CustomerLogoDto defines logo entity with sync-related fields: syncStatus (EnumLogoSyncStatus), backendId, backendFilePath, backendFilename, lastSyncAt, lastSyncError. EnumLogoSyncStatus values: PENDING, SYNCED, FAILED, DELETED. EnumLogoSyncAction values: CREATE, UPDATE, DELETE, GET, GET_CURRENT. EnumLogoSyncRequestStatus values: PENDING, SENT, ACKNOWLEDGED, FAILED, RETRYING. CustomerLogoSyncRequestDto tracks sync requests with: correlationId, action, logoId, customerGlobalId, status, attempts, maxAttempts, lastAttemptAt, acknowledgedAt, errorMessage. LogoSyncResultOutput returns: correlationId, success, message."
+    },
+    {
+      "id": 283,
+      "corrected_answer": "GetAggregatedStagingRecordsDto provides query parameters for filtering staging records: status (InventoryCheckStagingStatus enum: PENDING, PROCESSING, READY, APPROVED, REJECTED, COMMITTED, ERROR), hasIssues (boolean string), issueTypes (comma-separated list like 'InventoryCheck:BarrelNoLabel,InventoryCheck:OrphanBarrelPrior'), issueFilterLogic (AND/OR via IssueFilterLogic enum), issueLevels (comma-separated EnumDeviceSyncErrorLevel values like 'CRITICAL,ERROR,WARN'). ProcessBarrelFillJobDto defines barrel fill job processing with BarrelFillJobItemInput array containing: serialNumber, fillDate, locationPath, fillWeight, harvestTime, harvestedBy, entryTime, entryBy, typeSize, toast, char. ProcessBarrelFillJobResponse returns: jobId, lotNumber, barrelsCreated, barrelIds."
+    },
+    {
+      "id": 284,
+      "corrected_answer": "upload-csv.dto.ts defines CSV upload with: file (Multer file), customerId (optional), uploadedBy (required), trustAndroidScansMode (boolean), androidScansCutoffDate (ISO 8601 date when trust mode enabled), trustModeDescription (optional), reconciliationMode (marks barrels not in CSV as Rejected with PendingDeletion status). ValidationResult interface provides: isValid, errors[], warnings[], fileInfo (originalName, size, mimeType, encoding). DataValidationService.validateSchemaCompliance() uses SchemaValidationService with Zod schemas. CSV rows map to fields: Notes, Customer, Warehouse, Floor, Tier, Rick, Position, Lot# (LotNumber), Mashbill, Barrel# (BarrelNumber). Validation phases: 1) Schema compliance via Zod (InventoryRowSchema validates field formats/types). 2) Database validation (warehouse/holding location existence via validateWarehouseOrHoldingLocation). 3) Business entity validation via validateBusinessEntities() (lot numbers, customers with auto lot creation). 4) Data integrity via checkDataIntegrity() (duplicate barrel detection). 5) Business rules via validateBusinessRules() (duplicate lot/barrel in batch, customer existence). Invalid rows tracked via InventoryUploadStaging.processingStatus='error' with errorMessage; valid rows proceed to processing."
+    }
+  ]
+}

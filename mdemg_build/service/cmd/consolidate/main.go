@@ -10,9 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
 	"mdemg/internal/hidden"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 // consolidateConfig holds CLI and environment configuration for the consolidation job
@@ -29,6 +30,7 @@ type consolidateConfig struct {
 
 	// Hidden layer parameters
 	HiddenLayerEnabled    bool    // Run hidden layer operations
+	MultiLayer            bool    // Run full multi-layer consolidation (L0-L5)
 	HiddenClusterEps      float64 // DBSCAN epsilon
 	HiddenMinSamples      int     // DBSCAN min samples
 	HiddenMaxNodes        int     // Max hidden nodes to create
@@ -108,6 +110,7 @@ func parseConfig() (consolidateConfig, error) {
 
 	// Hidden layer flags
 	flag.BoolVar(&cfg.HiddenLayerEnabled, "hidden-layer", false, "Enable hidden layer operations")
+	flag.BoolVar(&cfg.MultiLayer, "multi-layer", false, "Run full multi-layer consolidation (L0-L5)")
 	flag.Float64Var(&cfg.HiddenClusterEps, "hidden-eps", 0.3, "DBSCAN epsilon (max distance)")
 	flag.IntVar(&cfg.HiddenMinSamples, "hidden-min-samples", 3, "DBSCAN minimum samples per cluster")
 	flag.IntVar(&cfg.HiddenMaxNodes, "hidden-max-nodes", 100, "Maximum hidden nodes to create")
@@ -264,15 +267,28 @@ func runHiddenLayerJob(ctx context.Context, driver neo4j.DriverWithContext, cfg 
 	fmt.Println("\nExecuting operations...")
 
 	if runClustering {
-		fmt.Println("\nStep 1: Creating hidden nodes from orphan base data...")
-		created, err := svc.CreateHiddenNodes(ctx, cfg.SpaceID)
-		if err != nil {
-			return fmt.Errorf("create hidden nodes: %w", err)
+		if cfg.MultiLayer {
+			fmt.Println("\nStep 1: Running full multi-layer consolidation (L0-L5)...")
+			result, err := svc.RunConsolidation(ctx, cfg.SpaceID)
+			if err != nil {
+				return fmt.Errorf("run multi-layer consolidation: %w", err)
+			}
+			fmt.Printf("  Hidden nodes created: %d\n", result.HiddenNodesCreated)
+			for layer, count := range result.ConceptNodesCreated {
+				fmt.Printf("  Layer %d concept nodes created: %d\n", layer, count)
+			}
+			fmt.Printf("  Total duration: %v\n", result.TotalDuration)
+		} else {
+			fmt.Println("\nStep 1: Creating hidden nodes from orphan base data (L0-L1)...")
+			created, err := svc.CreateHiddenNodes(ctx, cfg.SpaceID)
+			if err != nil {
+				return fmt.Errorf("create hidden nodes: %w", err)
+			}
+			fmt.Printf("  Hidden nodes created: %d\n", created)
 		}
-		fmt.Printf("  Hidden nodes created: %d\n", created)
 	}
 
-	if runForward {
+	if runForward && !cfg.MultiLayer {
 		fmt.Println("\nStep 2: Running forward pass...")
 		result, err := svc.ForwardPass(ctx, cfg.SpaceID)
 		if err != nil {
@@ -283,7 +299,7 @@ func runHiddenLayerJob(ctx context.Context, driver neo4j.DriverWithContext, cfg 
 		fmt.Printf("  Duration: %v\n", result.Duration)
 	}
 
-	if runBackward {
+	if runBackward && !cfg.MultiLayer {
 		fmt.Println("\nStep 3: Running backward pass...")
 		result, err := svc.BackwardPass(ctx, cfg.SpaceID)
 		if err != nil {
@@ -369,12 +385,12 @@ RETURN n.layer AS layer, count(n) AS cnt`
 
 // consolidateStats tracks statistics for the consolidation job
 type consolidateStats struct {
-	clustersFound    int
-	nodesPromoted    int
-	edgesCreated     int
-	skippedNoEmbed   int
-	skippedTooSmall  int
-	samples          []clusterSample // first few clusters for sample output
+	clustersFound   int
+	nodesPromoted   int
+	edgesCreated    int
+	skippedNoEmbed  int
+	skippedTooSmall int
+	samples         []clusterSample // first few clusters for sample output
 }
 
 // clusterSample holds information about a processed cluster for sample output

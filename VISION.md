@@ -111,7 +111,7 @@ This captures the key insight: **relationships are stable, but the conceptual or
 
 MDEMG is evolving from a unified memory store into a **Modular Intelligence Engine**. Specific "Modules" can be plugged into the graph to grant it specialized perception and reasoning skills:
 
-*   **SME Ingestion Modules**: Domain-specific parsers (PLC, P&ID, Jira).
+*   **SME Ingestion Modules**: Domain-specific parsers (PLC, P&ID, Linear, Obsidian).
 *   **Reasoning Modules**: Specialized architectural pattern detectors (NestJS, Go-Micro) and **sophisticated re-ranking logic (LLM Re-ranker)**.
 *   **Active Participant Modules**: Proactive reflection, consistency checking, and explainable retrieval.
 

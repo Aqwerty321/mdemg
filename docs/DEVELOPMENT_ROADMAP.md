@@ -268,22 +268,23 @@ This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 
 - [ ] Trace retrieval path (Vector → Spreading Activation → Final) for explanation.
 - [ ] **Integration**: Connect with the v9 LLM re-ranker to explain *why* specific results were promoted.
 
-### Deliverable 6.2: Module Specification & Registry
-- **Priority**: P1 | **Effort**: 3-4 days
-- [ ] Finalize `mdemg-module.json` schema and Go interfaces (`BaseParser`, `ReasoningModule`).
-- [ ] Implement `/v1/modules` API for registration and state management.
-- [ ] Add `:ModuleRegistry` nodes to Neo4j.
-
-### Deliverable 6.3: Plugin Ingestion Framework
+### Deliverable 6.2: gRPC Module specification & Host
 - **Priority**: P1 | **Effort**: 4-5 days
-- [ ] Refactor `ingest-codebase` to support dynamically loaded parsers via a central `ParserRegistry`.
-- [ ] Port current parsers (Go, TS, Py) to the `BaseParser` module structure.
+- [ ] Finalize `mdemg-module.proto` and generate Go/Python/Node bindings.
+- [ ] Implement the **Plugin Host** in Go (using HashiCorp `go-plugin` or custom gRPC).
+- [ ] Develop the discovery mechanism (scan `/plugins` folder).
 
-### Deliverable 6.4: Active Participant Engine (APE)
+### Deliverable 6.3: Refactored RPC-Based Ingestion
+- **Priority**: P1 | **Effort**: 4-5 days
+- [ ] Refactor `ingest-codebase` to delegate parsing to the RPC layer.
+- [ ] Implement the **first General Modules**: `Linear` (engineering tasks) and `Obsidian` (SME notes).
+- [ ] Port current Go/TS parsers to "Code Perception" modules.
+
+### Deliverable 6.4: The "Internal Dialog" Participant (APE)
 - **Priority**: P2 | **Effort**: 5-7 days
 - [ ] Implement background Consistency Checker (APEModule).
-- [ ] Implement Context Cooler for graduation of short-term task noise.
-- [ ] Implement LLM Reconciler for contradictory memory resolution.
+- [ ] Implement **General Reflection Module**: Periodically synthesizes "Internal Dialog" summaries from all observation sources.
+- [ ] Implement **Constraint Module**: Detects non-code commitments (e.g., "Always use metric units in Whiskey House") and tags them as high-priority constraints.
 
 ---
 

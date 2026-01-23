@@ -31,51 +31,65 @@ Every module is defined by a manifest that specifies its hooks into the MDEMG li
 
 ## 3. Module Types & Go Interfaces
 
-To ensure technical depth and type safety, modules must implement specific Go interfaces.
+To ensure technical depth and type safety while avoiding the fragility of native Go `plugin` binaries, MDEMG utilizes a **gRPC-based Sidecar Architecture**. This allows modules to be written in any language and avoids "dependency hell."
 
 ### A. Ingestion Modules (Perception)
 *   **Deliverable**: `internal/modules/ingest/`
-*   **Interface**:
-```go
-type BaseParser interface {
-    // ID returns the unique identifier for this parser (e.g., "golang-ast")
-    ID() string
-    // Matches returns true if this parser can handle the given file path
-    Matches(filePath string) bool
-    // Parse extracts code elements from the file content
-    Parse(ctx context.Context, filePath string, content []byte) ([]models.CodeElement, error)
+*   **GRPC Service Definition**:
+```proto
+service IngestionModule {
+    rpc Matches(MatchRequest) returns (MatchResponse);
+    rpc Parse(ParseRequest) returns (ParseResponse);
 }
 ```
-*   **Discovery**: Modules are registered at compile-time via an `init()` function into a central `ParserRegistry`.
+*   **General Examples (Non-Code)**:
+    *   **P&ID Module**: Parses industrial process diagrams (XML/SVG).
+    *   **Linear Module**: High-velocity task history and engineering decision chains.
+    *   **Obsidian Module**: Unstructured second-brain notes, research fragments, and personal knowledge graphs.
+    *   **Conversation Module**: Extracts specific commitments from Slack/Discord logs.
 
 ### B. Reasoning Modules (Cognition)
 *   **Deliverable**: `internal/modules/reasoning/`
-*   **Interface**:
-```go
-type ReasoningModule interface {
-    // ID returns the unique identifier (e.g., "llm-reranker")
-    ID() string
-    // Process executes the reasoning logic on a set of nodes or search results
-    Process(ctx context.Context, spaceID string, input any) (any, error)
+*   **GRPC Service Definition**:
+```proto
+service ReasoningModule {
+    rpc Process(ReasonRequest) returns (ReasonResponse);
 }
 ```
-*   **Note**: The **LLM Re-ranking (v9)** should be refactored as a `ReasoningModule`. This allows the retrieval pipeline to stay lean while delegating sophisticated ranking to pluggable logic.
+*   **General Examples (Non-Code)**:
+    *   **Strategic Consistency Module**: Cross-references new decisions against "Company North Star" principles.
+    *   **Logical Conflict Module**: Identifies when a new observation contradicts a 1-year-old "Ground Truth" node.
 
 ### C. Active Participant Modules (APE)
 *   **Deliverable**: `internal/modules/ape/`
-*   **Interface**:
-```go
-type APEModule interface {
-    // Trigger specifies when this module should run (e.g., "on-ingest", "on-session-end", "hourly")
-    Trigger() string
-    // Execute runs the background task
-    Execute(ctx context.Context, driver neo4j.DriverWithContext) error
+*   **GRPC Service Definition**:
+```proto
+service APEModule {
+    rpc Execute(ExecuteRequest) returns (ExecuteResponse);
 }
 ```
 
 ---
 
-## 4. Active Participant Engine (APE) Detail
+## 4. Detailed Technical Implementation Path
+
+### Phase 1: gRPC Plugin Host (The Discovery Layer)
+1.  **Define Protobufs**: Create `mdemg-module.proto` defining the service interfaces above.
+2.  **Plugin Manager**: Develop a Go service that scans a `/plugins` directory for binary executables or a `docker-compose` for sidecar containers.
+3.  **Automatic Handshake**: On startup, MDEMG executes the plugin and performs a handshake to negotiate capabilities (Ingestion vs Reasoning).
+
+### Phase 2: Refactoring Ingest & Retrieval for RPC
+1.  **Ingest Hook**: Instead of hardcoded Go parsers, `IngestObservation` calls the `IngestionModule.Parse` RPC for all registered modules.
+2.  **Retrieval Hook**: Refactor the retrieval pipeline to allow `ReasoningModule.Process` to run between the **Spreading Activation** and **Final Top-K** steps.
+
+### Phase 3: The "General Intelligence" Baseline
+To prove MDEMG isn't just for code, we will implement the **"Internal Dialog Baseline"**:
+*   **Reflection Module**: A module that takes the last 10 observations (regardless of source) and generates a "What I learned today" node.
+*   **Commitment Module**: A module that extracts "IF/THEN" rules from text observations and creates specific `CONSTRAINT` nodes.
+
+---
+
+## 5. Active Participant Engine (APE) Detail
 
 The **APE** orchestrates the lifecycle of the memory graph.
 

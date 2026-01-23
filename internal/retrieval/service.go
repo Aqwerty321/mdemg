@@ -16,12 +16,25 @@ import (
 )
 
 type Service struct {
-	cfg config.Config
-	driver neo4j.DriverWithContext
+	cfg               config.Config
+	driver            neo4j.DriverWithContext
+	reasoningProvider ReasoningProvider
 }
 
 func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
-	return &Service{cfg: cfg, driver: driver}
+	return &Service{
+		cfg:               cfg,
+		driver:            driver,
+		reasoningProvider: &NoOpReasoningProvider{}, // Default: no reasoning modules
+	}
+}
+
+// SetReasoningProvider sets the reasoning provider for the service.
+// This allows reasoning modules to be wired in after service creation.
+func (s *Service) SetReasoningProvider(provider ReasoningProvider) {
+	if provider != nil {
+		s.reasoningProvider = provider
+	}
 }
 
 // Retrieve performs:
@@ -148,7 +161,32 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		results = ScoreAndRank(cands, act, edges, initialTopK, s.cfg, req.QueryText)
 	}
 
-	// 5) LLM Re-ranking (if enabled and query text provided)
+	// 5) Reasoning Module Processing (if available and query text provided)
+	var reasoningModuleID string
+	var reasoningLatencyMs float64
+	var reasoningTokens int
+	if s.reasoningProvider != nil && s.reasoningProvider.Available() && req.QueryText != "" && len(results) > 0 {
+		reasoningReq := ReasoningRequest{
+			QueryText:  req.QueryText,
+			Candidates: results,
+			TopK:       initialTopK,
+			Context: map[string]string{
+				"space_id": req.SpaceID,
+			},
+		}
+
+		reasoningResult, reasoningErr := s.reasoningProvider.Process(ctx, reasoningReq)
+		if reasoningErr != nil {
+			log.Printf("WARN: reasoning module processing failed, using initial results: %v", reasoningErr)
+		} else if len(reasoningResult.Results) > 0 {
+			results = reasoningResult.Results
+			reasoningModuleID = reasoningResult.ModuleID
+			reasoningLatencyMs = reasoningResult.LatencyMs
+			reasoningTokens = reasoningResult.TokensUsed
+		}
+	}
+
+	// 6) LLM Re-ranking (if enabled and query text provided)
 	var rerankLatencyMs float64
 	var rerankTokens int
 	wasReranked := false
@@ -228,18 +266,21 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		SpaceID: req.SpaceID,
 		Results: results,
 		Debug: map[string]any{
-			"candidate_k":       candK,
-			"seed_n":            seedN,
-			"edges_fetched":     len(edges),
-			"hop_depth":         hopDepth,
-			"hybrid_enabled":    s.cfg.HybridRetrievalEnabled,
-			"vector_count":      len(vectorCands),
-			"bm25_count":        bm25Count,
-			"fused_count":       len(cands),
-			"rerank_enabled":    s.cfg.RerankEnabled,
-			"rerank_latency_ms": rerankLatencyMs,
-			"rerank_tokens":     rerankTokens,
-			"jiminy_enabled":    req.JiminyEnabled,
+			"candidate_k":            candK,
+			"seed_n":                 seedN,
+			"edges_fetched":          len(edges),
+			"hop_depth":              hopDepth,
+			"hybrid_enabled":         s.cfg.HybridRetrievalEnabled,
+			"vector_count":           len(vectorCands),
+			"bm25_count":             bm25Count,
+			"fused_count":            len(cands),
+			"reasoning_module":       reasoningModuleID,
+			"reasoning_latency_ms":   reasoningLatencyMs,
+			"reasoning_tokens":       reasoningTokens,
+			"rerank_enabled":         s.cfg.RerankEnabled,
+			"rerank_latency_ms":      rerankLatencyMs,
+			"rerank_tokens":          rerankTokens,
+			"jiminy_enabled":         req.JiminyEnabled,
 		},
 	}
 	return resp, nil

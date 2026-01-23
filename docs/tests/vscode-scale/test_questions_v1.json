@@ -1,0 +1,431 @@
+{
+  "metadata": {
+    "codebase": "vscode",
+    "version": "v1",
+    "created": "2026-01-23",
+    "total_questions": 60,
+    "categories": 6
+  },
+  "questions": [
+    {
+      "id": "ext_001",
+      "category": "extension_api",
+      "question": "In VS Code's extension activation system, what class is used to track timing metrics during extension activation, and what three specific time measurements does it capture?",
+      "answer": "The ExtensionActivationTimesBuilder class is used to track timing metrics. It captures three specific measurements: codeLoadingTime (time to load the extension's code), activateCallTime (time to call the activate function), and activateResolvedTime (time for async activation to finish).",
+      "difficulty": "medium"
+    },
+    {
+      "id": "ext_002",
+      "category": "extension_api",
+      "question": "What is the name of the special class that represents an extension whose dependency failed to activate, and what default values does it pass to its parent ActivatedExtension constructor?",
+      "answer": "The class is called FailedExtension. It passes activationFailed=true, the activationError as activationFailedError, ExtensionActivationTimes.NONE for activation times, an empty module object { activate: undefined, deactivate: undefined }, undefined for exports, and Disposable.None for the disposable.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "ext_003",
+      "category": "extension_api",
+      "question": "In the ExtensionContext provided to extensions at activation, what property provides access to environment variable collection management, and which internal service backs this functionality?",
+      "answer": "The environmentVariableCollection property provides access to environment variable collection management. It is backed by the _extHostTerminalService through the call that._extHostTerminalService.getEnvironmentVariableCollection(extensionDescription).",
+      "difficulty": "medium"
+    },
+    {
+      "id": "ext_004",
+      "category": "extension_api",
+      "question": "In the views extension point schema, what are the three valid values for the 'visibility' property of a contributed view, and what is the default value?",
+      "answer": "The three valid values are 'visible', 'hidden', and 'collapsed'. The default value is 'visible'. These are defined in the InitialVisibility enum.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "ext_005",
+      "category": "extension_api",
+      "question": "What is the purpose of the _alreadyActivatedEvents map in the ExtensionsActivator class, and how does the activateByEvent method use it?",
+      "answer": "The _alreadyActivatedEvents map is used to cache activation events that have already been processed, speeding up repeated calls with the same activation event. In activateByEvent(), the method first checks if the activation event exists in _alreadyActivatedEvents - if it does, the method returns immediately.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "ext_006",
+      "category": "extension_api",
+      "question": "In the MainThread-ExtHost RPC protocol, how many proxy identifiers are defined in the MainContext object, and name three proxy identifiers related to notebook functionality.",
+      "answer": "The MainContext object defines 72 proxy identifiers. Three notebook-related identifiers are: MainThreadNotebook, MainThreadNotebookKernels, and MainThreadNotebookDocuments.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "ext_007",
+      "category": "extension_api",
+      "question": "What is the time budget (in milliseconds) that the _activateAllStartupFinishedDeferred method uses when deferring activation of onStartupFinished extensions?",
+      "answer": "The time budget is 50 milliseconds (const timeBudget = 50). When this budget is exceeded during iteration through extensions, the method sets a new task via setTimeout0 to continue activating the remaining extensions.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "ext_008",
+      "category": "extension_api",
+      "question": "In the status bar extension point service, what two special background color IDs trigger automatic mapping to StatusbarEntryKind?",
+      "answer": "The two special background color IDs are STATUS_BAR_ERROR_ITEM_BACKGROUND and STATUS_BAR_WARNING_ITEM_BACKGROUND. When detected, they set the 'kind' property to 'error' or 'warning' respectively.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "ext_009",
+      "category": "extension_api",
+      "question": "In the createApiFactoryAndRegisterActors function, what method is called on rpcProtocol after registering all ExtHost proxy identifiers to verify registration?",
+      "answer": "The method assertRegistered is called: rpcProtocol.assertRegistered(expected), where 'expected' is obtained from Object.values<ProxyIdentifier<any>>(ExtHostContext).",
+      "difficulty": "medium"
+    },
+    {
+      "id": "ext_010",
+      "category": "extension_api",
+      "question": "What three ExtensionHostKind values does the MainThreadExtensionService use to determine how to record performance marks via the timer service?",
+      "answer": "The three ExtensionHostKind values are: LocalProcess (marks recorded as 'localExtHost'), LocalWebWorker (marks recorded as 'workerExtHost'), and remote extension hosts (marks recorded as 'remoteExtHost').",
+      "difficulty": "medium"
+    },
+    {
+      "id": "edt_001",
+      "category": "editor_textmodel",
+      "question": "In VS Code's piece tree text buffer implementation, what is the constant value used for AverageBufferSize when determining whether to split large text content?",
+      "answer": "65535. This constant is defined at the top of pieceTreeBase.ts and is used to determine when text content is large enough to be split into smaller chunks.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "edt_002",
+      "category": "editor_textmodel",
+      "question": "In the PieceTreeBase class, what two metadata fields does each TreeNode maintain to track information about its left subtree?",
+      "answer": "size_left and lf_left. size_left represents the total character count/size of the left subtree, and lf_left represents the total line feed count in the left subtree.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "edt_003",
+      "category": "editor_textmodel",
+      "question": "In VS Code's TextModel class, what are the three threshold values used to determine if a file is 'too large' for various operations?",
+      "answer": "LARGE_FILE_SIZE_THRESHOLD (20 MB), LARGE_FILE_LINE_COUNT_THRESHOLD (300,000 lines), and LARGE_FILE_HEAP_OPERATION_THRESHOLD (256 MB characters).",
+      "difficulty": "hard"
+    },
+    {
+      "id": "edt_004",
+      "category": "editor_textmodel",
+      "question": "What is the cache limit size for the PieceTreeSearchCache class, and how does the cache behave when this limit is reached?",
+      "answer": "The cache limit is 1. When the limit is reached, the cache uses shift() to remove the oldest entry before adding a new one (FIFO behavior).",
+      "difficulty": "hard"
+    },
+    {
+      "id": "edt_005",
+      "category": "editor_textmodel",
+      "question": "In VS Code's CursorCollection class, what is the relationship between cursors[0] and the rest of the cursors array?",
+      "answer": "cursors[0] is the primary cursor, and cursors.slice(1) are secondary cursors. The lastAddedCursorIndex field tracks the most recently added/moved cursor.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "edt_006",
+      "category": "editor_textmodel",
+      "question": "What are the three possible values of the SelectionStartKind enum in VS Code's cursor implementation?",
+      "answer": "The three values are Simple (0), Word (1), and Line (2). It is used in the SingleCursorState class to track the selectionStartKind property.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "edt_007",
+      "category": "editor_textmodel",
+      "question": "In VS Code's IntervalTree for decorations, what is the purpose of the MIN_SAFE_DELTA and MAX_SAFE_DELTA constants, and what are their values?",
+      "answer": "MIN_SAFE_DELTA is -(1 << 30) and MAX_SAFE_DELTA is (1 << 30). These constants prevent integer overflow during deletion operations where node deltas can grow dramatically.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "edt_008",
+      "category": "editor_textmodel",
+      "question": "In the ViewZones class, what is the default ordinal value used when computing zone order if neither ordinal nor afterColumn is specified?",
+      "answer": "10000. The _getZoneOrdinal method returns zone.ordinal ?? zone.afterColumn ?? 10000.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "edt_009",
+      "category": "editor_textmodel",
+      "question": "In VS Code's content widget implementation, what are the three ContentWidgetPositionPreference enum values that determine where a widget can be placed?",
+      "answer": "EXACT (0), ABOVE (1), and BELOW (2). EXACT places the widget at the exact position, ABOVE places it above, and BELOW places it below.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "edt_010",
+      "category": "editor_textmodel",
+      "question": "In the PieceTreeTextBufferBuilder class, what determines if EOL should be normalized to CRLF vs LF based on the counted line endings?",
+      "answer": "If totalCRCount (cr + crlf) is greater than totalEOLCount (cr + lf + crlf) / 2, then CRLF is used. Otherwise LF is used.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "wkb_001",
+      "category": "workbench_layout",
+      "question": "In VS Code's workbench layout, what is the static HEIGHT constant defined for StatusbarPart?",
+      "answer": "The static HEIGHT constant is 22 pixels. This value is used for both minimumHeight and maximumHeight of the status bar.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "wkb_002",
+      "category": "workbench_layout",
+      "question": "What are the three possible values for the CompositeBarPosition enum in the paneCompositePart.ts file?",
+      "answer": "The three possible values are: TOP (0), TITLE (1), and BOTTOM (2). These determine where the composite bar is positioned within a pane composite part.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "wkb_003",
+      "category": "workbench_layout",
+      "question": "In the ActivitybarPart class, what is the static ACTION_HEIGHT constant and what storage keys are used for pinned view containers?",
+      "answer": "ACTION_HEIGHT is 48 pixels. Storage keys are: pinnedViewContainersKey = 'workbench.activity.pinnedViewlets2', placeholderViewContainersKey = 'workbench.activity.placeholderViewlets', viewContainersWorkspaceStateKey = 'workbench.activity.viewletsWorkspaceState'.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "wkb_004",
+      "category": "workbench_layout",
+      "question": "In the SidebarPart class, what is the minimumWidth and what is the activeViewletSettingsKey?",
+      "answer": "The minimumWidth is 170 pixels. The activeViewletSettingsKey is 'workbench.sidebar.activeviewletid'.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "wkb_005",
+      "category": "workbench_layout",
+      "question": "What are the static height constants defined in the PartLayout class for header, title, and footer areas?",
+      "answer": "HEADER_HEIGHT = 35 pixels, TITLE_HEIGHT = 35 pixels, and Footer_HEIGHT = 35 pixels (note the inconsistent casing with uppercase 'F' in Footer).",
+      "difficulty": "medium"
+    },
+    {
+      "id": "wkb_006",
+      "category": "workbench_layout",
+      "question": "In the PanelPart class, what is the minimumHeight, and how is the preferredHeight calculated?",
+      "answer": "The minimumHeight is 77 pixels. The preferredHeight is calculated as 40% (0.4) of the main container's height dimension.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "wkb_007",
+      "category": "workbench_layout",
+      "question": "What CSS class names are defined in the LayoutClasses enum for controlling workbench visibility states?",
+      "answer": "SIDEBAR_HIDDEN = 'nosidebar', MAIN_EDITOR_AREA_HIDDEN = 'nomaineditorarea', PANEL_HIDDEN = 'nopanel', AUXILIARYBAR_HIDDEN = 'noauxiliarybar', STATUSBAR_HIDDEN = 'nostatusbar', FULLSCREEN = 'fullscreen', MAXIMIZED = 'maximized', WINDOW_BORDER = 'border'.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "wkb_008",
+      "category": "workbench_layout",
+      "question": "In the AbstractPaneCompositePart class, what is the MIN_COMPOSITE_BAR_WIDTH constant and what empty pane message is displayed?",
+      "answer": "MIN_COMPOSITE_BAR_WIDTH is 50 pixels. The empty pane message is 'Drag a view here to display.'",
+      "difficulty": "medium"
+    },
+    {
+      "id": "wkb_009",
+      "category": "workbench_layout",
+      "question": "In the CompositeBar class, what ARIA role and label are assigned to the action bar for accessibility?",
+      "answer": "ariaRole: 'tablist' and ariaLabel: 'Active View Switcher'.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "wkb_010",
+      "category": "workbench_layout",
+      "question": "In the BrowserTitlebarPart class, what is the default height returned by minimumHeight when the command center is visible?",
+      "answer": "When the command center is visible, it uses DEFAULT_CUSTOM_TITLEBAR_HEIGHT from the window module, otherwise 30 pixels. The value is divided by getZoomFactor if preventZoom is true.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "svc_001",
+      "category": "services_di",
+      "question": "In VS Code's dependency injection system, what are the two internal properties stored on a constructor function to track DI metadata?",
+      "answer": "The two properties are '$di$target' (DI_TARGET) and '$di$dependencies' (DI_DEPENDENCIES), stored in the _util namespace within instantiation.ts.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "svc_002",
+      "category": "services_di",
+      "question": "What is the purpose of the 'supportsDelayedInstantiation' property in SyncDescriptor?",
+      "answer": "When supportsDelayedInstantiation is true, InstantiationService creates a Proxy object backed by a GlobalIdleValue instead of immediately instantiating the service. The actual service instance is created lazily when first accessed.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "svc_003",
+      "category": "services_di",
+      "question": "In the extensions.ts file for instantiation, what are the two values in the InstantiationType enum?",
+      "answer": "The enum has Eager (value 0) which instantiates immediately, and Delayed (value 1) which instantiates only when actually used.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "svc_004",
+      "category": "services_di",
+      "question": "What method does the Graph class use to detect cyclic dependencies in service instantiation?",
+      "answer": "The method is findCycleSlow(). It's described as 'brute force and slow' because it iterates through all nodes and performs DFS with a seen set for each node.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "svc_005",
+      "category": "services_di",
+      "question": "What are the three StorageScope values defined in storage.ts, and what numeric values are they assigned?",
+      "answer": "APPLICATION (-1) for data across all workspaces/profiles, PROFILE (0) for data in same profile, WORKSPACE (1) for current workspace only.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "svc_006",
+      "category": "services_di",
+      "question": "In the LifecycleMainService, what are the four LifecycleMainPhase values in order?",
+      "answer": "Starting (1), Ready (2), AfterWindowOpen (3), and Eventually (4). Event listeners are registered when the Ready phase is reached.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "svc_007",
+      "category": "services_di",
+      "question": "In the ServiceCollection class, what does the set() method return when adding a service?",
+      "answer": "The set() method returns the previous value that was registered for that ServiceIdentifier (or undefined if none existed).",
+      "difficulty": "easy"
+    },
+    {
+      "id": "svc_008",
+      "category": "services_di",
+      "question": "What is the default flush interval for AbstractStorageService?",
+      "answer": "The default flush interval is 60000 milliseconds (60 seconds / 1 minute), defined as DEFAULT_FLUSH_INTERVAL.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "svc_009",
+      "category": "services_di",
+      "question": "In the createDecorator function, what validation is performed and what error is thrown if the decorator is used incorrectly?",
+      "answer": "It checks if arguments.length !== 3 (target, key, index), and throws 'Error: @IServiceName-decorator can only be used to decorate a parameter'.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "svc_010",
+      "category": "services_di",
+      "question": "How does BrowserLifecycleService handle vetos differently from the desktop version?",
+      "answer": "BrowserLifecycleService logs an error for promises in veto handlers stating 'Long running operations before shutdown are unsupported in the web', and immediately treats them as vetoes.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "lng_001",
+      "category": "language_features",
+      "question": "In VS Code's code action architecture, what is the default delay (in milliseconds) that the CodeActionOracle uses before auto-triggering code actions?",
+      "answer": "250 milliseconds. The CodeActionOracle constructor has a private readonly _delay parameter with a default value of 250.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "lng_002",
+      "category": "language_features",
+      "question": "In the ManagedCodeActionSet class, how are AI-generated code actions sorted relative to non-AI code actions?",
+      "answer": "AI code actions are sorted AFTER non-AI code actions (return 1 if a.isAI && !b.isAI, return -1 if !a.isAI && b.isAI).",
+      "difficulty": "medium"
+    },
+    {
+      "id": "lng_003",
+      "category": "language_features",
+      "question": "What is the contribution ID used to register the CodeLensContribution in VS Code's editor?",
+      "answer": "The contribution ID is 'css.editor.codeLens', which is surprising because it uses a 'css' prefix despite being the general CodeLens contribution.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "lng_004",
+      "category": "language_features",
+      "question": "In the CodeLensCache implementation, what is the storage key used for persisting CodeLens data, and what was the old key?",
+      "answer": "The current storage key is 'codelens/cache2' and the old key that gets removed is 'codelens/cache'.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "lng_005",
+      "category": "language_features",
+      "question": "What are the two validation criteria that determine if a Hover result is considered valid?",
+      "answer": "A Hover result is valid if it has a defined range AND it has non-empty contents (result.contents is defined, truthy, and has length > 0).",
+      "difficulty": "easy"
+    },
+    {
+      "id": "lng_006",
+      "category": "language_features",
+      "question": "In the MarkdownHoverParticipant class, what is the value of hoverOrdinal?",
+      "answer": "The hoverOrdinal value is 3. This determines the sorting order when multiple hover participants contribute content.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "lng_007",
+      "category": "language_features",
+      "question": "In the suggest/completions system, what three possible values can the SnippetSortOrder enum have?",
+      "answer": "Top (0), Inline (1), and Bottom (2). The default value in CompletionOptions.default is SnippetSortOrder.Bottom.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "lng_008",
+      "category": "language_features",
+      "question": "In the SuggestModel class, what percentage of completion duration telemetry reports are actually sent?",
+      "answer": "Only 0.01% of telemetry reports are sent. Implemented with: if (Math.random() > 0.0001) { return; }",
+      "difficulty": "hard"
+    },
+    {
+      "id": "lng_009",
+      "category": "language_features",
+      "question": "In the WordHighlighter class, what configuration key controls the delay before highlighting occurrences?",
+      "answer": "The configuration key is 'editor.occurrencesHighlightDelay'.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "lng_010",
+      "category": "language_features",
+      "question": "In the LightBulbWidget class, how many different icon variations are registered for gutter lightbulb decorations?",
+      "answer": "Five icons: GUTTER_LIGHTBULB_ICON, GUTTER_LIGHTBULB_AUTO_FIX_ICON, GUTTER_LIGHTBULB_AIFIX_ICON, GUTTER_LIGHTBULB_AIFIX_AUTO_FIX_ICON, and GUTTER_SPARKLE_FILLED_ICON.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "cmd_001",
+      "category": "commands_actions",
+      "question": "In the CommandsRegistry implementation, what data structure is used to store commands internally?",
+      "answer": "Map<string, LinkedList<ICommand>>. This LinkedList allows multiple commands with the same ID - new ones are added to the front with unshift().",
+      "difficulty": "medium"
+    },
+    {
+      "id": "cmd_002",
+      "category": "commands_actions",
+      "question": "What is the storage key used by PersistedMenuHideState to persist hidden menu commands?",
+      "answer": "The storage key is 'menu.hiddenCommands'. It uses StorageScope.PROFILE and StorageTarget.USER when persisting.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "cmd_003",
+      "category": "commands_actions",
+      "question": "What command is registered by default in the CommandsRegistry singleton at initialization time?",
+      "answer": "The 'noop' command is registered with an empty function handler: CommandsRegistry.registerCommand('noop', () => { }).",
+      "difficulty": "easy"
+    },
+    {
+      "id": "cmd_004",
+      "category": "commands_actions",
+      "question": "In the MenuRegistry, what special behavior occurs when getMenuItems() is called with MenuId.CommandPalette?",
+      "answer": "The registry calls _appendImplicitItems() which adds all registered commands that aren't already in the result, making CommandPalette show all commands by default.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "cmd_005",
+      "category": "commands_actions",
+      "question": "What happens when you try to create a new MenuId with an identifier that already exists?",
+      "answer": "The constructor throws TypeError: `MenuId with identifier '${identifier}' already exists. Use MenuId.for(ident) or a unique identifier`.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "cmd_006",
+      "category": "commands_actions",
+      "question": "In the registerAction2 function, what three things are registered when f1 is set to true?",
+      "answer": "1) Command appended to MenuId.CommandPalette with precondition as 'when' clause, 2) Command added to MenuRegistry via addCommand(), 3) Command registered with CommandsRegistry.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "cmd_007",
+      "category": "commands_actions",
+      "question": "What is the default eventDebounceDelay value set by MenuService when creating a menu?",
+      "answer": "The default eventDebounceDelay is 50 milliseconds. MenuImpl uses a DebounceEmitter for the _onDidChange event.",
+      "difficulty": "medium"
+    },
+    {
+      "id": "cmd_008",
+      "category": "commands_actions",
+      "question": "In the ActionViewItemService, how is the key constructed for storing action view item providers?",
+      "answer": "`${menu.id}/${(commandOrMenuId instanceof MenuId ? commandOrMenuId.id : commandOrMenuId)}` - combining menu id and command/submenu id with a forward slash.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "cmd_009",
+      "category": "commands_actions",
+      "question": "In the MenuInfo._compareMenuItems method, what special treatment does the 'navigation' group receive?",
+      "answer": "The 'navigation' group always sorts before any other group (returns -1). Falsy groups always sort last. After group comparison, items sort by 'order' then title.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "cmd_010",
+      "category": "commands_actions",
+      "question": "What is the command ID used by the MenuHiddenStatesReset action that resets all hidden menu states?",
+      "answer": "The command ID is 'menu.resetHiddenStates' with category Categories.View. It accesses IMenuService and ILogService.",
+      "difficulty": "easy"
+    }
+  ]
+}

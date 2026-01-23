@@ -58,7 +58,7 @@ cd mdemg
 docker compose up -d
 
 # Apply migrations
-for f in mdemg_build/migrations/V*.cypher; do
+for f in migrations/V*.cypher; do
   docker exec -i mdemg-neo4j cypher-shell -u neo4j -p testpassword < "$f"
 done
 
@@ -82,7 +82,7 @@ Add to `~/.cursor/mcp.json`:
 {
   "mcpServers": {
     "mdemg": {
-      "command": "/path/to/mdemg/mdemg_build/mcp-server/mdemg-mcp",
+      "command": "/path/to/mdemg/cmd/mcp-server/mdemg-mcp",
       "args": [],
       "env": {
         "MDEMG_ENDPOINT": "http://localhost:8082"
@@ -102,26 +102,43 @@ Add to `~/.cursor/mcp.json`:
 | `memory_reflect` | Deep exploration of a topic |
 | `memory_status` | Check system health |
 
+## Benchmarks & Performance
+
+MDEMG has been rigorously tested against large-scale industrial codebases, including **whk-wms** (792K LOC) and **plc-gbt** (Industrial Control Systems). The transition from the v4 baseline to the v11 production iteration resulted in a **29.3% improvement** in average retrieval quality and a **7.5x increase** in high-confidence architectural reasoning.
+
+**Key v11 Results (whk-wms):**
+*   **Average Retrieval Score**: 0.733 (vs 0.567 baseline)
+*   **High Confidence Rate (Score > 0.7)**: 75%
+*   **Retrieval Latency**: < 50ms
+*   **Token Efficiency**: 99.7% reduction in token cost per query.
+
+**Cross-Codebase Validation (plc-gbt):**
+*   **Average Retrieval Score**: 0.719
+*   **High Confidence Rate**: 58%
+*   **ICS-Specific Performance**: Verified 0.71+ scores for control loop and data model architecture.
+
+For a detailed breakdown of the technical evolution and performance metrics across all iterations, see the [Up-to-Date Benchmark Summary](docs/tests/UP_TO_DATE_BENCHMARK_SUMMARY.md).
+
 ## Documentation
 
-- [HANDOFF.md](HANDOFF.md) - Development status and quickstart
-- [CLAUDE.md](CLAUDE.md) - AI assistant context
-- [Architecture](mdemg_build/docs/01_Architecture.md) - System design
-- [Graph Schema](mdemg_build/docs/02_Graph_Schema.md) - Labels and relationships
-- [Retrieval & Scoring](mdemg_build/docs/06_Retrieval_API_and_Scoring.md) - Scoring algorithm
+- [Vision & Architecture](VISION.md) - Core philosophy and design
+- [Detailed Benchmarks](docs/tests/UP_TO_DATE_BENCHMARK_SUMMARY.md) - Evolution from v4 to v11
+- [Repo-to-Public Roadmap](docs/repo-to-public-roadmap.md) - Plan for open-source transition
+- [Architecture Details](docs/01_Architecture.md) - System design
+- [Graph Schema](docs/02_Graph_Schema.md) - Labels and relationships
+- [Retrieval & Scoring](docs/06_Retrieval_API_and_Scoring.md) - Scoring algorithm details
 
 ## Project Structure
 
 ```
 mdemg/
-├── mdemg_build/
-│   ├── service/          # Go HTTP service
-│   ├── mcp-server/       # MCP server for agent integration
-│   ├── migrations/       # Neo4j schema migrations
-│   └── docs/             # Technical documentation
+├── cmd/                  # Binaries (Server, MCP, Ingest, etc.)
+├── internal/             # Private core logic (Retrieval, Learning, APE)
+├── pkg/                  # Importable Go client logic
+├── migrations/           # Neo4j schema migrations (Cypher)
+├── docs/                 # Technical documentation & Benchmarks
 ├── docker-compose.yml    # Neo4j container
-├── start-mdemg.sh        # One-command startup
-└── HANDOFF.md            # Development status
+└── start-mdemg.sh        # One-command startup
 ```
 
 ## Emergent Behaviors

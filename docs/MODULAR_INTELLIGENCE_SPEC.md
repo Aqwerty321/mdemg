@@ -250,14 +250,33 @@ type JiminyExplanation struct {
 
 ## 6. Implementation Roadmap
 
-### Phase 6.1: Ingestion Plugin Architecture
-*   Refactor `ingest-codebase` to use an interface-based parser registry.
-*   Implement the `BaseParser` interface.
+### Phase 6.1: Ingestion Plugin Architecture ✅ COMPLETE
+*   ✅ Binary sidecar architecture with gRPC over Unix sockets
+*   ✅ Plugin Manager scans `/plugins` directory
+*   ✅ Manifest-based module configuration
+*   ✅ Health checks with auto-restart (max 3 attempts, exponential backoff)
 
-### Phase 6.2: Module Manifest & Registry
-*   Create the `/v1/modules` API for registering and configuring modules.
-*   Store module state in Neo4j under a `:ModuleRegistry` label.
+### Phase 6.2: Module Manifest & Registry ✅ COMPLETE
+*   ✅ `GET /v1/modules` API lists all loaded modules with status
+*   ✅ `POST /v1/modules/{id}/sync` triggers ingestion module sync
+*   ✅ Module state tracked in memory (not Neo4j - avoids DB coupling)
 
-### Phase 6.3: Active Participant Orchestrator
-*   Implement the APE as a long-running Go routine within the server.
-*   Add event-based triggers (e.g., trigger `reflection` module on `session-end`).
+### Phase 6.3: Active Participant Orchestrator ✅ COMPLETE
+*   ✅ APE Scheduler (`internal/ape/scheduler.go`) with cron support
+*   ✅ Event-triggered execution (`session_end`, `consolidate`, etc.)
+*   ✅ `GET /v1/ape/status` and `POST /v1/ape/trigger` APIs
+*   ✅ Sample `reflection-module` demonstrating APE pattern
+
+### Phase 6.4: Reasoning Pipeline Integration ✅ COMPLETE
+*   ✅ `ReasoningProvider` interface (`internal/retrieval/reasoning.go`)
+*   ✅ `PluginReasoningProvider` wraps plugin manager
+*   ✅ Reasoning modules called after initial scoring, before LLM rerank
+*   ✅ Sample `keyword-booster` module demonstrating pattern
+
+### Production Modules Implemented
+| Module | Type | Status |
+|--------|------|--------|
+| `echo-module` | INGESTION | ✅ Test module |
+| `linear-module` | INGESTION | ✅ Full Linear API integration |
+| `keyword-booster` | REASONING | ✅ Query keyword boosting |
+| `reflection-module` | APE | ✅ Session reflection |

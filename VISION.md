@@ -115,6 +115,14 @@ MDEMG is evolving from a unified memory store into a **Modular Intelligence Engi
 *   **Reasoning Modules**: Specialized architectural pattern detectors (NestJS, Go-Micro) and **sophisticated re-ranking logic (LLM Re-ranker)**.
 *   **Active Participant Modules**: Proactive reflection, consistency checking, and explainable retrieval.
 
+### Benchmarking & Performance Validation
+
+MDEMG's effectiveness is continuously validated through rigorous benchmarking against real-world industrial codebases. The system has demonstrated a **29.3% lift in retrieval quality** and a **7.5x increase in high-confidence reasoning** through its iterative development. For the complete performance trajectory, see the [Up-to-Date Benchmark Summary](docs/tests/UP_TO_DATE_BENCHMARK_SUMMARY.md).
+
+### Public Repository Standards
+
+To facilitate global collaboration while maintaining the core system's integrity, MDEMG follows strict public-readiness standards. This ensures that the engine is secure, the architecture is extensible for contributors, and the "Internal Dialog" remains a reliable substrate for all AI agents. (See [Repo-to-Public Roadmap](docs/repo-to-public-roadmap.md) for the full strategy).
+
 #### Integration with Retrieval Pipeline
 Modules integrate with the retrieval pipeline at three critical points:
 1.  **Candidate Selection**: Perception modules tag nodes during ingest, allowing filtered recall.

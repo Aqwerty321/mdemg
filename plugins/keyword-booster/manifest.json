@@ -1,0 +1,15 @@
+{
+  "id": "keyword-booster",
+  "name": "Keyword Booster Reasoning Module",
+  "version": "1.0.0",
+  "type": "REASONING",
+  "binary": "keyword-booster",
+  "capabilities": {
+    "pattern_detectors": ["keyword_match", "term_frequency"]
+  },
+  "health_check_interval_ms": 5000,
+  "startup_timeout_ms": 10000,
+  "config": {
+    "boost_factor": "0.2"
+  }
+}

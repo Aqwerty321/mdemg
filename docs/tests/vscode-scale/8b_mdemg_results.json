@@ -1,0 +1,96 @@
+{
+  "test_config": {
+    "model": "qwen2.5-coder:7b",
+    "mdemg_space": "vscode-scale",
+    "mdemg_nodes": 28960,
+    "date": "2026-01-23"
+  },
+  "results": [
+    {
+      "id": "ev_001",
+      "question": "EDITOR_FONT_DEFAULTS fontSize",
+      "mdemg_top_file": "/src/vs/editor/common/textModelEvents.ts",
+      "mdemg_score": 0.81,
+      "model_answer": {"file_path": "/src/vs/platform/theme/common/colors/editorColors.ts", "value": 14},
+      "ground_truth": {"file_path": "src/vs/editor/common/config/fontInfo.ts", "value": "12 (Mac), 14 (Win/Linux)"},
+      "correct_value": true,
+      "correct_file": false,
+      "notes": "Value correct (14 for Windows), file path wrong"
+    },
+    {
+      "id": "ev_002",
+      "question": "DEFAULT_FLUSH_INTERVAL storage",
+      "mdemg_top_file": "/src/vs/base/node/pfs.ts",
+      "mdemg_score": 0.59,
+      "model_answer": {"file_path": "/src/vs/base/node/storage.ts", "value": 1000},
+      "ground_truth": {"file_path": "src/vs/platform/storage/common/storage.ts", "value": 60000},
+      "correct_value": false,
+      "correct_file": false,
+      "notes": "Both wrong - 8B guessed 1000, actual is 60000"
+    },
+    {
+      "id": "ev_004",
+      "question": "SidebarPart minimumWidth",
+      "mdemg_top_file": "/src/vs/workbench/browser/parts/paneCompositeBar.ts",
+      "mdemg_score": 0.80,
+      "model_answer": {"symbol": "minimumWidth", "value": 200},
+      "ground_truth": {"file_path": "src/vs/workbench/browser/parts/sidebar/sidebarPart.ts", "value": 170},
+      "correct_value": false,
+      "correct_file": false,
+      "notes": "8B guessed 200, actual is 170"
+    },
+    {
+      "id": "ev_007",
+      "question": "hover delay EditorOptions",
+      "mdemg_top_file": "/src/vs/workbench/contrib/scm/browser/scmHistory.ts",
+      "mdemg_score": 0.90,
+      "model_answer": {"file_path": "/src/vs/editor/common/config/editorOptions.ts", "value": 300},
+      "ground_truth": {"file_path": "src/vs/editor/common/config/editorOptions.ts", "value": 300},
+      "correct_value": true,
+      "correct_file": true,
+      "notes": "CORRECT - Both value and file"
+    },
+    {
+      "id": "ev_011",
+      "question": "quickSuggestionsDelay default",
+      "mdemg_top_file": "/src/vs/editor/common/standaloneStrings.ts",
+      "mdemg_score": 0.82,
+      "model_answer": {"file_path": "/src/vs/editor/common/config/editorOptions.ts", "value": 100},
+      "ground_truth": {"file_path": "src/vs/editor/common/config/editorOptions.ts", "value": 10},
+      "correct_value": false,
+      "correct_file": true,
+      "notes": "File correct, value wrong (100 vs 10)"
+    },
+    {
+      "id": "ev_014",
+      "question": "DEFAULT_MAX_SEARCH_RESULTS",
+      "mdemg_top_file": "/src/vs/editor/common/model/textModelSearch.ts",
+      "mdemg_score": 0.77,
+      "model_answer": {"value": 1000},
+      "ground_truth": {"file_path": "src/vs/workbench/services/search/common/search.ts", "value": 20000},
+      "correct_value": false,
+      "correct_file": false,
+      "notes": "8B guessed 1000, actual is 20000"
+    }
+  ],
+  "summary": {
+    "total_questions": 6,
+    "correct_value": 2,
+    "correct_file": 2,
+    "correct_both": 1,
+    "accuracy_value": "33%",
+    "accuracy_file": "33%",
+    "accuracy_full": "17%"
+  },
+  "analysis": {
+    "key_finding": "8B model accuracy is low (17-33%) even with MDEMG context",
+    "mdemg_limitation": "MDEMG retrieval doesn't find constant definition files - returns related but not exact matches",
+    "model_limitation": "8B model guesses plausible-sounding values but often wrong by 10-60x",
+    "comparison": {
+      "baseline_no_tools": "~0% (cannot provide evidence)",
+      "baseline_with_tools": "100% (grep finds exact values)",
+      "large_llm_mdemg": "~20% (MDEMG paths, no content)",
+      "8b_mdemg": "~17-33% (similar to large LLM)"
+    }
+  }
+}

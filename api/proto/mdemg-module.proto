@@ -1,0 +1,237 @@
+syntax = "proto3";
+
+package mdemg.module.v1;
+
+option go_package = "mdemg/api/modulepb";
+
+// =============================================================================
+// Module Lifecycle Service
+// All modules must implement this service for discovery and health management.
+// =============================================================================
+
+service ModuleLifecycle {
+    // Handshake is called immediately after spawn to verify module is ready.
+    // MDEMG sends its version and the socket path; module responds with capabilities.
+    rpc Handshake(HandshakeRequest) returns (HandshakeResponse);
+
+    // HealthCheck is called periodically (configurable interval, default 5s).
+    // Module should respond quickly (<100ms) with current health status.
+    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+    // Shutdown is called when MDEMG is stopping or the module is being disabled.
+    // Module should clean up resources and exit gracefully within timeout.
+    rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
+}
+
+message HandshakeRequest {
+    string mdemg_version = 1;      // MDEMG server version (e.g., "1.0.0")
+    string socket_path = 2;        // Unix socket path for this module
+    map<string, string> config = 3; // Module-specific configuration from manifest
+}
+
+message HandshakeResponse {
+    string module_id = 1;           // Module identifier (from manifest)
+    string module_version = 2;      // Module version
+    ModuleType module_type = 3;     // Type of module (INGESTION, REASONING, APE)
+    repeated string capabilities = 4; // List of capabilities (e.g., ["parse:typescript", "parse:go"])
+    bool ready = 5;                 // Whether module is ready to accept requests
+    string error = 6;               // Error message if not ready
+}
+
+message HealthCheckRequest {
+    // Empty - just a ping
+}
+
+message HealthCheckResponse {
+    bool healthy = 1;               // Overall health status
+    string status = 2;              // Human-readable status message
+    map<string, string> metrics = 3; // Module-specific metrics (e.g., "requests_processed": "1234")
+}
+
+message ShutdownRequest {
+    int32 timeout_ms = 1;           // Maximum time to wait for graceful shutdown
+    string reason = 2;              // Reason for shutdown (e.g., "server_stop", "module_disabled")
+}
+
+message ShutdownResponse {
+    bool success = 1;               // Whether shutdown completed successfully
+    string message = 2;             // Additional shutdown message
+}
+
+// ModuleType defines the category of module
+enum ModuleType {
+    MODULE_TYPE_UNSPECIFIED = 0;
+    MODULE_TYPE_INGESTION = 1;      // Perception - parses content into observations
+    MODULE_TYPE_REASONING = 2;      // Cognition - processes/re-ranks retrieval results
+    MODULE_TYPE_APE = 3;            // Active Participant - background maintenance tasks
+}
+
+// =============================================================================
+// Ingestion Module Service
+// Modules that parse external sources into MDEMG observations.
+// =============================================================================
+
+service IngestionModule {
+    // Matches checks if this module can handle the given source.
+    // Called during ingest to find the right parser.
+    rpc Matches(MatchRequest) returns (MatchResponse);
+
+    // Parse converts source content into MDEMG observations.
+    // Called when Matches returns true.
+    rpc Parse(ParseRequest) returns (ParseResponse);
+
+    // Sync performs incremental synchronization with an external source.
+    // Called by scheduled jobs or manual sync commands.
+    rpc Sync(SyncRequest) returns (stream SyncResponse);
+}
+
+message MatchRequest {
+    string source_uri = 1;          // URI of source (e.g., "linear://workspace/issue/123", "file:///path/to.ts")
+    string content_type = 2;        // MIME type or custom type (e.g., "text/typescript", "linear/issue")
+    map<string, string> metadata = 3; // Additional context
+}
+
+message MatchResponse {
+    bool matches = 1;               // Whether this module can handle the source
+    float confidence = 2;           // 0.0-1.0 confidence in handling (for priority when multiple match)
+    string reason = 3;              // Why it matches/doesn't match
+}
+
+message ParseRequest {
+    string source_uri = 1;          // URI of source
+    string content_type = 2;        // Content type
+    bytes content = 3;              // Raw content to parse
+    map<string, string> metadata = 4; // Additional context (e.g., file path, timestamps)
+}
+
+message ParseResponse {
+    repeated Observation observations = 1; // Parsed observations
+    repeated Edge edges = 2;               // Relationships between observations
+    map<string, string> metadata = 3;      // Module-specific metadata about the parse
+    string error = 4;                      // Error message if parsing failed
+}
+
+message SyncRequest {
+    string source_id = 1;           // Identifier for the source to sync (e.g., Linear workspace ID)
+    string cursor = 2;              // Last sync cursor (empty for full sync)
+    map<string, string> config = 3; // Sync configuration (e.g., API keys, filters)
+}
+
+message SyncResponse {
+    repeated Observation observations = 1; // New/updated observations
+    repeated Edge edges = 2;               // New/updated edges
+    string cursor = 3;                     // Cursor for next incremental sync
+    bool has_more = 4;                     // Whether there are more items to sync
+    SyncStats stats = 5;                   // Sync statistics
+}
+
+message SyncStats {
+    int32 items_processed = 1;
+    int32 items_created = 2;
+    int32 items_updated = 3;
+    int32 items_skipped = 4;
+}
+
+// =============================================================================
+// Reasoning Module Service
+// Modules that process retrieval results (e.g., re-ranking, filtering).
+// =============================================================================
+
+service ReasoningModule {
+    // Process takes retrieval candidates and returns refined results.
+    // Called during retrieval pipeline after initial scoring.
+    rpc Process(ProcessRequest) returns (ProcessResponse);
+}
+
+message ProcessRequest {
+    string query_text = 1;                 // Original query
+    repeated RetrievalCandidate candidates = 2; // Candidates to process
+    int32 top_k = 3;                       // Number of results to return
+    map<string, string> context = 4;       // Additional context
+}
+
+message ProcessResponse {
+    repeated RetrievalCandidate results = 1; // Processed/reranked results
+    map<string, string> metadata = 2;        // Processing metadata (e.g., latency, tokens used)
+    string error = 3;                        // Error message if processing failed
+}
+
+message RetrievalCandidate {
+    string node_id = 1;
+    string path = 2;
+    string name = 3;
+    string summary = 4;
+    float score = 5;
+    float vector_sim = 6;
+    float activation = 7;
+    map<string, string> metadata = 8;
+}
+
+// =============================================================================
+// APE Module Service (Active Participant Engine)
+// Modules that perform background maintenance and proactive tasks.
+// =============================================================================
+
+service APEModule {
+    // Execute runs a background task.
+    // Called by scheduler or event triggers.
+    rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+
+    // GetSchedule returns the module's preferred execution schedule.
+    rpc GetSchedule(GetScheduleRequest) returns (GetScheduleResponse);
+}
+
+message ExecuteRequest {
+    string task_id = 1;                    // Unique task execution ID
+    string trigger = 2;                    // What triggered this execution (e.g., "schedule", "event:ingest")
+    map<string, string> context = 3;       // Execution context
+}
+
+message ExecuteResponse {
+    bool success = 1;
+    string message = 2;
+    ExecuteStats stats = 3;
+    string error = 4;
+}
+
+message ExecuteStats {
+    int32 nodes_created = 1;
+    int32 nodes_updated = 2;
+    int32 edges_created = 3;
+    int32 edges_updated = 4;
+    int64 duration_ms = 5;
+}
+
+message GetScheduleRequest {
+    // Empty
+}
+
+message GetScheduleResponse {
+    string cron_expression = 1;            // Cron expression (e.g., "0 * * * *" for hourly)
+    repeated string event_triggers = 2;    // Events that should trigger execution (e.g., "ingest", "session_end")
+    int32 min_interval_seconds = 3;        // Minimum time between executions
+}
+
+// =============================================================================
+// Common Types
+// =============================================================================
+
+message Observation {
+    string node_id = 1;                    // Optional - generated if not provided
+    string path = 2;                       // Path/URI of the source
+    string name = 3;                       // Human-readable name
+    string content = 4;                    // Content text
+    string content_type = 5;               // Content type (e.g., "code", "task", "note")
+    repeated string tags = 6;              // Tags for categorization
+    map<string, string> metadata = 7;      // Additional metadata
+    string timestamp = 8;                  // ISO8601 timestamp
+    string source = 9;                     // Source identifier (e.g., "linear", "obsidian")
+}
+
+message Edge {
+    string from_node_id = 1;               // Source node
+    string to_node_id = 2;                 // Target node
+    string rel_type = 3;                   // Relationship type (e.g., "BLOCKS", "RELATED_TO")
+    float weight = 4;                      // Edge weight (0.0-1.0)
+    map<string, string> properties = 5;   // Additional edge properties
+}

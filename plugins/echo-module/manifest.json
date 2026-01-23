@@ -1,0 +1,13 @@
+{
+  "id": "echo-module",
+  "name": "Echo Test Module",
+  "version": "1.0.0",
+  "type": "INGESTION",
+  "binary": "echo-module",
+  "capabilities": {
+    "ingestion_sources": ["echo://"],
+    "content_types": ["text/plain"]
+  },
+  "health_check_interval_ms": 5000,
+  "startup_timeout_ms": 5000
+}

@@ -1,0 +1,12 @@
+{
+  "id": "reflection-module",
+  "name": "Reflection APE Module",
+  "version": "1.0.0",
+  "type": "APE",
+  "binary": "reflection-module",
+  "capabilities": {
+    "event_triggers": ["session_end", "consolidate"]
+  },
+  "health_check_interval_ms": 5000,
+  "startup_timeout_ms": 10000
+}

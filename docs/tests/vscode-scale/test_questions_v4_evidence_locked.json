@@ -1,0 +1,297 @@
+{
+  "metadata": {
+    "codebase": "vscode",
+    "version": "v4-evidence-locked",
+    "created": "2026-01-23",
+    "total_questions": 15,
+    "design_principles": {
+      "evidence_locked": "Answer must include file path, symbol name, exact value, and quote/line anchor",
+      "multi_hop": "Questions require tracing value through 2-3 files to find effective runtime default",
+      "effective_not_declared": "Focus on what actually happens at runtime, not just declared values"
+    },
+    "scoring": {
+      "correct_with_evidence": 4,
+      "correct_without_evidence": 0,
+      "partial_with_evidence": 2,
+      "no_answer": 0
+    }
+  },
+  "questions": [
+    {
+      "id": "ev_001",
+      "category": "effective_default",
+      "question": "The editor's font size has a declared default in editorOptions.ts, but this can be overridden by the platform-specific defaults. Trace the effective default: (1) What is the base EDITOR_FONT_DEFAULTS.fontSize value? (2) In which file is the platform-specific override applied? (3) What is the effective default fontSize on macOS vs Windows?",
+      "multi_hop_trace": [
+        "src/vs/editor/common/config/editorOptions.ts → EDITOR_FONT_DEFAULTS",
+        "src/vs/editor/common/config/editorConfiguration.ts → platform detection",
+        "src/vs/base/common/platform.ts → isMacintosh check"
+      ],
+      "required_evidence": {
+        "base_default_file": "editorOptions.ts",
+        "base_default_symbol": "EDITOR_FONT_DEFAULTS.fontSize",
+        "base_default_value": "exact number",
+        "override_file": "path where platform override happens",
+        "macos_effective": "exact number",
+        "windows_effective": "exact number",
+        "quote": "≤25 word code quote proving override logic"
+      }
+    },
+    {
+      "id": "ev_002",
+      "category": "effective_default",
+      "question": "Storage flush interval: (1) What is DEFAULT_FLUSH_INTERVAL declared in storage.ts? (2) Where is this value passed to the actual storage implementation? (3) Is there any code path that uses a DIFFERENT interval value? If so, what triggers it and what is that value?",
+      "multi_hop_trace": [
+        "src/vs/platform/storage/common/storage.ts → DEFAULT_FLUSH_INTERVAL",
+        "src/vs/base/parts/storage/common/storage.ts → actual flush logic",
+        "src/vs/workbench/services/storage/browser/storageService.ts → browser-specific"
+      ],
+      "required_evidence": {
+        "declared_value_file": "storage.ts path",
+        "declared_value": "exact ms value",
+        "implementation_file": "where it's actually used",
+        "alternative_path": "yes/no with file path if yes",
+        "alternative_value": "if different value exists",
+        "quote": "code showing the flush interval in use"
+      }
+    },
+    {
+      "id": "ev_003",
+      "category": "multi_hop_trace",
+      "question": "Extension activation timeout chain: (1) What constant defines the extension activation timeout? (2) Where is this timeout applied to the actual Promise.race? (3) Is there a different timeout for LOCAL vs REMOTE extension hosts? Provide exact values for each.",
+      "multi_hop_trace": [
+        "src/vs/workbench/api/common/extHostExtensionActivator.ts → timeout constant",
+        "src/vs/workbench/services/extensions/common/abstractExtensionService.ts → Promise.race",
+        "src/vs/workbench/services/extensions/electron-sandbox/localProcessExtensionHost.ts → local timeout"
+      ],
+      "required_evidence": {
+        "timeout_constant_file": "path",
+        "timeout_constant_name": "symbol",
+        "timeout_value_ms": "exact number",
+        "promise_race_file": "where timeout is applied",
+        "local_timeout": "exact ms or 'same'",
+        "remote_timeout": "exact ms or 'same'",
+        "quote": "Promise.race or timeout application code"
+      }
+    },
+    {
+      "id": "ev_004",
+      "category": "effective_default",
+      "question": "Sidebar minimum width has a declared constant, but the EFFECTIVE minimum depends on activity bar visibility. (1) What is the declared minimumWidth in SidebarPart? (2) What additional width is added when activity bar is beside sidebar? (3) What is the effective minimum when activity bar is hidden vs visible?",
+      "multi_hop_trace": [
+        "src/vs/workbench/browser/parts/sidebar/sidebarPart.ts → minimumWidth",
+        "src/vs/workbench/browser/parts/activitybar/activitybarPart.ts → ACTION_HEIGHT/width",
+        "src/vs/workbench/browser/layout.ts → combined calculation"
+      ],
+      "required_evidence": {
+        "declared_min_file": "sidebarPart.ts",
+        "declared_min_value": "exact px",
+        "activitybar_width_file": "path",
+        "activitybar_width_value": "exact px",
+        "effective_with_activitybar": "calculated total",
+        "effective_without_activitybar": "base value",
+        "quote": "code showing width calculation"
+      }
+    },
+    {
+      "id": "ev_005",
+      "category": "multi_hop_trace",
+      "question": "CodeLens refresh delay chain: (1) What is the declared debounce delay for CodeLens updates? (2) Where is this delay applied? (3) Is there a DIFFERENT delay used during scrolling vs typing? Trace to the actual setTimeout/debounce call.",
+      "multi_hop_trace": [
+        "src/vs/editor/contrib/codelens/browser/codelensController.ts → delay constant",
+        "src/vs/editor/contrib/codelens/browser/codelensController.ts → debounce application",
+        "src/vs/base/common/async.ts → Delayer implementation"
+      ],
+      "required_evidence": {
+        "delay_constant_file": "path",
+        "delay_constant_name": "symbol",
+        "delay_value_ms": "exact number",
+        "scroll_delay": "same or different value",
+        "typing_delay": "same or different value",
+        "delayer_file": "where Delayer is used",
+        "quote": "the debounce/delay application"
+      }
+    },
+    {
+      "id": "ev_006",
+      "category": "effective_default",
+      "question": "Terminal cursor blink interval: (1) What is the DEFAULT_CURSOR_BLINK constant? (2) Where is this value read from user configuration? (3) What is the EFFECTIVE blink interval when 'terminal.integrated.cursorBlinking' is true vs false?",
+      "multi_hop_trace": [
+        "src/vs/workbench/contrib/terminal/common/terminalConfiguration.ts → defaults",
+        "src/vs/workbench/contrib/terminal/browser/xterm/xtermTerminal.ts → cursor config",
+        "xterm.js options → actual blink interval"
+      ],
+      "required_evidence": {
+        "default_file": "path",
+        "default_symbol": "constant name",
+        "default_value": "exact value",
+        "config_read_file": "where user setting is read",
+        "effective_when_true": "actual interval used",
+        "effective_when_false": "what happens (0 or disabled)",
+        "quote": "code showing blink configuration"
+      }
+    },
+    {
+      "id": "ev_007",
+      "category": "multi_hop_trace",
+      "question": "Hover delay chain: (1) What is the default hover delay in EditorOptions? (2) Where does the HoverController read this? (3) Is there a SEPARATE delay for sticky hover? Trace all three values.",
+      "multi_hop_trace": [
+        "src/vs/editor/common/config/editorOptions.ts → hover delay default",
+        "src/vs/editor/contrib/hover/browser/hoverController.ts → delay reading",
+        "src/vs/editor/contrib/hover/browser/contentHoverController.ts → sticky delay"
+      ],
+      "required_evidence": {
+        "default_file": "editorOptions.ts",
+        "default_symbol": "EditorOption.hover delay property",
+        "default_delay_ms": "exact number",
+        "controller_file": "hoverController.ts",
+        "sticky_delay_file": "if different file",
+        "sticky_delay_ms": "same or different value",
+        "quote": "delay application in controller"
+      }
+    },
+    {
+      "id": "ev_008",
+      "category": "effective_default",
+      "question": "Auto-save delay chain: (1) What is the default autoSaveDelay in files configuration? (2) Where is this converted to the actual save timeout? (3) What is the MINIMUM enforced delay regardless of user setting?",
+      "multi_hop_trace": [
+        "src/vs/platform/files/common/files.ts → IFilesConfiguration",
+        "src/vs/workbench/services/textfile/common/textFileEditorModel.ts → save scheduling",
+        "src/vs/workbench/services/textfile/common/textFileService.ts → delay enforcement"
+      ],
+      "required_evidence": {
+        "config_default_file": "path",
+        "config_default_value": "exact ms",
+        "save_scheduling_file": "where delay is applied",
+        "minimum_delay_value": "enforced minimum ms",
+        "minimum_delay_symbol": "constant name if exists",
+        "quote": "minimum enforcement code"
+      }
+    },
+    {
+      "id": "ev_009",
+      "category": "multi_hop_trace",
+      "question": "Command palette debounce: (1) What is the input debounce delay for QuickInput? (2) Where is this applied in the quick pick controller? (3) Is there a DIFFERENT debounce for extension-contributed quick picks?",
+      "multi_hop_trace": [
+        "src/vs/platform/quickinput/browser/quickInputController.ts → debounce",
+        "src/vs/platform/quickinput/browser/quickInput.ts → input handling",
+        "src/vs/workbench/services/quickinput/browser/quickInputService.ts → extension handling"
+      ],
+      "required_evidence": {
+        "debounce_file": "path",
+        "debounce_value_ms": "exact number",
+        "application_file": "where debounce is used",
+        "extension_debounce": "same or different",
+        "extension_debounce_value": "if different",
+        "quote": "debounce application code"
+      }
+    },
+    {
+      "id": "ev_010",
+      "category": "effective_default",
+      "question": "Minimap character width: (1) What is the default minimapCharWidth in editorOptions? (2) Where is this scaled by device pixel ratio? (3) What is the EFFECTIVE character width on a 2x DPR display?",
+      "multi_hop_trace": [
+        "src/vs/editor/common/config/editorOptions.ts → minimap options",
+        "src/vs/editor/browser/viewParts/minimap/minimap.ts → DPR scaling",
+        "src/vs/base/browser/browser.ts → getPixelRatio"
+      ],
+      "required_evidence": {
+        "default_file": "path",
+        "default_symbol": "property name",
+        "default_value": "exact number",
+        "scaling_file": "where DPR is applied",
+        "effective_at_2x": "calculated value",
+        "quote": "DPR scaling code"
+      }
+    },
+    {
+      "id": "ev_011",
+      "category": "multi_hop_trace",
+      "question": "Suggest widget delay: (1) What is quickSuggestionsDelay default? (2) Where is this combined with the typing trigger delay? (3) What is the TOTAL effective delay from keypress to suggestions appearing?",
+      "multi_hop_trace": [
+        "src/vs/editor/common/config/editorOptions.ts → quickSuggestionsDelay",
+        "src/vs/editor/contrib/suggest/browser/suggestController.ts → delay application",
+        "src/vs/editor/contrib/suggest/browser/suggestModel.ts → trigger delay"
+      ],
+      "required_evidence": {
+        "delay_default_file": "path",
+        "delay_default_value": "exact ms",
+        "trigger_delay_file": "path",
+        "trigger_delay_value": "exact ms",
+        "total_effective_delay": "combined value",
+        "quote": "delay combination logic"
+      }
+    },
+    {
+      "id": "ev_012",
+      "category": "effective_default",
+      "question": "Bracket pair colorization limits: (1) What is the default maxBracketPairs limit? (2) Where is this checked during parsing? (3) What happens when the limit is exceeded - what fallback behavior occurs?",
+      "multi_hop_trace": [
+        "src/vs/editor/common/config/editorOptions.ts → bracket pair options",
+        "src/vs/editor/common/model/bracketPairsTextModelPart/bracketPairsTree/parser.ts → limit check",
+        "src/vs/editor/common/model/bracketPairsTextModelPart/bracketPairsImpl.ts → fallback"
+      ],
+      "required_evidence": {
+        "limit_file": "path",
+        "limit_symbol": "constant name",
+        "limit_value": "exact number",
+        "check_file": "where limit is enforced",
+        "fallback_behavior": "what happens at limit",
+        "quote": "limit check and fallback code"
+      }
+    },
+    {
+      "id": "ev_013",
+      "category": "multi_hop_trace",
+      "question": "Workspace trust: (1) What is the default trust state for an empty workspace? (2) Where is this determined in the trust service? (3) How does this differ for a FOLDER workspace vs a REMOTE workspace?",
+      "multi_hop_trace": [
+        "src/vs/platform/workspace/common/workspaceTrust.ts → defaults",
+        "src/vs/workbench/services/workspaces/common/workspaceTrust.ts → state determination",
+        "src/vs/workbench/services/workspaces/browser/workspaceTrustService.ts → type-specific"
+      ],
+      "required_evidence": {
+        "default_file": "path",
+        "empty_workspace_trust": "trusted/untrusted/prompt",
+        "folder_workspace_trust": "behavior",
+        "remote_workspace_trust": "behavior",
+        "determination_file": "where decision is made",
+        "quote": "trust determination logic"
+      }
+    },
+    {
+      "id": "ev_014",
+      "category": "effective_default",
+      "question": "Search results max: (1) What is the default maxResults in search configuration? (2) Where is this passed to ripgrep? (3) Is there a SEPARATE limit for file search vs text search?",
+      "multi_hop_trace": [
+        "src/vs/workbench/services/search/common/search.ts → ITextQuery",
+        "src/vs/workbench/services/search/node/ripgrepTextSearchEngine.ts → limit passing",
+        "src/vs/workbench/services/search/node/ripgrepFileSearch.ts → file search limit"
+      ],
+      "required_evidence": {
+        "config_file": "path",
+        "text_search_limit": "exact number",
+        "file_search_limit": "exact number or 'same'",
+        "ripgrep_file": "where passed to rg",
+        "ripgrep_flag": "exact flag used",
+        "quote": "limit application to ripgrep"
+      }
+    },
+    {
+      "id": "ev_015",
+      "category": "multi_hop_trace",
+      "question": "Extension host startup timeout: (1) What is the declared timeout for extension host startup? (2) Where is this used in a Promise.race? (3) Is there a DIFFERENT timeout for the initial startup vs reconnection? Trace both code paths.",
+      "multi_hop_trace": [
+        "src/vs/workbench/services/extensions/common/extensionHostManager.ts → timeout",
+        "src/vs/workbench/services/extensions/electron-sandbox/localProcessExtensionHost.ts → startup",
+        "src/vs/workbench/services/extensions/common/remoteExtensionHost.ts → reconnection"
+      ],
+      "required_evidence": {
+        "timeout_file": "path",
+        "timeout_symbol": "constant name",
+        "startup_timeout_ms": "exact number",
+        "reconnection_timeout_ms": "same or different",
+        "promise_race_file": "where timeout applied",
+        "quote": "Promise.race with timeout"
+      }
+    }
+  ]
+}

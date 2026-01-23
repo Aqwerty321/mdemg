@@ -10,16 +10,18 @@
 *.pem
 
 # Go binaries
+server
+ingest-codebase
+decay
+consolidate
+prune
+mdemg-server
+mdemg-mcp
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-mdemg-server
-mdemg-mcp
-/mdemg_build/mcp-server/mdemg-mcp
-/mdemg_build/service/bin/
-/mdemg_build/service/consolidate
 
 # Go test and build
 *.test
@@ -68,17 +70,11 @@ temp/
 *.log
 logs/
 
-# Auto Claude data directory
-.auto-claude/
-
-# Auto Claude generated files
-.auto-claude-security.json
-.auto-claude-status
-.claude_settings.json
-.worktrees/
-.security-key
-logs/security/
-
 # Compiled binaries
-mdemg_build/service/ingest-codebase
-mdemg_build/service/server
+server
+ingest-codebase
+decay
+consolidate
+prune
+mdemg-server
+mdemg-mcp

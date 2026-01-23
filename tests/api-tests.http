@@ -1,0 +1,54 @@
+### MDEMG API Tests
+### Use with REST Client extension (humao.rest-client)
+
+@baseUrl = http://localhost:8082
+
+### Health Check
+GET {{baseUrl}}/healthz
+
+### Readiness Check (verifies Neo4j + schema version)
+GET {{baseUrl}}/readyz
+
+### Retrieve Memories (requires query_embedding)
+POST {{baseUrl}}/v1/memory/retrieve
+Content-Type: application/json
+
+{
+  "space_id": "demo",
+  "query_embedding": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+  "candidate_k": 50,
+  "top_k": 10,
+  "hop_depth": 2
+}
+
+### Ingest Observation (creates/updates MemoryNode)
+POST {{baseUrl}}/v1/memory/ingest
+Content-Type: application/json
+
+{
+  "space_id": "demo",
+  "path": "/test/hello-world",
+  "name": "Hello World Test",
+  "source": "manual-test",
+  "timestamp": "2026-01-15T10:00:00Z",
+  "content": "This is a test observation for the MDEMG system.",
+  "tags": ["test", "manual"],
+  "sensitivity": "internal",
+  "confidence": 0.8
+}
+
+### Ingest with specific node_id
+POST {{baseUrl}}/v1/memory/ingest
+Content-Type: application/json
+
+{
+  "space_id": "demo",
+  "node_id": "test-node-001",
+  "name": "Specific Node Test",
+  "source": "manual-test",
+  "timestamp": "2026-01-15T10:05:00Z",
+  "content": "Testing ingestion with a specific node_id.",
+  "tags": ["test"],
+  "sensitivity": "internal",
+  "confidence": 0.7
+}

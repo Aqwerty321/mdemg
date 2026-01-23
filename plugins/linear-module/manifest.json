@@ -1,0 +1,18 @@
+{
+  "id": "linear-module",
+  "name": "Linear Integration Module",
+  "version": "1.0.0",
+  "type": "INGESTION",
+  "binary": "linear-module",
+  "capabilities": {
+    "ingestion_sources": ["linear://"],
+    "content_types": ["application/vnd.linear.issue", "application/vnd.linear.project"]
+  },
+  "health_check_interval_ms": 10000,
+  "startup_timeout_ms": 10000,
+  "config": {
+    "api_key_env": "LINEAR_API_KEY",
+    "default_team": "",
+    "sync_interval_minutes": "15"
+  }
+}

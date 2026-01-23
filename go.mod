@@ -15,6 +15,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/smacker/go-tree-sitter v0.0.0-20240827094217-dd81d9e9be82 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/crypto v0.44.0 // indirect
 	golang.org/x/net v0.47.0 // indirect

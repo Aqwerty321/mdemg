@@ -78,3 +78,7 @@ logs/
 .worktrees/
 .security-key
 logs/security/
+
+# Compiled binaries
+mdemg_build/service/ingest-codebase
+mdemg_build/service/server

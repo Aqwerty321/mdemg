@@ -1,0 +1,497 @@
+{
+  "metadata": {
+    "codebase": "plc-gbt",
+    "created": "2026-01-23",
+    "total_questions": 60,
+    "categories": [
+      "control_loop_architecture",
+      "data_models_schema",
+      "api_services",
+      "configuration_infrastructure",
+      "business_logic_workflows",
+      "ui_ux"
+    ]
+  },
+  "questions": [
+    {
+      "id": "cla_001",
+      "category": "control_loop_architecture",
+      "difficulty": "easy",
+      "question": "What are the four PID controller types defined in the plc-gbt system?",
+      "answer": "ladder_logic_standard_pid, ladder_logic_advanced_pid, function_block_standard_pide, function_block_advanced_pide",
+      "source_hint": "control-loop.types.ts, controlLoopTypeSchema"
+    },
+    {
+      "id": "cla_002",
+      "category": "control_loop_architecture",
+      "difficulty": "medium",
+      "question": "What is the maximum character length allowed for a tag_name in the plc-gbt system, and what regex pattern must it match?",
+      "answer": "Maximum 40 characters, must match pattern ^[A-Za-z][A-Za-z0-9_]*$ (start with letter, contain only alphanumeric and underscores)",
+      "source_hint": "control-loop.schemas.ts, processVariableSchema"
+    },
+    {
+      "id": "cla_003",
+      "category": "control_loop_architecture",
+      "difficulty": "medium",
+      "question": "In cascade control configuration, what are the four communication_method enum values that define how master-slave loops communicate?",
+      "answer": "direct_write, message_instruction, produced_tag, ethernet_ip",
+      "source_hint": "function-block-standard-pide-cascade.json, communication_method enum"
+    },
+    {
+      "id": "cla_004",
+      "category": "control_loop_architecture",
+      "difficulty": "hard",
+      "question": "What is the default value and valid range for the overshoot_limit parameter in master loop tuning configuration?",
+      "answer": "Default: 10.0%, Range: 0.0 to 50.0%",
+      "source_hint": "function-block-standard-pide-cascade.json, master_tuning.overshoot_limit"
+    },
+    {
+      "id": "cla_005",
+      "category": "control_loop_architecture",
+      "difficulty": "hard",
+      "question": "What is the default response_ratio for slave loop tuning, and what are its minimum and maximum allowed values?",
+      "answer": "Default: 0.2, Minimum: 0.1, Maximum: 1.0",
+      "source_hint": "function-block-standard-pide-cascade.json, slave_tuning.response_ratio"
+    },
+    {
+      "id": "cla_006",
+      "category": "control_loop_architecture",
+      "difficulty": "medium",
+      "question": "What are the three scaling_type enum values available for setpoint scaling between master and slave loops?",
+      "answer": "linear, square_root, custom",
+      "source_hint": "function-block-standard-pide-cascade.json, setpoint_scaling.scaling_type"
+    },
+    {
+      "id": "cla_007",
+      "category": "control_loop_architecture",
+      "difficulty": "easy",
+      "question": "What are the six control modes defined in the ControlMode type?",
+      "answer": "Manual, Automatic, Cascade, Override, Program, Ratio",
+      "source_hint": "control-loop.types.ts, controlModeSchema"
+    },
+    {
+      "id": "cla_008",
+      "category": "control_loop_architecture",
+      "difficulty": "hard",
+      "question": "What is the valid range for response_time_target in master loop tuning parameters?",
+      "answer": "Minimum: 1.0 seconds, Maximum: 3600.0 seconds",
+      "source_hint": "function-block-standard-pide-cascade.json, master_tuning.response_time_target"
+    },
+    {
+      "id": "cla_009",
+      "category": "control_loop_architecture",
+      "difficulty": "medium",
+      "question": "What is the default stability_margin value for slave loop tuning, and what are its minimum and maximum constraints?",
+      "answer": "Default: 2.0, Minimum: 1.0, Maximum: 5.0",
+      "source_hint": "function-block-standard-pide-cascade.json, slave_tuning.stability_margin"
+    },
+    {
+      "id": "cla_010",
+      "category": "control_loop_architecture",
+      "difficulty": "medium",
+      "question": "What are the valid values for cascade_fault_action that define slave loop behavior when cascade communication fails?",
+      "answer": "manual_mode, local_setpoint, safe_state (default: local_setpoint)",
+      "source_hint": "function-block-standard-pide-cascade.json, mode_coordination.cascade_fault_action"
+    },
+    {
+      "id": "dms_001",
+      "category": "data_models_schema",
+      "difficulty": "easy",
+      "question": "What are the possible values for ProcessVariable quality in the plc-gbt control-loop.types.ts file?",
+      "answer": "'good', 'bad', 'uncertain'",
+      "source_hint": "control-loop.types.ts line 49"
+    },
+    {
+      "id": "dms_002",
+      "category": "data_models_schema",
+      "difficulty": "easy",
+      "question": "What is the regex pattern used for ProcessVariable tag_name validation in plc-gbt schemas?",
+      "answer": "^[A-Za-z][A-Za-z0-9_]*$",
+      "source_hint": "control-loop.types.ts line 44, schema files"
+    },
+    {
+      "id": "dms_003",
+      "category": "data_models_schema",
+      "difficulty": "medium",
+      "question": "List all InstanceStatus enum values in plc-gbt in the order they appear in the code.",
+      "answer": "DRAFT, CONFIGURED, VALIDATED, DEPLOYED, ACTIVE, INACTIVE, ERROR, ARCHIVED",
+      "source_hint": "cli/commands/instance.py lines 84-93"
+    },
+    {
+      "id": "dms_004",
+      "category": "data_models_schema",
+      "difficulty": "medium",
+      "question": "What are the four ValidationLevel values in plc-gbt and what does each level validate?",
+      "answer": "BASIC (schema compliance only), STANDARD (schema + basic logic validation), ADVANCED (standard + simulation testing), PRODUCTION (advanced + PLC connectivity validation)",
+      "source_hint": "cli/commands/instance.py lines 105-110"
+    },
+    {
+      "id": "dms_005",
+      "category": "data_models_schema",
+      "difficulty": "hard",
+      "question": "In the CascadeConfiguration interface, what are the two possible values for cascade_type and what additional fields are used for each type?",
+      "answer": "cascade_type can be 'master' or 'slave'. Master loops use slave_loop_ids (array), slave loops use master_loop_id (string). Both share is_cascade and cascade_ratio fields.",
+      "source_hint": "control-loop.types.ts lines 181-187"
+    },
+    {
+      "id": "dms_006",
+      "category": "data_models_schema",
+      "difficulty": "medium",
+      "question": "What JSON Schema draft version is used in plc-gbt control loop schemas?",
+      "answer": "JSON Schema 2020-12 (https://json-schema.org/draft/2020-12/schema)",
+      "source_hint": "ladder-logic-standard-pid-feedforward.json line 2"
+    },
+    {
+      "id": "dms_007",
+      "category": "data_models_schema",
+      "difficulty": "easy",
+      "question": "What are the three priority levels for WorkflowMetadata in plc-gbt?",
+      "answer": "'low', 'medium', 'high'",
+      "source_hint": "workflow-management.types.ts line 49"
+    },
+    {
+      "id": "dms_008",
+      "category": "data_models_schema",
+      "difficulty": "hard",
+      "question": "What are the four schema organization directories under plc-gbt-stack/schemas/control-loops/subtypes/?",
+      "answer": "cascade, combined_ff_cascade, feedforward, multi_formula_weighted_ff",
+      "source_hint": "schemas/control-loops/subtypes/ directory structure"
+    },
+    {
+      "id": "dms_009",
+      "category": "data_models_schema",
+      "difficulty": "medium",
+      "question": "In plc-gbt, what keyword is used in JSON schemas to reference base schemas for inheritance?",
+      "answer": "$ref",
+      "source_hint": "ladder-logic-standard-pid-feedforward.json line 9"
+    },
+    {
+      "id": "dms_010",
+      "category": "data_models_schema",
+      "difficulty": "hard",
+      "question": "What are all seven InstanceType enum values in plc-gbt?",
+      "answer": "BASIC_PID, CASCADE_PID, FEEDFORWARD_PID, MULTI_LOOP, ADAPTIVE_PID, MPC, CUSTOM",
+      "source_hint": "cli/commands/instance.py lines 95-103"
+    },
+    {
+      "id": "api_001",
+      "category": "api_services",
+      "difficulty": "easy",
+      "question": "What is the default timeout value (in seconds) for the CommandRequest model's timeout field in the CLI-to-API Bridge?",
+      "answer": "30.0 seconds",
+      "source_hint": "cli_api_bridge.py:131 CommandRequest model"
+    },
+    {
+      "id": "api_002",
+      "category": "api_services",
+      "difficulty": "medium",
+      "question": "What are the five fields defined in the APIResponse Pydantic model in cli_api_bridge.py?",
+      "answer": "success, message, data, command_executed, execution_time, and timestamp",
+      "source_hint": "cli_api_bridge.py:118-125 APIResponse class"
+    },
+    {
+      "id": "api_003",
+      "category": "api_services",
+      "difficulty": "medium",
+      "question": "What is the default chunk_size (in bytes) used by the FileStorageService for file operations?",
+      "answer": "8192 bytes",
+      "source_hint": "file_storage_service.py:42 __init__ method"
+    },
+    {
+      "id": "api_004",
+      "category": "api_services",
+      "difficulty": "hard",
+      "question": "What is the default fine-tuned OpenAI model ID used by the OpenAIService when no OPENAI_MODEL environment variable is set?",
+      "answer": "ft:gpt-4o-mini-2024-07-18:whiskey-house:plc-gbt:CMx89NDT",
+      "source_hint": "openai_service.py:18 DEFAULT_MODEL constant"
+    },
+    {
+      "id": "api_005",
+      "category": "api_services",
+      "difficulty": "medium",
+      "question": "What hashing algorithm does the FileStorageService use to calculate file checksums?",
+      "answer": "SHA-256",
+      "source_hint": "file_storage_service.py:65-79 calculate_checksum method"
+    },
+    {
+      "id": "api_006",
+      "category": "api_services",
+      "difficulty": "easy",
+      "question": "What is the CLI version constant (CLI_VERSION) defined in the plc_control_loop_cli.py file?",
+      "answer": "1.0.0",
+      "source_hint": "plc_control_loop_cli.py:58 CLI_VERSION constant"
+    },
+    {
+      "id": "api_007",
+      "category": "api_services",
+      "difficulty": "hard",
+      "question": "In the CLIConfiguration dataclass, what is the default value for session_timeout and what unit is it measured in?",
+      "answer": "3600 (1 hour in seconds)",
+      "source_hint": "plc_control_loop_cli.py:91 CLIConfiguration dataclass"
+    },
+    {
+      "id": "api_008",
+      "category": "api_services",
+      "difficulty": "medium",
+      "question": "What are the four ExecutionStatus enum values defined in cli_api_bridge.py?",
+      "answer": "SUCCESS, ERROR, TIMEOUT, UNAUTHORIZED",
+      "source_hint": "cli_api_bridge.py:101-105 ExecutionStatus enum"
+    },
+    {
+      "id": "api_009",
+      "category": "api_services",
+      "difficulty": "hard",
+      "question": "What temperature value does the OpenAIService use when calling the chat completion API for truth-seeking responses?",
+      "answer": "0.2",
+      "source_hint": "openai_service.py:147 chat_completion method"
+    },
+    {
+      "id": "api_010",
+      "category": "api_services",
+      "difficulty": "medium",
+      "question": "What is the maximum number of command results stored in the CLIExecutor's command_history before older entries are trimmed?",
+      "answer": "1000",
+      "source_hint": "cli_api_bridge.py:157 max_history attribute"
+    },
+    {
+      "id": "cfg_001",
+      "category": "configuration_infrastructure",
+      "difficulty": "hard",
+      "question": "What is the full model ID for the fine-tuned OpenAI model used in plc-gbt?",
+      "answer": "ft:gpt-4o-mini-2024-07-18:whiskey-house:plc-gbt:CMx89NDT",
+      "source_hint": ".env.example line 7"
+    },
+    {
+      "id": "cfg_002",
+      "category": "configuration_infrastructure",
+      "difficulty": "easy",
+      "question": "What is the OpenAI Seed value configured for deterministic responses in plc-gbt?",
+      "answer": "1",
+      "source_hint": ".env.example line 10"
+    },
+    {
+      "id": "cfg_003",
+      "category": "configuration_infrastructure",
+      "difficulty": "medium",
+      "question": "What is the default port for the backend API in plc-gbt?",
+      "answer": "8000",
+      "source_hint": ".env.example line 14"
+    },
+    {
+      "id": "cfg_004",
+      "category": "configuration_infrastructure",
+      "difficulty": "hard",
+      "question": "What is the full path to the CLI configuration file location?",
+      "answer": "~/.plc-control-loop/.plc-cl-config",
+      "source_hint": "cli/config_manager.py line 278 and cli/plc_control_loop_cli.py line 59-60"
+    },
+    {
+      "id": "cfg_005",
+      "category": "configuration_infrastructure",
+      "difficulty": "medium",
+      "question": "What is the default session timeout value in seconds for the CLI?",
+      "answer": "3600",
+      "source_hint": "cli/config_manager.py line 148"
+    },
+    {
+      "id": "cfg_006",
+      "category": "configuration_infrastructure",
+      "difficulty": "medium",
+      "question": "What is the default cache TTL (time-to-live) in seconds for the CLI?",
+      "answer": "300",
+      "source_hint": "cli/config_manager.py line 184"
+    },
+    {
+      "id": "cfg_007",
+      "category": "configuration_infrastructure",
+      "difficulty": "easy",
+      "question": "What port does the mTLS proxy expose in the docker-compose configuration?",
+      "answer": "8443",
+      "source_hint": "docker-compose.yml line 36"
+    },
+    {
+      "id": "cfg_008",
+      "category": "configuration_infrastructure",
+      "difficulty": "hard",
+      "question": "What is the default FILE_STORAGE_ROOT path configured in the CLI API bridge?",
+      "answer": "/Users/reh3376/repos/plc-gbt/file-storage",
+      "source_hint": "api/cli_api_bridge.py line 66"
+    },
+    {
+      "id": "cfg_009",
+      "category": "configuration_infrastructure",
+      "difficulty": "medium",
+      "question": "What is the default request timeout in seconds for the CLIExecutor class?",
+      "answer": "30.0",
+      "source_hint": "api/cli_api_bridge.py line 131"
+    },
+    {
+      "id": "cfg_010",
+      "category": "configuration_infrastructure",
+      "difficulty": "hard",
+      "question": "Which PostgreSQL database name is used for N8N workflows according to docker-compose.yml?",
+      "answer": "plc_gbt",
+      "source_hint": "docker-compose.yml line 201 (DB_POSTGRESDB_DATABASE)"
+    },
+    {
+      "id": "blw_001",
+      "category": "business_logic_workflows",
+      "difficulty": "easy",
+      "question": "What PLC connection mode is enforced by default in plc-gbt for safety reasons?",
+      "answer": "READ_ONLY",
+      "source_hint": "cli/commands/instance.py line 114-116, line 380, line 391"
+    },
+    {
+      "id": "blw_002",
+      "category": "business_logic_workflows",
+      "difficulty": "medium",
+      "question": "What are the four communication methods supported for cascade master-slave loop coordination?",
+      "answer": "direct_write, message_instruction, produced_tag, ethernet_ip",
+      "source_hint": "schemas/control-loops/subtypes/cascade/*.json communication_method enum"
+    },
+    {
+      "id": "blw_003",
+      "category": "business_logic_workflows",
+      "difficulty": "easy",
+      "question": "What is the correct lifecycle state progression from DRAFT to DEPLOYED?",
+      "answer": "DRAFT → CONFIGURED → VALIDATED → DEPLOYED",
+      "source_hint": "cli/commands/instance.py InstanceStatus enum lines 84-93"
+    },
+    {
+      "id": "blw_004",
+      "category": "business_logic_workflows",
+      "difficulty": "hard",
+      "question": "What validation level includes simulation testing but not PLC connectivity validation?",
+      "answer": "ADVANCED",
+      "source_hint": "cli/commands/instance.py ValidationLevel enum lines 105-110, validate_instance method lines 320-332"
+    },
+    {
+      "id": "blw_005",
+      "category": "business_logic_workflows",
+      "difficulty": "medium",
+      "question": "What database column is used to implement soft delete functionality in the file storage service?",
+      "answer": "deleted_at",
+      "source_hint": "api/services/file_storage_service.py line 94"
+    },
+    {
+      "id": "blw_006",
+      "category": "business_logic_workflows",
+      "difficulty": "hard",
+      "question": "In the OpenAI service system prompt, what are the three critical behavior requirements listed (keywords only)?",
+      "answer": "TRUTH-SEEKING, CONCISE, HONEST",
+      "source_hint": "api/services/openai_service.py lines 96-101"
+    },
+    {
+      "id": "blw_007",
+      "category": "business_logic_workflows",
+      "difficulty": "medium",
+      "question": "What is the temperature parameter value used in the OpenAI chat completion for truth-seeking deterministic responses?",
+      "answer": "0.2",
+      "source_hint": "api/services/openai_service.py line 147"
+    },
+    {
+      "id": "blw_008",
+      "category": "business_logic_workflows",
+      "difficulty": "easy",
+      "question": "What is the default instance status when creating a new control loop instance via the wizard?",
+      "answer": "CONFIGURED",
+      "source_hint": "cli/commands/instance.py line 635"
+    },
+    {
+      "id": "blw_009",
+      "category": "business_logic_workflows",
+      "difficulty": "hard",
+      "question": "What are the four PID parameters that MUST be present for BASIC_PID instance type to pass STANDARD validation level?",
+      "answer": "kp, ki, kd, setpoint",
+      "source_hint": "cli/commands/instance.py lines 313-317"
+    },
+    {
+      "id": "blw_010",
+      "category": "business_logic_workflows",
+      "difficulty": "medium",
+      "question": "What permission level is required to delete an instance in the CLI?",
+      "answer": "ADMIN",
+      "source_hint": "cli/commands/instance.py line 1238 @requires_permission decorator"
+    },
+    {
+      "id": "uix_001",
+      "category": "ui_ux",
+      "difficulty": "easy",
+      "question": "What is the name of the Zustand store used for managing layout state in the plc-gbt UI, and what is its localStorage persistence key?",
+      "answer": "The store is named 'useLayoutStore' and its localStorage persistence key is 'plc-gbt-layout-storage'",
+      "source_hint": "ui/nextjs/src/lib/stores/layout-store.ts"
+    },
+    {
+      "id": "uix_002",
+      "category": "ui_ux",
+      "difficulty": "medium",
+      "question": "What are the seven possible values for the ToolType type in the layout store?",
+      "answer": "explorer, search, analytics, workflows, control-loops, settings, plc-git",
+      "source_hint": "ui/nextjs/src/lib/stores/layout-store.ts lines 7-14"
+    },
+    {
+      "id": "uix_003",
+      "category": "ui_ux",
+      "difficulty": "medium",
+      "question": "What two Google fonts are loaded in the root layout of the plc-gbt Next.js application?",
+      "answer": "Inter (--font-inter) and JetBrains_Mono (--font-jetbrains-mono)",
+      "source_hint": "ui/nextjs/src/app/layout.tsx"
+    },
+    {
+      "id": "uix_004",
+      "category": "ui_ux",
+      "difficulty": "hard",
+      "question": "In the Providers component, what is the default staleTime configured for React Query queries, and what is the gcTime (garbage collection time)?",
+      "answer": "staleTime is 5 minutes (5 * 60 * 1000 = 300000ms) and gcTime is 10 minutes (10 * 60 * 1000 = 600000ms)",
+      "source_hint": "ui/nextjs/src/components/providers/Providers.tsx"
+    },
+    {
+      "id": "uix_005",
+      "category": "ui_ux",
+      "difficulty": "medium",
+      "question": "What toast notification library is used in the Providers component, and where is its default position configured?",
+      "answer": "Sonner is used for toast notifications, positioned at 'bottom-right'",
+      "source_hint": "ui/nextjs/src/components/providers/Providers.tsx"
+    },
+    {
+      "id": "uix_006",
+      "category": "ui_ux",
+      "difficulty": "hard",
+      "question": "In the ControlLoopGrid component, how many columns does the responsive grid display at different breakpoints (default, md, lg, xl)?",
+      "answer": "1 column by default, 2 columns at md breakpoint, 3 columns at lg breakpoint, and 4 columns at xl breakpoint",
+      "source_hint": "ui/nextjs/src/components/control-loop/ControlLoopGrid.tsx line 93"
+    },
+    {
+      "id": "uix_007",
+      "category": "ui_ux",
+      "difficulty": "easy",
+      "question": "What four types of widgets are supported in the analytics store Dashboard interface?",
+      "answer": "chart, metric, table, gauge",
+      "source_hint": "ui/nextjs/src/lib/stores/analytics-store.ts lines 51-56"
+    },
+    {
+      "id": "uix_008",
+      "category": "ui_ux",
+      "difficulty": "hard",
+      "question": "What drag-and-drop library is used for the IconStrip component's icon reordering functionality, and what two sensors are configured?",
+      "answer": "@dnd-kit library is used with PointerSensor (8px activation constraint) and KeyboardSensor sensors",
+      "source_hint": "ui/nextjs/src/components/layout/LeftSidebar/IconStrip.tsx"
+    },
+    {
+      "id": "uix_009",
+      "category": "ui_ux",
+      "difficulty": "medium",
+      "question": "What are the three layout presets available in the useLayoutStore's applyLayoutPreset action?",
+      "answer": "minimal, development, debugging",
+      "source_hint": "ui/nextjs/src/lib/stores/layout-store.ts line 124"
+    },
+    {
+      "id": "uix_010",
+      "category": "ui_ux",
+      "difficulty": "hard",
+      "question": "In the ControlLoopStats component, what are the three color thresholds for the avgPerformance value that determine whether it displays as green, yellow, or red?",
+      "answer": "Performance >= 90% displays green (text-green-400), >= 70% displays yellow (text-yellow-400), and below 70% displays red (text-red-400)",
+      "source_hint": "ui/nextjs/src/components/control-loop/ControlLoopStats.tsx lines 42-48"
+    }
+  ]
+}

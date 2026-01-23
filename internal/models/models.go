@@ -303,6 +303,10 @@ type ConsolidateResponse struct {
 	ConfigEdgesCreated      int     `json:"config_edges_created"`       // Number of IMPLEMENTS_CONFIG edges created
 	ComparisonNodesCreated  int     `json:"comparison_nodes_created"`   // Number of comparison nodes created (P2 Track 3)
 	ComparisonEdgesCreated  int     `json:"comparison_edges_created"`   // Number of COMPARED_IN edges created
+	TemporalNodeCreated     bool    `json:"temporal_node_created"`      // Whether temporal pattern node was created (P3 Track 5)
+	TemporalEdgesCreated    int     `json:"temporal_edges_created"`     // Number of SHARES_TEMPORAL_PATTERN edges created
+	UINodesCreated          int     `json:"ui_nodes_created"`           // Number of UI pattern nodes created (P4 Track 6)
+	UIEdgesCreated          int     `json:"ui_edges_created"`           // Number of SHARES_UI_PATTERN edges created
 	SummariesGenerated      int     `json:"summaries_generated"`        // Number of summaries generated
 	EdgesStrengthened   int     `json:"edges_strengthened"`
 	DurationMs          float64 `json:"duration_ms"`

@@ -73,10 +73,110 @@ service APEModule {
 
 ## 4. Detailed Technical Implementation Path
 
-### Phase 1: gRPC Plugin Host (The Discovery Layer)
-1.  **Define Protobufs**: Create `mdemg-module.proto` defining the service interfaces above.
-2.  **Plugin Manager**: Develop a Go service that scans a `/plugins` directory for binary executables or a `docker-compose` for sidecar containers.
-3.  **Automatic Handshake**: On startup, MDEMG executes the plugin and performs a handshake to negotiate capabilities (Ingestion vs Reasoning).
+### Binary Sidecar Architecture
+
+MDEMG uses **binary executables** (not Docker containers) for modules to minimize latency. Each module is a standalone binary that MDEMG spawns and communicates with via gRPC over Unix domain sockets.
+
+```
+mdemg-server (main process)
+    │
+    ├── Unix Socket: /tmp/mdemg-linear.sock
+    │   └── linear-module (binary)
+    │
+    ├── Unix Socket: /tmp/mdemg-nestjs.sock
+    │   └── nestjs-module (binary)
+    │
+    └── Unix Socket: /tmp/mdemg-obsidian.sock
+        └── obsidian-module (binary)
+```
+
+**Why Binary over Docker:**
+- ~10ms savings per RPC call (no network stack)
+- Simpler deployment (single binary)
+- Direct process management (signals, stdio)
+- Better debugging (attach debugger directly)
+
+**Trade-offs:**
+- Must compile for target platform
+- Dependency management is module's responsibility
+- Need explicit build/release process per module
+
+### Phase 1: Plugin Host (Discovery & Lifecycle)
+
+#### 1.1 Plugin Directory Structure
+```
+/plugins/
+├── linear-module/
+│   ├── manifest.json        # Module metadata
+│   ├── linear-module        # Binary executable
+│   └── linear-module.exe    # Windows variant (optional)
+├── nestjs-module/
+│   ├── manifest.json
+│   └── nestjs-module
+└── .disabled/               # Disabled modules moved here
+```
+
+#### 1.2 Manifest Schema
+```json
+{
+  "id": "linear-module",
+  "name": "Linear Engineering Tasks",
+  "version": "1.0.0",
+  "type": "INGESTION",
+  "binary": "linear-module",
+  "capabilities": {
+    "ingestion_sources": ["linear-api"],
+    "content_types": ["task", "issue", "project"]
+  },
+  "health_check_interval_ms": 5000,
+  "startup_timeout_ms": 10000
+}
+```
+
+#### 1.3 Module Lifecycle Proto
+```proto
+service ModuleLifecycle {
+    // Called immediately after spawn to verify module is ready
+    rpc Handshake(HandshakeRequest) returns (HandshakeResponse);
+
+    // Periodic health check (every health_check_interval_ms)
+    rpc HealthCheck(Empty) returns (HealthResponse);
+
+    // Graceful shutdown signal
+    rpc Shutdown(ShutdownRequest) returns (Empty);
+}
+
+message HandshakeRequest {
+    string mdemg_version = 1;
+    string socket_path = 2;
+}
+
+message HandshakeResponse {
+    string module_id = 1;
+    string module_version = 2;
+    repeated string capabilities = 3;
+    bool ready = 4;
+}
+
+message HealthResponse {
+    bool healthy = 1;
+    string status = 2;
+    map<string, string> metrics = 3;
+}
+```
+
+#### 1.4 Plugin Manager Responsibilities
+1. **Scan** `/plugins` directory on startup
+2. **Validate** manifest.json for each module
+3. **Spawn** binary with Unix socket path as argument
+4. **Handshake** to verify module is ready
+5. **Monitor** health via periodic HealthCheck RPCs
+6. **Restart** crashed modules (with backoff)
+7. **Route** requests to appropriate module based on capabilities
+
+### Phase 2: Refactoring Ingest & Retrieval for RPC
+1.  **Ingest Hook**: Instead of hardcoded Go parsers, `IngestObservation` calls the `IngestionModule.Parse` RPC for all registered modules.
+2.  **Retrieval Hook**: Refactor the retrieval pipeline to allow `ReasoningModule.Process` to run between the **Spreading Activation** and **Final Top-K** steps.
 
 ### Phase 2: Refactoring Ingest & Retrieval for RPC
 1.  **Ingest Hook**: Instead of hardcoded Go parsers, `IngestObservation` calls the `IngestionModule.Parse` RPC for all registered modules.
@@ -102,9 +202,15 @@ The **APE** orchestrates the lifecycle of the memory graph.
 
 ---
 
-## 5. Explainable Retrieval (Explain-RAG)
+## 5. Jiminy: Explainable Retrieval
 
-Updates to the `/v1/memory/retrieve` endpoint to provide transparency.
+**Jiminy** is MDEMG's "conscience" layer - it explains *why* specific memories were retrieved and how confident the system is in each result. Named after the character who guides and explains.
+
+### Purpose
+- Provide transparency into retrieval decisions
+- Enable debugging of poor retrieval results
+- Build trust by showing reasoning, not just results
+- Allow modules to contribute explanations
 
 ### Deliverable: `RetrieveResponse` Extension
 ```json
@@ -112,11 +218,31 @@ Updates to the `/v1/memory/retrieve` endpoint to provide transparency.
   "data": [
     {
       "node_id": "auth_service_01",
-      "rationale": "Direct semantic match for 'authentication' + strongly linked to 'JWT' via CO_ACTIVATED_WITH (weight 0.85)",
-      "confidence_score": 0.92,
-      "source_module": "nestjs-architecture-module"
+      "jiminy": {
+        "rationale": "Direct semantic match for 'authentication' + strongly linked to 'JWT' via CO_ACTIVATED_WITH (weight 0.85)",
+        "confidence": 0.92,
+        "retrieval_path": ["vector_recall", "spreading_activation", "llm_rerank"],
+        "contributing_modules": ["nestjs-architecture-module"],
+        "score_breakdown": {
+          "vector_similarity": 0.78,
+          "activation": 0.65,
+          "rerank_boost": 0.12,
+          "learning_edge_boost": 0.08
+        }
+      }
     }
   ]
+}
+```
+
+### Go Interface
+```go
+type JiminyExplanation struct {
+    Rationale           string            `json:"rationale"`
+    Confidence          float64           `json:"confidence"`
+    RetrievalPath       []string          `json:"retrieval_path"`
+    ContributingModules []string          `json:"contributing_modules,omitempty"`
+    ScoreBreakdown      map[string]float64 `json:"score_breakdown"`
 }
 ```
 

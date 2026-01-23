@@ -31,39 +31,35 @@ This roadmap addresses these gaps through 5 improvement tracks.
 
 ---
 
-## Track 1: Edge Strengthening (Learning Edges)
-**Priority**: P0 | **Estimated Effort**: 2-3 days
+## Track 1: Edge Strengthening (Learning Edges) ✅ COMPLETE
+**Priority**: P0 | **Status**: COMPLETE (v10)
 
-### Problem
-`co_activated_edges` remained at 0 during the entire test. The learning mechanism exists but isn't creating edges during retrieval.
+### Problem (Resolved)
+`co_activated_edges` remained at 0 during the entire test. The learning mechanism existed but wasn't creating edges.
 
-### Root Cause Analysis
-- [ ] Verify learning edge creation code path in `learning/` package
-- [ ] Check if edge creation is gated by a feature flag or threshold
-- [ ] Review `LEARNING_EDGE_CAP_PER_REQUEST` setting (default: 200)
+### Root Cause (Identified)
+Only top 2 candidates were seeded with activation values in `activation.go`. Combined with sparse graph connectivity, most returned nodes had zero activation and failed the 0.20 learning threshold.
 
-### Implementation Tasks
-
-#### 1.1 Debug Learning Edge Creation
+### Fix Applied
+Modified `activation.go` to seed ALL candidates with their VectorSim values:
+```go
+// Before: only top 2 seeded
+// After: all candidates seeded
+for _, c := range cands {
+    act[c.NodeID] = c.VectorSim
+}
 ```
-Files: mdemg_build/service/internal/learning/
-```
-- [ ] Add logging to edge creation code path
-- [ ] Verify co-retrieval detection logic
-- [ ] Test with explicit co-retrieval scenarios
 
-#### 1.2 Implement Co-Retrieval Tracking
-- [ ] Track which memories are returned together in the same query
-- [ ] Create `CO_ACTIVATED_WITH` edges when nodes are co-retrieved N times
-- [ ] Configure threshold (suggest: 3 co-retrievals = edge creation)
+### Results
+| Metric | Before Fix | After Fix | Improvement |
+|--------|------------|-----------|-------------|
+| Pairs per query | ~0.8 | **43.1** | **54x faster** |
+| Edges (cold start) | 0 | **8,622** | ✅ |
+| Avg Score | 0.619 | **0.710** | **+14.6%** |
 
-#### 1.3 Edge Weight Decay
-- [ ] Implement time-based weight decay for learning edges
-- [ ] Prevent stale associations from dominating retrieval
-
-### Success Metrics
-- [ ] `co_activated_edges > 0` after 100 queries
-- [ ] Improved retrieval consistency for repeated query patterns
+### Documentation
+- See `docs/LEARNING_EDGES_ANALYSIS.md` for full diagnosis
+- Commit: `3fc2136` - fix(learning): seed all candidates for Hebbian learning activation
 
 ---
 
@@ -262,25 +258,45 @@ Files: mdemg_build/service/cmd/ingest-codebase/
 
 This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 (Phases A-C) are foundational** and should proceed in parallel or prior to Phase 6.
 
-### Deliverable 6.1: Explainable Retrieval (Explain-RAG)
+### Deliverable 6.1: Jiminy (Explainable Retrieval)
 - **Priority**: P0 | **Effort**: 2-3 days
-- [ ] Update `/v1/memory/retrieve` to return `rationale` and `confidence_score`.
-- [ ] Trace retrieval path (Vector → Spreading Activation → Final) for explanation.
+- [ ] Update `/v1/memory/retrieve` to return `jiminy` block with rationale and confidence.
+- [ ] Trace retrieval path (Vector → Spreading Activation → LLM Rerank) for explanation.
+- [ ] Add `score_breakdown` showing contribution from each scoring component.
 - [ ] **Integration**: Connect with the v9 LLM re-ranker to explain *why* specific results were promoted.
 
-### Deliverable 6.2: gRPC Module specification & Host
+### Deliverable 6.2: Binary Plugin Host
 - **Priority**: P1 | **Effort**: 4-5 days
-- [ ] Finalize `mdemg-module.proto` and generate Go/Python/Node bindings.
-- [ ] Implement the **Plugin Host** in Go (using HashiCorp `go-plugin` or custom gRPC).
-- [ ] Develop the discovery mechanism (scan `/plugins` folder).
+- [ ] Finalize `mdemg-module.proto` with lifecycle RPCs (Handshake, HealthCheck, Shutdown).
+- [ ] Implement **Plugin Manager** in Go:
+  - Scan `/plugins` directory for module folders
+  - Parse `manifest.json` for each module
+  - Spawn binaries with Unix socket paths
+  - Maintain health check loops
+  - Restart crashed modules with backoff
+- [ ] Create "echo" test module to validate RPC round-trip latency.
+- [ ] Document module development guide with build instructions.
 
-### Deliverable 6.3: Refactored RPC-Based Ingestion
+### Deliverable 6.3: Linear Integration Module (First Non-Code Module)
 - **Priority**: P1 | **Effort**: 4-5 days
-- [ ] Refactor `ingest-codebase` to delegate parsing to the RPC layer.
-- [ ] Implement the **first General Modules**: `Linear` (engineering tasks) and `Obsidian` (SME notes).
-- [ ] Port current Go/TS parsers to "Code Perception" modules.
+- [ ] Implement Linear API client (Go binary).
+- [ ] Create `IngestionModule` that:
+  - Fetches issues, tasks, projects from Linear workspace
+  - Extracts engineering decisions, blockers, dependencies
+  - Creates observation nodes with appropriate metadata
+- [ ] Define Linear-specific edge types:
+  - `BLOCKS` / `BLOCKED_BY` (task dependencies)
+  - `ASSIGNED_TO` (ownership tracking)
+  - `RELATES_TO` (cross-references)
+- [ ] Incremental sync: track last sync cursor, fetch only new/updated items.
 
-### Deliverable 6.4: The "Internal Dialog" Participant (APE)
+### Deliverable 6.4: Code Parser Module Migration
+- **Priority**: P2 | **Effort**: 3-4 days
+- [ ] Extract existing Go/TS parsers from `ingest-codebase` into standalone module.
+- [ ] Refactor `ingest-codebase` to use RPC-based ingestion.
+- [ ] Benchmark: RPC overhead vs direct call (target: <5ms added latency).
+
+### Deliverable 6.5: The "Internal Dialog" Participant (APE)
 - **Priority**: P2 | **Effort**: 5-7 days
 - [ ] Implement background Consistency Checker (APEModule).
 - [ ] Implement **General Reflection Module**: Periodically synthesizes "Internal Dialog" summaries from all observation sources.
@@ -351,14 +367,15 @@ FOR ()-[r:COMPARED_IN]-() REQUIRE r.created_at IS NOT NULL;
 
 ### Quantitative
 
-| Metric | Baseline (v4) | Current (v9 Rerank) | Target |
-|--------|---------------|---------------------|--------|
-| Average retrieval score | 0.567 | **0.619 (+10.2%)** | 0.70+ |
-| Cross-cutting questions | 0.45 | 0.52 | 0.65+ |
-| Architecture questions | ~0.50 | 0.58 | 0.68+ |
-| Configuration questions | ~0.45 | 0.54 | 0.62+ |
-| Temporal questions | 0.46 | 0.49 | 0.58+ |
-| Learning edges created | 0 | 0 | 50+ per 100 queries |
+| Metric | Baseline (v4) | v9 Rerank | v10 Learning | Target |
+|--------|---------------|-----------|--------------|--------|
+| Average retrieval score | 0.567 | 0.619 | **0.710 (+14.6%)** | 0.75+ |
+| Cross-cutting questions | 0.45 | 0.52 | 0.59 | 0.70+ |
+| Architecture questions | ~0.50 | 0.58 | 0.65 | 0.72+ |
+| Configuration questions | ~0.45 | 0.54 | 0.61 | 0.68+ |
+| Temporal questions | 0.46 | 0.49 | 0.55 | 0.62+ |
+| Learning edges created | 0 | 0 | **8,622** | ✅ ACHIEVED |
+| Score >0.7 rate | ~10% | ~25% | **64%** | 70%+ |
 
 ### Qualitative
 - [ ] Retrieval returns concern/comparison nodes when appropriate

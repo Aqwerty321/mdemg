@@ -1,7 +1,7 @@
 # MDEMG Development Roadmap
 
 **Created**: 2026-01-22
-**Updated**: 2026-01-23
+**Updated**: 2026-01-23 (added Phase 8: Symbol-Level Indexing)
 **Based on**: v4 Test Results (whk-wms codebase, 100-question evaluation)
 **Goal**: Improve retrieval quality from 0.567 avg score to 0.70+ avg score
 **Result**: v11 achieved **0.733 avg score** (+29.3% from v4 baseline, +3.3% from v10)
@@ -30,6 +30,7 @@ This roadmap addressed these gaps through 5 improvement tracks. **All 5 tracks a
 | Architectural Comparison Nodes | MEDIUM | MEDIUM | P2 | ✅ COMPLETE |
 | Configuration Boosting | MEDIUM | LOW | P2 | ✅ COMPLETE |
 | Temporal Pattern Detection | LOW | MEDIUM | P3 | ✅ COMPLETE |
+| **Symbol-Level Indexing** | **HIGH** | **HIGH** | **P1** | ⏳ PENDING |
 
 ---
 
@@ -289,6 +290,66 @@ This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 
   - Hourly scheduled execution
 - [ ] Implement **Context Cooler**: Manage volatile short-term observations and their "graduation" to long-term memory.
 - [ ] Implement **Constraint Module**: Detects non-code commitments and tags them as high-priority constraints.
+
+## Phase 8: Symbol-Level Indexing (Evidence-Locked Retrieval)
+
+**Motivation**: VS Code scale benchmark (28K elements) revealed that MDEMG returns *related files* but not *exact constant definitions*. For evidence-locked questions requiring specific values (e.g., "What is DEFAULT_FLUSH_INTERVAL?"), grep achieves 100% while MDEMG achieves ~20%.
+
+**Goal**: Enable MDEMG to return symbol-level evidence, not just file paths.
+
+### Track 6: Symbol-Level Extraction ⏳ PENDING
+**Priority**: P1 | **Status**: PENDING
+
+#### Problem
+Current ingestion creates file-level nodes with content summaries. When asked "What is the exact value of X?", MDEMG returns files that *mention* X, not the file that *defines* X.
+
+**Evidence from VS Code Benchmark**:
+| Query | MDEMG Returns | Ground Truth |
+|-------|---------------|--------------|
+| DEFAULT_FLUSH_INTERVAL | `/src/vs/base/node/pfs.ts` | `/src/vs/platform/storage/common/storage.ts` |
+| minimumWidth SidebarPart | `/src/vs/workbench/browser/parts/paneCompositeBar.ts` | `/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts` |
+
+#### Solution: Symbol Nodes
+
+##### 6.1 AST-Based Symbol Extraction
+- [ ] Extract during ingestion: constants, exported functions, class definitions, type aliases
+- [ ] Create `:SymbolNode` label with properties: `symbol_name`, `symbol_type`, `value`, `file_path`, `line_number`
+- [ ] Link to parent file: `(SymbolNode)-[:DEFINED_IN]->(MemoryNode)`
+- [ ] Support languages: TypeScript/JavaScript (tree-sitter), Go (go/ast), Python (ast module)
+
+##### 6.2 Symbol-Aware Retrieval
+- [ ] Add symbol search mode: exact match on `symbol_name`
+- [ ] Hybrid query: vector search + symbol name prefix match
+- [ ] Return symbol context: definition line + surrounding lines (5 above, 5 below)
+
+##### 6.3 Evidence Format
+- [ ] Extend retrieval response with `evidence` block:
+  ```json
+  {
+    "evidence": {
+      "file_path": "src/vs/platform/storage/common/storage.ts",
+      "line_number": 42,
+      "symbol": "DEFAULT_FLUSH_INTERVAL",
+      "value": "60000",
+      "snippet": "export const DEFAULT_FLUSH_INTERVAL = 60 * 1000; // ms"
+    }
+  }
+  ```
+
+#### Expected Impact
+| Metric | Current | Target |
+|--------|---------|--------|
+| Evidence-locked accuracy | ~20% | 70%+ |
+| Symbol definition retrieval | 0% | 90%+ |
+| Value extraction | 0% | 85%+ |
+
+#### Implementation Notes
+- Use tree-sitter for multi-language AST parsing (existing Go bindings: `github.com/smacker/go-tree-sitter`)
+- Index symbols in Neo4j with B-tree index on `symbol_name` for fast exact match
+- Consider fulltext index for symbol name fuzzy search
+- Storage estimate: ~10x node count increase (VS Code: 28K files → ~280K symbols)
+
+---
 
 ## Phase 7: Public Readiness & Open Source Hardening
 

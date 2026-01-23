@@ -107,6 +107,20 @@ The **TapRoot level** stores the concrete, domain-specific knowledge—the "inst
 
 This captures the key insight: **relationships are stable, but the conceptual organization is fluid**. Just as human memory reorganizes concepts as understanding deepens, MDEMG allows nodes to migrate through layers while preserving their relational connections.
 
+### Modular Intelligence Architecture
+
+MDEMG is evolving from a unified memory store into a **Modular Intelligence Engine**. Specific "Modules" can be plugged into the graph to grant it specialized perception and reasoning skills:
+
+*   **SME Ingestion Modules**: Domain-specific parsers (PLC, P&ID, Jira).
+*   **Reasoning Modules**: Specialized architectural pattern detectors (NestJS, Go-Micro) and **sophisticated re-ranking logic (LLM Re-ranker)**.
+*   **Active Participant Modules**: Proactive reflection, consistency checking, and explainable retrieval.
+
+#### Integration with Retrieval Pipeline
+Modules integrate with the retrieval pipeline at three critical points:
+1.  **Candidate Selection**: Perception modules tag nodes during ingest, allowing filtered recall.
+2.  **Reasoning (Re-ranking)**: Reasoning modules (like the v9 LLM re-ranker) process raw retrieval results to refine the final top-K list.
+3.  **Explanation**: The explainable retrieval layer traces which module influenced a node's score to provide a human-readable `rationale`.
+
 ### Multi-Dimensional Layered Graph
 
 ```

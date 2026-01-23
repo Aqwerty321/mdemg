@@ -258,6 +258,35 @@ Files: mdemg_build/service/cmd/ingest-codebase/
 
 ---
 
+## Phase 6: Modular Intelligence & Active Participation
+
+This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 (Phases A-C) are foundational** and should proceed in parallel or prior to Phase 6.
+
+### Deliverable 6.1: Explainable Retrieval (Explain-RAG)
+- **Priority**: P0 | **Effort**: 2-3 days
+- [ ] Update `/v1/memory/retrieve` to return `rationale` and `confidence_score`.
+- [ ] Trace retrieval path (Vector → Spreading Activation → Final) for explanation.
+- [ ] **Integration**: Connect with the v9 LLM re-ranker to explain *why* specific results were promoted.
+
+### Deliverable 6.2: Module Specification & Registry
+- **Priority**: P1 | **Effort**: 3-4 days
+- [ ] Finalize `mdemg-module.json` schema and Go interfaces (`BaseParser`, `ReasoningModule`).
+- [ ] Implement `/v1/modules` API for registration and state management.
+- [ ] Add `:ModuleRegistry` nodes to Neo4j.
+
+### Deliverable 6.3: Plugin Ingestion Framework
+- **Priority**: P1 | **Effort**: 4-5 days
+- [ ] Refactor `ingest-codebase` to support dynamically loaded parsers via a central `ParserRegistry`.
+- [ ] Port current parsers (Go, TS, Py) to the `BaseParser` module structure.
+
+### Deliverable 6.4: Active Participant Engine (APE)
+- **Priority**: P2 | **Effort**: 5-7 days
+- [ ] Implement background Consistency Checker (APEModule).
+- [ ] Implement Context Cooler for graduation of short-term task noise.
+- [ ] Implement LLM Reconciler for contradictory memory resolution.
+
+---
+
 ## Testing Strategy
 
 ### Regression Test Suite
@@ -320,14 +349,15 @@ FOR ()-[r:COMPARED_IN]-() REQUIRE r.created_at IS NOT NULL;
 ## Success Criteria
 
 ### Quantitative
-| Metric | Current | Target |
-|--------|---------|--------|
-| Average retrieval score | 0.567 | 0.70+ |
-| Cross-cutting questions | 0.45 | 0.60+ |
-| Architecture questions | ~0.50 | 0.65+ |
-| Configuration questions | ~0.45 | 0.60+ |
-| Temporal questions | 0.46 | 0.55+ |
-| Learning edges created | 0 | 50+ per 100 queries |
+
+| Metric | Baseline (v4) | Current (v9 Rerank) | Target |
+|--------|---------------|---------------------|--------|
+| Average retrieval score | 0.567 | **0.619 (+10.2%)** | 0.70+ |
+| Cross-cutting questions | 0.45 | 0.52 | 0.65+ |
+| Architecture questions | ~0.50 | 0.58 | 0.68+ |
+| Configuration questions | ~0.45 | 0.54 | 0.62+ |
+| Temporal questions | 0.46 | 0.49 | 0.58+ |
+| Learning edges created | 0 | 0 | 50+ per 100 queries |
 
 ### Qualitative
 - [ ] Retrieval returns concern/comparison nodes when appropriate

@@ -168,12 +168,7 @@ func buildRerankPrompt(query string, candidates []models.RetrieveResult) string 
 		sb.WriteString(fmt.Sprintf("[%d] %s\n", i, c.Name))
 		sb.WriteString(fmt.Sprintf("    Path: %s\n", c.Path))
 		if c.Summary != "" {
-			// Truncate summary to avoid token explosion
-			summary := c.Summary
-			if len(summary) > 200 {
-				summary = summary[:200] + "..."
-			}
-			sb.WriteString(fmt.Sprintf("    Summary: %s\n", summary))
+			sb.WriteString(fmt.Sprintf("    Summary: %s\n", c.Summary))
 		}
 		sb.WriteString("\n")
 	}

@@ -1,0 +1,200 @@
+{
+  "metadata": {
+    "codebase": "whk-wms",
+    "type": "symbol_focused",
+    "created": "2026-01-23",
+    "purpose": "Test symbol search functionality with exact value lookups",
+    "total_questions": 20,
+    "questions_per_category": 4,
+    "categories": [
+      "architecture_structure",
+      "service_relationships",
+      "business_logic_constraints",
+      "data_flow_integration",
+      "cross_cutting_concerns"
+    ]
+  },
+  "questions": [
+    {
+      "id": "sym_arch_1",
+      "category": "architecture_structure",
+      "question": "What is the DEFAULT_MAX_COMPLEXITY limit configured in AppModule for GraphQL query complexity validation?",
+      "answer": "1000",
+      "symbol_name": "DEFAULT_MAX_COMPLEXITY",
+      "required_files": ["/apps/whk-wms/src/app.module.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_arch_2",
+      "category": "architecture_structure",
+      "question": "What is the MAX_TAKE pagination constant defined in the pagination constants file that limits query results?",
+      "answer": "1000",
+      "symbol_name": "MAX_TAKE",
+      "required_files": ["/apps/whk-wms/src/util/pagination.constants.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_arch_3",
+      "category": "architecture_structure",
+      "question": "What is the ID_CHUNK_SIZE used by BarrelAggregatesService for chunked processing of barrel IDs to prevent memory issues?",
+      "answer": "5000",
+      "symbol_name": "ID_CHUNK_SIZE",
+      "required_files": ["/apps/whk-wms/src/barrelAggregates/barrel-aggregates.service.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_arch_4",
+      "category": "architecture_structure",
+      "question": "What is the MAX_BARRELS_FOR_AGGREGATION threshold that determines when aggregation queries should use chunked processing?",
+      "answer": "100000",
+      "symbol_name": "MAX_BARRELS_FOR_AGGREGATION",
+      "required_files": ["/apps/whk-wms/src/barrelAggregates/barrel-aggregates.service.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_svc_1",
+      "category": "service_relationships",
+      "question": "What is the DEFAULT_SLOW_QUERY_THRESHOLD_MS value in PrismaService that triggers slow query logging?",
+      "answer": "1000",
+      "symbol_name": "DEFAULT_SLOW_QUERY_THRESHOLD_MS",
+      "required_files": ["/apps/whk-wms/src/prisma/prisma.service.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_svc_2",
+      "category": "service_relationships",
+      "question": "What is the EMBEDDING_BATCH_SIZE used by LlamaService when processing embeddings in batches?",
+      "answer": "50",
+      "symbol_name": "EMBEDDING_BATCH_SIZE",
+      "required_files": ["/apps/whk-wms/src/providers/llama/llama.service.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_svc_3",
+      "category": "service_relationships",
+      "question": "What is the BATCH_DELAY_MS value between embedding batches in LlamaService to avoid rate limiting?",
+      "answer": "50",
+      "symbol_name": "BATCH_DELAY_MS",
+      "required_files": ["/apps/whk-wms/src/providers/llama/llama.service.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_svc_4",
+      "category": "service_relationships",
+      "question": "What is the STARTUP_HEALTH_CHECK_DELAY_MS in the indexing scheduler before initial health checks begin?",
+      "answer": "60000",
+      "symbol_name": "STARTUP_HEALTH_CHECK_DELAY_MS",
+      "required_files": ["/apps/whk-wms/src/providers/indexing/indexing.scheduler.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_biz_1",
+      "category": "business_logic_constraints",
+      "question": "What is the MAX_EXPORT_SIZE limit for barrel exports in the BarrelController?",
+      "answer": "50000",
+      "symbol_name": "MAX_EXPORT_SIZE",
+      "required_files": ["/apps/whk-wms/src/barrel/barrel.controller.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_biz_2",
+      "category": "business_logic_constraints",
+      "question": "What is the MAX_SORT_RECORDS limit in TransferService that restricts in-memory sorting operations?",
+      "answer": "10000",
+      "symbol_name": "MAX_SORT_RECORDS",
+      "required_files": ["/apps/whk-wms/src/transfer/transfer.service.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_biz_3",
+      "category": "business_logic_constraints",
+      "question": "What is the MAX_QUERY_SIZE limit in the BarrelResolver for GraphQL queries?",
+      "answer": "10000",
+      "symbol_name": "MAX_QUERY_SIZE",
+      "required_files": ["/apps/whk-wms/src/barrel/barrel.resolver.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_biz_4",
+      "category": "business_logic_constraints",
+      "question": "What is the MAX_JOB_ID_FILTER_COUNT limit in WarehouseJobsController for filtering by job IDs?",
+      "answer": "100",
+      "symbol_name": "MAX_JOB_ID_FILTER_COUNT",
+      "required_files": ["/apps/whk-wms/src/warehouseJobs/base/warehouse-jobs.controller.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_data_1",
+      "category": "data_flow_integration",
+      "question": "What is the BATCH_SIZE for trust mode processing in the inventory upload service?",
+      "answer": "10",
+      "symbol_name": "BATCH_SIZE",
+      "required_files": ["/apps/whk-wms/src/inventory-upload/trust-mode-processing.service.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_data_2",
+      "category": "data_flow_integration",
+      "question": "What is the MAX_EMPTY_BATCHES threshold in InventoryProcessingService before stopping processing?",
+      "answer": "3",
+      "symbol_name": "MAX_EMPTY_BATCHES",
+      "required_files": ["/apps/whk-wms/src/inventory-upload/inventory-processing.service.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_data_3",
+      "category": "data_flow_integration",
+      "question": "What is the MAX_EXPORT_RECORDS limit defined in serverUtils for data exports?",
+      "answer": "100000",
+      "symbol_name": "MAX_EXPORT_RECORDS",
+      "required_files": ["/apps/whk-wms-front-end/lib/serverUtils.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_data_4",
+      "category": "data_flow_integration",
+      "question": "What are the ALLOWED_ERROR_TYPES that DeviceSyncErrorService accepts for error categorization?",
+      "answer": "[\"INVENTORY_DUPLICATE\", \"STORAGELOCATION\", \"ENTRY_DUPLICATE\", \"OTHER\"]",
+      "symbol_name": "ALLOWED_ERROR_TYPES",
+      "required_files": ["/apps/whk-wms/src/deviceSyncError/deviceSyncError.service.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_cross_1",
+      "category": "cross_cutting_concerns",
+      "question": "What is the CACHE_EXPIRATION_MS for the EventTypesContext cache in the frontend?",
+      "answer": "14400000",
+      "symbol_name": "CACHE_EXPIRATION_MS",
+      "required_files": ["/apps/whk-wms-front-end/context/EventTypesContext.tsx"],
+      "complexity": "symbol-lookup",
+      "notes": "4 * 60 * 60 * 1000 = 14400000 (4 hours)"
+    },
+    {
+      "id": "sym_cross_2",
+      "category": "cross_cutting_concerns",
+      "question": "What is the MAX_RETRY_ATTEMPTS for the chatbot fallback service?",
+      "answer": "3",
+      "symbol_name": "MAX_RETRY_ATTEMPTS",
+      "required_files": ["/apps/whk-wms-front-end/lib/services/chatBotFallback.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_cross_3",
+      "category": "cross_cutting_concerns",
+      "question": "What are the RETRY_DELAYS (in milliseconds) configured for the chatbot fallback service?",
+      "answer": "[1000, 3000, 5000]",
+      "symbol_name": "RETRY_DELAYS",
+      "required_files": ["/apps/whk-wms-front-end/lib/services/chatBotFallback.ts"],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": "sym_cross_4",
+      "category": "cross_cutting_concerns",
+      "question": "What is the HEALTH_CHECK_TIMEOUT in milliseconds for the chatbot fallback service health checks?",
+      "answer": "5000",
+      "symbol_name": "HEALTH_CHECK_TIMEOUT",
+      "required_files": ["/apps/whk-wms-front-end/lib/services/chatBotFallback.ts"],
+      "complexity": "symbol-lookup"
+    }
+  ]
+}

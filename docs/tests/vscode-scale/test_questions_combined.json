@@ -1,0 +1,432 @@
+{
+  "metadata": {
+    "version": "combined-v1",
+    "created": "2026-01-23",
+    "total_questions": 41,
+    "composition": {
+      "v4_evidence_locked": 15,
+      "v3_hard": 20,
+      "v5_simple_constants": 6
+    },
+    "design": "Multi-hop (v4) + Hard correlation (v3) + 10% simple constants (v5)",
+    "scoring": {
+      "multi_hop_with_trace": 5,
+      "hard_with_evidence": 4,
+      "simple_exact_match": 2,
+      "partial_evidence": 1,
+      "wrong": 0
+    }
+  },
+  "questions": [
+    {
+      "id": "v4_001",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "effective_default",
+      "question": "The editor's font size has a declared default in editorOptions.ts, but this can be overridden by platform-specific defaults. Trace the effective default: (1) What is the base EDITOR_FONT_DEFAULTS.fontSize value? (2) In which file is the platform-specific override applied? (3) What is the effective default fontSize on macOS vs Windows?",
+      "required_evidence": {
+        "base_default_file": "editorOptions.ts",
+        "base_default_symbol": "EDITOR_FONT_DEFAULTS.fontSize",
+        "macos_effective": "12",
+        "windows_effective": "14"
+      }
+    },
+    {
+      "id": "v4_002",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "effective_default",
+      "question": "Storage flush interval: (1) What is DEFAULT_FLUSH_INTERVAL declared in storage.ts? (2) Where is this value passed to the actual storage implementation? (3) Is there any code path that uses a DIFFERENT interval value? If so, what triggers it and what is that value?",
+      "required_evidence": {
+        "declared_value_file": "storage.ts",
+        "declared_value": "60000",
+        "alternative_path": "storageService.ts browser path",
+        "alternative_value": "5000"
+      }
+    },
+    {
+      "id": "v4_003",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "multi_hop_trace",
+      "question": "Extension activation timeout chain: (1) What constant defines the extension activation timeout? (2) Where is this timeout applied to the actual Promise.race? (3) Is there a different timeout for LOCAL vs REMOTE extension hosts?",
+      "required_evidence": {
+        "timeout_constant_file": "extensionsActivationProgress.ts",
+        "timeout_value_ms": "5000"
+      }
+    },
+    {
+      "id": "v4_004",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "effective_default",
+      "question": "Sidebar minimum width has a declared constant, but the EFFECTIVE minimum depends on activity bar visibility. (1) What is the declared minimumWidth in SidebarPart? (2) What additional width is added when activity bar is beside sidebar? (3) What is the effective minimum when activity bar is hidden vs visible?",
+      "required_evidence": {
+        "declared_min_file": "sidebarPart.ts",
+        "declared_min_value": "170",
+        "activitybar_width_file": "activitybarPart.ts",
+        "activitybar_width_value": "48"
+      }
+    },
+    {
+      "id": "v4_005",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "multi_hop_trace",
+      "question": "CodeLens refresh delay chain: (1) What is the declared debounce delay for CodeLens updates? (2) Where is this delay applied? (3) Is there a DIFFERENT delay used during scrolling vs typing?",
+      "required_evidence": {
+        "delay_constant_file": "codelensController.ts",
+        "delay_value_ms": "250"
+      }
+    },
+    {
+      "id": "v4_006",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "effective_default",
+      "question": "Terminal cursor blink interval: (1) What is the DEFAULT_CURSOR_BLINK constant? (2) Where is this value read from user configuration? (3) What is the EFFECTIVE blink interval when 'terminal.integrated.cursorBlinking' is true vs false?",
+      "required_evidence": {
+        "default_file": "terminalConfiguration.ts",
+        "default_value": "false"
+      }
+    },
+    {
+      "id": "v4_007",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "multi_hop_trace",
+      "question": "Hover delay chain: (1) What is the default hover delay in EditorOptions? (2) Where does the HoverController read this? (3) Is there a SEPARATE delay for sticky hover?",
+      "required_evidence": {
+        "default_file": "editorOptions.ts",
+        "default_delay_ms": "300"
+      }
+    },
+    {
+      "id": "v4_008",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "effective_default",
+      "question": "Auto-save delay chain: (1) What is the default autoSaveDelay in files configuration? (2) Where is this converted to the actual save timeout? (3) What is the MINIMUM enforced delay regardless of user setting?",
+      "required_evidence": {
+        "config_default_file": "filesConfigurationService.ts",
+        "config_default_value": "1000"
+      }
+    },
+    {
+      "id": "v4_009",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "multi_hop_trace",
+      "question": "Command palette debounce: (1) What is the input debounce delay for QuickInput? (2) Where is this applied in the quick pick controller? (3) Is there a DIFFERENT debounce for extension-contributed quick picks?",
+      "required_evidence": {
+        "debounce_file": "quickInputController.ts",
+        "debounce_value_ms": "100"
+      }
+    },
+    {
+      "id": "v4_010",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "effective_default",
+      "question": "Minimap character width: (1) What is the default minimapCharWidth in editorOptions? (2) Where is this scaled by device pixel ratio? (3) What is the EFFECTIVE character width on a 2x DPR display?",
+      "required_evidence": {
+        "default_file": "editorOptions.ts"
+      }
+    },
+    {
+      "id": "v4_011",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "multi_hop_trace",
+      "question": "Suggest widget delay: (1) What is quickSuggestionsDelay default? (2) Where is this combined with the typing trigger delay? (3) What is the TOTAL effective delay from keypress to suggestions appearing?",
+      "required_evidence": {
+        "delay_default_file": "editorOptions.ts",
+        "delay_default_value": "10"
+      }
+    },
+    {
+      "id": "v4_012",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "effective_default",
+      "question": "Bracket pair colorization limits: (1) What is the default maxBracketPairs limit? (2) Where is this checked during parsing? (3) What happens when the limit is exceeded?",
+      "required_evidence": {
+        "limit_file": "editorOptions.ts"
+      }
+    },
+    {
+      "id": "v4_013",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "multi_hop_trace",
+      "question": "Workspace trust: (1) What is the default trust state for an empty workspace? (2) Where is this determined in the trust service? (3) How does this differ for a FOLDER workspace vs a REMOTE workspace?",
+      "required_evidence": {
+        "empty_workspace_trust": "true"
+      }
+    },
+    {
+      "id": "v4_014",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "effective_default",
+      "question": "Search results max: (1) What is the default maxResults in search configuration? (2) Where is this passed to ripgrep? (3) Is there a SEPARATE limit for file search vs text search?",
+      "required_evidence": {
+        "config_file": "search.ts",
+        "text_search_limit": "20000"
+      }
+    },
+    {
+      "id": "v4_015",
+      "source": "v4_evidence_locked",
+      "type": "multi_hop",
+      "category": "multi_hop_trace",
+      "question": "Extension host startup timeout: (1) What is the declared timeout for extension host startup? (2) Where is this used in a Promise.race? (3) Is there a DIFFERENT timeout for the initial startup vs reconnection?",
+      "required_evidence": {
+        "startup_timeout_ms": "10000 (local) / 60000 (web worker)"
+      }
+    },
+    {
+      "id": "v3_001",
+      "source": "v3_hard",
+      "type": "cross_file_trace",
+      "category": "extension_activation",
+      "question": "Trace the extension activation flow: When an extension with activationEvent 'onLanguage:typescript' activates, what is the exact method call chain from ExtensionService.ts through ExtHostExtensionService.ts to the extension's activate() function? List the 3 key method names in order AND the timeout value (in ms) used for activation.",
+      "required_evidence": {
+        "method_chain": ["method1", "method2", "method3"],
+        "timeout_ms": "5000"
+      }
+    },
+    {
+      "id": "v3_002",
+      "source": "v3_hard",
+      "type": "cross_file_trace",
+      "category": "text_model",
+      "question": "In the editor's text model creation flow: What factory method in textModel.ts creates a TextModel, what class in pieceTreeTextBuffer creates the buffer, and what is the exact AverageBufferSize constant AND the NodeColor enum values used for the red-black tree?",
+      "required_evidence": {
+        "average_buffer_size": "65535",
+        "node_colors": ["Red", "Black"]
+      }
+    },
+    {
+      "id": "v3_003",
+      "source": "v3_hard",
+      "type": "service_injection",
+      "category": "commands",
+      "question": "The CommandService depends on multiple services. List the 3 services injected into CommandService's constructor (exact interface names from instantiation decorators), AND for IExtensionService, what is the exact string value of the 'extensionHostStarted' event name?",
+      "required_evidence": {
+        "injected_services": ["ILogService", "IExtensionService", "IInstantiationService"]
+      }
+    },
+    {
+      "id": "v3_004",
+      "source": "v3_hard",
+      "type": "config_chain",
+      "category": "editor_config",
+      "question": "For the 'editor.fontSize' configuration: What is the default value defined in editorOptions.ts, what is the minimum allowed value, and in which file is the IEditorOptions interface that types this config?",
+      "required_evidence": {
+        "default_value": "14",
+        "minimum_value": "6 or 8"
+      }
+    },
+    {
+      "id": "v3_005",
+      "source": "v3_hard",
+      "type": "event_flow",
+      "category": "files",
+      "question": "When a file is saved in VS Code: Trace the event from ITextFileService.save() through to the actual file write. What is the name of the event emitted BEFORE save (for extensions to participate), what service performs the actual write, and what is the default autoSaveDelay value in ms?",
+      "required_evidence": {
+        "auto_save_delay_ms": "1000"
+      }
+    },
+    {
+      "id": "v3_006",
+      "source": "v3_hard",
+      "type": "ui_component_chain",
+      "category": "workbench_layout",
+      "question": "For the Activity Bar: What class renders the activity bar icons, what is the static ACTION_HEIGHT in pixels, what CSS class is applied to the container, and what storage key persists the pinned items?",
+      "required_evidence": {
+        "action_height_px": "48"
+      }
+    },
+    {
+      "id": "v3_007",
+      "source": "v3_hard",
+      "type": "protocol_rpc",
+      "category": "extensions",
+      "question": "In the Extension Host RPC protocol: How many proxy identifiers are in MainContext vs ExtHostContext? What is the exact method that serializes arguments for IPC, and what is the maximum message size constant (if any)?",
+      "required_evidence": {}
+    },
+    {
+      "id": "v3_008",
+      "source": "v3_hard",
+      "type": "lifecycle_phases",
+      "category": "workbench",
+      "question": "List ALL lifecycle phases for BOTH LifecycleMainPhase (electron-main) AND LifecyclePhase (browser/workbench) with their numeric values. What method in WorkbenchLifecycleService triggers the 'Eventually' phase?",
+      "required_evidence": {
+        "workbench_phases": {"Starting": 1, "Ready": 2, "Restored": 3, "Eventually": 4}
+      }
+    },
+    {
+      "id": "v3_009",
+      "source": "v3_hard",
+      "type": "storage_flow",
+      "category": "storage",
+      "question": "For workspace storage: What are ALL StorageScope enum values with their numbers, what is the DEFAULT_FLUSH_INTERVAL in ms, and what SQLite table name stores the actual data?",
+      "required_evidence": {
+        "storage_scopes": {"APPLICATION": -1, "PROFILE": 0, "WORKSPACE": 1},
+        "flush_interval_ms": "60000"
+      }
+    },
+    {
+      "id": "v3_010",
+      "source": "v3_hard",
+      "type": "keybinding_chain",
+      "category": "keybinding",
+      "question": "When a keybinding is pressed: Trace from the DOM event handler through to command execution. What class in standaloneKeybindingService handles the event, what method in commandService executes the command, and what is the default KEYBINDING_CONTEXT_ATTR attribute name?",
+      "required_evidence": {}
+    },
+    {
+      "id": "v3_011",
+      "source": "v3_hard",
+      "type": "notification_system",
+      "category": "notifications",
+      "question": "For notifications: What service interface handles notifications, what are the 3 severity levels (enum values with numbers), what is the default toast timeout in ms, and what DOM element ID is used for the notification center?",
+      "required_evidence": {
+        "severity_values": {"Info": 1, "Warning": 2, "Error": 3},
+        "toast_timeout_ms": "10000"
+      }
+    },
+    {
+      "id": "v3_012",
+      "source": "v3_hard",
+      "type": "diff_algorithm",
+      "category": "diff",
+      "question": "For the diff editor: What is the name of the main diff algorithm class, what constant controls the maximum computation time before giving up, what method computes the character-level diff?",
+      "required_evidence": {}
+    },
+    {
+      "id": "v3_013",
+      "source": "v3_hard",
+      "type": "git_integration",
+      "category": "git",
+      "question": "For Git integration: What is the extension ID for the built-in Git extension, what service interface manages Git repositories, what is the default poll interval for checking changes (ms), and what command ID opens the Git view?",
+      "required_evidence": {
+        "extension_id": "vscode.git"
+      }
+    },
+    {
+      "id": "v3_014",
+      "source": "v3_hard",
+      "type": "terminal_integration",
+      "category": "terminal",
+      "question": "For the integrated terminal: What class manages terminal instances, what is the default shell integration timeout (ms), what IPC channel name is used for terminal communication, and what environment variable is set to identify VS Code terminals?",
+      "required_evidence": {
+        "env_variable": "TERM_PROGRAM"
+      }
+    },
+    {
+      "id": "v3_015",
+      "source": "v3_hard",
+      "type": "language_server",
+      "category": "lsp",
+      "question": "For Language Server Protocol support: What client class manages LSP connections, what is the default initialization timeout (ms), what method sends the 'initialize' request, and what capability key enables semantic tokens?",
+      "required_evidence": {}
+    },
+    {
+      "id": "v3_016",
+      "source": "v3_hard",
+      "type": "search_integration",
+      "category": "search",
+      "question": "For workspace search: What service performs the actual file search, what is the default max results limit, what ripgrep flag is used for case-insensitive search?",
+      "required_evidence": {
+        "max_results": "20000"
+      }
+    },
+    {
+      "id": "v3_017",
+      "source": "v3_hard",
+      "type": "debug_adapter",
+      "category": "debug",
+      "question": "For debugging: What class manages debug sessions, what is the timeout for debugger startup (ms), what DAP message type initiates a debug session, and what storage key persists breakpoints?",
+      "required_evidence": {}
+    },
+    {
+      "id": "v3_018",
+      "source": "v3_hard",
+      "type": "workbench_layout",
+      "category": "workbench_layout",
+      "question": "For workbench layout: List ALL Part IDs (sidebar, panel, editor, etc.) with their exact string values, what is the minimum width of the sidebar in pixels, and what storage key persists the layout state?",
+      "required_evidence": {
+        "sidebar_min_width_px": "170"
+      }
+    },
+    {
+      "id": "v3_019",
+      "source": "v3_hard",
+      "type": "theme_system",
+      "category": "themes",
+      "question": "For themes: What service manages color themes, what are the 3 theme types (enum values with strings), what is the default dark theme ID, and what CSS variable prefix is used for workbench colors?",
+      "required_evidence": {
+        "theme_types": ["light", "dark", "hcDark"]
+      }
+    },
+    {
+      "id": "v3_020",
+      "source": "v3_hard",
+      "type": "extension_host",
+      "category": "extensions",
+      "question": "For extension host management: What are ALL ExtensionHostKind values (with numbers), what is the extension host startup timeout (ms), what IPC channel is used for extension host communication?",
+      "required_evidence": {
+        "extension_host_kinds": {"LocalProcess": 1, "LocalWebWorker": 2, "Remote": 3}
+      }
+    },
+    {
+      "id": "v5_001",
+      "source": "v5_comprehensive",
+      "type": "simple_constant",
+      "category": "editor_config",
+      "question": "What is the default tabSize in editorOptions?",
+      "expected": {"value": "4", "file": "editorOptions.ts"}
+    },
+    {
+      "id": "v5_002",
+      "source": "v5_comprehensive",
+      "type": "simple_constant",
+      "category": "storage",
+      "question": "What is DEFAULT_FLUSH_INTERVAL for storage in ms?",
+      "expected": {"value": "60000", "file": "storage.ts"}
+    },
+    {
+      "id": "v5_003",
+      "source": "v5_comprehensive",
+      "type": "simple_constant",
+      "category": "workbench_layout",
+      "question": "What is DEFAULT_CUSTOM_TITLEBAR_HEIGHT?",
+      "expected": {"value": "35", "file": "titlebarPart.ts"}
+    },
+    {
+      "id": "v5_004",
+      "source": "v5_comprehensive",
+      "type": "simple_constant",
+      "category": "terminal",
+      "question": "What is the default terminal.integrated.scrollback lines?",
+      "expected": {"value": "1000", "file": "terminalConfiguration.ts"}
+    },
+    {
+      "id": "v5_005",
+      "source": "v5_comprehensive",
+      "type": "simple_constant",
+      "category": "search",
+      "question": "What is DEFAULT_MAX_SEARCH_RESULTS?",
+      "expected": {"value": "20000", "file": "search.ts"}
+    },
+    {
+      "id": "v5_006",
+      "source": "v5_comprehensive",
+      "type": "simple_constant",
+      "category": "extensions",
+      "question": "What is EXTENSION_FETCH_TIMEOUT_MS?",
+      "expected": {"value": "30000", "file": "preferences.ts"}
+    }
+  ]
+}

@@ -124,11 +124,10 @@ func (p *Parser) ParseContent(ctx context.Context, filePath string, lang Languag
 
 		// Add language
 		sym.Language = lang
-
 		result.Symbols = append(result.Symbols, sym)
 
-		// Enforce max symbols limit
-		if len(result.Symbols) >= p.config.MaxSymbolsPerFile {
+		// Enforce max symbols limit (0 means unlimited)
+		if p.config.MaxSymbolsPerFile > 0 && len(result.Symbols) >= p.config.MaxSymbolsPerFile {
 			result.ParseErrors = append(result.ParseErrors,
 				fmt.Sprintf("truncated at %d symbols (max limit)", p.config.MaxSymbolsPerFile))
 			break
@@ -179,6 +178,12 @@ func (p *Parser) extractTypeScriptSymbols(root *sitter.Node, content []byte, fil
 		case "enum_declaration":
 			// enum X { }
 			symbols = append(symbols, p.extractTSEnum(node, content, lines, filePath)...)
+
+		case "public_field_definition":
+			// Class static/instance fields: static DEFAULT_VALUE = 42
+			if sym := p.extractTSClassField(node, content, lines, filePath); sym != nil {
+				symbols = append(symbols, *sym)
+			}
 
 		case "export_statement":
 			// Check for export default or export { }
@@ -322,6 +327,102 @@ func (p *Parser) extractTSClass(node *sitter.Node, content []byte, lines []strin
 	}
 
 	sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.LineNumber+5) // First few lines
+
+	return &sym
+}
+
+// extractTSClassField extracts class static/readonly fields as constants.
+// Handles patterns like: static DEFAULT_TIMEOUT = 1000
+func (p *Parser) extractTSClassField(node *sitter.Node, content []byte, lines []string, filePath string) *Symbol {
+	// Check for static modifier - only extract static fields as constants
+	hasStatic := false
+	for i := 0; i < int(node.ChildCount()); i++ {
+		child := node.Child(i)
+		if child.Type() == "static" {
+			hasStatic = true
+			break
+		}
+	}
+
+	// Only extract static fields (they're effectively constants)
+	if !hasStatic {
+		return nil
+	}
+
+	// Get field name - look for property_identifier child
+	var nameNode *sitter.Node
+	for i := 0; i < int(node.ChildCount()); i++ {
+		child := node.Child(i)
+		if child.Type() == "property_identifier" {
+			nameNode = child
+			break
+		}
+	}
+	if nameNode == nil {
+		return nil
+	}
+	name := nameNode.Content(content)
+
+	// Skip private fields (usually start with _ or #)
+	if strings.HasPrefix(name, "#") {
+		return nil
+	}
+
+	// Get value - find the value after the = sign
+	var value string
+	foundEquals := false
+	for i := 0; i < int(node.ChildCount()); i++ {
+		child := node.Child(i)
+		if child.Type() == "=" {
+			foundEquals = true
+			continue
+		}
+		if foundEquals && child.Type() != ";" {
+			value = child.Content(content)
+			// Evaluate simple numeric expressions
+			value = p.evaluateValue(value)
+			break
+		}
+	}
+
+	// Get the class name for context (parent is class_body, grandparent is class_declaration)
+	// Also check if the class is exported - if so, the static field is effectively exported
+	var className string
+	var classExported bool
+	if parent := node.Parent(); parent != nil && parent.Type() == "class_body" {
+		if grandparent := parent.Parent(); grandparent != nil {
+			if classNameNode := grandparent.ChildByFieldName("name"); classNameNode != nil {
+				className = classNameNode.Content(content)
+			}
+			classExported = p.isExported(grandparent)
+		}
+	}
+
+	sym := Symbol{
+		Name:       name,
+		Type:       SymbolTypeConst, // Treat static fields as constants
+		FilePath:   filePath,
+		LineNumber: int(nameNode.StartPoint().Row) + 1,
+		EndLine:    int(node.EndPoint().Row) + 1,
+		Column:     int(nameNode.StartPoint().Column),
+		Exported:   classExported, // Inherit export status from class
+		Value:      value,
+		RawValue:   value,
+	}
+
+	// Add class context to snippet
+	if className != "" {
+		sym.Snippet = className + "." + name
+		if value != "" {
+			sym.Snippet += " = " + value
+		}
+	} else {
+		sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.LineNumber)
+	}
+
+	if p.config.IncludeDocComments {
+		sym.DocComment = p.extractPrecedingComment(node, content)
+	}
 
 	return &sym
 }

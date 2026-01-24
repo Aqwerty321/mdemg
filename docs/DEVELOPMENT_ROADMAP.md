@@ -1,7 +1,7 @@
 # MDEMG Development Roadmap
 
 **Created**: 2026-01-22
-**Updated**: 2026-01-23 (added Phase 8: Symbol-Level Indexing)
+**Updated**: 2026-01-23 (Phase 8: Symbol extraction complete, validation in progress; Phase 9: Incremental updates planned)
 **Based on**: v4 Test Results (whk-wms codebase, 100-question evaluation)
 **Goal**: Improve retrieval quality from 0.567 avg score to 0.70+ avg score
 **Result**: v11 achieved **0.733 avg score** (+29.3% from v4 baseline, +3.3% from v10)
@@ -30,7 +30,9 @@ This roadmap addressed these gaps through 5 improvement tracks. **All 5 tracks a
 | Architectural Comparison Nodes | MEDIUM | MEDIUM | P2 | ✅ COMPLETE |
 | Configuration Boosting | MEDIUM | LOW | P2 | ✅ COMPLETE |
 | Temporal Pattern Detection | LOW | MEDIUM | P3 | ✅ COMPLETE |
-| **Symbol-Level Indexing** | **HIGH** | **HIGH** | **P1** | ⏳ PENDING |
+| **Symbol-Level Indexing** | **HIGH** | **HIGH** | **P1** | ⏳ VALIDATING |
+| **Incremental Updates** | **MEDIUM** | **MEDIUM** | **P2** | 📋 PLANNED |
+| **Query Optimization & Caching** | **HIGH** | **MEDIUM** | **P1** | 📋 PLANNED |
 
 ---
 
@@ -400,7 +402,7 @@ Python:     class X:
 ---
 
 ### Deliverable 8.2: Symbol Storage Schema
-**Priority**: P0 | **Effort**: 1-2 days | **Status**: ⏳ PENDING
+**Priority**: P0 | **Effort**: 1-2 days | **Status**: ✅ COMPLETE
 
 #### 8.2.1 Neo4j Schema (V0007 Migration)
 ```cypher
@@ -464,7 +466,7 @@ OPTIONS {indexConfig: {`vector.dimensions`: 1536, `vector.similarity_function`: 
 ---
 
 ### Deliverable 8.3: Ingestion Pipeline Integration
-**Priority**: P1 | **Effort**: 2-3 days | **Status**: ⏳ PENDING
+**Priority**: P1 | **Effort**: 2-3 days | **Status**: ✅ COMPLETE
 
 #### 8.3.1 Ingest Flow Update
 ```
@@ -498,15 +500,23 @@ SYMBOL_EMBED_DOC_COMMENTS=true          # Generate embeddings for doc comments
 | `internal/symbols/types.go` | ✅ DONE | Symbol, FileSymbols, ParserConfig types |
 | `internal/symbols/parser.go` | ✅ DONE | Tree-sitter parsing for TS/JS/Go/Python |
 | `internal/symbols/parser_test.go` | ✅ DONE | 12 unit tests |
-| `internal/symbols/store.go` | ⏳ TODO | Neo4j storage for SymbolNodes |
-| `cmd/ingest-codebase/main.go` | ⏳ TODO | Add symbol extraction step |
-| `internal/retrieval/service.go` | ⏳ TODO | Add symbol search methods |
-| `internal/models/models.go` | ⏳ TODO | Add SymbolResult types |
+| `internal/symbols/service.go` | ✅ DONE | Symbol service with caching and query methods |
+| `internal/symbols/service_test.go` | ✅ DONE | Service unit tests (7 tests) |
+| `internal/symbols/provider.go` | ✅ DONE | Provider interface for plugins |
+| `api/proto/mdemg-module.proto` | ✅ DONE | SymbolInfo, SymbolQueryRequest/Response messages |
+| `internal/models/models.go` | ✅ DONE | SymbolEvidence, IngestSymbol, Symbols field |
+| `internal/symbols/store.go` | ✅ DONE | Neo4j persistence for SymbolNodes |
+| `internal/symbols/store_test.go` | ✅ DONE | Store unit tests |
+| `cmd/ingest-codebase/main.go` | ✅ DONE | --extract-symbols flag, TS/JS/Go/Python extractors |
+| `internal/retrieval/service.go` | ✅ DONE | Symbol search methods, evidence attachment |
+| `internal/api/server.go` | ✅ DONE | SymbolStore wiring to retrieval service |
+| `internal/api/handlers.go` | ✅ DONE | storeSymbolsForBatch during ingestion |
+| `migrations/V0007__symbol_nodes.cypher` | ✅ DONE | SymbolNode schema, indexes, constraints |
 
 ---
 
 ### Deliverable 8.4: Symbol-Aware Retrieval
-**Priority**: P1 | **Effort**: 2-3 days | **Status**: ⏳ PENDING
+**Priority**: P1 | **Effort**: 2-3 days | **Status**: ✅ COMPLETE
 
 #### 8.4.1 Search Modes
 | Mode | Query | Use Case |
@@ -582,34 +592,64 @@ Rebalanced: α = 0.40, β = 0.20, γ = 0.10, δ = 0.05, ε = 0.25
 ---
 
 ### Deliverable 8.5: Symbol Search Endpoint & Proto Integration
-**Priority**: P2 | **Effort**: 1-2 days | **Status**: ⏳ PENDING
+**Priority**: P2 | **Effort**: 1-2 days | **Status**: 🔶 PARTIAL (Proto done, endpoint pending)
 
-#### 8.5.0 Proto Updates (`api/proto/mdemg-module.proto`)
-Extend the proto definition to support symbols in module ingestion:
+#### 8.5.0 Proto Updates (`api/proto/mdemg-module.proto`) ✅ COMPLETE
+Extended the proto definition to support symbols in module communication:
 
 ```protobuf
-// Add to Observation message
+// Added to Observation message
 message Observation {
     // ... existing fields ...
-    repeated Symbol symbols = 10;  // Symbols extracted from this content
+    repeated SymbolInfo symbols = 10;  // Symbols extracted from this content
 }
 
-// New Symbol message
-message Symbol {
-    string name = 1;               // "DEFAULT_FLUSH_INTERVAL"
-    string symbol_type = 2;        // "const", "function", "class"
-    string value = 3;              // "60000" for constants
-    int32 line_number = 4;         // 42
-    int32 end_line = 5;            // 42
-    bool exported = 6;             // true
-    string doc_comment = 7;        // JSDoc/GoDoc comment
-    string signature = 8;          // For functions
-    string parent = 9;             // Parent class/module
-    string snippet = 10;           // Source context
+// Added to RetrievalCandidate for reasoning modules
+message RetrievalCandidate {
+    // ... existing fields ...
+    repeated SymbolInfo symbols = 9;   // Symbols for evidence-locked retrieval
+}
+
+// SymbolInfo message for ingestion and retrieval
+message SymbolInfo {
+    string name = 1;
+    string symbol_type = 2;
+    string value = 3;
+    string raw_value = 4;
+    string file_path = 5;
+    int32 line_number = 6;
+    int32 end_line = 7;
+    int32 column = 8;
+    bool exported = 9;
+    string doc_comment = 10;
+    string signature = 11;
+    string parent = 12;
+    string language = 13;
+    string type_annotation = 14;
+}
+
+// SymbolQueryRequest/Response for plugin symbol lookups
+message SymbolQueryRequest {
+    string space_id = 1;
+    string query = 2;
+    string file_path = 3;
+    repeated string symbol_types = 4;
+    string language = 5;
+    bool exported_only = 6;
+    int32 limit = 7;
+}
+
+message SymbolQueryResponse {
+    repeated SymbolInfo symbols = 1;
+    int32 total_count = 2;
+    string error = 3;
 }
 ```
 
-This allows ingestion modules (like future code-parser modules) to return symbols directly.
+This allows:
+- Ingestion modules to emit symbols with their observations
+- Reasoning modules to receive symbol evidence in retrieval candidates
+- Plugins to query the core symbol service via gRPC
 
 
 #### 8.5.1 New Endpoint: `GET /v1/memory/symbols`
@@ -687,29 +727,76 @@ Run the 15 evidence-locked questions from VS Code benchmark:
 | Week | Deliverable | Tasks | Status |
 |------|-------------|-------|--------|
 | **Week 1** | 8.1 | Tree-sitter integration, parser, types | ✅ DONE |
-| **Week 1-2** | 8.2 | V0007 migration, Neo4j schema, store.go | ⏳ NEXT |
-| **Week 2** | 8.3 | Ingestion pipeline, cmd/ingest-codebase | ⏳ TODO |
-| **Week 3** | 8.4 | Hybrid retrieval, scoring formula update | ⏳ TODO |
-| **Week 4** | 8.5, 8.6 | Symbol endpoint, testing, VS Code re-benchmark | ⏳ TODO |
+| **Week 1-2** | 8.2 | V0007 migration, Neo4j schema, store.go | ✅ DONE |
+| **Week 2** | 8.3 | Ingestion pipeline, cmd/ingest-codebase | ✅ DONE |
+| **Week 3** | 8.4 | Hybrid retrieval, scoring formula update | ✅ DONE |
+| **Week 4** | 8.5, 8.6 | Symbol endpoint, testing, VS Code re-benchmark | ⏳ IN PROGRESS |
 
 ### Current Progress Summary
 
-**✅ Completed (Deliverable 8.1)**:
+**✅ Completed (Deliverable 8.1 - Parser Infrastructure)**:
 - `internal/symbols/types.go` - Symbol, FileSymbols, ParserConfig structs
 - `internal/symbols/parser.go` - Tree-sitter integration for TS/JS/Go/Python
 - `internal/symbols/parser_test.go` - 12 passing unit tests
 - **Validated**: 451 symbols extracted from 49 Go files in MDEMG codebase
 
-**⏳ Next Steps (Deliverable 8.2)**:
-1. Create `migrations/V0007__symbol_indexes.cypher`
-2. Create `internal/symbols/store.go` with Neo4j CRUD operations
-3. Wire into `cmd/ingest-codebase/main.go`
+**✅ Completed (Deliverable 8.2 - Storage Schema)**:
+- `migrations/V0007__symbol_nodes.cypher` - SymbolNode label, indexes, constraints
+- `internal/symbols/store.go` - Neo4j CRUD operations for SymbolNodes
+- `internal/symbols/store_test.go` - Store unit tests
 
-**📋 Remaining (Deliverables 8.3-8.6)**:
-- Integrate with batch ingest API
-- Add symbol search to retrieval pipeline
-- Create `/v1/memory/symbols` endpoint
-- Re-run VS Code V4 benchmark
+**✅ Completed (Deliverable 8.3 - Ingestion Integration)**:
+- `cmd/ingest-codebase/main.go` - `--extract-symbols` flag, extractors for TS/JS/Go/Python
+- `internal/models/models.go` - `IngestSymbol` struct, `Symbols` field on `BatchIngestItem`
+- `internal/api/handlers.go` - `storeSymbolsForBatch()` stores symbols during batch ingest
+- Symbol embedding via configured embedder (OpenAI/Ollama)
+
+**✅ Completed (Deliverable 8.4 - Retrieval Integration)**:
+- `internal/retrieval/service.go` - Symbol search in Retrieve() pipeline (step 1c)
+- `internal/api/server.go` - SymbolStore wiring to retrieval service
+- Symbol pattern matching: CamelCase, UPPER_CASE, snake_case extraction from queries
+- Symbol evidence attachment to retrieval results
+
+**Plugin Integration Architecture**:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CORE (mdemg)                            │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │ symbols.Service │  │ symbols.Parser  │  │ symbols.Store   │ │
+│  │ (caching/query) │  │ (tree-sitter)   │  │ (Neo4j persist) │ │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘ │
+│           │                    │                    │           │
+│           └──────────┬─────────┴────────────────────┘           │
+│                      │                                          │
+│           ┌──────────▼──────────┐                               │
+│           │ gRPC / HTTP API     │                               │
+│           │ - SymbolQueryReq/Res│                               │
+│           │ - SymbolEvidence    │                               │
+│           └──────────┬──────────┘                               │
+└──────────────────────┼──────────────────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+        ▼              ▼              ▼
+   ┌─────────┐   ┌─────────┐   ┌─────────┐
+   │INGESTION│   │REASONING│   │   APE   │
+   │ Module  │   │ Module  │   │ Module  │
+   │         │   │         │   │         │
+   │ Emits   │   │Receives │   │ Queries │
+   │ symbols │   │ symbol  │   │ symbols │
+   │ in Obs  │   │ evidence│   │ for     │
+   │         │   │         │   │ analysis│
+   └─────────┘   └─────────┘   └─────────┘
+```
+
+**⏳ In Progress (Deliverable 8.5-8.6)**:
+- VS Code scale re-ingestion with symbol extraction (28,406 elements)
+- After ingestion: verify SymbolNodes in Neo4j
+- Run V6 benchmark to measure improvement over 11.7% baseline
+
+**📋 Remaining**:
+- Create `/v1/memory/symbols` endpoint for direct symbol queries
+- Run full benchmark validation
 
 ---
 
@@ -744,6 +831,465 @@ Run the 15 evidence-locked questions from VS Code benchmark:
 | Value extraction accuracy | 0% | **85%** | 90% |
 | Query latency (p95) | 50ms | **75ms** | 60ms |
 | Storage overhead | 1x | **5-10x** | <5x |
+
+---
+
+---
+
+## Phase 9: Incremental Update & Re-Ingestion
+
+**Motivation**: As codebases evolve, MDEMG must efficiently update its memory graph without full re-ingestion. Different update triggers serve different use cases: git commits for CI/CD integration, time-based for scheduled maintenance, user-triggered for on-demand refresh, and plugin-specific for domain events.
+
+**Goal**: Provide flexible, efficient mechanisms to keep the memory graph synchronized with source data.
+
+---
+
+### Deliverable 9.1: Git Commit Hooks
+**Priority**: P1 | **Effort**: 2-3 days | **Status**: ⏳ PENDING
+
+#### 9.1.1 Git Diff-Based Ingestion
+- [ ] Add `--incremental` flag to `cmd/ingest-codebase`
+- [ ] Parse `git diff HEAD~1` to identify changed/added/deleted files
+- [ ] Only process changed files (skip unchanged)
+- [ ] Handle deletions: archive or delete corresponding MemoryNodes
+- [ ] Handle renames: update file_path, preserve node_id
+
+#### 9.1.2 Post-Commit Hook Integration
+```bash
+# .git/hooks/post-commit
+#!/bin/bash
+mdemg-cli ingest --incremental --space-id="my-project"
+```
+
+- [ ] Create `mdemg-cli` wrapper binary for hook integration
+- [ ] Support `--quiet` mode for background execution
+- [ ] Log to file for debugging (`.mdemg/incremental.log`)
+
+#### 9.1.3 CI/CD Integration
+```yaml
+# GitHub Actions example
+- name: Update MDEMG Memory
+  run: |
+    go run ./cmd/ingest-codebase \
+      --incremental \
+      --space-id=${{ github.repository }} \
+      --endpoint=${{ secrets.MDEMG_ENDPOINT }}
+```
+
+---
+
+### Deliverable 9.2: Time-Based Scheduled Sync
+**Priority**: P2 | **Effort**: 1-2 days | **Status**: ⏳ PENDING
+
+#### 9.2.1 APE Scheduled Ingestion
+Leverage existing APE scheduler for periodic re-ingestion:
+
+```json
+{
+  "id": "scheduled-ingest",
+  "type": "APE",
+  "schedule": "0 2 * * *",
+  "config": {
+    "action": "full_reingest",
+    "space_id": "my-project",
+    "source_path": "/path/to/repo"
+  }
+}
+```
+
+- [ ] Add `INGEST` action type to APE modules
+- [ ] Support `full_reingest` vs `incremental` modes
+- [ ] Track last_ingest_time per space_id
+- [ ] Detect stale spaces (no update in N days) and trigger refresh
+
+#### 9.2.2 Freshness Tracking
+```cypher
+// Add to TapRoot
+MATCH (t:TapRoot {space_id: $space_id})
+SET t.last_ingest_at = datetime(),
+    t.last_ingest_type = 'incremental',
+    t.ingest_count = coalesce(t.ingest_count, 0) + 1
+```
+
+- [ ] Add freshness metadata to TapRoot nodes
+- [ ] API endpoint: `GET /v1/memory/spaces/{space_id}/freshness`
+- [ ] Alert when space is stale (configurable threshold)
+
+---
+
+### Deliverable 9.3: User-Triggered Updates
+**Priority**: P1 | **Effort**: 1 day | **Status**: ⏳ PENDING
+
+#### 9.3.1 Manual Re-Ingest API
+```bash
+POST /v1/memory/ingest/trigger
+{
+  "space_id": "my-project",
+  "mode": "incremental",  // or "full"
+  "source_path": "/path/to/repo",
+  "options": {
+    "extract_symbols": true,
+    "run_consolidation": true
+  }
+}
+```
+
+Response:
+```json
+{
+  "data": {
+    "job_id": "ingest-abc123",
+    "status": "started",
+    "estimated_elements": 1500,
+    "started_at": "2026-01-23T15:30:00Z"
+  }
+}
+```
+
+- [ ] Implement background job queue for ingestion
+- [ ] Return job_id for status polling
+- [ ] `GET /v1/memory/ingest/status/{job_id}` for progress
+
+#### 9.3.2 File-Level Re-Ingest
+```bash
+POST /v1/memory/ingest/files
+{
+  "space_id": "my-project",
+  "files": [
+    "src/auth/service.ts",
+    "src/users/controller.ts"
+  ]
+}
+```
+
+- [ ] Re-ingest specific files without full scan
+- [ ] Useful for IDE integration (save → update)
+- [ ] Update symbols, embeddings, edges for affected files only
+
+---
+
+### Deliverable 9.4: Plugin-Specific Triggers
+**Priority**: P2 | **Effort**: 2 days | **Status**: ⏳ PENDING
+
+#### 9.4.1 Linear Webhook Integration
+```go
+// Linear module subscribes to Linear webhooks
+func (m *LinearModule) HandleWebhook(event WebhookEvent) {
+    switch event.Type {
+    case "Issue.created", "Issue.updated":
+        m.IngestIssue(event.Data)
+    case "Project.updated":
+        m.RefreshProject(event.Data.ProjectID)
+    }
+}
+```
+
+- [ ] Add webhook receiver to Linear module
+- [ ] Real-time issue/project sync on Linear changes
+- [ ] Debounce rapid updates (10s window)
+
+#### 9.4.2 File Watcher Integration (IDE Mode)
+```bash
+# Start file watcher daemon
+mdemg-cli watch --space-id="my-project" --path="/path/to/repo"
+```
+
+- [ ] Use fsnotify for file system events
+- [ ] Debounce: batch changes over 500ms window
+- [ ] Filter: only watch configured extensions (`.ts`, `.go`, `.py`)
+- [ ] Exclude: `node_modules`, `.git`, `vendor`
+
+#### 9.4.3 Event-Driven Module Updates
+```protobuf
+// Extend APE events for modules
+message ModuleEvent {
+  string event_type = 1;  // "source_changed", "dependency_updated"
+  string module_id = 2;
+  map<string, string> metadata = 3;
+}
+```
+
+- [ ] Modules can subscribe to `source_changed` events
+- [ ] Trigger module-specific re-processing (e.g., re-parse symbols)
+- [ ] Support custom event types per module
+
+---
+
+### Deliverable 9.5: Conflict Resolution & Consistency
+**Priority**: P2 | **Effort**: 1-2 days | **Status**: ⏳ PENDING
+
+#### 9.5.1 Concurrent Update Handling
+- [ ] Optimistic locking on MemoryNode updates (version field)
+- [ ] Last-write-wins for concurrent ingestion
+- [ ] Log conflicts for audit trail
+
+#### 9.5.2 Orphan Detection
+```cypher
+// Find MemoryNodes whose source files no longer exist
+MATCH (m:MemoryNode {space_id: $space_id})
+WHERE m.file_path IS NOT NULL
+  AND NOT EXISTS {
+    // Check file exists in latest ingest
+    MATCH (t:TapRoot {space_id: $space_id})-[:CONTAINS]->(m)
+    WHERE m.updated_at >= t.last_ingest_at
+  }
+RETURN m.node_id, m.file_path
+```
+
+- [ ] Run orphan detection after incremental ingest
+- [ ] Options: archive, delete, or flag for review
+- [ ] `POST /v1/memory/cleanup/orphans` endpoint
+
+#### 9.5.3 Edge Consistency
+- [ ] Refresh edges when connected nodes change
+- [ ] Re-run Hebbian learning for updated nodes
+- [ ] Invalidate stale hidden nodes if inputs changed
+
+---
+
+### Implementation Priority
+
+| Deliverable | Impact | Effort | Priority |
+|-------------|--------|--------|----------|
+| 9.3 User-Triggered | HIGH | LOW | P0 |
+| 9.1 Git Hooks | HIGH | MEDIUM | P1 |
+| 9.2 Time-Based | MEDIUM | LOW | P2 |
+| 9.4 Plugin Triggers | MEDIUM | MEDIUM | P2 |
+| 9.5 Conflict Resolution | MEDIUM | MEDIUM | P2 |
+
+### Success Metrics
+
+| Metric | Full Re-Ingest | Incremental Target |
+|--------|----------------|-------------------|
+| Time for 1000 file change | 30-60 min | **< 2 min** |
+| Time for 10 file change | 30-60 min | **< 10 sec** |
+| CPU overhead (file watcher) | N/A | **< 5%** |
+| Memory overhead (file watcher) | N/A | **< 50 MB** |
+
+---
+
+## Phase 10: Query Optimization & Caching
+
+**Motivation**: As MDEMG scales to larger codebases (100K+ nodes) and handles more concurrent requests, query performance and data transmission efficiency become critical. This phase focuses on profiling, optimizing, and caching at multiple layers.
+
+**Goal**: Reduce p95 query latency by 50% and enable efficient operation at 10x current scale.
+
+---
+
+### Deliverable 10.1: Neo4j Query Optimization
+**Priority**: P1 | **Effort**: 3-4 days | **Status**: ⏳ PENDING
+
+#### 10.1.1 Query Profiling & Analysis
+- [ ] Add query timing instrumentation to all Neo4j operations
+- [ ] Log slow queries (>100ms) with full Cypher and parameters
+- [ ] Use `EXPLAIN` and `PROFILE` to analyze query plans
+- [ ] Identify missing indexes and inefficient patterns
+
+#### 10.1.2 Index Optimization
+```cypher
+// Review and optimize existing indexes
+// Consider composite indexes for common query patterns
+CREATE INDEX memory_space_layer IF NOT EXISTS
+FOR (m:MemoryNode) ON (m.space_id, m.layer);
+
+CREATE INDEX memory_space_archived IF NOT EXISTS
+FOR (m:MemoryNode) ON (m.space_id, m.archived);
+
+// Range indexes for temporal queries
+CREATE RANGE INDEX memory_created_at IF NOT EXISTS
+FOR (m:MemoryNode) ON (m.created_at);
+```
+
+- [ ] Audit all Cypher queries for index usage
+- [ ] Add composite indexes for multi-field filters
+- [ ] Consider range indexes for timestamp queries
+- [ ] Benchmark before/after for each optimization
+
+#### 10.1.3 Query Rewriting
+- [ ] Replace `OPTIONAL MATCH` with existence checks where possible
+- [ ] Use `UNWIND` for batch operations instead of multiple queries
+- [ ] Limit graph traversal depth with explicit bounds
+- [ ] Use `WITH` to reduce intermediate result sets early
+
+---
+
+### Deliverable 10.2: Result Caching Layer
+**Priority**: P1 | **Effort**: 2-3 days | **Status**: ⏳ PENDING
+
+#### 10.2.1 Query Result Cache
+```go
+type QueryCache struct {
+    cache    *lru.Cache[string, CacheEntry]
+    ttl      time.Duration
+    maxSize  int
+}
+
+type CacheEntry struct {
+    Results   []RetrieveResult
+    Timestamp time.Time
+    HitCount  int64
+}
+```
+
+- [ ] Implement LRU cache for retrieval results
+- [ ] Cache key: hash of (space_id, query_text, top_k, filters)
+- [ ] Configurable TTL (default: 5 minutes)
+- [ ] Invalidate on ingest/update to affected space_id
+- [ ] Cache hit/miss metrics for monitoring
+
+#### 10.2.2 Embedding Cache Enhancement
+Current: In-memory LRU cache for embeddings
+- [ ] Add persistent cache option (Redis or disk-based)
+- [ ] Pre-warm cache on server startup for frequent queries
+- [ ] Batch embedding requests to reduce API round-trips
+- [ ] Cache embedding provider responses with content hash
+
+#### 10.2.3 Graph Structure Cache
+```go
+// Cache frequently-accessed graph structures
+type GraphCache struct {
+    tapRoots     map[string]*TapRoot      // space_id -> TapRoot
+    nodeCount    map[string]int           // space_id -> count
+    edgeStats    map[string]EdgeStats     // space_id -> edge statistics
+}
+```
+
+- [ ] Cache TapRoot lookups (very frequent)
+- [ ] Cache node/edge counts for stats endpoint
+- [ ] Cache graph metadata (schema version, last ingest time)
+- [ ] Invalidate selectively on graph mutations
+
+---
+
+### Deliverable 10.3: Data Transmission Optimization
+**Priority**: P2 | **Effort**: 2-3 days | **Status**: ⏳ PENDING
+
+#### 10.3.1 Response Compression
+- [ ] Enable gzip compression for API responses
+- [ ] Compress large embedding vectors in transit
+- [ ] Use Protocol Buffers for internal gRPC (already in place)
+- [ ] Benchmark: JSON vs gzip JSON vs Protobuf
+
+#### 10.3.2 Pagination & Streaming
+```go
+// Streaming response for large result sets
+type StreamingRetrieveResponse struct {
+    StreamID    string
+    ChunkIndex  int
+    TotalChunks int
+    Results     []RetrieveResult
+    HasMore     bool
+}
+```
+
+- [ ] Implement cursor-based pagination for large result sets
+- [ ] Add `limit` and `offset` to all list endpoints
+- [ ] Streaming option for batch ingest responses
+- [ ] WebSocket support for real-time progress updates
+
+#### 10.3.3 Selective Field Loading
+```json
+// Request only needed fields
+{
+  "space_id": "vscode-scale",
+  "query_text": "storage flush",
+  "fields": ["node_id", "summary", "score"],
+  "exclude": ["embedding", "content"]
+}
+```
+
+- [ ] Support field selection in retrieve requests
+- [ ] Skip loading large fields (embedding, full content) when not needed
+- [ ] Lazy loading for symbol details and evidence
+
+---
+
+### Deliverable 10.4: Connection Pooling & Resource Management
+**Priority**: P2 | **Effort**: 1-2 days | **Status**: ⏳ PENDING
+
+#### 10.4.1 Neo4j Connection Pool Tuning
+```go
+// Optimize driver configuration
+driver, _ := neo4j.NewDriverWithContext(uri, auth,
+    func(c *neo4j.Config) {
+        c.MaxConnectionPoolSize = 50          // Up from default 100
+        c.ConnectionAcquisitionTimeout = 30s  // Fail fast
+        c.MaxConnectionLifetime = 1h          // Refresh connections
+        c.ConnectionLivenessCheckTimeout = 30s
+    })
+```
+
+- [ ] Profile connection pool utilization under load
+- [ ] Tune pool size based on concurrent request patterns
+- [ ] Add connection pool metrics (active, idle, waiting)
+- [ ] Implement connection health checks
+
+#### 10.4.2 Embedding API Rate Limiting
+- [ ] Implement client-side rate limiting for OpenAI/Ollama
+- [ ] Request queuing with configurable concurrency
+- [ ] Exponential backoff on rate limit errors
+- [ ] Circuit breaker for embedding service failures
+
+#### 10.4.3 Memory Management
+- [ ] Profile memory usage during large ingestions
+- [ ] Implement streaming JSON parsing for batch requests
+- [ ] Limit in-flight embedding requests
+- [ ] Add memory pressure monitoring and backpressure
+
+---
+
+### Deliverable 10.5: Benchmarking & Monitoring
+**Priority**: P1 | **Effort**: 2 days | **Status**: ⏳ PENDING
+
+#### 10.5.1 Performance Benchmarks
+```bash
+# Benchmark suite
+go test -bench=. -benchmem ./internal/retrieval/...
+go test -bench=. -benchmem ./internal/symbols/...
+```
+
+- [ ] Create benchmark suite for critical paths
+- [ ] Measure: retrieval latency, ingest throughput, symbol search
+- [ ] Track regression in CI (fail if >10% slower)
+- [ ] Document baseline metrics
+
+#### 10.5.2 Observability
+```go
+// Metrics to expose
+mdemg_query_duration_seconds{space_id, query_type}
+mdemg_cache_hits_total{cache_type}
+mdemg_cache_misses_total{cache_type}
+mdemg_neo4j_query_duration_seconds{query_name}
+mdemg_embedding_requests_total{provider, status}
+```
+
+- [ ] Add Prometheus metrics for all caches
+- [ ] Track query latency histograms by type
+- [ ] Monitor Neo4j driver pool statistics
+- [ ] Alert on cache hit rate drops
+
+---
+
+### Implementation Priority
+
+| Deliverable | Impact | Effort | Priority |
+|-------------|--------|--------|----------|
+| 10.1 Query Optimization | HIGH | MEDIUM | P0 |
+| 10.2 Result Caching | HIGH | MEDIUM | P1 |
+| 10.5 Benchmarking | MEDIUM | LOW | P1 |
+| 10.3 Data Transmission | MEDIUM | MEDIUM | P2 |
+| 10.4 Connection Pooling | MEDIUM | LOW | P2 |
+
+### Success Metrics
+
+| Metric | Current | Target | Stretch |
+|--------|---------|--------|---------|
+| Retrieve p50 latency | ~30ms | **15ms** | 10ms |
+| Retrieve p95 latency | ~80ms | **40ms** | 25ms |
+| Query cache hit rate | 0% | **60%** | 80% |
+| Embedding cache hit rate | ~40% | **80%** | 90% |
+| Ingest throughput | 7/s | **15/s** | 25/s |
+| Max concurrent retrievals | ~20 | **100** | 200 |
 
 ---
 

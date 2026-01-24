@@ -1,7 +1,7 @@
 # MDEMG Benchmarking Guide
 
-**Version:** 1.0
-**Last Updated:** 2026-01-23
+**Version:** 1.3
+**Last Updated:** 2026-01-24
 **Purpose:** Step-by-step guide for setting up, running, and analyzing MDEMG vs Baseline retrieval tests on new codebases
 
 ---
@@ -17,7 +17,11 @@
 7. [Phase 5: Analysis and Reporting](#phase-5-analysis-and-reporting)
 8. [Roles and Responsibilities](#roles-and-responsibilities)
 9. [Common Mistakes to Avoid](#common-mistakes-to-avoid)
-10. [Appendix: Templates and Scripts](#appendix-templates-and-scripts)
+10. [V6 Composite Test Set](#v6-composite-test-set)
+11. [WHK-WMS 120-Question Test Set](#whk-wms-120-question-test-set)
+12. [Baseline Benchmarking Rules](#baseline-benchmarking-rules)
+13. [End-to-End Multi-Corpus Runbook](#end-to-end-multi-corpus-runbook)
+14. [Appendix: Templates and Scripts](#appendix-templates-and-scripts)
 
 ---
 
@@ -726,6 +730,437 @@ The Main AI coordinates the testing process:
 
 ---
 
+## V6 Composite Test Set
+
+### Overview
+
+The V6 Composite Test Set is the standardized benchmark for VS Code codebase testing. It combines questions from multiple prior test versions into a single, balanced evaluation suite.
+
+| Property | Value |
+|----------|-------|
+| **Total Questions** | 100 |
+| **Categories** | 10 (10 questions each) |
+| **Question Types** | simple_constant (61), multi_hop (18), hard (21) |
+| **Codebase** | VS Code (`vscode-scale` space) |
+| **Nodes in Graph** | ~29,000+ |
+
+### Categories
+
+| Category | Description | Example Question Type |
+|----------|-------------|----------------------|
+| `editor_config` | Editor settings, fonts, cursors | MAX_CURSOR_COUNT, tabSize defaults |
+| `storage` | Storage backends, flush intervals | Flush timeouts, storage paths |
+| `workbench_layout` | Panel sizes, grid dimensions | Sidebar widths, panel heights |
+| `extensions` | Extension host, marketplace | Max extensions, timeout values |
+| `terminal` | Terminal emulator settings | Scrollback limits, shell paths |
+| `search` | Search features, limits | Max results, regex patterns |
+| `files` | File handling, watchers | Max file size, watcher limits |
+| `debug` | Debugger configuration | Timeout values, adapter settings |
+| `notifications` | Notification system | Toast limits, duration values |
+| `lifecycle` | App lifecycle, shutdown | Shutdown timeouts, startup flags |
+
+### Question Types
+
+1. **simple_constant** (61 questions)
+   - Single-file evidence-locked questions
+   - Require finding exact constant values
+   - Example: "What is the DEFAULT_FLUSH_INTERVAL in storage.ts?"
+
+2. **multi_hop** (18 questions)
+   - Require tracing through 2-3 files
+   - Test graph traversal capabilities
+   - Example: "Trace how terminal scrollback limit is applied from config to renderer"
+
+3. **hard** (21 questions)
+   - Complex cross-file correlations
+   - May require understanding of multiple interacting systems
+   - Example: "What determines the maximum concurrent file watchers?"
+
+### File Locations
+
+```
+docs/tests/vscode-scale/
+├── test_questions_V6_composite.json    # Master set WITH expected answers
+├── test_questions_V6_blind.json        # Blind set (questions only, for agents)
+├── run_combined_benchmark.py           # Benchmark runner script
+└── combined_benchmark_results.json     # Output from benchmark runs
+```
+
+### Master vs Blind Versions
+
+| Version | File | Purpose | Contains Answers |
+|---------|------|---------|------------------|
+| **Master** | `test_questions_V6_composite.json` | Scoring, verification | YES |
+| **Blind** | `test_questions_V6_blind.json` | Agent benchmark tasks | NO |
+
+**Important:** Always use the **blind version** when testing agents to prevent answer leakage. The master version is for scoring and result verification only.
+
+### Master Question Format
+
+```json
+{
+  "id": "v6_editor_config_01",
+  "category": "editor_config",
+  "type": "simple_constant",
+  "source": "v5_comprehensive",
+  "question": "What is the MAX_CURSOR_COUNT constant in the VS Code editor?",
+  "required_evidence": {
+    "file": "cursor.ts",
+    "value": "10000"
+  }
+}
+```
+
+### Blind Question Format
+
+```json
+{
+  "id": "v6_editor_config_01",
+  "category": "editor_config",
+  "type": "simple_constant",
+  "question": "What is the MAX_CURSOR_COUNT constant in the VS Code editor?"
+}
+```
+
+### Running the Benchmark
+
+```bash
+# Activate test environment
+source /tmp/mdemg-test-venv/bin/activate
+
+# Run the benchmark (requires MDEMG running on localhost:8090)
+python docs/tests/vscode-scale/run_combined_benchmark.py
+
+# Results saved to combined_benchmark_results.json
+```
+
+### Scoring Criteria
+
+| Score | Criteria |
+|-------|----------|
+| **1.0** | Correct file found AND correct value/evidence found |
+| **0.5** | Correct file found but value not confirmed |
+| **0.0** | Neither file nor evidence found |
+
+### Baseline Results (Pre-Symbol Extraction)
+
+| Metric | Value |
+|--------|-------|
+| Correct file in top-5 | 11.7% (7/60) |
+| Evidence-locked accuracy | ~5% |
+| Key Issue | Returns related files, not defining files |
+
+This establishes the baseline that symbol extraction aims to improve.
+
+---
+
+## WHK-WMS 120-Question Test Set
+
+### Overview
+
+The WHK-WMS 120-question test set is the standardized benchmark for the warehouse management system codebase. It combines complex multi-file questions with symbol-lookup questions that test exact constant/value retrieval.
+
+| Property | Value |
+|----------|-------|
+| **Total Questions** | 120 |
+| **Categories** | 5 (architecture_structure, service_relationships, business_logic_constraints, data_flow_integration, cross_cutting_concerns) |
+| **Question Types** | multi-file (59), cross-module (38), system-wide (3), symbol-lookup (20) |
+| **Codebase** | WHK-WMS (`whk-wms` space) |
+
+### Question Types
+
+1. **multi-file** (59 questions)
+   - Require understanding 2+ files to answer correctly
+   - Test cross-file knowledge synthesis
+
+2. **cross-module** (38 questions)
+   - Require tracing through multiple modules
+   - Test understanding of module interactions
+
+3. **system-wide** (3 questions)
+   - Complex architectural questions
+   - Require broad system understanding
+
+4. **symbol-lookup** (20 questions)
+   - Test exact constant/value retrieval
+   - Require finding specific symbol definitions (e.g., `MAX_EXPORT_SIZE`, `ID_CHUNK_SIZE`)
+   - Symbol name included in agent version as search hint
+
+### File Locations
+
+```
+docs/tests/whk-wms/
+├── test_questions_120.json           # Master set WITH answers (for grading)
+├── test_questions_120_agent.json     # Agent set WITHOUT answers (for task agents)
+├── symbol-focused-questions-20.json  # Symbol questions source file
+└── test_questions_100.json           # Original 100 questions (no symbols)
+```
+
+### Master vs Agent Versions
+
+| Version | File | Purpose | Contains |
+|---------|------|---------|----------|
+| **Master** | `test_questions_120.json` | Scoring, grading | answers, required_files |
+| **Agent** | `test_questions_120_agent.json` | Task agent input | questions only, NO answers |
+
+**CRITICAL:** Always use the **agent version** (`_agent.json`) when feeding questions to task agents. The master version is for scoring and result verification only. Feeding answers to agents constitutes data contamination and invalidates test results.
+
+### Master Question Format
+
+```json
+{
+  "id": "sym_arch_3",
+  "category": "architecture_structure",
+  "question": "What is the ID_CHUNK_SIZE used by BarrelAggregatesService for chunked processing?",
+  "answer": "5000",
+  "symbol_name": "ID_CHUNK_SIZE",
+  "required_files": ["/apps/whk-wms/src/barrelAggregates/barrel-aggregates.service.ts"],
+  "complexity": "symbol-lookup"
+}
+```
+
+### Agent Question Format (Answer Stripped)
+
+```json
+{
+  "id": "sym_arch_3",
+  "category": "architecture_structure",
+  "question": "What is the ID_CHUNK_SIZE used by BarrelAggregatesService for chunked processing?",
+  "complexity": "symbol-lookup",
+  "symbol_name": "ID_CHUNK_SIZE"
+}
+```
+
+Note: `symbol_name` is retained in the agent version because it appears in the question text and helps the agent know what to search for.
+
+---
+
+## Baseline Benchmarking Rules
+
+### Time Limit
+
+| Constraint | Value |
+|------------|-------|
+| **Total time to complete test** | 20 minutes |
+
+### Model Selection
+
+| Parameter | Value |
+|-----------|-------|
+| **Model** | Claude Haiku (haiku) |
+| **Rationale** | Cost-effective for benchmark testing; Opus reserved for production |
+
+When spawning task agents, always specify `model: "haiku"` to use Claude Haiku.
+
+### Task Agent Instructions
+
+When spawning task agents for baseline benchmarking, use this **EXACT prompt** (do not deviate):
+
+```
+BASELINE BENCHMARK RULES - READ CAREFULLY
+
+1. USE TOOLS (Read, Glob, Grep) but DO NOT search the web
+2. You may read the QUESTION FILE below, then ONLY interact with the whk-wms repo at /Users/reh3376/whk-wms
+3. You are NOT ALLOWED to access any other repo or directory after reading the question file
+4. These questions are complex and require EXPLANATION for full credit
+5. Your primary goal is to be AS CORRECT AS POSSIBLE when answering questions
+6. TIME LIMIT: 20 minutes total
+
+WARNING: If you violate these rules you will be DISQUALIFIED and your task execution will end immediately.
+
+QUESTION FILE (read this first, then work only in whk-wms): /Users/reh3376/mdemg/docs/tests/whk-wms/test_questions_120_agent.json
+
+This file contains 120 questions across multiple categories and complexity levels. Answer them IN ORDER as they appear in the file.
+
+SCORING CRITERIA:
+
+For symbol-lookup questions (have "complexity": "symbol-lookup"):
+- 1.0 = Exact value match from correct file with line number
+- 0.5 = Correct file found but value not confirmed
+- 0.0 = Wrong file or wrong value
+
+For complex questions:
+- 1.0 = Complete, correct answer with explanation and file references
+- 0.75 = Correct answer with partial explanation
+- 0.5 = Partially correct, missing key details
+- 0.25 = Relevant information found but answer incomplete
+- 0.0 = Unable to answer or incorrect
+
+OUTPUT FORMAT for each question:
+Q[id]: [question text truncated to 80 chars]
+Files: [files searched/read]
+Answer: [your answer with file:line references]
+Confidence: [HIGH/MEDIUM/LOW]
+Score: [self-assessed 0.0-1.0]
+
+STRATEGY:
+1. Read the question file first
+2. Work through questions IN ORDER as they appear
+3. For each question: search relevant files, synthesize answer, cite sources with file:line
+4. Answer as many questions as possible within the time limit
+
+FINAL REPORT FORMAT:
+=== BASELINE BENCHMARK RESULTS ===
+Time Elapsed: [minutes]
+Questions Attempted: [X/120]
+By Complexity:
+  - symbol-lookup: [X attempted]
+  - multi-file: [X attempted]
+  - cross-module: [X attempted]
+  - disambiguation: [X attempted]
+  - computed_value: [X attempted]
+  - relationship: [X attempted]
+Disqualified: [Yes/No]
+
+ANSWERS:
+[List each answered question with: id, answer summary, file:line, confidence, score]
+===
+
+BEGIN NOW - Read the question file and start answering in order.
+```
+
+### Rule Violations
+
+| Violation | Consequence |
+|-----------|-------------|
+| Searching the web | Immediate disqualification |
+| Accessing repos outside whk-wms | Immediate disqualification |
+| Exceeding 20-minute time limit | Test terminated, partial results only |
+
+### Scoring for Complex Questions
+
+| Score | Criteria |
+|-------|----------|
+| 1.0 | Complete, correct answer with explanation and file references |
+| 0.75 | Correct answer with partial explanation |
+| 0.5 | Partially correct, missing key details |
+| 0.25 | Relevant information found but answer incomplete |
+| 0.0 | Unable to answer or incorrect |
+
+### Symbol-Lookup Question Scoring
+
+| Score | Criteria |
+|-------|----------|
+| 1.0 | Exact value match from correct file |
+| 0.5 | Correct file found but value not confirmed |
+| 0.0 | Wrong file or wrong value |
+
+---
+
+## Required Benchmark Metrics
+
+All benchmark reports MUST include the following metrics. This comprehensive list ensures reproducibility and blocks skepticism paths.
+
+### Core Outcome Metrics (Must-Have)
+
+These answer: "Did it work?"
+
+| # | Metric | Description |
+|---|--------|-------------|
+| 1 | **Mean Score (μ)** | Primary scalar score across the battery |
+| 2 | **Std Dev (σ) + CV** | CV = 100·σ/μ - Stability across runs |
+| 3 | **Median + Percentiles** | p10 / p25 / p75 / p90 distribution |
+| 4 | **Min Score** | Worst-case / edge-case survivability |
+| 5 | **High-Confidence Rate** | % with score ≥ 0.7 (publish threshold explicitly) |
+| 6 | **Completion Rate** | % answered without stalling, "UNKNOWN," or partials |
+
+### Grounding & Evidence Metrics
+
+These answer: "Was it actually grounded in repo truth?"
+
+| # | Metric | Description |
+|---|--------|-------------|
+| 7 | **Evidence Compliance Rate (ECR)** | % answers with: file paths, symbol names, exact values, line anchors |
+| 8 | **Evidence Correctness Rate (E-Accuracy)** | % cited values that are actually correct |
+| 9 | **Hard-Value Resolution Rate (HVRR)** | % exact-value questions correctly resolved with evidence |
+| 10 | **Refusal/Not-Found Correctness** | % correct "not found" on trap questions |
+| 11 | **Hallucination Rate** | Count of claims not supported by cited sources |
+| 12 | **Guess Rate vs Grounded Rate** | % using hedging ("likely," "probably") vs sourced answers |
+
+### Prior-Resistance Metrics
+
+These answer: "Did priors inflate results?"
+
+| # | Metric | Description |
+|---|--------|-------------|
+| 13 | **Tier Split Performance** | Report separately for Tier 1 (prior-friendly) vs Tier 2 (evidence-locked) |
+| 14 | **Evidence Lift (Tier 2)** | Tier 2 ECR/HVRR comparison baseline vs MDEMG |
+| 15 | **Exactness Error Rate** | % returning plausible but wrong values on exact-value questions |
+
+### Multi-hop / Multi-file Rigor Metrics
+
+These answer: "Is this hard-mode or toy-mode?"
+
+| # | Metric | Description |
+|---|--------|-------------|
+| 16 | **Multi-file Coverage** | % requiring ≥2 files, avg required files per question |
+| 17 | **Multi-hop Depth** | Performance by hop count (2,3,4…) |
+| 18 | **Cross-module Questions** | % spanning multiple subsystems, performance on subset |
+| 19 | **Effective Default Accuracy** | Declared vs runtime-effective defaults |
+
+### Scale & Performance Metrics
+
+These answer: "Is it practical?"
+
+| # | Metric | Description |
+|---|--------|-------------|
+| 20 | **Total Elapsed Test Time** | Wall-clock time from test start to completion (minutes) |
+| 21 | **Auto-Compact Events Count** | Number of context window compaction events during test |
+| 22 | **Total Tokens Consumed** | Sum of input + output tokens across entire test run |
+| 23 | **Ingestion Throughput** | LOC, elements/sec, observations/sec, wall time |
+| 24 | **Embedding Coverage + Health** | Track and publish for credibility |
+| 25 | **DB Footprint** | Neo4j size, vector index size, peak memory |
+| 26 | **Retrieval Latency** | p50/p95/p99 for: vector fetch, graph traversal, rerank, e2e |
+| 27 | **Token Efficiency** | Tokens/question (avg/p95), total tokens/run |
+| 28 | **Tool Call Budget** | Tool calls/question (avg/p95), total tool calls |
+| 29 | **Cost Proxy** | Estimated $ cost (tokens + tool calls) or GPU-hours |
+
+### Reproducibility & Integrity Metrics
+
+These answer: "Can anyone rerun it and get the same thing?"
+
+| # | Metric | Description |
+|---|--------|-------------|
+| 30 | **Repo commit hash + scope** | URL, commit, filetype allowlist/denylist, directory scope |
+| 31 | **Question set identity** | Dataset SHA-256, question IDs, seeds if sampled |
+| 32 | **Cold vs warm disclosure** | Learning edges reset? Caches cleared? |
+| 33 | **Determinism controls** | Temperature, decoding settings, max tool calls/time |
+| 34 | **Run Count (k)** | Minimum 5, ideally 8 runs |
+
+### Multi-Repo Integrity (if applicable)
+
+These answer: "Does it confuse corpora?"
+
+| # | Metric | Description |
+|---|--------|-------------|
+| 35 | **Cross-Repo Contamination Rate (CRCR)** | % citing files from wrong repo |
+| 36 | **Repo Attribution Accuracy (RAA)** | % citing exclusively from correct repo |
+| 37 | **Collision Set Performance** | Performance on adversarial overlapping vocabulary questions |
+
+### Minimum Publication Set (12 metrics)
+
+For compact but defensible reports, publish at minimum:
+
+| Category | Metrics |
+|----------|---------|
+| Distribution | Mean, Std, CV, Min, Median, p10/p90 |
+| Quality | Completion rate, ECR, E-Accuracy, HVRR |
+| Performance | Retrieval latency p50/p95, Tokens/question, Tool calls/question |
+| Reproducibility | Dataset hash, seeds/IDs, repo commit, scope |
+
+### Report Table Format
+
+Use this format for condition comparison:
+
+| Condition | Mean | CV% | Min | p10 | p90 | Comp% | ECR% | E-Acc% | HVRR% | p95 Lat(ms) | Tok/Q |
+|-----------|------|-----|-----|-----|-----|-------|------|--------|-------|-------------|-------|
+| Baseline  |      |     |     |     |     |       |      |        |       |             |       |
+| MDEMG     |      |     |     |     |     |       |      |        |       |             |       |
+
+**CRITICAL:** Always publish raw per-question outputs (JSONL) for audit.
+
+---
+
 ## Appendix: Templates and Scripts
 
 ### A. Question Template
@@ -809,9 +1244,437 @@ Learning Edges Created: 8,622 (86 pairs/query)
 
 ---
 
+## End-to-End Multi-Corpus Runbook
+
+This runbook defines the complete end-to-end process for multi-corpus benchmarking (e.g., WHK-WMS + plc-gbt). It ensures reproducibility, captures all required artifacts, and blocks skepticism paths.
+
+### Phase 0 — Preflight Receipts (Must Capture)
+
+Capture these BEFORE you touch the DB:
+
+#### Environment + Config
+
+```bash
+# Capture preflight receipts
+mdemg_commit=$(cd /Users/reh3376/mdemg && git rev-parse HEAD)
+neo4j_version=$(curl -s http://localhost:7474/db/data/ | jq -r '.neo4j_version // "unknown"')
+hardware_info=$(system_profiler SPHardwareDataType 2>/dev/null | grep -E "Chip|Memory|Cores" || echo "N/A")
+disk_free=$(df -h . | tail -1 | awk '{print $4}')
+
+echo "MDEMG Commit: $mdemg_commit"
+echo "Neo4j Version: $neo4j_version"
+echo "Hardware: $hardware_info"
+echo "Disk Free: $disk_free"
+```
+
+| Receipt | How to Capture |
+|---------|----------------|
+| MDEMG commit hash | `git rev-parse HEAD` |
+| Config snapshot | Copy `.env` or export to JSON |
+| Neo4j version, DB name, path | `curl localhost:7474/db/data/` |
+| Hardware | CPU, RAM, GPU (if any), disk free |
+
+#### Corpora Identity
+
+| Receipt | How to Capture |
+|---------|----------------|
+| whk-wms repo commit | `cd /path/to/whk-wms && git rev-parse HEAD` |
+| whk-wms ingest scope | Filetype allowlist/denylist, excluded dirs |
+| plc-gbt repo commit | `cd /path/to/plc-gbt && git rev-parse HEAD` |
+| plc-gbt ingest scope | Filetype allowlist/denylist, excluded dirs |
+
+#### Question Sets Identity
+
+| Receipt | How to Capture |
+|---------|----------------|
+| Question bank file name(s) | Full paths |
+| SHA-256 of question set(s) | `shasum -a 256 <file>` |
+| Sampling seed or question IDs | If sampling, document seed or explicit ID list |
+
+### Phase 1 — Benchmark Test Summary (Required Artifacts)
+
+Every benchmark run MUST produce these artifacts:
+
+#### Required Artifact Files
+
+| File | Description |
+|------|-------------|
+| `run_manifest.json` | Immutable receipts (commits, config, timestamps) |
+| `per_question_results.jsonl` | One JSON record per question |
+| `aggregate_metrics.json` | Computed from JSONL |
+| `neo4j_snapshot.json` | Counts + high-level DB state |
+| `stdout.log` | Raw run output |
+
+#### run_manifest.json Template
+
+```json
+{
+  "run_id": "benchmark-v12-20260124-043000",
+  "timestamp": "2026-01-24T04:30:00Z",
+  "operator": "reh3376",
+  "mdemg_commit": "abc123...",
+  "neo4j_version": "5.x",
+  "hardware": {
+    "cpu": "Apple M2 Max",
+    "ram": "64GB",
+    "gpu": "N/A"
+  },
+  "corpora": {
+    "whk-wms": {
+      "commit": "def456...",
+      "space_id": "whk-wms",
+      "scope_paths": ["/apps/whk-wms", "/apps/whk-wms-front-end"],
+      "filetypes": ["*.ts", "*.tsx", "*.json"],
+      "excluded": [".git", "node_modules", "dist"]
+    },
+    "plc-gbt": {
+      "commit": "ghi789...",
+      "space_id": "plc-gbt",
+      "scope_paths": ["/"],
+      "filetypes": ["*.ts", "*.py", "*.json"],
+      "excluded": [".git", "node_modules", "plc_backups", "n8n-framework"]
+    }
+  },
+  "question_set": {
+    "file": "test_questions_v4_selected.json",
+    "sha256": "abc123...",
+    "n_questions": 100,
+    "sampling_seed": null
+  },
+  "config": {
+    "RERANK_ENABLED": true,
+    "RERANK_WEIGHT": 0.15,
+    "RERANK_MODEL": "gpt-4o-mini"
+  },
+  "cold_start": false,
+  "initial_learning_edges": 5926
+}
+```
+
+#### per_question_results.jsonl Format
+
+```jsonl
+{"id":"q001","question":"What is MAX_TAKE?","score":0.85,"top_file":"pagination.constants.ts","latency_ms":234,"tokens":1200,"tool_calls":3,"evidence_found":true,"space_id":"whk-wms"}
+{"id":"q002","question":"What services does X inject?","score":0.72,"top_file":"barrel.service.ts","latency_ms":456,"tokens":1800,"tool_calls":5,"evidence_found":true,"space_id":"whk-wms"}
+```
+
+#### Required Metrics to Compute
+
+**Core Metrics:**
+
+| Metric | Description |
+|--------|-------------|
+| mean score | Average across all questions |
+| median | Middle value |
+| std, CV | Standard deviation, Coefficient of Variation |
+| p10/p90 | 10th/90th percentiles |
+| min score | Worst case |
+| completion rate | % answered without stalling |
+
+**Grounding Metrics:**
+
+| Metric | Description |
+|--------|-------------|
+| Evidence Compliance Rate (ECR) | % with file paths, line numbers, values |
+| Evidence Accuracy (E-Acc) | % cited values actually correct |
+| Hard-Value Resolution Rate (HVRR) | % exact-value questions correct |
+| Hallucination rate | Claims not supported by citations |
+| Refusal correctness | % correct "not found" on trap questions |
+
+**Efficiency Metrics:**
+
+| Metric | Description |
+|--------|-------------|
+| tokens/question avg, p95 | Token consumption |
+| tool calls/question avg, p95 | Tool call budget |
+| latency p50/p95 | Retrieval + end-to-end |
+| total wall time | Complete run duration |
+
+**Reproducibility:**
+
+| Metric | Description |
+|--------|-------------|
+| k runs | Number of runs (minimum 5) |
+| seeds/ID lists | For sampling |
+| dataset hash | SHA-256 of question file |
+| repo commit hashes | All corpora |
+
+### Phase 2 — Ingest Second Corpus (Multi-Space)
+
+**CRITICAL RULES:**
+- Do NOT delete or clear existing space nodes/edges
+- Ingest new corpus into its OWN SpaceID
+- Cross-space edges should be disallowed or tracked as contamination
+
+#### Ingest Command
+
+```bash
+# Ingest plc-gbt into its own space (whk-wms remains)
+go run ./cmd/ingest-codebase/main.go \
+  -path /Users/reh3376/repos/plc-gbt \
+  -space-id plc-gbt \
+  -extract-symbols=false \
+  -exclude ".git,vendor,node_modules,plc_backups,n8n-framework,n8n-mcp"
+```
+
+#### Required Ingest Logs
+
+| Metric | Description |
+|--------|-------------|
+| LOC ingested | Lines of code |
+| filetype diversity | Count + list of file types |
+| elements | Code elements extracted |
+| observations | Observations created |
+| embedding coverage | % with embeddings |
+| health score | Post-ingest health |
+| ingestion time | Wall clock time |
+| throughput | elements/sec |
+
+#### Post-Ingest Invariants
+
+- [ ] Nodes/edges for first corpus unchanged (except global indexes)
+- [ ] Second corpus has non-zero nodes/edges
+- [ ] Cross-space edges = 0 (or tracked as contamination)
+
+### Phase 3 — Consolidate (Multi-Corpus)
+
+Run consolidation with both SpaceIDs present:
+
+```bash
+# Consolidate each space
+curl -X POST 'http://localhost:8090/v1/memory/consolidate' \
+  -H 'Content-Type: application/json' \
+  -d '{"space_id":"whk-wms"}'
+
+curl -X POST 'http://localhost:8090/v1/memory/consolidate' \
+  -H 'Content-Type: application/json' \
+  -d '{"space_id":"plc-gbt"}'
+```
+
+#### Required Consolidation Logs
+
+| Metric | Description |
+|--------|-------------|
+| nodes/edges created | During consolidation |
+| concept layer nodes per space | Hidden/concept nodes |
+| co-activation edges | Learning edges created |
+| time spent | Consolidation duration |
+| post-consolidation health | Health score |
+
+### Phase 4 — Neo4j Verification (Critical)
+
+Execute these Cypher queries to verify isolation:
+
+#### 4.1 Counts by SpaceID
+
+```cypher
+MATCH (n:MemoryNode)
+RETURN n.spaceId AS spaceId, count(n) AS nodes
+ORDER BY nodes DESC;
+```
+
+#### 4.2 Edges by SpaceID
+
+```cypher
+MATCH (a:MemoryNode)-[r]->(b:MemoryNode)
+RETURN a.spaceId AS fromSpace, b.spaceId AS toSpace, type(r) AS relType, count(r) AS rels
+ORDER BY rels DESC;
+```
+
+#### 4.3 Cross-Space Contamination Check (CRITICAL)
+
+```cypher
+-- Count cross-space relationships
+MATCH (a:MemoryNode)-[r]->(b:MemoryNode)
+WHERE a.spaceId <> b.spaceId
+RETURN count(r) AS crossSpaceRels;
+
+-- If non-zero, list examples:
+MATCH (a:MemoryNode)-[r]->(b:MemoryNode)
+WHERE a.spaceId <> b.spaceId
+RETURN a.spaceId, type(r), b.spaceId, a.name, b.name
+LIMIT 25;
+```
+
+#### 4.4 Hidden Layer Nodes per Space
+
+```cypher
+MATCH (n:MemoryNode)
+WHERE n.layer > 0
+RETURN n.spaceId AS spaceId, n.layer AS layer, count(n) AS count
+ORDER BY spaceId, layer;
+```
+
+#### 4.5 File Distribution per Space
+
+```cypher
+MATCH (o:Observation)
+RETURN o.spaceId AS spaceId, count(o) AS files
+ORDER BY files DESC;
+```
+
+#### Pass Criteria for "Consolidation Confirmed"
+
+- [ ] Both spaces present with expected magnitude
+- [ ] crossSpaceRels == 0 (or explain why not)
+- [ ] Concept/cluster layers exist in each space
+- [ ] Basic retrieval returns evidence from correct space
+
+### Phase 5 — Multi-Corpus Benchmark
+
+Run benchmark with both corpora loaded:
+
+#### Additional Required Metrics
+
+| Metric | Description |
+|--------|-------------|
+| Repo Attribution Accuracy (RAA) | % answers citing only correct spaceId |
+| Cross-Repo Contamination Rate (CRCR) | % citing wrong spaceId |
+| Collision subset performance | Performance on overlapping vocabulary |
+
+#### Collision Questions
+
+If not present, add 10 questions designed to cause confusion between repos (e.g., shared constant names, similar module names).
+
+### Benchmark Summary Template
+
+Use this exact structure for reports:
+
+```markdown
+# Benchmark Summary
+
+## 1) Run Identity
+
+| Field | Value |
+|-------|-------|
+| Date/time (TZ) | |
+| Operator | |
+| MDEMG commit | |
+| Neo4j version / DB | |
+| Hardware | |
+| Run type | single-corpus / multi-corpus / consolidation-verify |
+| Cold-start? | Y/N - what was cleared? |
+
+## 2) Corpora + Scope
+
+### whk-wms
+| Field | Value |
+|-------|-------|
+| commit | |
+| scope paths | |
+| filetypes | |
+| LOC | |
+| SpaceID | |
+
+### plc-gbt
+| Field | Value |
+|-------|-------|
+| commit | |
+| scope paths | |
+| filetypes | |
+| LOC | |
+| SpaceID | |
+
+## 3) Ingestion Metrics
+
+| Metric | whk-wms | plc-gbt |
+|--------|---------|---------|
+| elements | | |
+| observations | | |
+| embedding coverage | | |
+| health score | | |
+| ingest time | | |
+| throughput (elem/sec) | | |
+
+## 4) Consolidation Metrics
+
+| Metric | Value |
+|--------|-------|
+| consolidation time | |
+| nodes added | |
+| edges added | |
+| concept nodes added | |
+| learning edges added | |
+| post-consolidation health | |
+
+## 5) DB Verification (Neo4j)
+
+| Metric | Value |
+|--------|-------|
+| nodes by space | |
+| rels by space | |
+| cross-space relationships | |
+| filetype distribution | |
+| PASS/FAIL | |
+
+## 6) Benchmark Battery
+
+| Field | Value |
+|-------|-------|
+| question set name | |
+| SHA-256 | |
+| N questions | |
+| tiers (Tier1/Tier2) | |
+| sampling seed | |
+| k runs | |
+
+## 7) Results (Aggregate)
+
+### Core
+| Metric | Value |
+|--------|-------|
+| mean | |
+| median | |
+| std | |
+| CV | |
+| p10/p90 | |
+| min | |
+| completion % | |
+
+### Grounding
+| Metric | Value |
+|--------|-------|
+| ECR % | |
+| E-Acc % | |
+| HVRR % | |
+| hallucination rate | |
+| refusal correctness % | |
+
+### Multi-corpus Integrity
+| Metric | Value |
+|--------|-------|
+| RAA % | |
+| CRCR % | |
+| collision subset mean | |
+
+### Efficiency
+| Metric | Value |
+|--------|-------|
+| tokens/Q avg, p95 | |
+| tool calls/Q avg, p95 | |
+| latency p50/p95 | |
+| wall time | |
+
+## 8) Top Failure Modes
+
+- Examples of wrong answers with evidence issues
+- Examples of repo confusion (if any)
+- Timeouts / stalls / unknowns
+```
+
+### Skeptic-Killer Requirements
+
+1. **Evidence must include repo identity** (spaceId or repo label) in every cited file path
+2. **Publish raw JSONL** per-question results for audit
+
+---
+
 ## Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.3 | 2026-01-24 | Added End-to-End Multi-Corpus Runbook with Phase 0-5, artifact requirements, Neo4j verification queries, and benchmark summary template |
+| 1.2 | 2026-01-23 | Added WHK-WMS 120-question test set, baseline benchmarking rules (20-min limit, repo restrictions, disqualification criteria), master vs agent file distinction |
+| 1.1 | 2026-01-23 | Added V6 Composite Test Set documentation |
 | 1.0 | 2026-01-23 | Initial comprehensive guide |
 

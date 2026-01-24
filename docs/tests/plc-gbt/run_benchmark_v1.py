@@ -9,6 +9,11 @@ Tests 60 questions across 6 categories:
 - configuration_infrastructure
 - business_logic_workflows
 - ui_ux
+
+Token Consumption Tracking:
+- Tracks estimated tokens for MDEMG retrieval (summaries returned)
+- Compares to estimated baseline (grep full file content)
+- Reports token efficiency ratio
 """
 
 import json
@@ -17,6 +22,7 @@ import time
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
+import statistics
 
 TEST_DIR = Path(__file__).parent
 QUESTIONS_FILE = TEST_DIR / "test_questions_v1.json"
@@ -55,6 +61,46 @@ def get_stats() -> dict:
     except:
         return {}
 
+def estimate_tokens(text: str) -> int:
+    """Estimate token count using ~4 chars per token heuristic"""
+    if not text:
+        return 0
+    return len(text) // 4
+
+def calculate_token_metrics(results: list, nodes_per_query: list) -> dict:
+    """Calculate token consumption metrics for MDEMG vs baseline comparison"""
+
+    # MDEMG token estimates (summaries + paths returned)
+    mdemg_tokens_per_query = []
+    for nodes in nodes_per_query:
+        query_tokens = 0
+        for node in nodes:
+            # Count tokens in returned context
+            query_tokens += estimate_tokens(node.get('name', ''))
+            query_tokens += estimate_tokens(node.get('path', ''))
+            query_tokens += estimate_tokens(node.get('summary', ''))
+        mdemg_tokens_per_query.append(query_tokens)
+
+    # Baseline estimate: assume grep returns 5 full files @ 500 lines avg, 40 chars/line
+    # This is conservative - real baseline often reads many more files
+    BASELINE_FILES_PER_QUERY = 5
+    BASELINE_AVG_FILE_LINES = 500
+    BASELINE_AVG_LINE_CHARS = 40
+    baseline_tokens_per_query = (BASELINE_FILES_PER_QUERY * BASELINE_AVG_FILE_LINES * BASELINE_AVG_LINE_CHARS) // 4
+
+    total_mdemg_tokens = sum(mdemg_tokens_per_query)
+    total_baseline_tokens = baseline_tokens_per_query * len(results)
+
+    return {
+        "mdemg_tokens_total": total_mdemg_tokens,
+        "mdemg_tokens_avg": total_mdemg_tokens / len(results) if results else 0,
+        "mdemg_tokens_p95": sorted(mdemg_tokens_per_query)[int(len(mdemg_tokens_per_query) * 0.95)] if mdemg_tokens_per_query else 0,
+        "baseline_tokens_total": total_baseline_tokens,
+        "baseline_tokens_avg": baseline_tokens_per_query,
+        "token_savings_ratio": total_baseline_tokens / total_mdemg_tokens if total_mdemg_tokens > 0 else 0,
+        "token_savings_pct": (1 - total_mdemg_tokens / total_baseline_tokens) * 100 if total_baseline_tokens > 0 else 0
+    }
+
 def run_test():
     print("=" * 60)
     print("PLC-GBT BENCHMARK TEST v1")
@@ -80,6 +126,7 @@ def run_test():
     print("-" * 60)
 
     results = []
+    nodes_per_query = []  # Track nodes for token calculation
     start_time = time.time()
     total_rerank_latency = 0
 
@@ -92,9 +139,11 @@ def run_test():
         if "error" in resp:
             print(f"Q{i}: ERROR - {resp['error']}")
             results.append({"id": q['id'], "category": category, "difficulty": difficulty, "score": 0})
+            nodes_per_query.append([])
             continue
 
         nodes = resp.get('results', [])
+        nodes_per_query.append(nodes)  # Track for token calculation
         debug = resp.get('debug', {})
 
         top_score = nodes[0].get('score', 0) if nodes else 0
@@ -171,6 +220,15 @@ def run_test():
     for diff, vals in sorted(by_difficulty.items()):
         diff_avg = sum(vals) / len(vals)
         print(f"  {diff}: {diff_avg:.3f} (n={len(vals)})")
+
+    # Token consumption metrics
+    token_metrics = calculate_token_metrics(results, nodes_per_query)
+    print(f"\nToken Consumption:")
+    print(f"  MDEMG Total: {token_metrics['mdemg_tokens_total']:,} tokens")
+    print(f"  MDEMG Avg/Query: {token_metrics['mdemg_tokens_avg']:.0f} tokens")
+    print(f"  MDEMG p95: {token_metrics['mdemg_tokens_p95']} tokens")
+    print(f"  Baseline Estimate: {token_metrics['baseline_tokens_total']:,} tokens")
+    print(f"  Token Savings: {token_metrics['token_savings_pct']:.1f}% ({token_metrics['token_savings_ratio']:.1f}x reduction)")
 
     # Write report
     with open(OUTPUT_FILE, 'w') as f:

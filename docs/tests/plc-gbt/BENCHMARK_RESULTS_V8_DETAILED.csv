@@ -1,0 +1,101 @@
+Rank,Question #,Question ID,Category,Difficulty,Question Text,Top Retrieval Score,Quality Level,Quality Score
+1,57,blw_001,business_logic_workflows,easy,What PLC connection mode is enforced by default in plc-gbt for safety reasons?,0.7996,Excellent,1.0
+2,7,api_009,api_services,hard,What temperature value does the OpenAIService use when calling the chat completion API for truth-seeking responses?,0.7976,Excellent,1.0
+3,38,ai_008,ai_ml_integration,easy,What environment variable stores the OpenAI API key for AI service authentication?,0.7972,Excellent,1.0
+4,33,db_002,database_persistence,medium,What is the default chunk_size in bytes for file processing in FileStorageService?,0.7948,Excellent,1.0
+5,93,api_002,api_services,medium,What are the five fields defined in the APIResponse Pydantic model in cli_api_bridge.py?,0.7886,Excellent,1.0
+6,98,sec_005,security_authentication,hard,What validation level includes simulation testing before deployment to verify safe operation?,0.7797,Excellent,1.0
+7,97,api_007,api_services,hard,"In the CLIConfiguration dataclass, what is the default value for session_timeout and what unit is it measured in?",0.7703,Excellent,1.0
+8,83,cfg_009,configuration_infrastructure,medium,What is the default request timeout in seconds for the CLIExecutor class?,0.7681,Excellent,1.0
+9,58,cfg_010,configuration_infrastructure,hard,Which PostgreSQL database name is used for N8N workflows according to docker-compose.yml?,0.7593,Excellent,1.0
+10,84,n8n_001,n8n_workflow,easy,What is the purpose of the n8n-mcp module in the plc-gbt stack?,0.7517,Excellent,1.0
+11,4,n8n_002,n8n_workflow,medium,What PostgreSQL database name is used for N8N workflows in docker-compose?,0.7437,Excellent,1.0
+12,94,cfg_003,configuration_infrastructure,medium,What is the default port for the backend API in plc-gbt?,0.7423,Excellent,1.0
+13,61,api_004,api_services,hard,What is the default fine-tuned OpenAI model ID used by the OpenAIService when no OPENAI_MODEL environment variable is set?,0.7351,Excellent,1.0
+14,10,dms_004,data_models_schema,medium,What are the four ValidationLevel values in plc-gbt and what does each level validate?,0.7308,Excellent,1.0
+15,2,dms_005,data_models_schema,hard,"In the CascadeConfiguration interface, what are the two possible values for cascade_type and what additional fields are used for each type?",0.7299,Excellent,1.0
+16,56,acd_006,acd_l5x_conversion,easy,What file format is .L5X based on?,0.7211,Excellent,1.0
+17,34,cla_001,control_loop_architecture,easy,What are the four PID controller types defined in the plc-gbt system?,0.7147,Excellent,1.0
+18,79,api_003,api_services,medium,What is the default chunk_size (in bytes) used by the FileStorageService for file operations?,0.7139,Excellent,1.0
+19,71,blw_008,business_logic_workflows,easy,What is the default instance status when creating a new control loop instance via the wizard?,0.7071,Excellent,1.0
+20,89,ai_006,ai_ml_integration,hard,What RAG (Retrieval-Augmented Generation) database is used to store PLC program context for AI assistance?,0.7057,Excellent,1.0
+21,51,dms_006,data_models_schema,medium,What JSON Schema draft version is used in plc-gbt control loop schemas?,0.7021,Excellent,1.0
+22,63,concept_011,data_architecture,conceptual,How does plc-gbt ensure data integrity for file storage operations?,0.7017,Excellent,1.0
+23,75,acd_005,acd_l5x_conversion,medium,What is the external library used for ACD to L5X conversion in plc-gbt?,0.7011,Excellent,1.0
+24,72,cla_007,control_loop_architecture,easy,What are the six control modes defined in the ControlMode type?,0.6989,Partial,0.5
+25,22,concept_005,system_architecture,conceptual,How does the cascade control configuration in plc-gbt enable complex multi-loop control strategies?,0.6951,Partial,0.5
+26,48,cfg_004,configuration_infrastructure,hard,What is the full path to the CLI configuration file location?,0.6931,Partial,0.5
+27,52,sec_006,security_authentication,medium,What is the default session timeout value for the CLI security session?,0.6917,Partial,0.5
+28,35,api_001,api_services,easy,What is the default timeout value (in seconds) for the CommandRequest model's timeout field in the CLI-to-API Bridge?,0.6911,Partial,0.5
+29,47,blw_005,business_logic_workflows,medium,What database column is used to implement soft delete functionality in the file storage service?,0.6901,Partial,0.5
+30,37,blw_004,business_logic_workflows,hard,What validation level includes simulation testing but not PLC connectivity validation?,0.6886,Partial,0.5
+31,95,cla_002,control_loop_architecture,medium,"What is the maximum character length allowed for a tag_name in the plc-gbt system, and what regex pattern must it match?",0.6866,Partial,0.5
+32,36,acd_001,acd_l5x_conversion,easy,What is the core purpose of plc-gbt's ACD to L5X conversion capability?,0.6824,Partial,0.5
+33,60,uix_006,ui_ux,hard,"In the ControlLoopGrid component, how many columns does the responsive grid display at different breakpoints (default, md, lg, xl)?",0.6808,Partial,0.5
+34,86,concept_009,system_architecture,conceptual,What is the instance lifecycle in plc-gbt and how does it track PLC program states?,0.6805,Partial,0.5
+35,39,dms_010,data_models_schema,hard,What are all seven InstanceType enum values in plc-gbt?,0.6805,Partial,0.5
+36,59,uix_007,ui_ux,easy,What four types of widgets are supported in the analytics store Dashboard interface?,0.6784,Partial,0.5
+37,6,cfg_002,configuration_infrastructure,easy,What is the OpenAI Seed value configured for deterministic responses in plc-gbt?,0.6778,Partial,0.5
+38,90,uix_010,ui_ux,hard,"In the ControlLoopStats component, what are the three color thresholds for the avgPerformance value that determine whether it displays as green, yellow, or red?",0.6757,Partial,0.5
+39,18,db_004,database_persistence,medium,What database is used for Neo4j knowledge graph storage in the RAG architecture?,0.6753,Partial,0.5
+40,44,blw_009,business_logic_workflows,hard,What are the four PID parameters that MUST be present for BASIC_PID instance type to pass STANDARD validation level?,0.6747,Partial,0.5
+41,20,api_008,api_services,medium,What are the four ExecutionStatus enum values defined in cli_api_bridge.py?,0.6738,Partial,0.5
+42,21,api_010,api_services,medium,What is the maximum number of command results stored in the CLIExecutor's command_history before older entries are trimmed?,0.6727,Partial,0.5
+43,80,concept_014,safety_security,conceptual,What validation levels does plc-gbt provide and when would you use each?,0.6715,Partial,0.5
+44,64,sec_003,security_authentication,hard,What decorator is used in the CLI to enforce permission levels for protected operations?,0.6670,Partial,0.5
+45,32,acd_002,acd_l5x_conversion,medium,Why are .ACD files unsuitable for traditional version control systems?,0.6648,Partial,0.5
+46,49,cla_006,control_loop_architecture,medium,What are the three scaling_type enum values available for setpoint scaling between master and slave loops?,0.6632,Partial,0.5
+47,53,concept_007,integration,conceptual,How does plc-gbt's n8n integration enable workflow automation for industrial processes?,0.6614,Partial,0.5
+48,11,sec_002,security_authentication,medium,What port does the mTLS proxy expose in the docker-compose configuration for secure API access?,0.6606,Partial,0.5
+49,13,concept_010,ui_architecture,conceptual,"How does the plc-gbt UI implement a flexible, user-customizable layout system?",0.6571,Partial,0.5
+50,87,uix_003,ui_ux,medium,What two Google fonts are loaded in the root layout of the plc-gbt Next.js application?,0.6489,Partial,0.5
+51,100,sec_004,security_authentication,medium,What permission level is required to delete a control loop instance?,0.6484,Partial,0.5
+52,99,sec_001,security_authentication,easy,What connection mode is enforced by default in plc-gbt to prevent accidental PLC modifications?,0.6479,Partial,0.5
+53,88,cla_009,control_loop_architecture,medium,"What is the default stability_margin value for slave loop tuning, and what are its minimum and maximum constraints?",0.6455,Partial,0.5
+54,70,concept_003,system_architecture,conceptual,How does plc-gbt integrate AI assistance with traditional PLC programming workflows?,0.6439,Partial,0.5
+55,55,dms_009,data_models_schema,medium,"In plc-gbt, what keyword is used in JSON schemas to reference base schemas for inheritance?",0.6417,Partial,0.5
+56,73,api_005,api_services,medium,What hashing algorithm does the FileStorageService use to calculate file checksums?,0.6392,Partial,0.5
+57,31,uix_008,ui_ux,hard,"What drag-and-drop library is used for the IconStrip component's icon reordering functionality, and what two sensors are configured?",0.6360,Partial,0.5
+58,96,cfg_008,configuration_infrastructure,hard,What is the default FILE_STORAGE_ROOT path configured in the CLI API bridge?,0.6359,Partial,0.5
+59,19,acd_003,acd_l5x_conversion,hard,What are the three Rockwell/Allen-Bradley controller families supported by plc-gbt?,0.6352,Partial,0.5
+60,1,ai_007,ai_ml_integration,medium,What is the trainer_callback.py module used for in the OpenAI fine-tuning workflow?,0.6297,Partial,0.5
+61,66,cla_003,control_loop_architecture,medium,"In cascade control configuration, what are the four communication_method enum values that define how master-slave loops communicate?",0.6287,Partial,0.5
+62,82,uix_001,ui_ux,easy,"What is the name of the Zustand store used for managing layout state in the plc-gbt UI, and what is its localStorage persistence key?",0.6255,Partial,0.5
+63,68,db_005,database_persistence,hard,What is the default FILE_STORAGE_ROOT path for the CLI API bridge file storage?,0.6245,Partial,0.5
+64,69,concept_001,system_purpose,conceptual,What is the core purpose of plc-gbt and how does it provide a novel solution to process control and automation version control?,0.6224,Partial,0.5
+65,30,acd_010,acd_l5x_conversion,medium,How does plc-gbt bridge process control engineers and software developers?,0.6212,Partial,0.5
+66,9,db_003,database_persistence,hard,What is the maximum number of command results stored in CLIExecutor's command_history?,0.6134,Partial,0.5
+67,92,cla_008,control_loop_architecture,hard,What is the valid range for response_time_target in master loop tuning parameters?,0.6103,Partial,0.5
+68,5,cfg_006,configuration_infrastructure,medium,What is the default cache TTL (time-to-live) in seconds for the CLI?,0.6093,Partial,0.5
+69,91,cfg_005,configuration_infrastructure,medium,What is the default session timeout value in seconds for the CLI?,0.6093,Partial,0.5
+70,74,acd_009,acd_l5x_conversion,hard,Which controller family supports motion control capabilities?,0.6084,Partial,0.5
+71,40,n8n_003,n8n_workflow,hard,What is the relationship between n8n-framework and plc-gbt event handling?,0.5968,Partial,0.5
+72,62,cfg_007,configuration_infrastructure,easy,What port does the mTLS proxy expose in the docker-compose configuration?,0.5967,Partial,0.5
+73,43,n8n_004,n8n_workflow,medium,What type of workflows can be automated using n8n in the plc-gbt stack?,0.5936,Partial,0.5
+74,26,api_006,api_services,easy,What is the CLI version constant (CLI_VERSION) defined in the plc_control_loop_cli.py file?,0.5895,Partial,0.5
+75,16,uix_005,ui_ux,medium,"What toast notification library is used in the Providers component, and where is its default position configured?",0.5880,Partial,0.5
+76,42,acd_007,acd_l5x_conversion,hard,What DevOps capabilities are enabled by converting .ACD to .L5X format?,0.5848,Partial,0.5
+77,14,dms_002,data_models_schema,easy,What is the regex pattern used for ProcessVariable tag_name validation in plc-gbt schemas?,0.5757,Partial,0.5
+78,54,sec_008,security_authentication,medium,What soft delete mechanism is used in the file storage service for audit compliance?,0.5745,Partial,0.5
+79,29,uix_004,ui_ux,hard,"In the Providers component, what is the default staleTime configured for React Query queries, and what is the gcTime (garbage collection time)?",0.5742,Partial,0.5
+80,24,n8n_005,n8n_workflow,hard,What three workflow priority levels are defined in WorkflowMetadata?,0.5738,Partial,0.5
+81,65,n8n_006,n8n_workflow,medium,What is the purpose of the WorkflowState type in workflow management?,0.5714,Partial,0.5
+82,27,ai_009,ai_ml_integration,hard,What is the max_tokens parameter typically used in OpenAI completions for PLC assistance queries?,0.5707,Partial,0.5
+83,50,uix_009,ui_ux,medium,What are the three layout presets available in the useLayoutStore's applyLayoutPreset action?,0.5681,Partial,0.5
+84,76,ai_005,ai_ml_integration,medium,What is the purpose of the neural_tuning.py module in the plc-gbt AI integration?,0.5680,Partial,0.5
+85,8,dms_008,data_models_schema,hard,What are the four schema organization directories under plc-gbt-stack/schemas/control-loops/subtypes/?,0.5673,Partial,0.5
+86,41,ai_004,ai_ml_integration,hard,What OpenAI seed value is configured in plc-gbt for reproducible responses?,0.5651,Partial,0.5
+87,12,acd_008,acd_l5x_conversion,medium,Which controller family has the highest I/O module capacity?,0.5627,Partial,0.5
+88,77,dms_001,data_models_schema,easy,What are the possible values for ProcessVariable quality in the plc-gbt control-loop.types.ts file?,0.5608,Partial,0.5
+89,78,ai_010,ai_ml_integration,medium,How does plc-gbt's AI assistant handle domain-specific PLC terminology in responses?,0.5600,Partial,0.5
+90,28,acd_004,acd_l5x_conversion,hard,What are the capacity differences between ControlLogix and Micro800 controllers in terms of max programs and tags?,0.5582,Partial,0.5
+91,85,uix_002,ui_ux,medium,What are the seven possible values for the ToolType type in the layout store?,0.5533,Partial,0.5
+92,46,blw_006,business_logic_workflows,hard,"In the OpenAI service system prompt, what are the three critical behavior requirements listed (keywords only)?",0.5531,Partial,0.5
+93,45,dms_003,data_models_schema,medium,List all InstanceStatus enum values in plc-gbt in the order they appear in the code.,0.5484,Partial,0.5
+94,15,ai_001,ai_ml_integration,medium,"What is the default OpenAI model used for fine-tuning in plc-gbt, and what base model is it derived from?",0.5452,Partial,0.5
+95,25,concept_012,integration,conceptual,What PLC controller families does plc-gbt support and what are their key capability differences?,0.5403,Partial,0.5
+96,23,ai_003,ai_ml_integration,medium,What temperature value is used in the OpenAI chat completion API to ensure deterministic responses?,0.5357,Partial,0.5
+97,3,cla_004,control_loop_architecture,hard,What is the default value and valid range for the overshoot_limit parameter in master loop tuning configuration?,0.5346,Partial,0.5
+98,17,cla_005,control_loop_architecture,hard,"What is the default response_ratio for slave loop tuning, and what are its minimum and maximum allowed values?",0.5289,Partial,0.5
+99,81,blw_002,business_logic_workflows,medium,What are the four communication methods supported for cascade master-slave loop coordination?,0.5236,Partial,0.5
+100,67,blw_003,business_logic_workflows,easy,What is the correct lifecycle state progression from DRAFT to DEPLOYED?,0.5091,Partial,0.5

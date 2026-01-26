@@ -16,6 +16,12 @@ import (
 	"mdemg/internal/symbols"
 )
 
+// MaxConfidence is the upper bound for confidence scores.
+// From a Bayesian perspective, absolute certainty (1.0) is epistemologically
+// invalid - no prediction system should claim 100% confidence as it leaves
+// no room for belief updating with new evidence.
+const MaxConfidence = 0.95
+
 // Service provides the Agent Consulting API.
 type Service struct {
 	cfg         config.Config
@@ -339,8 +345,8 @@ func (s *Service) calculateOverallConfidence(suggestions []models.Suggestion, to
 	}
 
 	confidence := avgConfidence * coverageBoost
-	if confidence > 1.0 {
-		confidence = 1.0
+	if confidence > MaxConfidence {
+		confidence = MaxConfidence
 	}
 	return confidence
 }
@@ -855,8 +861,8 @@ func (s *Service) calculateSuggestConfidence(suggestions []models.Suggestion, fi
 	}
 
 	confidence := avgConfidence * boost
-	if confidence > 1.0 {
-		confidence = 1.0
+	if confidence > MaxConfidence {
+		confidence = MaxConfidence
 	}
 	return confidence
 }

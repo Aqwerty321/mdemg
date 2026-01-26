@@ -379,3 +379,484 @@ func (s *Service) generateRationale(req models.ConsultRequest, suggestions []mod
 
 	return strings.Join(parts, ", ") + "."
 }
+
+// Suggest implements context-triggered suggestions - proactive surfacing of relevant
+// information without requiring an explicit question. This is the "Active Participation"
+// mode where MDEMG analyzes what the user is working on and surfaces:
+// - Related patterns/decisions from the graph
+// - Previous solutions to similar problems
+// - Architectural constraints that apply
+// - Potential conflicts with existing knowledge
+func (s *Service) Suggest(ctx context.Context, req models.SuggestRequest) (models.SuggestResponse, error) {
+	resp := models.SuggestResponse{
+		SpaceID:     req.SpaceID,
+		Suggestions: []models.Suggestion{},
+		Debug:       make(map[string]any),
+	}
+
+	maxSuggestions := req.MaxSuggestions
+	if maxSuggestions <= 0 {
+		maxSuggestions = 5
+	}
+
+	minConfidence := req.MinConfidence
+	if minConfidence <= 0 {
+		minConfidence = 0.5 // Default threshold
+	}
+
+	// Step 1: Analyze context to identify triggers
+	triggers := s.analyzeContextTriggers(req.Context, req.FilePath)
+	resp.Triggers = triggers
+	resp.Debug["trigger_count"] = len(triggers)
+
+	// Step 2: Generate query embedding from context
+	if s.embedder == nil {
+		return resp, fmt.Errorf("no embedding provider configured")
+	}
+	queryEmbedding, err := s.embedder.Embed(ctx, req.Context)
+	if err != nil {
+		return resp, fmt.Errorf("failed to generate context embedding: %w", err)
+	}
+
+	// Step 3: Retrieve relevant memories using context
+	retrieveReq := models.RetrieveRequest{
+		SpaceID:        req.SpaceID,
+		QueryText:      req.Context,
+		QueryEmbedding: queryEmbedding,
+		TopK:           maxSuggestions * 4, // Get more candidates for filtering
+		HopDepth:       2,
+	}
+
+	retrieveResp, err := s.retriever.Retrieve(ctx, retrieveReq)
+	if err != nil {
+		return resp, fmt.Errorf("retrieval failed: %w", err)
+	}
+
+	resp.Debug["retrieved_count"] = len(retrieveResp.Results)
+
+	// Step 4: Filter by minimum confidence threshold
+	var filteredResults []models.RetrieveResult
+	for _, r := range retrieveResp.Results {
+		if r.Score >= minConfidence {
+			filteredResults = append(filteredResults, r)
+		}
+	}
+	resp.Debug["filtered_count"] = len(filteredResults)
+
+	// Step 5: Generate proactive suggestions
+	suggestions := s.generateProactiveSuggestions(ctx, req, filteredResults, triggers)
+
+	// Step 6: Detect conflicts if requested
+	if req.IncludeConflicts {
+		conflicts := s.detectConflicts(ctx, req.SpaceID, req.Context, filteredResults)
+		resp.Conflicts = conflicts
+		resp.Debug["conflicts_detected"] = len(conflicts)
+	}
+
+	// Step 7: Find applicable constraints if requested
+	if req.IncludeConstraints {
+		constraints := s.findApplicableConstraints(ctx, req.SpaceID, filteredResults, triggers)
+		resp.Constraints = constraints
+		resp.Debug["constraints_found"] = len(constraints)
+	}
+
+	// Step 8: Fetch related concepts
+	concepts, err := s.fetchRelatedConcepts(ctx, req.SpaceID, filteredResults)
+	if err != nil {
+		resp.Debug["concept_error"] = err.Error()
+	} else {
+		resp.RelatedConcepts = concepts
+	}
+
+	// Step 9: Enrich with symbol evidence if requested
+	if req.IncludeEvidence && s.symbolStore != nil {
+		for i := range suggestions {
+			for _, nodeID := range suggestions[i].SourceNodes {
+				syms, err := s.symbolStore.GetSymbolsForMemoryNode(ctx, req.SpaceID, nodeID)
+				if err != nil {
+					continue
+				}
+				for _, sym := range syms {
+					suggestions[i].Evidence = append(suggestions[i].Evidence, models.SymbolEvidence{
+						SymbolName: sym.Name,
+						SymbolType: sym.SymbolType,
+						FilePath:   sym.FilePath,
+						LineNumber: sym.LineNumber,
+						EndLine:    sym.EndLine,
+						Value:      sym.Value,
+						Signature:  sym.Signature,
+					})
+				}
+			}
+		}
+	}
+
+	// Limit to max suggestions
+	if len(suggestions) > maxSuggestions {
+		suggestions = suggestions[:maxSuggestions]
+	}
+
+	resp.Suggestions = suggestions
+
+	// Step 10: Calculate overall confidence
+	resp.Confidence = s.calculateSuggestConfidence(suggestions, len(filteredResults), len(triggers))
+
+	return resp, nil
+}
+
+// analyzeContextTriggers identifies what in the context warrants proactive suggestions.
+func (s *Service) analyzeContextTriggers(context, filePath string) []models.ContextTrigger {
+	var triggers []models.ContextTrigger
+	contextLower := strings.ToLower(context)
+
+	// Pattern-based triggers
+	patternTriggers := map[string][]string{
+		"error_handling": {"try", "catch", "error", "exception", "throw", "panic", "recover"},
+		"authentication": {"auth", "login", "logout", "token", "jwt", "session", "password"},
+		"database":       {"query", "select", "insert", "update", "delete", "transaction", "sql", "db."},
+		"api":            {"endpoint", "route", "handler", "request", "response", "http", "rest", "graphql"},
+		"testing":        {"test", "spec", "mock", "stub", "assert", "expect", "describe", "it("},
+		"config":         {"config", "env", "environment", "setting", "option", "flag"},
+		"async":          {"async", "await", "promise", "callback", "observable", "concurrent"},
+		"security":       {"encrypt", "decrypt", "hash", "salt", "sanitize", "escape", "xss", "csrf"},
+	}
+
+	for triggerType, keywords := range patternTriggers {
+		var matched []string
+		for _, kw := range keywords {
+			if strings.Contains(contextLower, kw) {
+				matched = append(matched, kw)
+			}
+		}
+		if len(matched) > 0 {
+			triggers = append(triggers, models.ContextTrigger{
+				TriggerType: "pattern_match",
+				Matched:     triggerType,
+				Keywords:    matched,
+			})
+		}
+	}
+
+	// File-type based triggers
+	if filePath != "" {
+		filePathLower := strings.ToLower(filePath)
+		if strings.HasSuffix(filePathLower, ".test.ts") || strings.HasSuffix(filePathLower, "_test.go") || strings.HasSuffix(filePathLower, ".spec.ts") {
+			triggers = append(triggers, models.ContextTrigger{
+				TriggerType: "file_type",
+				Matched:     "test_file",
+			})
+		}
+		if strings.Contains(filePathLower, "/config/") || strings.Contains(filePathLower, "config.") {
+			triggers = append(triggers, models.ContextTrigger{
+				TriggerType: "file_type",
+				Matched:     "config_file",
+			})
+		}
+		if strings.Contains(filePathLower, "/api/") || strings.Contains(filePathLower, "/handler") {
+			triggers = append(triggers, models.ContextTrigger{
+				TriggerType: "file_type",
+				Matched:     "api_handler",
+			})
+		}
+	}
+
+	return triggers
+}
+
+// generateProactiveSuggestions creates suggestions based on context analysis.
+func (s *Service) generateProactiveSuggestions(ctx context.Context, req models.SuggestRequest, results []models.RetrieveResult, triggers []models.ContextTrigger) []models.Suggestion {
+	var suggestions []models.Suggestion
+
+	// Build a set of trigger types for quick lookup
+	triggerTypes := make(map[string]bool)
+	for _, t := range triggers {
+		triggerTypes[t.Matched] = true
+	}
+
+	for _, r := range results {
+		suggType := s.classifyProactiveSuggestionType(r, triggerTypes)
+		content := s.formatProactiveSuggestionContent(suggType, r, triggers)
+
+		if content == "" {
+			continue
+		}
+
+		suggestions = append(suggestions, models.Suggestion{
+			Type:        suggType,
+			Content:     content,
+			Confidence:  r.Score,
+			SourceNodes: []string{r.NodeID},
+		})
+	}
+
+	// Deduplicate
+	suggestions = s.deduplicateSuggestions(suggestions)
+
+	return suggestions
+}
+
+// classifyProactiveSuggestionType determines the type for proactive suggestions.
+func (s *Service) classifyProactiveSuggestionType(r models.RetrieveResult, triggerTypes map[string]bool) models.SuggestionType {
+	name := strings.ToLower(r.Name)
+	path := strings.ToLower(r.Path)
+	summary := strings.ToLower(r.Summary)
+
+	// Check for pattern indicators
+	patternKeywords := []string{"pattern", "convention", "standard", "practice", "approach", "style"}
+	for _, kw := range patternKeywords {
+		if strings.Contains(name, kw) || strings.Contains(summary, kw) {
+			return models.SuggestionPattern
+		}
+	}
+
+	// Check for solution indicators (similar problems solved before)
+	solutionKeywords := []string{"solution", "fix", "resolve", "implement", "handle", "workaround"}
+	for _, kw := range solutionKeywords {
+		if strings.Contains(name, kw) || strings.Contains(summary, kw) {
+			return models.SuggestionSolution
+		}
+	}
+
+	// Check for constraint indicators
+	constraintKeywords := []string{"constraint", "must", "require", "enforce", "rule", "policy", "limit"}
+	for _, kw := range constraintKeywords {
+		if strings.Contains(name, kw) || strings.Contains(summary, kw) {
+			return models.SuggestionConstraint
+		}
+	}
+
+	// Risk indicators (inherited from consult)
+	riskKeywords := []string{"error", "fail", "issue", "problem", "bug", "deprecated", "warning"}
+	for _, kw := range riskKeywords {
+		if strings.Contains(name, kw) || strings.Contains(summary, kw) {
+			return models.SuggestionRisk
+		}
+	}
+
+	// Match against trigger types for context relevance
+	if triggerTypes["error_handling"] && (strings.Contains(path, "error") || strings.Contains(summary, "error")) {
+		return models.SuggestionPattern
+	}
+	if triggerTypes["authentication"] && (strings.Contains(path, "auth") || strings.Contains(summary, "auth")) {
+		return models.SuggestionPattern
+	}
+	if triggerTypes["database"] && (strings.Contains(path, "db") || strings.Contains(path, "repository") || strings.Contains(summary, "database")) {
+		return models.SuggestionPattern
+	}
+
+	// Default to pattern for proactive suggestions
+	return models.SuggestionPattern
+}
+
+// formatProactiveSuggestionContent formats proactive suggestion text.
+func (s *Service) formatProactiveSuggestionContent(suggType models.SuggestionType, r models.RetrieveResult, triggers []models.ContextTrigger) string {
+	content := r.Summary
+	if content == "" {
+		content = r.Name
+	}
+	if content == "" {
+		return ""
+	}
+
+	// Truncate long content
+	if len(content) > 500 {
+		content = content[:497] + "..."
+	}
+
+	// Find the most relevant trigger for context
+	var relevantTrigger string
+	for _, t := range triggers {
+		if relevantTrigger == "" {
+			relevantTrigger = t.Matched
+		}
+	}
+
+	switch suggType {
+	case models.SuggestionPattern:
+		if relevantTrigger != "" {
+			return fmt.Sprintf("Related %s pattern: %s", strings.ReplaceAll(relevantTrigger, "_", " "), content)
+		}
+		return fmt.Sprintf("Related pattern in this codebase: %s", content)
+	case models.SuggestionSolution:
+		return fmt.Sprintf("Previous solution to similar problem: %s", content)
+	case models.SuggestionConstraint:
+		return fmt.Sprintf("Architectural constraint that applies: %s", content)
+	case models.SuggestionConflict:
+		return fmt.Sprintf("Potential conflict with existing: %s", content)
+	case models.SuggestionRisk:
+		return fmt.Sprintf("Risk warning: %s", content)
+	default:
+		return fmt.Sprintf("Relevant context: %s", content)
+	}
+}
+
+// detectConflicts identifies potential conflicts between context and existing knowledge.
+func (s *Service) detectConflicts(ctx context.Context, spaceID, contextText string, results []models.RetrieveResult) []models.ConflictWarning {
+	var conflicts []models.ConflictWarning
+	contextLower := strings.ToLower(contextText)
+
+	// Simple conflict detection based on contradictory patterns
+	for _, r := range results {
+		summaryLower := strings.ToLower(r.Summary)
+		nameLower := strings.ToLower(r.Name)
+
+		// Check for deprecated patterns being used
+		if strings.Contains(summaryLower, "deprecated") {
+			// Check if context might be using deprecated approach
+			if r.Score > 0.7 { // High similarity suggests relevant
+				conflicts = append(conflicts, models.ConflictWarning{
+					Severity:      "medium",
+					Description:   fmt.Sprintf("You may be using a deprecated pattern: %s", r.Name),
+					ConflictsWith: r.NodeID,
+					Evidence:      r.Summary,
+					SourceNodes:   []string{r.NodeID},
+				})
+			}
+		}
+
+		// Check for "don't" or "avoid" patterns
+		if strings.Contains(summaryLower, "avoid") || strings.Contains(summaryLower, "don't") || strings.Contains(summaryLower, "do not") {
+			if r.Score > 0.6 {
+				conflicts = append(conflicts, models.ConflictWarning{
+					Severity:      "low",
+					Description:   fmt.Sprintf("Consider reviewing: %s", r.Name),
+					ConflictsWith: r.NodeID,
+					Evidence:      r.Summary,
+					SourceNodes:   []string{r.NodeID},
+				})
+			}
+		}
+
+		// Check for naming/style conflicts
+		if strings.Contains(summaryLower, "naming") || strings.Contains(nameLower, "convention") {
+			if r.Score > 0.65 {
+				conflicts = append(conflicts, models.ConflictWarning{
+					Severity:      "low",
+					Description:   "Review naming convention",
+					ConflictsWith: r.NodeID,
+					Evidence:      r.Summary,
+					SourceNodes:   []string{r.NodeID},
+				})
+			}
+		}
+	}
+
+	// Check for direct contradictions in context
+	contradictionPairs := []struct{ pattern1, pattern2 string }{
+		{"sync", "async"},
+		{"class", "function"},
+		{"sql", "nosql"},
+		{"rest", "graphql"},
+	}
+
+	for _, pair := range contradictionPairs {
+		if strings.Contains(contextLower, pair.pattern1) {
+			// Look for results about the opposite pattern
+			for _, r := range results {
+				if strings.Contains(strings.ToLower(r.Summary), pair.pattern2) && r.Score > 0.6 {
+					conflicts = append(conflicts, models.ConflictWarning{
+						Severity:      "low",
+						Description:   fmt.Sprintf("Context uses %s but codebase has %s patterns", pair.pattern1, pair.pattern2),
+						ConflictsWith: r.NodeID,
+						Evidence:      r.Summary,
+						SourceNodes:   []string{r.NodeID},
+					})
+				}
+			}
+		}
+	}
+
+	return conflicts
+}
+
+// findApplicableConstraints finds architectural constraints relevant to the context.
+func (s *Service) findApplicableConstraints(ctx context.Context, spaceID string, results []models.RetrieveResult, triggers []models.ContextTrigger) []models.Constraint {
+	var constraints []models.Constraint
+
+	// Extract constraints from high-scoring results
+	for _, r := range results {
+		summaryLower := strings.ToLower(r.Summary)
+		nameLower := strings.ToLower(r.Name)
+
+		// Look for must/should patterns
+		constraintType := ""
+		if strings.Contains(summaryLower, "must") || strings.Contains(summaryLower, "required") {
+			constraintType = "must"
+		} else if strings.Contains(summaryLower, "must not") || strings.Contains(summaryLower, "forbidden") {
+			constraintType = "must_not"
+		} else if strings.Contains(summaryLower, "should") || strings.Contains(summaryLower, "recommended") {
+			constraintType = "should"
+		} else if strings.Contains(summaryLower, "should not") || strings.Contains(summaryLower, "discouraged") {
+			constraintType = "should_not"
+		}
+
+		if constraintType != "" && r.Score > 0.6 {
+			constraints = append(constraints, models.Constraint{
+				Name:           r.Name,
+				Description:    r.Summary,
+				ConstraintType: constraintType,
+				Scope:          r.Path,
+				SourceNodes:    []string{r.NodeID},
+				Confidence:     r.Score,
+			})
+		}
+
+		// Look for rule/policy nodes
+		if strings.Contains(nameLower, "rule") || strings.Contains(nameLower, "policy") || strings.Contains(nameLower, "constraint") {
+			if r.Score > 0.55 {
+				ct := "should"
+				if strings.Contains(summaryLower, "must") {
+					ct = "must"
+				}
+				constraints = append(constraints, models.Constraint{
+					Name:           r.Name,
+					Description:    r.Summary,
+					ConstraintType: ct,
+					Scope:          r.Path,
+					SourceNodes:    []string{r.NodeID},
+					Confidence:     r.Score,
+				})
+			}
+		}
+	}
+
+	// Deduplicate by name
+	seen := make(map[string]bool)
+	var unique []models.Constraint
+	for _, c := range constraints {
+		if !seen[c.Name] {
+			seen[c.Name] = true
+			unique = append(unique, c)
+		}
+	}
+
+	return unique
+}
+
+// calculateSuggestConfidence computes confidence for suggest response.
+func (s *Service) calculateSuggestConfidence(suggestions []models.Suggestion, filteredCount, triggerCount int) float64 {
+	if len(suggestions) == 0 {
+		return 0.0
+	}
+
+	var sum float64
+	for _, sugg := range suggestions {
+		sum += sugg.Confidence
+	}
+	avgConfidence := sum / float64(len(suggestions))
+
+	// Boost based on triggers and filtered results
+	boost := 1.0
+	if triggerCount > 0 {
+		boost += 0.05 * float64(triggerCount)
+	}
+	if filteredCount >= 5 {
+		boost += 0.1
+	}
+
+	confidence := avgConfidence * boost
+	if confidence > 1.0 {
+		confidence = 1.0
+	}
+	return confidence
+}

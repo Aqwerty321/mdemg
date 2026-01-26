@@ -376,6 +376,67 @@ type RelatedConcept struct {
 	Relevance  float64 `json:"relevance"` // How relevant to the query 0.0-1.0
 }
 
+// SuggestRequest - request for POST /v1/memory/suggest
+// Context-triggered suggestions: proactive surfacing of relevant info without explicit questions.
+// This moves MDEMG from passive retrieval to active participation.
+type SuggestRequest struct {
+	SpaceID            string   `json:"space_id" validate:"required,min=1,max=256"`
+	Context            string   `json:"context" validate:"required,min=1,max=20000"` // Current context (code being edited, file content, error message)
+	FilePath           string   `json:"file_path,omitempty"`                         // Optional: path of file being edited
+	Tags               []string `json:"tags,omitempty" validate:"omitempty,dive,min=1"`
+	MaxSuggestions     int      `json:"max_suggestions,omitempty" validate:"omitempty,min=1,max=20"` // Max suggestions (default 5)
+	MinConfidence      float64  `json:"min_confidence,omitempty" validate:"omitempty,min=0,max=1"`   // Minimum confidence threshold (default 0.5)
+	IncludeEvidence    bool     `json:"include_evidence,omitempty"`                                  // Include symbol evidence
+	IncludeConflicts   bool     `json:"include_conflicts,omitempty"`                                 // Detect potential conflicts
+	IncludeConstraints bool     `json:"include_constraints,omitempty"`                               // Include architectural constraints
+}
+
+// SuggestResponse - response from context-triggered suggestion endpoint
+type SuggestResponse struct {
+	SpaceID         string             `json:"space_id"`
+	Triggers        []ContextTrigger   `json:"triggers,omitempty"`         // What triggered these suggestions
+	Suggestions     []Suggestion       `json:"suggestions"`                // Proactive suggestions
+	Conflicts       []ConflictWarning  `json:"conflicts,omitempty"`        // Potential conflicts with existing knowledge
+	Constraints     []Constraint       `json:"constraints,omitempty"`      // Relevant architectural constraints
+	RelatedConcepts []RelatedConcept   `json:"related_concepts,omitempty"` // Higher-level concepts
+	Confidence      float64            `json:"confidence"`                 // Overall confidence
+	Debug           map[string]any     `json:"debug,omitempty"`
+}
+
+// ContextTrigger explains what in the context triggered suggestions
+type ContextTrigger struct {
+	TriggerType string   `json:"trigger_type"` // pattern_match, keyword, file_type, semantic
+	Matched     string   `json:"matched"`      // What was matched in the context
+	Keywords    []string `json:"keywords,omitempty"`
+}
+
+// ConflictWarning indicates a potential conflict with existing knowledge
+type ConflictWarning struct {
+	Severity    string   `json:"severity"`     // low, medium, high
+	Description string   `json:"description"`  // What the conflict is
+	ConflictsWith string `json:"conflicts_with"` // Node ID or pattern that conflicts
+	Evidence    string   `json:"evidence,omitempty"` // Supporting evidence
+	SourceNodes []string `json:"source_nodes"`
+}
+
+// Constraint represents an architectural constraint that applies to the context
+type Constraint struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	ConstraintType string `json:"constraint_type"` // must, must_not, should, should_not
+	Scope       string   `json:"scope,omitempty"` // Where this constraint applies
+	SourceNodes []string `json:"source_nodes"`
+	Confidence  float64  `json:"confidence"`
+}
+
+// Additional suggestion types for context-triggered suggestions
+const (
+	SuggestionPattern    SuggestionType = "pattern"    // "Related pattern in this codebase..."
+	SuggestionSolution   SuggestionType = "solution"   // "Previous solution to similar problem..."
+	SuggestionConstraint SuggestionType = "constraint" // "Architectural constraint that applies..."
+	SuggestionConflict   SuggestionType = "conflict"   // "Potential conflict with existing..."
+)
+
 // ConsolidateRequest - request for POST /v1/memory/consolidate
 // Triggers hidden layer creation and message passing operations.
 type ConsolidateRequest struct {

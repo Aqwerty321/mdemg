@@ -348,9 +348,9 @@ The system tries **ALL 5 layers** even if intermediate layers produce no cluster
 - [x] Reflection endpoint (`POST /v1/memory/reflect`)
 - [x] Anomaly detection on ingest (duplicates, stale updates)
 - [x] Graph health metrics (`GET /v1/metrics`)
-- [ ] Context-triggered suggestions
+- [x] Context-triggered suggestions (`POST /v1/memory/suggest`)
 - [ ] Periodic reflection summaries
-- [ ] Agent consulting service API
+- [x] Agent consulting service API (`POST /v1/memory/consult`)
 
 ### Phase 4: IDE Integration
 - [ ] VS Code extension

@@ -1591,6 +1591,32 @@ func (s *Server) handleConsult(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// handleSuggest handles POST /v1/memory/suggest
+// Context-triggered suggestions - proactively surfaces relevant information
+// without requiring an explicit question. This is MDEMG's "Active Participation" mode.
+func (s *Server) handleSuggest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req models.SuggestRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if !validateRequest(w, &req) {
+		return
+	}
+
+	resp, err := s.consultant.Suggest(r.Context(), req)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
 // handleLearningStats handles GET /v1/learning/stats
 // Returns statistics about learning edges for a space.
 func (s *Server) handleLearningStats(w http.ResponseWriter, r *http.Request) {

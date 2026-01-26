@@ -31,6 +31,7 @@ type SymbolRecord struct {
 	Value              string    `json:"value,omitempty"`
 	RawValue           string    `json:"raw_value,omitempty"`
 	FilePath           string    `json:"file_path"`
+	ParentNodeID       string    `json:"parent_node_id,omitempty"` // Direct link to MemoryNode (avoids MATCH)
 	LineNumber         int       `json:"line_number"`
 	EndLine            int       `json:"end_line"`
 	Column             int       `json:"column,omitempty"`
@@ -161,6 +162,7 @@ func (s *Store) SaveSymbols(ctx context.Context, spaceID string, symbols []Symbo
 				"value":               sym.Value,
 				"raw_value":           sym.RawValue,
 				"file_path":           sym.FilePath,
+				"parent_node_id":      sym.ParentNodeID,
 				"line_number":         sym.LineNumber,
 				"end_line":            sym.EndLine,
 				"column":              sym.Column,
@@ -206,15 +208,20 @@ SET
   s.type_annotation = sym.type_annotation,
   s.context_specificity = sym.context_specificity
 WITH s, sym
-CALL {
-  WITH s, sym
-  WITH s, sym WHERE sym.embedding IS NOT NULL AND size(sym.embedding) > 0
+// Set embedding only if provided (using FOREACH to avoid filtering)
+FOREACH (_ IN CASE WHEN sym.embedding IS NOT NULL AND size(sym.embedding) > 0 THEN [1] ELSE [] END |
   SET s.embedding = sym.embedding
-  RETURN 0 AS _
-}
+)
 WITH s, sym
-// Link symbol to parent MemoryNode by file path
-MATCH (m:MemoryNode {space_id: sym.space_id, path: sym.file_path})
+// Link symbol to parent MemoryNode
+// Prefer direct node_id link (avoids transaction isolation issues)
+// Fall back to path matching if node_id not provided
+OPTIONAL MATCH (m1:MemoryNode {space_id: sym.space_id, node_id: sym.parent_node_id})
+WHERE sym.parent_node_id IS NOT NULL AND sym.parent_node_id <> ''
+OPTIONAL MATCH (m2:MemoryNode {space_id: sym.space_id, path: sym.file_path})
+WHERE sym.parent_node_id IS NULL OR sym.parent_node_id = ''
+WITH s, coalesce(m1, m2) AS m
+WHERE m IS NOT NULL
 MERGE (m)-[:DEFINES_SYMBOL]->(s)
 RETURN count(s) AS created
 		`, params)

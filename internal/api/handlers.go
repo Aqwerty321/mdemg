@@ -231,10 +231,20 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store symbols if any were provided
+	// Build path->nodeID map from response to link symbols directly
+	// (avoids transaction isolation issues with MATCH by path)
 	if s.symbolStore != nil {
+		pathToNodeID := make(map[string]string)
+		for i, result := range resp.Results {
+			if result.Status == "success" && result.NodeID != "" && i < len(req.Observations) {
+				pathToNodeID[req.Observations[i].Path] = result.NodeID
+			}
+		}
+
 		var allSymbols []symbols.SymbolRecord
 		for _, obs := range req.Observations {
 			if len(obs.Symbols) > 0 {
+				nodeID := pathToNodeID[obs.Path]
 				for _, sym := range obs.Symbols {
 					rec := symbols.SymbolRecord{
 						SpaceID:        req.SpaceID,
@@ -244,6 +254,7 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 						Value:          sym.Value,
 						RawValue:       sym.RawValue,
 						FilePath:       obs.Path,
+						ParentNodeID:   nodeID, // Direct link to MemoryNode
 						LineNumber:     sym.LineNumber,
 						EndLine:        sym.EndLine,
 						Exported:       sym.Exported,

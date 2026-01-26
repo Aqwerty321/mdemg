@@ -1,0 +1,560 @@
+// Package summarize provides LLM-based semantic summary generation for code elements.
+// Summaries describe WHAT code does (purpose, behavior) rather than what it contains structurally.
+package summarize
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+)
+
+// Config holds configuration for the summarize service.
+type Config struct {
+	Enabled      bool   // Feature toggle (default: false)
+	Provider     string // "openai" or "ollama" (default: openai)
+	Model        string // Model to use (default: gpt-4o-mini)
+	MaxTokens    int    // Max tokens in response (default: 150)
+	BatchSize    int    // Files per API call (default: 10)
+	TimeoutMs    int    // Request timeout in ms (default: 30000)
+	CacheEnabled bool   // Cache summaries to avoid regenerating (default: true)
+	CacheSize    int    // Max cached summaries (default: 5000)
+	Debug        bool   // Enable debug logging
+
+	// OpenAI settings
+	OpenAIAPIKey   string
+	OpenAIEndpoint string // default: https://api.openai.com/v1
+
+	// Ollama settings (for local LLM)
+	OllamaEndpoint string // default: http://localhost:11434
+}
+
+// CodeElement represents a code element to summarize.
+// This mirrors the structure used in ingest-codebase.
+type CodeElement struct {
+	Name     string   // Element name
+	Kind     string   // package, function, struct, module, etc.
+	Path     string   // Full path including anchors
+	Content  string   // Full content of the element
+	Package  string   // Package/module name
+	FilePath string   // File path
+	Tags     []string // Associated tags
+	Concerns []string // Cross-cutting concerns
+}
+
+// Service provides LLM-based semantic summary generation.
+type Service struct {
+	config     Config
+	client     *http.Client
+	cache      *summaryCache
+	structFn   func(CodeElement) string // Fallback structural summary function
+	mu         sync.Mutex
+	totalCalls int64
+	totalHits  int64
+}
+
+// summaryCache provides thread-safe LRU caching of summaries.
+type summaryCache struct {
+	mu       sync.RWMutex
+	items    map[string]cacheEntry
+	order    []string // LRU order
+	capacity int
+}
+
+type cacheEntry struct {
+	summary   string
+	timestamp time.Time
+}
+
+func newSummaryCache(capacity int) *summaryCache {
+	return &summaryCache{
+		items:    make(map[string]cacheEntry),
+		order:    make([]string, 0, capacity),
+		capacity: capacity,
+	}
+}
+
+func (c *summaryCache) Get(key string) (string, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if entry, ok := c.items[key]; ok {
+		return entry.summary, true
+	}
+	return "", false
+}
+
+func (c *summaryCache) Put(key, summary string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Check if already exists
+	if _, exists := c.items[key]; exists {
+		c.items[key] = cacheEntry{summary: summary, timestamp: time.Now()}
+		return
+	}
+
+	// Evict oldest if at capacity
+	if len(c.order) >= c.capacity {
+		oldest := c.order[0]
+		c.order = c.order[1:]
+		delete(c.items, oldest)
+	}
+
+	c.items[key] = cacheEntry{summary: summary, timestamp: time.Now()}
+	c.order = append(c.order, key)
+}
+
+func (c *summaryCache) Len() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.items)
+}
+
+// New creates a new summarize service.
+// If structuralFallback is provided, it will be used when LLM fails.
+func New(cfg Config, structuralFallback func(CodeElement) string) (*Service, error) {
+	if !cfg.Enabled {
+		return nil, errors.New("summarize service is disabled")
+	}
+
+	// Set defaults
+	if cfg.Provider == "" {
+		cfg.Provider = "openai"
+	}
+	if cfg.Model == "" {
+		cfg.Model = "gpt-4o-mini"
+	}
+	if cfg.MaxTokens <= 0 {
+		cfg.MaxTokens = 150
+	}
+	if cfg.BatchSize <= 0 {
+		cfg.BatchSize = 10
+	}
+	if cfg.TimeoutMs <= 0 {
+		cfg.TimeoutMs = 30000
+	}
+	if cfg.CacheSize <= 0 {
+		cfg.CacheSize = 5000
+	}
+	if cfg.OpenAIEndpoint == "" {
+		cfg.OpenAIEndpoint = "https://api.openai.com/v1"
+	}
+	if cfg.OllamaEndpoint == "" {
+		cfg.OllamaEndpoint = "http://localhost:11434"
+	}
+
+	// Validate provider config
+	switch cfg.Provider {
+	case "openai":
+		if cfg.OpenAIAPIKey == "" {
+			return nil, errors.New("OPENAI_API_KEY is required for openai provider")
+		}
+	case "ollama":
+		// No API key needed for local Ollama
+	default:
+		return nil, fmt.Errorf("unknown summarize provider: %s", cfg.Provider)
+	}
+
+	var cache *summaryCache
+	if cfg.CacheEnabled {
+		cache = newSummaryCache(cfg.CacheSize)
+	}
+
+	return &Service{
+		config: cfg,
+		client: &http.Client{
+			Timeout: time.Duration(cfg.TimeoutMs) * time.Millisecond,
+		},
+		cache:    cache,
+		structFn: structuralFallback,
+	}, nil
+}
+
+// cacheKey generates a unique cache key from element content.
+// Uses SHA256 hash of content to handle large code blocks efficiently.
+func (s *Service) cacheKey(elem CodeElement) string {
+	// Create a deterministic key from element properties
+	data := fmt.Sprintf("%s:%s:%s:%s", elem.Kind, elem.Name, elem.Path, elem.Content)
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:16]) // Use first 16 bytes (32 hex chars)
+}
+
+// Summarize generates a semantic summary for a single code element.
+// Returns structural fallback if LLM fails.
+func (s *Service) Summarize(ctx context.Context, elem CodeElement) string {
+	summaries := s.SummarizeBatch(ctx, []CodeElement{elem})
+	if len(summaries) > 0 {
+		return summaries[0]
+	}
+	return s.fallback(elem)
+}
+
+// SummarizeBatch generates semantic summaries for multiple code elements.
+// Uses batching to minimize API calls. Returns structural fallback for failures.
+func (s *Service) SummarizeBatch(ctx context.Context, elements []CodeElement) []string {
+	if len(elements) == 0 {
+		return nil
+	}
+
+	s.mu.Lock()
+	s.totalCalls++
+	s.mu.Unlock()
+
+	results := make([]string, len(elements))
+	uncached := make([]int, 0) // Indices of elements needing LLM call
+
+	// Check cache first
+	if s.cache != nil {
+		for i, elem := range elements {
+			key := s.cacheKey(elem)
+			if summary, found := s.cache.Get(key); found {
+				results[i] = summary
+				s.mu.Lock()
+				s.totalHits++
+				s.mu.Unlock()
+				if s.config.Debug {
+					log.Printf("[SUMMARIZE] Cache HIT: %s (%s)", elem.Name, elem.Kind)
+				}
+			} else {
+				uncached = append(uncached, i)
+			}
+		}
+
+		if len(uncached) == 0 {
+			return results // All cached
+		}
+	} else {
+		// No cache - all need LLM
+		for i := range elements {
+			uncached = append(uncached, i)
+		}
+	}
+
+	if s.config.Debug {
+		log.Printf("[SUMMARIZE] Processing %d uncached elements (of %d total)", len(uncached), len(elements))
+	}
+
+	// Process uncached elements in batches
+	for i := 0; i < len(uncached); i += s.config.BatchSize {
+		end := i + s.config.BatchSize
+		if end > len(uncached) {
+			end = len(uncached)
+		}
+
+		batchIndices := uncached[i:end]
+		batchElements := make([]CodeElement, len(batchIndices))
+		for j, idx := range batchIndices {
+			batchElements[j] = elements[idx]
+		}
+
+		// Call LLM for this batch
+		summaries, err := s.callLLM(ctx, batchElements)
+		if err != nil {
+			if s.config.Debug {
+				log.Printf("[SUMMARIZE] LLM call failed: %v, using fallback", err)
+			}
+			// Use fallback for failed batch
+			for _, idx := range batchIndices {
+				results[idx] = s.fallback(elements[idx])
+			}
+			continue
+		}
+
+		// Store results and cache them
+		for j, idx := range batchIndices {
+			if j < len(summaries) && summaries[j] != "" {
+				results[idx] = summaries[j]
+				if s.cache != nil {
+					s.cache.Put(s.cacheKey(elements[idx]), summaries[j])
+				}
+			} else {
+				results[idx] = s.fallback(elements[idx])
+			}
+		}
+	}
+
+	return results
+}
+
+// callLLM makes the actual LLM API call for a batch of elements.
+func (s *Service) callLLM(ctx context.Context, elements []CodeElement) ([]string, error) {
+	switch s.config.Provider {
+	case "openai":
+		return s.callOpenAI(ctx, elements)
+	case "ollama":
+		return s.callOllama(ctx, elements)
+	default:
+		return nil, fmt.Errorf("unknown provider: %s", s.config.Provider)
+	}
+}
+
+// buildPrompt creates the prompt for summarizing code elements.
+func (s *Service) buildPrompt(elements []CodeElement) string {
+	var sb strings.Builder
+
+	sb.WriteString(`You are a code analyzer. For each code element below, write a brief semantic summary (2-3 sentences, max 200 characters) that describes:
+1. WHAT the code does (its purpose, behavior, functionality)
+2. Key dependencies or integrations (if apparent)
+
+DO NOT describe the code's structure (e.g., "contains 5 functions"). Focus only on purpose and behavior.
+
+Respond with a JSON array of summaries in the same order as the inputs. Each summary should be a string.
+
+Code elements to summarize:
+`)
+
+	for i, elem := range elements {
+		sb.WriteString(fmt.Sprintf("\n--- Element %d ---\n", i+1))
+		sb.WriteString(fmt.Sprintf("Type: %s\n", elem.Kind))
+		sb.WriteString(fmt.Sprintf("Name: %s\n", elem.Name))
+		if elem.Package != "" {
+			sb.WriteString(fmt.Sprintf("Package: %s\n", elem.Package))
+		}
+		sb.WriteString(fmt.Sprintf("Path: %s\n", elem.Path))
+		if len(elem.Concerns) > 0 {
+			sb.WriteString(fmt.Sprintf("Concerns: %s\n", strings.Join(elem.Concerns, ", ")))
+		}
+
+		// Include truncated content (first 1500 chars to stay within token limits)
+		content := elem.Content
+		if len(content) > 1500 {
+			content = content[:1500] + "\n... [truncated]"
+		}
+		sb.WriteString(fmt.Sprintf("Content:\n%s\n", content))
+	}
+
+	sb.WriteString("\nRespond ONLY with a JSON array of summary strings:")
+
+	return sb.String()
+}
+
+// OpenAI API types
+type openAIChatRequest struct {
+	Model       string           `json:"model"`
+	Messages    []openAIMessage  `json:"messages"`
+	MaxTokens   int              `json:"max_tokens"`
+	Temperature float64          `json:"temperature"`
+}
+
+type openAIMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type openAIChatResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
+}
+
+func (s *Service) callOpenAI(ctx context.Context, elements []CodeElement) ([]string, error) {
+	prompt := s.buildPrompt(elements)
+
+	reqBody := openAIChatRequest{
+		Model: s.config.Model,
+		Messages: []openAIMessage{
+			{Role: "system", Content: "You are a helpful code analysis assistant. Respond only with valid JSON."},
+			{Role: "user", Content: prompt},
+		},
+		MaxTokens:   s.config.MaxTokens * len(elements), // Scale with batch size
+		Temperature: 0.3,                                // Lower temperature for consistent results
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", s.config.OpenAIEndpoint+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+s.config.OpenAIAPIKey)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("openai api error (%d): %s", resp.StatusCode, string(respBody))
+	}
+
+	var chatResp openAIChatResponse
+	if err := json.Unmarshal(respBody, &chatResp); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	if chatResp.Error != nil {
+		return nil, fmt.Errorf("openai error: %s", chatResp.Error.Message)
+	}
+
+	if len(chatResp.Choices) == 0 {
+		return nil, errors.New("no response from OpenAI")
+	}
+
+	// Parse the JSON array of summaries
+	content := strings.TrimSpace(chatResp.Choices[0].Message.Content)
+
+	// Handle markdown code blocks
+	if strings.HasPrefix(content, "```json") {
+		content = strings.TrimPrefix(content, "```json")
+		content = strings.TrimSuffix(content, "```")
+		content = strings.TrimSpace(content)
+	} else if strings.HasPrefix(content, "```") {
+		content = strings.TrimPrefix(content, "```")
+		content = strings.TrimSuffix(content, "```")
+		content = strings.TrimSpace(content)
+	}
+
+	var summaries []string
+	if err := json.Unmarshal([]byte(content), &summaries); err != nil {
+		// If JSON parsing fails, try to extract individual summaries
+		if s.config.Debug {
+			log.Printf("[SUMMARIZE] Failed to parse JSON response, content: %s", content)
+		}
+		return nil, fmt.Errorf("parse summaries: %w", err)
+	}
+
+	return summaries, nil
+}
+
+// Ollama API types
+type ollamaGenerateRequest struct {
+	Model   string `json:"model"`
+	Prompt  string `json:"prompt"`
+	Stream  bool   `json:"stream"`
+	Options struct {
+		NumPredict int `json:"num_predict"`
+	} `json:"options"`
+}
+
+type ollamaGenerateResponse struct {
+	Response string `json:"response"`
+	Done     bool   `json:"done"`
+}
+
+func (s *Service) callOllama(ctx context.Context, elements []CodeElement) ([]string, error) {
+	prompt := s.buildPrompt(elements)
+
+	reqBody := ollamaGenerateRequest{
+		Model:  s.config.Model,
+		Prompt: prompt,
+		Stream: false,
+	}
+	reqBody.Options.NumPredict = s.config.MaxTokens * len(elements)
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", s.config.OllamaEndpoint+"/api/generate", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ollama api error (%d): %s", resp.StatusCode, string(respBody))
+	}
+
+	var genResp ollamaGenerateResponse
+	if err := json.Unmarshal(respBody, &genResp); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	// Parse the JSON array of summaries
+	content := strings.TrimSpace(genResp.Response)
+
+	// Handle markdown code blocks
+	if strings.HasPrefix(content, "```json") {
+		content = strings.TrimPrefix(content, "```json")
+		content = strings.TrimSuffix(content, "```")
+		content = strings.TrimSpace(content)
+	} else if strings.HasPrefix(content, "```") {
+		content = strings.TrimPrefix(content, "```")
+		content = strings.TrimSuffix(content, "```")
+		content = strings.TrimSpace(content)
+	}
+
+	var summaries []string
+	if err := json.Unmarshal([]byte(content), &summaries); err != nil {
+		return nil, fmt.Errorf("parse summaries: %w", err)
+	}
+
+	return summaries, nil
+}
+
+// fallback returns a structural summary when LLM fails.
+func (s *Service) fallback(elem CodeElement) string {
+	if s.structFn != nil {
+		return s.structFn(elem)
+	}
+	// Default minimal fallback
+	return fmt.Sprintf("%s: %s", elem.Kind, elem.Name)
+}
+
+// Stats returns cache statistics.
+func (s *Service) Stats() (totalCalls, cacheHits, cacheSize int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	size := int64(0)
+	if s.cache != nil {
+		size = int64(s.cache.Len())
+	}
+	return s.totalCalls, s.totalHits, size
+}
+
+// CombineSummary combines a structural summary with a semantic description.
+// This creates the enriched summary format for storage.
+func CombineSummary(structural, semantic string) string {
+	if semantic == "" {
+		return structural
+	}
+	if structural == "" {
+		return semantic
+	}
+
+	// Check if structural already contains semantic info (avoid duplication)
+	if strings.Contains(structural, semantic) {
+		return structural
+	}
+
+	// Format: "Structural info. SEMANTIC: Description"
+	// This allows easy parsing if needed later
+	return structural + " SEMANTIC: " + semantic
+}

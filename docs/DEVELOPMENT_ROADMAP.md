@@ -33,6 +33,7 @@ This roadmap addressed these gaps through 5 improvement tracks. **All 5 tracks a
 | **Symbol-Level Indexing** | **HIGH** | **HIGH** | **P1** | ⏳ VALIDATING |
 | **Incremental Updates** | **MEDIUM** | **MEDIUM** | **P2** | 📋 PLANNED |
 | **Query Optimization & Caching** | **HIGH** | **MEDIUM** | **P1** | ✅ COMPLETE (caching + profiling + indexes) |
+| **LLM Plugin SDK** | **HIGH** | **MEDIUM** | **P1** | ⏳ IN PROGRESS (SDK docs + semantic summaries complete) |
 
 ---
 
@@ -264,6 +265,14 @@ This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 
 - [x] Create "echo" test module to validate RPC round-trip latency.
 - [x] Wire REASONING modules into retrieval pipeline (`internal/retrieval/reasoning.go`)
 - [x] Create sample `keyword-booster` reasoning module
+
+**Documentation**: See [SDK Plugin Guide](SDK_PLUGIN_GUIDE.md) for complete plugin development documentation including:
+- Module types (INGESTION, REASONING, APE) with full code templates
+- manifest.json schema and configuration
+- gRPC lifecycle management
+- Best practices and troubleshooting
+
+**Claude Skill**: See `.claude/skills/create-plugin.md` for LLM-assisted plugin creation workflow.
 
 ### Deliverable 6.3: Code Parser Module Migration
 - **Priority**: P1 | **Effort**: 3-4 days
@@ -1326,6 +1335,79 @@ mdemg_embedding_requests_total{provider, status}
 | Embedding cache hit rate | ~40% | **80%** | 90% |
 | Ingest throughput | 7/s | **15/s** | 25/s |
 | Max concurrent retrievals | ~20 | **100** | 200 |
+
+---
+
+## Phase 11: LLM Plugin SDK & Self-Improvement Capabilities
+
+**Motivation**: To achieve MDEMG's vision as a self-improving long-term memory system, LLM agents need the ability to extend MDEMG's capabilities by creating their own sidecar plugins. This phase provides the framework, tooling, and skills for autonomous plugin creation.
+
+**Goal**: Enable LLM agents to identify capability gaps and create new plugins to fill them autonomously.
+
+---
+
+### Deliverable 11.1: Plugin SDK Documentation ✅ COMPLETE
+- **Priority**: P0 | **Status**: COMPLETE (Agent: a4f38ec)
+- [x] Comprehensive plugin development guide: `docs/SDK_PLUGIN_GUIDE.md` (1,582 lines)
+- [x] Module type templates (INGESTION, REASONING, APE)
+- [x] manifest.json schema with all configuration options
+- [x] gRPC lifecycle documentation and best practices
+- [x] Troubleshooting guide
+
+### Deliverable 11.2: LLM Semantic Summary Service ✅ COMPLETE
+- **Priority**: P1 | **Status**: COMPLETE (Agent: a3bff87)
+- [x] LLM client for semantic summary generation: `internal/summarize/service.go`
+- [x] Support for OpenAI and Ollama providers
+- [x] LRU caching for repeated content
+- [x] Batching support for API efficiency
+- [x] Fallback to structural summaries on failure
+- [x] Unit tests: `internal/summarize/service_test.go` (10 tests)
+- [x] CLI integration: `--llm-summary`, `--llm-summary-model`, `--llm-summary-batch`, `--llm-summary-provider`
+
+**Configuration**:
+```bash
+LLM_SUMMARY_ENABLED=true           # Feature toggle (default: false)
+LLM_SUMMARY_PROVIDER=openai        # "openai" or "ollama"
+LLM_SUMMARY_MODEL=gpt-4o-mini      # Model to use
+LLM_SUMMARY_MAX_TOKENS=150         # Max tokens in response
+LLM_SUMMARY_BATCH_SIZE=10          # Files per API call
+LLM_SUMMARY_TIMEOUT_MS=30000       # Request timeout
+LLM_SUMMARY_CACHE_SIZE=1000        # LRU cache size
+```
+
+### Deliverable 11.3: Claude Plugin Creation Skill ✅ COMPLETE
+- **Priority**: P1 | **Status**: COMPLETE (Agent: af9daaf)
+- [x] Claude skill for autonomous plugin creation: `.claude/skills/create-plugin.md` (931 lines)
+- [x] Decision framework for choosing plugin type
+- [x] Step-by-step workflow (5 phases)
+- [x] Complete code templates for all module types
+- [x] Validation checklist
+
+### Deliverable 11.4: Plugin Scaffolding Generator
+- **Priority**: P1 | **Status**: 📋 PENDING (blocked by 11.1)
+- [ ] CLI command: `mdemg plugin new <name> --type=<INGESTION|REASONING|APE>`
+- [ ] Generate directory structure with manifest.json, main.go, Makefile
+- [ ] Include boilerplate gRPC handlers
+- [ ] Validate against proto definitions
+
+### Deliverable 11.5: Plugin Validation & Testing Framework
+- **Priority**: P1 | **Status**: 📋 PENDING
+- [ ] Automated manifest.json validation
+- [ ] gRPC contract testing against mdemg-module.proto
+- [ ] Health check simulation
+- [ ] Performance benchmarking (latency, memory)
+
+### Deliverable 11.6: Plugin Creation API for LLM Agents
+- **Priority**: P2 | **Status**: 📋 PENDING (blocked by 11.4, 11.5)
+- [ ] `POST /v1/plugins/create` endpoint for programmatic plugin creation
+- [ ] Accept plugin spec, generate and validate scaffold
+- [ ] Return build instructions and deployment steps
+
+### Deliverable 11.7: Capability Gap Detection
+- **Priority**: P2 | **Status**: 📋 PENDING
+- [ ] Analyze query patterns to identify retrieval gaps
+- [ ] Suggest plugin types that could address gaps
+- [ ] Track plugin performance and recommend improvements
 
 ---
 

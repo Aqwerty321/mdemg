@@ -114,6 +114,15 @@ type Config struct {
 	RerankWeight    float64 // Weight of rerank score in final (default: 0.4)
 	RerankTimeoutMs int     // Timeout for rerank call in ms (default: 3000)
 
+	// LLM Summary settings (semantic summaries for ingest)
+	LLMSummaryEnabled   bool   // Feature toggle for LLM summaries (default: false)
+	LLMSummaryProvider  string // LLM provider for summaries (openai/ollama, default: openai)
+	LLMSummaryModel     string // Model for summaries (default: gpt-4o-mini)
+	LLMSummaryMaxTokens int    // Max tokens per summary (default: 150)
+	LLMSummaryBatchSize int    // Files per API call (default: 10)
+	LLMSummaryTimeoutMs int    // Request timeout in ms (default: 30000)
+	LLMSummaryCacheSize int    // Max cached summaries (default: 5000)
+
 	// Plugin system settings (V0006)
 	PluginsEnabled bool   // Feature toggle for plugin system (default: true)
 	PluginsDir     string // Path to plugins directory (default: ./plugins)
@@ -580,6 +589,39 @@ func FromEnv() (Config, error) {
 	pluginSocketDir := get("PLUGIN_SOCKET_DIR", "/tmp/mdemg-plugins")
 	mdemgVersion := get("MDEMG_VERSION", "0.6.0")
 
+	// LLM Summary settings (semantic summaries for ingest)
+	llmSummaryEnabled := getBool("LLM_SUMMARY_ENABLED", false)
+	llmSummaryProvider := get("LLM_SUMMARY_PROVIDER", "openai")
+	llmSummaryModel := get("LLM_SUMMARY_MODEL", "gpt-4o-mini")
+	llmSummaryMaxTokens, err := atoi("LLM_SUMMARY_MAX_TOKENS", 150)
+	if err != nil {
+		return Config{}, err
+	}
+	if llmSummaryMaxTokens < 50 || llmSummaryMaxTokens > 500 {
+		return Config{}, errors.New("LLM_SUMMARY_MAX_TOKENS must be in range [50, 500]")
+	}
+	llmSummaryBatchSize, err := atoi("LLM_SUMMARY_BATCH_SIZE", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	if llmSummaryBatchSize < 1 || llmSummaryBatchSize > 50 {
+		return Config{}, errors.New("LLM_SUMMARY_BATCH_SIZE must be in range [1, 50]")
+	}
+	llmSummaryTimeoutMs, err := atoi("LLM_SUMMARY_TIMEOUT_MS", 30000)
+	if err != nil {
+		return Config{}, err
+	}
+	if llmSummaryTimeoutMs < 1000 {
+		return Config{}, errors.New("LLM_SUMMARY_TIMEOUT_MS must be >= 1000")
+	}
+	llmSummaryCacheSize, err := atoi("LLM_SUMMARY_CACHE_SIZE", 5000)
+	if err != nil {
+		return Config{}, err
+	}
+	if llmSummaryCacheSize < 0 {
+		return Config{}, errors.New("LLM_SUMMARY_CACHE_SIZE must be >= 0")
+	}
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -662,5 +704,12 @@ func FromEnv() (Config, error) {
 		PluginsDir:                pluginsDir,
 		PluginSocketDir:           pluginSocketDir,
 		MdemgVersion:              mdemgVersion,
+		LLMSummaryEnabled:         llmSummaryEnabled,
+		LLMSummaryProvider:        llmSummaryProvider,
+		LLMSummaryModel:           llmSummaryModel,
+		LLMSummaryMaxTokens:       llmSummaryMaxTokens,
+		LLMSummaryBatchSize:       llmSummaryBatchSize,
+		LLMSummaryTimeoutMs:       llmSummaryTimeoutMs,
+		LLMSummaryCacheSize:       llmSummaryCacheSize,
 	}, nil
 }

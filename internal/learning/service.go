@@ -290,15 +290,16 @@ func (s *Service) PruneExcessEdgesPerNode(ctx context.Context, spaceID string) (
 
 	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		// Find nodes with more than maxEdgesPerNode CO_ACTIVATED_WITH edges
-		// and delete the lowest-weight excess edges
+		// and delete the lowest-weight excess edges.
+		// Uses a subquery approach to properly capture relationships for deletion.
 		cypher := `MATCH (n:MemoryNode {space_id:$spaceId})-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(m:MemoryNode {space_id:$spaceId})
-WITH n, r, m
+WITH n, r
 ORDER BY n.node_id, r.weight DESC
-WITH n, collect({rel: r, weight: r.weight}) AS edges
+WITH n, collect(r) AS edges
 WHERE size(edges) > $maxEdgesPerNode
-UNWIND range($maxEdgesPerNode, size(edges)-1) AS idx
-WITH (edges[idx]).rel AS toDelete
-DELETE toDelete
+WITH n, edges[$maxEdgesPerNode..] AS toDelete
+UNWIND toDelete AS r
+DELETE r
 RETURN count(*) AS deleted`
 		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {

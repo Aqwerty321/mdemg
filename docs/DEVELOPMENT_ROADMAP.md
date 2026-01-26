@@ -1,7 +1,7 @@
 # MDEMG Development Roadmap
 
 **Created**: 2026-01-22
-**Updated**: 2026-01-23 (Phase 8: Symbol extraction complete, validation in progress; Phase 9: Incremental updates planned)
+**Updated**: 2026-01-26 (Phase 8: Symbol extraction complete, validation in progress; Phase 9: Incremental updates planned; Confidence capping: Bayesian validity fix applied)
 **Based on**: v4 Test Results (whk-wms codebase, 100-question evaluation)
 **Goal**: Improve retrieval quality from 0.567 avg score to 0.70+ avg score
 **Result**: v11 achieved **0.733 avg score** (+29.3% from v4 baseline, +3.3% from v10)

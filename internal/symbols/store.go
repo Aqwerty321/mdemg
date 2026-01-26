@@ -489,20 +489,48 @@ ORDER BY s.context_specificity DESC, s.exported DESC, s.line_number
 }
 
 // GetSymbolsForMemoryNode returns all symbols defined in a MemoryNode.
+// For hidden/concept nodes (layer > 0), traverses GENERALIZES edges to find
+// symbols from descendant leaf nodes.
 func (s *Store) GetSymbolsForMemoryNode(ctx context.Context, spaceID, nodeID string) ([]SymbolRecord, error) {
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
 	result, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		params := map[string]any{
-			"space_id": spaceID,
-			"node_id":  nodeID,
+			"space_id":    spaceID,
+			"node_id":     nodeID,
+			"max_symbols": 20,
 		}
 
+		// Query handles symbols from multiple sources:
+		// 1. Direct symbols on the node (leaf nodes)
+		// 2. Symbols from descendant leaf nodes via GENERALIZES (hidden/concept nodes)
+		// 3. Symbols from parent file node for fragment nodes (path contains #)
 		res, err := tx.Run(ctx, `
-MATCH (m:MemoryNode {space_id: $space_id, node_id: $node_id})-[:DEFINES_SYMBOL]->(s:SymbolNode)
+MATCH (m:MemoryNode {space_id: $space_id, node_id: $node_id})
+
+// Collect direct symbols
+OPTIONAL MATCH (m)-[:DEFINES_SYMBOL]->(s1:SymbolNode)
+WITH m, collect(DISTINCT s1) AS directSymbols
+
+// Collect symbols from descendant leaf nodes (for hidden/concept nodes)
+OPTIONAL MATCH (leaf:MemoryNode {layer: 0})-[:GENERALIZES*]->(m)
+OPTIONAL MATCH (leaf)-[:DEFINES_SYMBOL]->(s2:SymbolNode)
+WITH m, directSymbols, collect(DISTINCT s2) AS descendantSymbols
+
+// Collect symbols from parent file node (for fragment nodes with # in path)
+OPTIONAL MATCH (parent:MemoryNode {space_id: $space_id, layer: 0})
+WHERE m.path CONTAINS '#' AND parent.path = split(m.path, '#')[0]
+OPTIONAL MATCH (parent)-[:DEFINES_SYMBOL]->(s3:SymbolNode)
+WITH directSymbols, descendantSymbols, collect(DISTINCT s3) AS parentSymbols
+
+// Combine all symbol sources
+WITH directSymbols + descendantSymbols + parentSymbols AS allSymbols
+UNWIND allSymbols AS s
+WITH s WHERE s IS NOT NULL
 RETURN s
 ORDER BY s.context_specificity DESC, s.line_number
+LIMIT $max_symbols
 		`, params)
 		if err != nil {
 			return nil, err

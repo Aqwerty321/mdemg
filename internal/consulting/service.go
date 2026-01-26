@@ -52,12 +52,22 @@ func (s *Service) Consult(ctx context.Context, req models.ConsultRequest) (model
 	// Combine context and question for retrieval
 	queryText := fmt.Sprintf("%s\n\nQuestion: %s", req.Context, req.Question)
 
+	// Generate query embedding (required by retrieval service)
+	if s.embedder == nil {
+		return resp, fmt.Errorf("no embedding provider configured")
+	}
+	queryEmbedding, err := s.embedder.Embed(ctx, queryText)
+	if err != nil {
+		return resp, fmt.Errorf("failed to generate query embedding: %w", err)
+	}
+
 	// Step 1: Retrieve relevant memories using existing retrieval pipeline
 	retrieveReq := models.RetrieveRequest{
-		SpaceID:   req.SpaceID,
-		QueryText: queryText,
-		TopK:      maxSuggestions * 3, // Get more candidates for filtering
-		HopDepth:  2,                  // Include related nodes
+		SpaceID:        req.SpaceID,
+		QueryText:      queryText,
+		QueryEmbedding: queryEmbedding,
+		TopK:           maxSuggestions * 3, // Get more candidates for filtering
+		HopDepth:       2,                  // Include related nodes
 	}
 
 	retrieveResp, err := s.retriever.Retrieve(ctx, retrieveReq)

@@ -15,6 +15,7 @@ import (
 	"mdemg/internal/learning"
 	"mdemg/internal/plugins"
 	"mdemg/internal/retrieval"
+	"mdemg/internal/symbols"
 	"mdemg/internal/validation"
 )
 
@@ -28,6 +29,7 @@ type Server struct {
 	hiddenLayer     *hidden.Service
 	pluginMgr       *plugins.Manager
 	apeScheduler    *ape.Scheduler
+	symbolStore     *symbols.Store
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -86,6 +88,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			cfg.HiddenLayerClusterEps, cfg.HiddenLayerMinSamples, cfg.HiddenLayerMaxHidden)
 	}
 
+	// Initialize symbol store
+	symStore := symbols.NewStore(driver)
+	log.Printf("Symbol store initialized")
+
 	// Initialize APE scheduler
 	var apeSched *ape.Scheduler
 	if pluginMgr != nil {
@@ -102,7 +108,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		}
 	}
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, pluginMgr: pluginMgr, apeScheduler: apeSched}
+	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore}
 }
 
 // Shutdown gracefully stops background services
@@ -136,6 +142,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/modules/", s.handleModuleSync)
 	mux.HandleFunc("/v1/ape/status", s.handleAPEStatus)
 	mux.HandleFunc("/v1/ape/trigger", s.handleAPETrigger)
+	mux.HandleFunc("/v1/learning/prune", s.handleLearningPrune)
+	mux.HandleFunc("/v1/learning/stats", s.handleLearningStats)
 
 	// Wrap mux with logging middleware
 	logCfg := LogConfig{

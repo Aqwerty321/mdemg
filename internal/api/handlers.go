@@ -12,6 +12,7 @@ import (
 	"mdemg/internal/anomaly"
 	"mdemg/internal/db"
 	"mdemg/internal/models"
+	"mdemg/internal/symbols"
 )
 
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
@@ -185,6 +186,43 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
+	}
+
+	// Store symbols if any were provided
+	if s.symbolStore != nil {
+		var allSymbols []symbols.SymbolRecord
+		for _, obs := range req.Observations {
+			if len(obs.Symbols) > 0 {
+				for _, sym := range obs.Symbols {
+					rec := symbols.SymbolRecord{
+						SpaceID:        req.SpaceID,
+						SymbolID:       symbols.GenerateSymbolID(req.SpaceID, obs.Path, sym.Name, sym.LineNumber),
+						Name:           sym.Name,
+						SymbolType:     sym.Type,
+						Value:          sym.Value,
+						RawValue:       sym.RawValue,
+						FilePath:       obs.Path,
+						LineNumber:     sym.LineNumber,
+						EndLine:        sym.EndLine,
+						Exported:       sym.Exported,
+						DocComment:     sym.DocComment,
+						Signature:      sym.Signature,
+						Parent:         sym.Parent,
+						Language:       sym.Language,
+						TypeAnnotation: sym.TypeAnnotation,
+					}
+					allSymbols = append(allSymbols, rec)
+				}
+			}
+		}
+		if len(allSymbols) > 0 {
+			if err := s.symbolStore.SaveSymbols(r.Context(), req.SpaceID, allSymbols); err != nil {
+				log.Printf("WARNING: failed to save symbols: %v", err)
+				// Non-fatal - continue with response
+			} else {
+				log.Printf("Stored %d symbols for space %s", len(allSymbols), req.SpaceID)
+			}
+		}
 	}
 
 	// Set appropriate status code based on results
@@ -1441,4 +1479,78 @@ DETACH DELETE n`
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+// handleLearningPrune handles POST /v1/learning/prune
+// Prunes decayed and excess learning edges (CO_ACTIVATED_WITH) for a space.
+func (s *Server) handleLearningPrune(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	spaceID := r.URL.Query().Get("space_id")
+	if spaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query parameter is required"})
+		return
+	}
+
+	ctx := r.Context()
+
+	// Prune decayed edges (below threshold after time decay)
+	decayedDeleted, err := s.learner.PruneDecayedEdges(ctx, spaceID)
+	if err != nil {
+		log.Printf("ERROR: PruneDecayedEdges failed for space %s: %v", spaceID, err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	// Prune excess edges per node (above cap)
+	excessDeleted, err := s.learner.PruneExcessEdgesPerNode(ctx, spaceID)
+	if err != nil {
+		log.Printf("ERROR: PruneExcessEdgesPerNode failed for space %s: %v", spaceID, err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	totalDeleted := decayedDeleted + excessDeleted
+	log.Printf("Learning edge pruning for %s: decayed=%d, excess=%d, total=%d", spaceID, decayedDeleted, excessDeleted, totalDeleted)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"space_id":        spaceID,
+		"decayed_deleted": decayedDeleted,
+		"excess_deleted":  excessDeleted,
+		"total_deleted":   totalDeleted,
+	})
+}
+
+// handleLearningStats handles GET /v1/learning/stats
+// Returns statistics about learning edges for a space.
+func (s *Server) handleLearningStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	spaceID := r.URL.Query().Get("space_id")
+	if spaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query parameter is required"})
+		return
+	}
+
+	ctx := r.Context()
+
+	stats, err := s.learner.GetLearningEdgeStats(ctx, spaceID)
+	if err != nil {
+		log.Printf("ERROR: GetLearningEdgeStats failed for space %s: %v", spaceID, err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	stats["space_id"] = spaceID
+	stats["decay_per_day"] = s.cfg.LearningDecayPerDay
+	stats["prune_threshold"] = s.cfg.LearningPruneThreshold
+	stats["max_edges_per_node"] = s.cfg.LearningMaxEdgesPerNode
+
+	writeJSON(w, http.StatusOK, stats)
 }

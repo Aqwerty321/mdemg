@@ -51,6 +51,7 @@ type IngestRequest struct {
 	NodeID      string    `json:"node_id,omitempty"`
 	Path        string    `json:"path,omitempty" validate:"omitempty,max=512"`
 	Name        string    `json:"name,omitempty"`
+	Summary     string    `json:"summary,omitempty" validate:"omitempty,max=1000"` // Brief summary for reranking (max 1000 chars)
 	Sensitivity string    `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
 	Confidence  *float64  `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
 	Embedding   []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"` // Optional: pre-computed embedding
@@ -161,16 +162,35 @@ type BatchIngestRequest struct {
 
 // BatchIngestItem - single observation in a batch ingest request
 type BatchIngestItem struct {
-	Timestamp   string    `json:"timestamp" validate:"required,min=1"`
-	Source      string    `json:"source" validate:"required,min=1,max=64"`
-	Content     any       `json:"content" validate:"required"`
-	Tags        []string  `json:"tags,omitempty" validate:"omitempty,dive,min=1"`
-	NodeID      string    `json:"node_id,omitempty"`
-	Path        string    `json:"path,omitempty" validate:"omitempty,max=512"`
-	Name        string    `json:"name,omitempty"`
-	Sensitivity string    `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
-	Confidence  *float64  `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
-	Embedding   []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"`
+	Timestamp   string         `json:"timestamp" validate:"required,min=1"`
+	Source      string         `json:"source" validate:"required,min=1,max=64"`
+	Content     any            `json:"content" validate:"required"`
+	Tags        []string       `json:"tags,omitempty" validate:"omitempty,dive,min=1"`
+	NodeID      string         `json:"node_id,omitempty"`
+	Path        string         `json:"path,omitempty" validate:"omitempty,max=512"`
+	Name        string         `json:"name,omitempty"`
+	Summary     string         `json:"summary,omitempty" validate:"omitempty,max=1000"` // Brief summary for reranking
+	Symbols     []IngestSymbol `json:"symbols,omitempty"`                               // Extracted code symbols (Phase 8)
+	Sensitivity string         `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
+	Confidence  *float64       `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
+	Embedding   []float32      `json:"embedding,omitempty" validate:"omitempty,embedding_dims"`
+}
+
+// IngestSymbol represents an extracted code symbol (constant, function, class, etc.)
+// Used for evidence-locked retrieval in Phase 8 symbol-level indexing.
+type IngestSymbol struct {
+	Name           string `json:"name"`
+	Type           string `json:"type"`                      // const, function, class, enum, enum_value, etc.
+	Value          string `json:"value,omitempty"`           // Resolved value (e.g., "60000" from "60 * 1000")
+	RawValue       string `json:"raw_value,omitempty"`       // Original value as written in code
+	LineNumber     int    `json:"line_number"`
+	EndLine        int    `json:"end_line,omitempty"`
+	Exported       bool   `json:"exported"`
+	DocComment     string `json:"doc_comment,omitempty"`
+	Signature      string `json:"signature,omitempty"`       // Function signature
+	Parent         string `json:"parent,omitempty"`          // Parent class/module name
+	TypeAnnotation string `json:"type_annotation,omitempty"` // Type annotation if present
+	Language       string `json:"language,omitempty"`        // go, typescript, python, etc.
 }
 
 // BatchIngestResult - result for a single item in batch ingest

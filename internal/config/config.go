@@ -30,6 +30,9 @@ type Config struct {
 	LearningMu                float64 // Hebbian decay/regularization (μ)
 	LearningWMin              float64 // Minimum weight clamp
 	LearningWMax              float64 // Maximum weight clamp
+	LearningDecayPerDay       float64 // Time-based decay per day of inactivity
+	LearningPruneThreshold    float64 // Weight threshold below which edges are pruned
+	LearningMaxEdgesPerNode   int     // Max CO_ACTIVATED_WITH edges per node
 
 	// Embedding provider settings
 	EmbeddingProvider   string // "openai", "ollama", or "" (disabled)
@@ -236,6 +239,25 @@ func FromEnv() (Config, error) {
 	}
 	if learnWMin >= learnWMax {
 		return Config{}, errors.New("LEARNING_WMIN must be < LEARNING_WMAX")
+	}
+
+	// Learning edge decay parameters
+	learnDecayPerDayStr := get("LEARNING_DECAY_PER_DAY", "0.05")
+	learnDecayPerDay, err := strconv.ParseFloat(learnDecayPerDayStr, 64)
+	if err != nil {
+		return Config{}, fmt.Errorf("LEARNING_DECAY_PER_DAY must be float: %w", err)
+	}
+
+	learnPruneThresholdStr := get("LEARNING_PRUNE_THRESHOLD", "0.05")
+	learnPruneThreshold, err := strconv.ParseFloat(learnPruneThresholdStr, 64)
+	if err != nil {
+		return Config{}, fmt.Errorf("LEARNING_PRUNE_THRESHOLD must be float: %w", err)
+	}
+
+	learnMaxEdgesPerNodeStr := get("LEARNING_MAX_EDGES_PER_NODE", "50")
+	learnMaxEdgesPerNode, err := strconv.Atoi(learnMaxEdgesPerNodeStr)
+	if err != nil {
+		return Config{}, fmt.Errorf("LEARNING_MAX_EDGES_PER_NODE must be int: %w", err)
 	}
 
 	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES,GENERALIZES")
@@ -561,6 +583,9 @@ func FromEnv() (Config, error) {
 		LearningMu:                learnMu,
 		LearningWMin:              learnWMin,
 		LearningWMax:              learnWMax,
+		LearningDecayPerDay:       learnDecayPerDay,
+		LearningPruneThreshold:    learnPruneThreshold,
+		LearningMaxEdgesPerNode:   learnMaxEdgesPerNode,
 		EmbeddingProvider:         embProvider,
 		OpenAIAPIKey: openaiKey,
 		OpenAIModel: openaiModel,

@@ -202,3 +202,180 @@ func HebbianWeightUpdate(w, ai, aj, eta, mu, wmin, wmax float64) float64 {
 	}
 	return newW
 }
+
+// PruneDecayedEdges removes CO_ACTIVATED_WITH edges that have decayed below the threshold.
+// This is a maintenance operation that can be run periodically.
+// Returns the number of edges deleted.
+func (s *Service) PruneDecayedEdges(ctx context.Context, spaceID string) (int64, error) {
+	if spaceID == "" {
+		return 0, nil
+	}
+
+	// Get decay parameters with defaults
+	decayPerDay := s.cfg.LearningDecayPerDay
+	if decayPerDay <= 0 {
+		decayPerDay = 0.05
+	}
+	pruneThreshold := s.cfg.LearningPruneThreshold
+	if pruneThreshold <= 0 {
+		pruneThreshold = 0.05
+	}
+
+	params := map[string]any{
+		"spaceId":        spaceID,
+		"decayPerDay":    decayPerDay,
+		"pruneThreshold": pruneThreshold,
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Find and delete CO_ACTIVATED_WITH edges where decayed weight < threshold
+		cypher := `MATCH (a:MemoryNode {space_id:$spaceId})-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(b:MemoryNode {space_id:$spaceId})
+WITH r,
+     duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days AS daysSinceActive,
+     coalesce(r.weight, 0.0) AS rawWeight
+WITH r, daysSinceActive, rawWeight,
+     CASE WHEN daysSinceActive > 0 THEN
+       rawWeight * ((1.0 - $decayPerDay) ^ daysSinceActive)
+     ELSE rawWeight END AS decayedWeight
+WHERE decayedWeight < $pruneThreshold
+DELETE r
+RETURN count(*) AS deleted`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return int64(0), err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			deleted, _ := rec.Get("deleted")
+			if d, ok := deleted.(int64); ok {
+				return d, nil
+			}
+		}
+		return int64(0), res.Err()
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return result.(int64), nil
+}
+
+// PruneExcessEdgesPerNode removes excess CO_ACTIVATED_WITH edges per node beyond the cap.
+// Keeps only the top N edges by weight for each node.
+// Returns the number of edges deleted.
+func (s *Service) PruneExcessEdgesPerNode(ctx context.Context, spaceID string) (int64, error) {
+	if spaceID == "" {
+		return 0, nil
+	}
+
+	maxEdgesPerNode := s.cfg.LearningMaxEdgesPerNode
+	if maxEdgesPerNode <= 0 {
+		maxEdgesPerNode = 50
+	}
+
+	params := map[string]any{
+		"spaceId":         spaceID,
+		"maxEdgesPerNode": maxEdgesPerNode,
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Find nodes with more than maxEdgesPerNode CO_ACTIVATED_WITH edges
+		// and delete the lowest-weight excess edges
+		cypher := `MATCH (n:MemoryNode {space_id:$spaceId})-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(m:MemoryNode {space_id:$spaceId})
+WITH n, r, m
+ORDER BY n.node_id, r.weight DESC
+WITH n, collect({rel: r, weight: r.weight}) AS edges
+WHERE size(edges) > $maxEdgesPerNode
+UNWIND range($maxEdgesPerNode, size(edges)-1) AS idx
+WITH (edges[idx]).rel AS toDelete
+DELETE toDelete
+RETURN count(*) AS deleted`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return int64(0), err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			deleted, _ := rec.Get("deleted")
+			if d, ok := deleted.(int64); ok {
+				return d, nil
+			}
+		}
+		return int64(0), res.Err()
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return result.(int64), nil
+}
+
+// GetLearningEdgeStats returns statistics about CO_ACTIVATED_WITH edges for a space.
+func (s *Service) GetLearningEdgeStats(ctx context.Context, spaceID string) (map[string]any, error) {
+	if spaceID == "" {
+		return nil, nil
+	}
+
+	decayPerDay := s.cfg.LearningDecayPerDay
+	if decayPerDay <= 0 {
+		decayPerDay = 0.05
+	}
+	pruneThreshold := s.cfg.LearningPruneThreshold
+	if pruneThreshold <= 0 {
+		pruneThreshold = 0.05
+	}
+
+	params := map[string]any{
+		"spaceId":        spaceID,
+		"decayPerDay":    decayPerDay,
+		"pruneThreshold": pruneThreshold,
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `MATCH (a:MemoryNode {space_id:$spaceId})-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(b:MemoryNode {space_id:$spaceId})
+WITH r,
+     duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days AS daysSinceActive,
+     coalesce(r.weight, 0.0) AS rawWeight
+WITH r, daysSinceActive, rawWeight,
+     CASE WHEN daysSinceActive > 0 THEN
+       rawWeight * ((1.0 - $decayPerDay) ^ daysSinceActive)
+     ELSE rawWeight END AS decayedWeight
+RETURN count(r) AS total_edges,
+       avg(rawWeight) AS avg_raw_weight,
+       avg(decayedWeight) AS avg_decayed_weight,
+       sum(CASE WHEN decayedWeight < $pruneThreshold THEN 1 ELSE 0 END) AS edges_below_threshold,
+       avg(daysSinceActive) AS avg_days_since_active,
+       max(daysSinceActive) AS max_days_since_active`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			stats := make(map[string]any)
+			for _, key := range rec.Keys {
+				val, _ := rec.Get(key)
+				stats[key] = val
+			}
+			return stats, nil
+		}
+		return nil, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return map[string]any{}, nil
+	}
+	return result.(map[string]any), nil
+}

@@ -495,23 +495,50 @@ func (s *Service) fetchOutgoingEdges(ctx context.Context, spaceID string, nodeID
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
+	// Get decay parameters with defaults
+	decayPerDay := s.cfg.LearningDecayPerDay
+	if decayPerDay <= 0 {
+		decayPerDay = 0.05 // 5% decay per day
+	}
+	pruneThreshold := s.cfg.LearningPruneThreshold
+	if pruneThreshold <= 0 {
+		pruneThreshold = 0.05 // prune edges below 0.05 weight
+	}
+
 	params := map[string]any{
-		"spaceId": spaceID,
-		"nodeIds": nodeIDs,
-		"allowed": s.cfg.AllowedRelationshipTypes,
-		"maxNbr": s.cfg.MaxNeighborsPerNode,
-		"maxTotal": s.cfg.MaxTotalEdgesFetched,
+		"spaceId":        spaceID,
+		"nodeIds":        nodeIDs,
+		"allowed":        s.cfg.AllowedRelationshipTypes,
+		"maxNbr":         s.cfg.MaxNeighborsPerNode,
+		"maxTotal":       s.cfg.MaxTotalEdgesFetched,
+		"decayPerDay":    decayPerDay,
+		"pruneThreshold": pruneThreshold,
 	}
 
 	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Query applies time-based decay to CO_ACTIVATED_WITH edges:
+		// - Calculates days since last_activated_at
+		// - Applies exponential decay: weight * (1 - decayPerDay)^days
+		// - Filters out edges below pruneThreshold
+		// Note: Per-node cap on learning edges is enforced via periodic pruning
 		cypher := `UNWIND $nodeIds AS sid
 MATCH (src:MemoryNode {space_id:$spaceId, node_id:sid})
 CALL {
   WITH src
   MATCH (src)-[r]->(dst:MemoryNode {space_id:$spaceId})
   WHERE type(r) IN $allowed AND coalesce(r.status,'active')='active'
-  RETURN src.node_id AS s, dst.node_id AS d, type(r) AS t,
-         coalesce(r.weight,0.0) AS w,
+  WITH src, r, dst, type(r) AS relType,
+       CASE WHEN type(r) = 'CO_ACTIVATED_WITH' THEN
+         duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days
+       ELSE 0 END AS daysSinceActive,
+       coalesce(r.weight, 0.0) AS rawWeight
+  WITH src, r, dst, relType, daysSinceActive, rawWeight,
+       CASE WHEN relType = 'CO_ACTIVATED_WITH' AND daysSinceActive > 0 THEN
+         rawWeight * ((1.0 - $decayPerDay) ^ daysSinceActive)
+       ELSE rawWeight END AS decayedWeight
+  WHERE NOT (relType = 'CO_ACTIVATED_WITH' AND decayedWeight < $pruneThreshold)
+  RETURN src.node_id AS s, dst.node_id AS d, relType AS t,
+         decayedWeight AS w,
          coalesce(r.dim_semantic,0.0) AS ds,
          coalesce(r.dim_temporal,0.0) AS dt,
          coalesce(r.dim_coactivation,0.0) AS dc,
@@ -600,6 +627,7 @@ func (s *Service) IngestObservation(ctx context.Context, req models.IngestReques
 		"nodeId":      nodeID,
 		"path":        req.Path,
 		"name":        req.Name,
+		"summary":     req.Summary,
 		"obsId":       obsID,
 		"timestamp":   req.Timestamp,
 		"source":      req.Source,
@@ -643,7 +671,7 @@ ON CREATE SET n.node_id=$nodeId,
               n.created_at=datetime(),
               n.updated_at=datetime(),
               n.update_count=0,
-              n.summary='',
+              n.summary=coalesce($summary,''),
               n.description='',
               n.confidence=coalesce($confidence, 0.6),
               n.sensitivity=coalesce($sensitivity,'internal'),
@@ -659,7 +687,8 @@ CREATE (o:Observation {
 })
 MERGE (n)-[:HAS_OBSERVATION {space_id:$spaceId, created_at:datetime()}]->(o)
 SET n.updated_at=datetime(),
-    n.update_count = coalesce(n.update_count,0) + 1` + embeddingClause + `
+    n.update_count = coalesce(n.update_count,0) + 1,
+    n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END` + embeddingClause + `
 RETURN n.node_id AS node_id`
 		} else {
 			cypher = `
@@ -676,7 +705,7 @@ ON CREATE SET n.path=coalesce($path, $mergeValue),
               n.created_at=datetime(),
               n.updated_at=datetime(),
               n.update_count=0,
-              n.summary='',
+              n.summary=coalesce($summary,''),
               n.description='',
               n.confidence=coalesce($confidence, 0.6),
               n.sensitivity=coalesce($sensitivity,'internal'),
@@ -692,7 +721,8 @@ CREATE (o:Observation {
 })
 MERGE (n)-[:HAS_OBSERVATION {space_id:$spaceId, created_at:datetime()}]->(o)
 SET n.updated_at=datetime(),
-    n.update_count = coalesce(n.update_count,0) + 1` + embeddingClause + `
+    n.update_count = coalesce(n.update_count,0) + 1,
+    n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END` + embeddingClause + `
 RETURN n.node_id AS node_id`
 		}
 
@@ -756,6 +786,7 @@ func (s *Service) BatchIngestObservations(ctx context.Context, req models.BatchI
 			NodeID:      obs.NodeID,
 			Path:        obs.Path,
 			Name:        obs.Name,
+			Summary:     obs.Summary,
 			Sensitivity: obs.Sensitivity,
 			Confidence:  obs.Confidence,
 			Embedding:   obs.Embedding,

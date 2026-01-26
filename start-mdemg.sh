@@ -6,14 +6,14 @@
 #   - Embedding provider: OpenAI (API key) or Ollama (local)
 #
 # Configuration:
-#   Edit mdemg_build/service/.env to configure embedding provider
+#   Edit .env to configure embedding provider
 #
 # Usage: ./start-mdemg.sh
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVICE_DIR="$SCRIPT_DIR/mdemg_build/service"
+SERVICE_DIR="$SCRIPT_DIR"
 ENV_FILE="$SERVICE_DIR/.env"
 
 echo "=== MDEMG Memory System Startup ==="
@@ -96,7 +96,7 @@ if curl -s http://localhost:8082/readyz | grep -q "ready"; then
     echo "API Endpoint: http://localhost:8082"
     echo "Neo4j Browser: http://localhost:7474"
     echo ""
-    echo "MCP Server: mdemg_build/mcp-server/mdemg-mcp"
+    echo "MCP Server: cmd/mcp-server/mdemg-mcp"
     echo ""
     echo "To stop: kill $MDEMG_PID"
 else

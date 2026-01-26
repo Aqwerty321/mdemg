@@ -77,6 +77,48 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 		resp.Debug["embedding_provider"] = s.embedder.Name()
 	}
 
+	// Fetch symbol evidence for each result (when requested)
+	if req.IncludeEvidence && s.symbolStore != nil && len(resp.Results) > 0 {
+		metrics := &models.EvidenceMetrics{
+			TotalResults: len(resp.Results),
+		}
+		for i := range resp.Results {
+			symbols, err := s.symbolStore.GetSymbolsForMemoryNode(r.Context(), req.SpaceID, resp.Results[i].NodeID)
+			if err != nil {
+				// Log but don't fail - evidence is optional enrichment
+				log.Printf("warning: failed to fetch symbols for node %s: %v", resp.Results[i].NodeID, err)
+				continue
+			}
+			if len(symbols) > 0 {
+				evidence := make([]models.SymbolEvidence, 0, len(symbols))
+				for _, sym := range symbols {
+					evidence = append(evidence, models.SymbolEvidence{
+						SymbolName: sym.Name,
+						SymbolType: sym.SymbolType,
+						FilePath:   sym.FilePath,
+						LineNumber: sym.LineNumber,
+						EndLine:    sym.EndLine,
+						Value:      sym.Value,
+						RawValue:   sym.RawValue,
+						Signature:  sym.Signature,
+						DocComment: sym.DocComment,
+					})
+				}
+				resp.Results[i].Evidence = evidence
+				metrics.ResultsWithEvidence++
+				metrics.TotalSymbols += len(symbols)
+			}
+		}
+		// Calculate compliance metrics
+		if metrics.TotalResults > 0 {
+			metrics.ComplianceRate = float64(metrics.ResultsWithEvidence) / float64(metrics.TotalResults)
+		}
+		if metrics.ResultsWithEvidence > 0 {
+			metrics.AvgSymbolsPerResult = float64(metrics.TotalSymbols) / float64(metrics.ResultsWithEvidence)
+		}
+		resp.EvidenceMetrics = metrics
+	}
+
 	// Learning deltas: bounded writeback
 	_ = s.learner.ApplyCoactivation(r.Context(), req.SpaceID, resp)
 
@@ -1522,6 +1564,31 @@ func (s *Server) handleLearningPrune(w http.ResponseWriter, r *http.Request) {
 		"excess_deleted":  excessDeleted,
 		"total_deleted":   totalDeleted,
 	})
+}
+
+// handleConsult handles POST /v1/memory/consult
+// The Agent Consulting Service acts as an SME for coding agents.
+func (s *Server) handleConsult(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req models.ConsultRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if !validateRequest(w, &req) {
+		return
+	}
+
+	resp, err := s.consultant.Consult(r.Context(), req)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleLearningStats handles GET /v1/learning/stats

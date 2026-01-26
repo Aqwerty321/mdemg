@@ -9,7 +9,8 @@ type RetrieveRequest struct {
 	TopK       int `json:"top_k,omitempty" validate:"omitempty,min=1,max=100"`
 	HopDepth   int `json:"hop_depth,omitempty" validate:"omitempty,min=0,max=5"`
 
-	JiminyEnabled bool `json:"jiminy_enabled,omitempty"` // Enable explainable retrieval (adds rationale + score breakdown)
+	JiminyEnabled   bool `json:"jiminy_enabled,omitempty"`   // Enable explainable retrieval (adds rationale + score breakdown)
+	IncludeEvidence bool `json:"include_evidence,omitempty"` // Include symbol evidence for each result
 
 	PolicyContext map[string]any `json:"policy_context,omitempty"`
 }
@@ -23,7 +24,22 @@ type RetrieveResult struct {
 
 	VectorSim  float64             `json:"vector_sim,omitempty"`
 	Activation float64             `json:"activation,omitempty"`
-	Jiminy     *JiminyExplanation  `json:"jiminy,omitempty"` // Explainable retrieval (when enabled)
+	Jiminy     *JiminyExplanation  `json:"jiminy,omitempty"`  // Explainable retrieval (when enabled)
+	Evidence   []SymbolEvidence    `json:"evidence,omitempty"` // Symbol evidence grounding the result
+}
+
+// SymbolEvidence provides verifiable evidence linking a retrieval result to specific code.
+// This enables Evidence Compliance tracking for grounded retrieval.
+type SymbolEvidence struct {
+	SymbolName string `json:"symbol_name"`           // Name of the symbol (e.g., "MAX_TIMEOUT")
+	SymbolType string `json:"symbol_type"`           // Type: const, function, class, etc.
+	FilePath   string `json:"file_path"`             // Path to the source file
+	LineNumber int    `json:"line_number"`           // Line where symbol is defined
+	EndLine    int    `json:"end_line,omitempty"`    // End line for multi-line symbols
+	Value      string `json:"value,omitempty"`       // Resolved value (for constants)
+	RawValue   string `json:"raw_value,omitempty"`   // Original value as written
+	Signature  string `json:"signature,omitempty"`   // Function/method signature
+	DocComment string `json:"doc_comment,omitempty"` // Documentation comment
 }
 
 // JiminyExplanation provides transparency into why a result was retrieved and ranked.
@@ -37,9 +53,19 @@ type JiminyExplanation struct {
 }
 
 type RetrieveResponse struct {
-	SpaceID string           `json:"space_id"`
-	Results []RetrieveResult `json:"results"`
-	Debug   map[string]any   `json:"debug,omitempty"`
+	SpaceID          string            `json:"space_id"`
+	Results          []RetrieveResult  `json:"results"`
+	EvidenceMetrics  *EvidenceMetrics  `json:"evidence_metrics,omitempty"` // Evidence compliance tracking
+	Debug            map[string]any    `json:"debug,omitempty"`
+}
+
+// EvidenceMetrics tracks evidence compliance for retrieval quality measurement.
+type EvidenceMetrics struct {
+	TotalResults       int     `json:"total_results"`        // Total number of results returned
+	ResultsWithEvidence int    `json:"results_with_evidence"` // Results that have at least one symbol evidence
+	TotalSymbols       int     `json:"total_symbols"`        // Total symbols across all results
+	ComplianceRate     float64 `json:"compliance_rate"`      // % of results with evidence (ECR)
+	AvgSymbolsPerResult float64 `json:"avg_symbols_per_result"` // Average symbols per result
 }
 
 type IngestRequest struct {
@@ -299,6 +325,55 @@ type BulkArchiveResponse struct {
 	SuccessCount int                 `json:"success_count"`
 	ErrorCount   int                 `json:"error_count"`
 	Results      []BulkArchiveResult `json:"results"`
+}
+
+// ConsultRequest - request for POST /v1/memory/consult
+// The Agent Consulting Service acts as an SME for coding agents.
+type ConsultRequest struct {
+	SpaceID  string         `json:"space_id" validate:"required,min=1,max=256"`
+	Context  string         `json:"context" validate:"required,min=1,max=10000"`   // Current context (code, error, task description)
+	Question string         `json:"question" validate:"required,min=1,max=2000"`   // What the agent is asking about
+	Tags     []string       `json:"tags,omitempty" validate:"omitempty,dive,min=1"` // Optional filtering tags
+	MaxSuggestions int      `json:"max_suggestions,omitempty" validate:"omitempty,min=1,max=20"` // Max suggestions to return (default 5)
+	IncludeEvidence bool    `json:"include_evidence,omitempty"` // Include symbol evidence for suggestions
+}
+
+// ConsultResponse - response from the Agent Consulting Service
+type ConsultResponse struct {
+	SpaceID         string            `json:"space_id"`
+	Suggestions     []Suggestion      `json:"suggestions"`
+	RelatedConcepts []RelatedConcept  `json:"related_concepts,omitempty"` // Higher-level concepts
+	Confidence      float64           `json:"confidence"`                 // Overall confidence 0.0-1.0
+	Rationale       string            `json:"rationale,omitempty"`        // Why these suggestions
+	Debug           map[string]any    `json:"debug,omitempty"`
+}
+
+// Suggestion represents a single piece of SME advice
+type Suggestion struct {
+	Type        SuggestionType     `json:"type"`         // context, process, concept, risk
+	Content     string             `json:"content"`      // The suggestion text
+	Confidence  float64            `json:"confidence"`   // Confidence 0.0-1.0
+	SourceNodes []string           `json:"source_nodes"` // Node IDs backing this suggestion
+	Evidence    []SymbolEvidence   `json:"evidence,omitempty"` // Symbol evidence (when requested)
+}
+
+// SuggestionType categorizes what kind of advice this is
+type SuggestionType string
+
+const (
+	SuggestionContext SuggestionType = "context"  // "Based on this codebase's patterns..."
+	SuggestionProcess SuggestionType = "process"  // "The typical workflow for this type of change is..."
+	SuggestionConcept SuggestionType = "concept"  // "This relates to the higher-level principle of..."
+	SuggestionRisk    SuggestionType = "risk"     // "Previous attempts at this approach encountered..."
+)
+
+// RelatedConcept represents a higher-level concept from the hidden layer
+type RelatedConcept struct {
+	NodeID     string  `json:"node_id"`
+	Name       string  `json:"name"`
+	Summary    string  `json:"summary,omitempty"`
+	Layer      int     `json:"layer"`
+	Relevance  float64 `json:"relevance"` // How relevant to the query 0.0-1.0
 }
 
 // ConsolidateRequest - request for POST /v1/memory/consolidate

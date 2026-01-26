@@ -15,6 +15,7 @@ import (
 	"mdemg/internal/learning"
 	"mdemg/internal/plugins"
 	"mdemg/internal/retrieval"
+	"mdemg/internal/consulting"
 	"mdemg/internal/symbols"
 	"mdemg/internal/validation"
 )
@@ -30,6 +31,7 @@ type Server struct {
 	pluginMgr       *plugins.Manager
 	apeScheduler    *ape.Scheduler
 	symbolStore     *symbols.Store
+	consultant      *consulting.Service
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -92,6 +94,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	symStore := symbols.NewStore(driver)
 	log.Printf("Symbol store initialized")
 
+	// Initialize consulting service (Agent Consulting API)
+	cons := consulting.NewService(cfg, driver, ret, emb, symStore)
+	log.Printf("Consulting service initialized")
+
 	// Initialize APE scheduler
 	var apeSched *ape.Scheduler
 	if pluginMgr != nil {
@@ -108,7 +114,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		}
 	}
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore}
+	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons}
 }
 
 // Shutdown gracefully stops background services
@@ -144,6 +150,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/ape/trigger", s.handleAPETrigger)
 	mux.HandleFunc("/v1/learning/prune", s.handleLearningPrune)
 	mux.HandleFunc("/v1/learning/stats", s.handleLearningStats)
+	mux.HandleFunc("/v1/memory/consult", s.handleConsult)
 
 	// Wrap mux with logging middleware
 	logCfg := LogConfig{

@@ -576,7 +576,51 @@ MDEMG_RETRIEVAL_STATS:
 ```
 ```
 
-### Step 4.5: Running Tests in Parallel
+### Step 4.5: MDEMG Skill Configuration
+
+**CRITICAL:** When spawning sub-agents for MDEMG benchmark tasks, ensure the agent has access to the `mdemg-consult` skill. This skill provides a direct interface to the Agent Consulting Service API.
+
+#### Skill Location
+
+The skill is defined in `.claude/commands/mdemg.md` and `.claude/commands/mdemg-consult.md`.
+
+#### Required Skill Capabilities
+
+| Skill | Purpose |
+|-------|---------|
+| `/mdemg consult <question>` | Get SME advice from the knowledge graph |
+| `/mdemg retrieve <query>` | Search for relevant memories |
+| `/mdemg stats` | Show space statistics |
+
+#### Task Agent Configuration
+
+When launching task agents, ensure they can access the MDEMG API:
+
+```bash
+# Verify MDEMG is accessible before spawning agents
+curl -s localhost:8090/healthz
+
+# The agent should be able to use the skill like:
+# /mdemg consult "How should I handle authentication in this service?"
+# /mdemg retrieve "database connection pooling"
+```
+
+#### Agent Prompt Addition
+
+Add this to MDEMG test agent prompts:
+
+```markdown
+## MDEMG SKILL ACCESS
+
+You have access to the `/mdemg` skill for querying the knowledge graph:
+- `/mdemg consult <question>` - Get SME suggestions with evidence
+- `/mdemg retrieve <query>` - Search for relevant memories
+
+Use these skills BEFORE attempting manual file searches to leverage
+the accumulated codebase knowledge.
+```
+
+### Step 4.6: Running Tests in Parallel
 
 ```bash
 # Terminal 1: Run MDEMG test

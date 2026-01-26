@@ -1078,10 +1078,27 @@ RETURN m.node_id, m.file_path
 - Deliverable 10.1: Query profiling + index optimization complete (29ms avg vectorRecall)
 - Deliverable 10.2: Query result caching complete (98.9% latency improvement on repeated queries)
 
+### Performance Summary
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Uncached query latency | 387ms | 29ms | **92.5%** |
+| Cached query latency | N/A | 4ms | **98.9%** vs uncached |
+| Slow queries (>100ms) | Unknown | 0% | Profiling enabled |
+| Cache hit rate | N/A | 100% | On repeated queries |
+
+**New Monitoring Endpoints:**
+- `GET /v1/memory/cache/stats` - Cache hit rate, size, capacity, TTL
+- `GET /v1/memory/query/metrics` - Query count, slow query %, avg duration
+
+**New Neo4j Indexes:**
+- `memory_space_archived` - (space_id, is_archived) for archive filtering
+- `memory_created_at` - (created_at) range index for temporal queries
+
 ---
 
-### Deliverable 10.1: Neo4j Query Optimization ⏳ IN PROGRESS
-**Priority**: P1 | **Effort**: 3-4 days | **Status**: ⏳ IN PROGRESS (2026-01-26)
+### Deliverable 10.1: Neo4j Query Optimization ✅ COMPLETE
+**Priority**: P1 | **Effort**: 3-4 days | **Status**: ✅ COMPLETE (2026-01-26)
 
 #### 10.1.1 Query Profiling & Analysis ✅ COMPLETE
 - [x] Add query timing instrumentation to Neo4j operations (`internal/retrieval/profiling.go`)

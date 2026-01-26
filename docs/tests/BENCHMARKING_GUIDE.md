@@ -1,7 +1,7 @@
 # MDEMG Benchmarking Guide
 
-**Version:** 1.3
-**Last Updated:** 2026-01-24
+**Version:** 1.4
+**Last Updated:** 2026-01-26
 **Purpose:** Step-by-step guide for setting up, running, and analyzing MDEMG vs Baseline retrieval tests on new codebases
 
 ---
@@ -288,7 +288,7 @@ curl -s -X POST 'http://localhost:8090/v1/memory/consolidate' \
 
 ## Phase 4: Running Tests
 
-### Step 4.1: Cold Start (Reset Learning Edges)
+### Step 4.1: Cold Start (Reset Learning Edges) ⚠️ CRITICAL
 
 For reproducible results, reset CO_ACTIVATED_WITH edges before each test:
 
@@ -297,11 +297,21 @@ For reproducible results, reset CO_ACTIVATED_WITH edges before each test:
 docker exec -it mdemg-neo4j cypher-shell -u neo4j -p testpassword
 
 # Delete learning edges for the space
-MATCH (m:MemoryNode)-[r:CO_ACTIVATED_WITH]-()
-WHERE m.spaceId = 'your-project-name'
+MATCH ()-[r:CO_ACTIVATED_WITH {space_id: 'your-project-name'}]-()
 DELETE r
 RETURN count(r) as deleted;
 ```
+
+**⚠️ CRITICAL FINDING (2026-01-26):** Edge accumulation causes score degradation.
+
+| Starting Condition | Avg Score |
+|--------------------|-----------|
+| Fresh (0 edges) | **0.740** (+4.3%) |
+| Accumulated (13,000+ edges) | **0.679** (-4.3%) |
+
+Learning edges created during one benchmark run do NOT transfer benefits to subsequent runs - they cause spreading activation dilution. Each benchmark run creates ~8,000+ new edges, and the accumulated edges dilute the signal for future queries.
+
+**Best Practice:** ALWAYS clear learning edges before benchmark runs for consistent, reproducible results. Use the cold start procedure above.
 
 ### Step 4.2: MDEMG Test Script
 
@@ -1717,6 +1727,7 @@ Use this exact structure for reports:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.4 | 2026-01-26 | Added CRITICAL finding about edge accumulation causing score degradation; updated cold start procedure with data showing 0.740 vs 0.679 score difference |
 | 1.3 | 2026-01-24 | Added End-to-End Multi-Corpus Runbook with Phase 0-5, artifact requirements, Neo4j verification queries, and benchmark summary template |
 | 1.2 | 2026-01-23 | Added WHK-WMS 120-question test set, baseline benchmarking rules (20-min limit, repo restrictions, disqualification criteria), master vs agent file distinction |
 | 1.1 | 2026-01-23 | Added V6 Composite Test Set documentation |

@@ -128,6 +128,12 @@ type Config struct {
 	PluginsDir     string // Path to plugins directory (default: ./plugins)
 	PluginSocketDir string // Path to Unix socket directory (default: /tmp/mdemg-plugins)
 	MdemgVersion   string // MDEMG version string for handshake
+
+	// Capability gap detection settings (Task #23)
+	GapLowScoreThreshold   float64 // Queries below this avg score are considered poor (default: 0.5)
+	GapMinOccurrences      int     // Min occurrences to create a gap (default: 3)
+	GapAnalysisWindowHours int     // Time window for pattern analysis in hours (default: 24)
+	GapMetricsWindowSize   int     // Number of queries to keep in history (default: 1000)
 }
 
 func FromEnv() (Config, error) {
@@ -622,6 +628,36 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("LLM_SUMMARY_CACHE_SIZE must be >= 0")
 	}
 
+	// Capability gap detection settings (Task #23)
+	gapLowScoreThreshold, err := atof("GAP_LOW_SCORE_THRESHOLD", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	if gapLowScoreThreshold < 0 || gapLowScoreThreshold > 1 {
+		return Config{}, errors.New("GAP_LOW_SCORE_THRESHOLD must be in range [0, 1]")
+	}
+	gapMinOccurrences, err := atoi("GAP_MIN_OCCURRENCES", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if gapMinOccurrences < 1 {
+		return Config{}, errors.New("GAP_MIN_OCCURRENCES must be >= 1")
+	}
+	gapAnalysisWindowHours, err := atoi("GAP_ANALYSIS_WINDOW_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+	if gapAnalysisWindowHours < 1 {
+		return Config{}, errors.New("GAP_ANALYSIS_WINDOW_HOURS must be >= 1")
+	}
+	gapMetricsWindowSize, err := atoi("GAP_METRICS_WINDOW_SIZE", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	if gapMetricsWindowSize < 100 {
+		return Config{}, errors.New("GAP_METRICS_WINDOW_SIZE must be >= 100")
+	}
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -711,5 +747,9 @@ func FromEnv() (Config, error) {
 		LLMSummaryBatchSize:       llmSummaryBatchSize,
 		LLMSummaryTimeoutMs:       llmSummaryTimeoutMs,
 		LLMSummaryCacheSize:       llmSummaryCacheSize,
+		GapLowScoreThreshold:      gapLowScoreThreshold,
+		GapMinOccurrences:         gapMinOccurrences,
+		GapAnalysisWindowHours:    gapAnalysisWindowHours,
+		GapMetricsWindowSize:      gapMetricsWindowSize,
 	}, nil
 }

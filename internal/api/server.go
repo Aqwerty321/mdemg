@@ -5,17 +5,19 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/anomaly"
 	"mdemg/internal/ape"
 	"mdemg/internal/config"
+	"mdemg/internal/consulting"
 	"mdemg/internal/embeddings"
+	"mdemg/internal/gaps"
 	"mdemg/internal/hidden"
 	"mdemg/internal/learning"
 	"mdemg/internal/plugins"
 	"mdemg/internal/retrieval"
-	"mdemg/internal/consulting"
 	"mdemg/internal/symbols"
 	"mdemg/internal/validation"
 )
@@ -32,6 +34,7 @@ type Server struct {
 	apeScheduler    *ape.Scheduler
 	symbolStore     *symbols.Store
 	consultant      *consulting.Service
+	gapDetector     *gaps.GapDetector
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -98,6 +101,24 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	cons := consulting.NewService(cfg, driver, ret, emb, symStore)
 	log.Printf("Consulting service initialized")
 
+	// Initialize gap detector for capability gap detection
+	// Collect registered ingestion sources from plugins
+	var registeredSources []string
+	if pluginMgr != nil {
+		for _, mod := range pluginMgr.GetIngestionModules() {
+			registeredSources = append(registeredSources, mod.Manifest.Capabilities.IngestionSources...)
+		}
+	}
+	gapCfg := gaps.DetectorConfig{
+		LowScoreThreshold: cfg.GapLowScoreThreshold,
+		MinOccurrences:    cfg.GapMinOccurrences,
+		AnalysisWindow:    time.Duration(cfg.GapAnalysisWindowHours) * time.Hour,
+		MetricsWindowSize: cfg.GapMetricsWindowSize,
+		RegisteredSources: registeredSources,
+	}
+	gapDet := gaps.NewGapDetector(driver, gapCfg)
+	log.Printf("Gap detector initialized (threshold: %.2f, minOccurrences: %d)", gapCfg.LowScoreThreshold, gapCfg.MinOccurrences)
+
 	// Initialize APE scheduler
 	var apeSched *ape.Scheduler
 	if pluginMgr != nil {
@@ -114,7 +135,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		}
 	}
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons}
+	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet}
 }
 
 // Shutdown gracefully stops background services
@@ -146,6 +167,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/consolidate", s.handleConsolidate)
 	mux.HandleFunc("/v1/modules", s.handleModules)
 	mux.HandleFunc("/v1/modules/", s.handleModuleSync)
+	mux.HandleFunc("/v1/plugins", s.handlePluginOperation)
+	mux.HandleFunc("/v1/plugins/", s.handlePluginOperation)
 	mux.HandleFunc("/v1/ape/status", s.handleAPEStatus)
 	mux.HandleFunc("/v1/ape/trigger", s.handleAPETrigger)
 	mux.HandleFunc("/v1/learning/prune", s.handleLearningPrune)
@@ -154,6 +177,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/suggest", s.handleSuggest)
 	mux.HandleFunc("/v1/memory/cache/stats", s.handleCacheStats)
 	mux.HandleFunc("/v1/memory/query/metrics", s.handleQueryMetrics)
+
+	// Capability gap detection endpoints
+	mux.HandleFunc("/v1/system/capability-gaps", s.handleCapabilityGaps)
+	mux.HandleFunc("/v1/system/capability-gaps/", s.handleCapabilityGapOperation)
+	mux.HandleFunc("/v1/feedback", s.handleFeedback)
 
 	// Wrap mux with logging middleware
 	logCfg := LogConfig{

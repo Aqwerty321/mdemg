@@ -123,6 +123,19 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 	// Learning deltas: bounded writeback
 	_ = s.learner.ApplyCoactivation(r.Context(), req.SpaceID, resp)
 
+	// Record query result for capability gap detection
+	if s.gapDetector != nil && req.QueryText != "" {
+		var avgScore float64
+		if len(resp.Results) > 0 {
+			var totalScore float64
+			for _, r := range resp.Results {
+				totalScore += r.Score
+			}
+			avgScore = totalScore / float64(len(resp.Results))
+		}
+		s.gapDetector.RecordQueryResult(req.SpaceID, req.QueryText, avgScore, len(resp.Results))
+	}
+
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -180,6 +193,12 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			IsUpdate:  req.NodeID != "", // If node_id was provided, this is an update
 		}
 		out.Anomalies = s.anomalyDetector.Detect(r.Context(), dctx)
+	}
+
+	// Record content for capability gap detection (data source references)
+	if s.gapDetector != nil {
+		contentText := contentToText(req.Content)
+		s.gapDetector.RecordContentIngest(req.SpaceID, contentText)
 	}
 
 	writeJSON(w, http.StatusOK, out)

@@ -153,6 +153,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/consult", s.handleConsult)
 	mux.HandleFunc("/v1/memory/suggest", s.handleSuggest)
 	mux.HandleFunc("/v1/memory/cache/stats", s.handleCacheStats)
+	mux.HandleFunc("/v1/memory/query/metrics", s.handleQueryMetrics)
 
 	// Wrap mux with logging middleware
 	logCfg := LogConfig{

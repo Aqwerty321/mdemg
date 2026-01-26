@@ -12,6 +12,7 @@ import (
 	"mdemg/internal/anomaly"
 	"mdemg/internal/db"
 	"mdemg/internal/models"
+	"mdemg/internal/retrieval"
 	"mdemg/internal/symbols"
 )
 
@@ -1668,5 +1669,17 @@ func (s *Server) handleCacheStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stats := s.retriever.QueryCacheStats()
+	writeJSON(w, http.StatusOK, stats)
+}
+
+// handleQueryMetrics handles GET /v1/memory/query/metrics
+// Returns Neo4j query execution statistics for performance monitoring.
+func (s *Server) handleQueryMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	stats := retrieval.GetQueryMetrics()
 	writeJSON(w, http.StatusOK, stats)
 }

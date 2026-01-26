@@ -377,8 +377,8 @@ func (s *Service) vectorRecall(ctx context.Context, spaceID string, q []float32,
 		"q": q,
 		"index": s.cfg.VectorIndexName,
 	}
-	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		cypher := `WITH $q AS q
+
+	cypher := `WITH $q AS q
 CALL db.index.vector.queryNodes($index, $k, q)
 YIELD node, score
 WHERE node.space_id = $spaceId AND NOT coalesce(node.is_archived, false)
@@ -392,6 +392,9 @@ RETURN node.node_id AS node_id,
        coalesce(node.tags, []) AS tags,
        score AS score
 ORDER BY score DESC`
+
+	timer := StartQueryTimer("vectorRecall", cypher, params)
+	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {
 			return nil, err
@@ -433,6 +436,7 @@ ORDER BY score DESC`
 		}
 		return cands, nil
 	})
+	timer.End()
 	if err != nil {
 		return nil, err
 	}

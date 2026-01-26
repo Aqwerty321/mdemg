@@ -46,6 +46,11 @@ type Config struct {
 	EmbeddingCacheEnabled bool // Feature toggle (default: true)
 	EmbeddingCacheSize    int  // LRU cache capacity (default: 1000)
 
+	// Query result cache settings (Phase 10)
+	QueryCacheEnabled    bool // Feature toggle (default: true)
+	QueryCacheCapacity   int  // LRU cache capacity (default: 500)
+	QueryCacheTTLSeconds int  // TTL in seconds (default: 300)
+
 	// Semantic edge creation on ingest settings
 	SemanticEdgeOnIngest      bool    // Feature toggle (default: true)
 	SemanticEdgeTopN          int     // Max similar nodes to query (default: 5)
@@ -436,6 +441,17 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("EMBEDDING_CACHE_SIZE must be > 0 when caching is enabled")
 	}
 
+	// Query result cache settings (Phase 10)
+	queryCacheEnabled := getBool("QUERY_CACHE_ENABLED", true)
+	queryCacheCapacity, err := atoi("QUERY_CACHE_CAPACITY", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	queryCacheTTL, err := atoi("QUERY_CACHE_TTL_SECONDS", 300)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// Logging settings
 	logFormat := get("LOG_FORMAT", "text")
 	if logFormat != "text" && logFormat != "json" {
@@ -594,6 +610,9 @@ func FromEnv() (Config, error) {
 		OllamaModel: ollamaModel,
 		EmbeddingCacheEnabled:     embCacheEnabled,
 		EmbeddingCacheSize:        embCacheSize,
+		QueryCacheEnabled:         queryCacheEnabled,
+		QueryCacheCapacity:        queryCacheCapacity,
+		QueryCacheTTLSeconds:      queryCacheTTL,
 		SemanticEdgeOnIngest:      semEdgeEnabled,
 		SemanticEdgeTopN:          semEdgeTopN,
 		SemanticEdgeMinSimilarity: semEdgeMinSim,

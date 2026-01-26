@@ -1658,3 +1658,15 @@ func (s *Server) handleLearningStats(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, stats)
 }
+
+// handleCacheStats handles GET /v1/memory/cache/stats
+// Returns statistics about the query result cache.
+func (s *Server) handleCacheStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	stats := s.retriever.QueryCacheStats()
+	writeJSON(w, http.StatusOK, stats)
+}

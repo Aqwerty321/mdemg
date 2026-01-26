@@ -19,13 +19,27 @@ type Service struct {
 	cfg               config.Config
 	driver            neo4j.DriverWithContext
 	reasoningProvider ReasoningProvider
+	queryCache        *QueryCache
 }
 
 func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
+	// Initialize query cache with configurable TTL (default: 5 minutes, capacity: 500)
+	cacheTTL := time.Duration(cfg.QueryCacheTTLSeconds) * time.Second
+	if cacheTTL <= 0 {
+		cacheTTL = 5 * time.Minute
+	}
+	cacheCapacity := cfg.QueryCacheCapacity
+	if cacheCapacity <= 0 {
+		cacheCapacity = 500
+	}
+
+	log.Printf("Query cache initialized: enabled=%v, capacity=%d, ttl=%v", cfg.QueryCacheEnabled, cacheCapacity, cacheTTL)
+
 	return &Service{
 		cfg:               cfg,
 		driver:            driver,
 		reasoningProvider: &NoOpReasoningProvider{}, // Default: no reasoning modules
+		queryCache:        NewQueryCache(cacheCapacity, cacheTTL),
 	}
 }
 
@@ -35,6 +49,25 @@ func (s *Service) SetReasoningProvider(provider ReasoningProvider) {
 	if provider != nil {
 		s.reasoningProvider = provider
 	}
+}
+
+// QueryCacheStats returns query cache statistics.
+func (s *Service) QueryCacheStats() map[string]any {
+	if s.queryCache == nil {
+		return map[string]any{"enabled": false}
+	}
+	stats := s.queryCache.Stats()
+	stats["enabled"] = s.cfg.QueryCacheEnabled
+	return stats
+}
+
+// InvalidateSpaceCache invalidates all cached queries for a space.
+// Call this after ingest, consolidate, or other mutations.
+func (s *Service) InvalidateSpaceCache(spaceID string) int {
+	if s.queryCache == nil {
+		return 0
+	}
+	return s.queryCache.InvalidateSpace(spaceID)
 }
 
 // Retrieve performs:
@@ -65,6 +98,28 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	if len(req.QueryEmbedding) == 0 {
 		// Intentionally not generating embeddings here; plug your embedder in upstream.
 		return models.RetrieveResponse{}, errors.New("query_embedding is required (wire your embedder upstream)")
+	}
+
+	// Normalize request for cache key (fill in defaults)
+	cacheReq := req
+	cacheReq.CandidateK = candK
+	cacheReq.TopK = topK
+	cacheReq.HopDepth = hopDepth
+
+	// Check query cache (skip for Jiminy-enabled requests which need fresh explanations)
+	cacheKey := CacheKey(cacheReq)
+	log.Printf("Query cache check: enabled=%v, jiminy=%v, key=%s", s.cfg.QueryCacheEnabled, req.JiminyEnabled, cacheKey[:16])
+	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled && s.queryCache != nil {
+		if cached, ok := s.queryCache.Get(cacheReq); ok {
+			// Ensure Debug map exists and set cache_hit flag
+			if cached.Debug == nil {
+				cached.Debug = make(map[string]any)
+			}
+			cached.Debug["cache_hit"] = true
+			log.Printf("Query cache HIT for space=%s query=%q", req.SpaceID, req.QueryText[:min(50, len(req.QueryText))])
+			return cached, nil
+		}
+		log.Printf("Query cache MISS for space=%s", req.SpaceID)
 	}
 
 	// 1) Vector recall
@@ -281,8 +336,16 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			"rerank_latency_ms":      rerankLatencyMs,
 			"rerank_tokens":          rerankTokens,
 			"jiminy_enabled":         req.JiminyEnabled,
+			"cache_hit":              false,
 		},
 	}
+
+	// Store in query cache (skip for Jiminy-enabled requests)
+	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled && s.queryCache != nil {
+		s.queryCache.Put(cacheReq, resp)
+		log.Printf("Query cache PUT for space=%s query=%q (cache size: %d)", req.SpaceID, req.QueryText[:min(50, len(req.QueryText))], s.queryCache.Len())
+	}
+
 	return resp, nil
 }
 

@@ -516,11 +516,13 @@ func (s *Service) fetchOutgoingEdges(ctx context.Context, spaceID string, nodeID
 	}
 
 	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		// Query applies time-based decay to CO_ACTIVATED_WITH edges:
+		// Query applies evidence-based decay to CO_ACTIVATED_WITH edges:
 		// - Calculates days since last_activated_at
-		// - Applies exponential decay: weight * (1 - decayPerDay)^days
+		// - Decay rate is reduced by sqrt(evidence_count) - frequently co-activated edges decay slower
+		// - Formula: weight * (1 - decayPerDay/sqrt(evidence_count))^days
 		// - Filters out edges below pruneThreshold
-		// Note: Per-node cap on learning edges is enforced via periodic pruning
+		// This ensures edges that have been repeatedly strengthened persist while
+		// spurious one-off connections decay quickly.
 		cypher := `UNWIND $nodeIds AS sid
 MATCH (src:MemoryNode {space_id:$spaceId, node_id:sid})
 CALL {
@@ -531,10 +533,13 @@ CALL {
        CASE WHEN type(r) = 'CO_ACTIVATED_WITH' THEN
          duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days
        ELSE 0 END AS daysSinceActive,
-       coalesce(r.weight, 0.0) AS rawWeight
-  WITH src, r, dst, relType, daysSinceActive, rawWeight,
+       coalesce(r.weight, 0.0) AS rawWeight,
+       coalesce(r.evidence_count, 1) AS evidenceCount
+  WITH src, r, dst, relType, daysSinceActive, rawWeight, evidenceCount,
+       // Evidence-based decay: stronger edges (more evidence) decay slower
+       // effectiveDecay = baseDecay / sqrt(evidenceCount)
        CASE WHEN relType = 'CO_ACTIVATED_WITH' AND daysSinceActive > 0 THEN
-         rawWeight * ((1.0 - $decayPerDay) ^ daysSinceActive)
+         rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount))) ^ daysSinceActive)
        ELSE rawWeight END AS decayedWeight
   WHERE NOT (relType = 'CO_ACTIVATED_WITH' AND decayedWeight < $pruneThreshold)
   RETURN src.node_id AS s, dst.node_id AS d, relType AS t,

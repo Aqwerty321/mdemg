@@ -204,6 +204,7 @@ func HebbianWeightUpdate(w, ai, aj, eta, mu, wmin, wmax float64) float64 {
 }
 
 // PruneDecayedEdges removes CO_ACTIVATED_WITH edges that have decayed below the threshold.
+// Uses evidence-based decay: edges with higher evidence_count decay slower.
 // This is a maintenance operation that can be run periodically.
 // Returns the number of edges deleted.
 func (s *Service) PruneDecayedEdges(ctx context.Context, spaceID string) (int64, error) {
@@ -232,13 +233,16 @@ func (s *Service) PruneDecayedEdges(ctx context.Context, spaceID string) (int64,
 
 	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		// Find and delete CO_ACTIVATED_WITH edges where decayed weight < threshold
+		// Uses evidence-based decay: effectiveDecay = baseDecay / sqrt(evidenceCount)
+		// Edges with more evidence (frequently co-activated) decay slower
 		cypher := `MATCH (a:MemoryNode {space_id:$spaceId})-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(b:MemoryNode {space_id:$spaceId})
 WITH r,
      duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days AS daysSinceActive,
-     coalesce(r.weight, 0.0) AS rawWeight
-WITH r, daysSinceActive, rawWeight,
+     coalesce(r.weight, 0.0) AS rawWeight,
+     coalesce(r.evidence_count, 1) AS evidenceCount
+WITH r, daysSinceActive, rawWeight, evidenceCount,
      CASE WHEN daysSinceActive > 0 THEN
-       rawWeight * ((1.0 - $decayPerDay) ^ daysSinceActive)
+       rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount))) ^ daysSinceActive)
      ELSE rawWeight END AS decayedWeight
 WHERE decayedWeight < $pruneThreshold
 DELETE r
@@ -317,6 +321,7 @@ RETURN count(*) AS deleted`
 }
 
 // GetLearningEdgeStats returns statistics about CO_ACTIVATED_WITH edges for a space.
+// Uses evidence-based decay in calculations.
 func (s *Service) GetLearningEdgeStats(ctx context.Context, spaceID string) (map[string]any, error) {
 	if spaceID == "" {
 		return nil, nil
@@ -341,17 +346,22 @@ func (s *Service) GetLearningEdgeStats(ctx context.Context, spaceID string) (map
 	defer sess.Close(ctx)
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Uses evidence-based decay: effectiveDecay = baseDecay / sqrt(evidenceCount)
 		cypher := `MATCH (a:MemoryNode {space_id:$spaceId})-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(b:MemoryNode {space_id:$spaceId})
 WITH r,
      duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days AS daysSinceActive,
-     coalesce(r.weight, 0.0) AS rawWeight
-WITH r, daysSinceActive, rawWeight,
+     coalesce(r.weight, 0.0) AS rawWeight,
+     coalesce(r.evidence_count, 1) AS evidenceCount
+WITH r, daysSinceActive, rawWeight, evidenceCount,
      CASE WHEN daysSinceActive > 0 THEN
-       rawWeight * ((1.0 - $decayPerDay) ^ daysSinceActive)
+       rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount))) ^ daysSinceActive)
      ELSE rawWeight END AS decayedWeight
 RETURN count(r) AS total_edges,
        avg(rawWeight) AS avg_raw_weight,
        avg(decayedWeight) AS avg_decayed_weight,
+       avg(evidenceCount) AS avg_evidence_count,
+       max(evidenceCount) AS max_evidence_count,
+       sum(CASE WHEN evidenceCount >= 5 THEN 1 ELSE 0 END) AS strong_edges,
        sum(CASE WHEN decayedWeight < $pruneThreshold THEN 1 ELSE 0 END) AS edges_below_threshold,
        avg(daysSinceActive) AS avg_days_since_active,
        max(daysSinceActive) AS max_days_since_active`

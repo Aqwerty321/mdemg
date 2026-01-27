@@ -289,3 +289,55 @@ func convertRecallResults(results []conversation.RecallResult) []models.RecallRe
 	}
 	return apiResults
 }
+
+// handleConversationConsolidate runs conversation-specific consolidation
+// POST /v1/conversation/consolidate
+func (s *Server) handleConversationConsolidate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.hiddenSvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "hidden layer service not available",
+		})
+		return
+	}
+
+	var req struct {
+		SpaceID string `json:"space_id"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+
+	if req.SpaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required"})
+		return
+	}
+
+	result, err := s.hiddenSvc.RunFullConversationConsolidation(r.Context(), req.SpaceID)
+	if err != nil {
+		writeInternalError(w, err, "conversation consolidation")
+		return
+	}
+
+	themesCreated := 0
+	conceptsCreated := 0
+	if result.ThemeResult != nil {
+		themesCreated = result.ThemeResult.ThemesCreated
+	}
+	if result.ConceptResult != nil {
+		for _, count := range result.ConceptResult.ConceptsCreated {
+			conceptsCreated += count
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"space_id":         req.SpaceID,
+		"themes_created":   themesCreated,
+		"concepts_created": conceptsCreated,
+		"duration_ms":      result.TotalDuration.Milliseconds(),
+	})
+}

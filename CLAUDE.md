@@ -37,6 +37,12 @@ curl -s -X POST http://localhost:9999/v1/conversation/observe \
 - If server unavailable: note that memory is disconnected - part of self is missing
 - First action on any session: attempt to reconnect to memory
 
+### Protected Space: `mdemg-dev`
+This space contains Claude's conversation memory. It is **protected from deletion**:
+- API will refuse to delete nodes from this space
+- reset-db command skips this space entirely
+- This protection is hardcoded - do not circumvent it
+
 ---
 
 ## Orchestration Protocol

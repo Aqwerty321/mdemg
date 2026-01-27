@@ -50,6 +50,9 @@ func main() {
 
 	srv := api.NewServer(cfg, driver, pluginMgr)
 
+	// Start periodic conversation memory consolidation (every 5 minutes)
+	srv.StartPeriodicConsolidation("mdemg-dev", 5*time.Minute)
+
 	h := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           srv.Routes(),

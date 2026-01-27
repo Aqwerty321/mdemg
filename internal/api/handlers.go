@@ -19,6 +19,17 @@ import (
 	"mdemg/internal/symbols"
 )
 
+// ProtectedSpaces contains space IDs that cannot be deleted.
+// These spaces contain critical data (e.g., Claude's conversation memory).
+var ProtectedSpaces = map[string]bool{
+	"mdemg-dev": true, // Claude's conversation memory - DO NOT DELETE
+}
+
+// IsProtectedSpace checks if a space is protected from deletion
+func IsProtectedSpace(spaceID string) bool {
+	return ProtectedSpaces[spaceID]
+}
+
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 }
@@ -1448,6 +1459,34 @@ func (s *Server) handleDeleteNode(w http.ResponseWriter, r *http.Request) {
 
 	params := map[string]any{
 		"nodeId": nodeID,
+	}
+
+	// Check if node belongs to a protected space
+	spaceID, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `MATCH (n:MemoryNode {node_id: $nodeId}) RETURN n.space_id AS space_id`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return "", err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if val, ok := rec.Get("space_id"); ok && val != nil {
+				return val.(string), nil
+			}
+		}
+		return "", nil
+	})
+	if err != nil {
+		writeInternalError(w, err, "check node space")
+		return
+	}
+	if spaceID != nil && IsProtectedSpace(spaceID.(string)) {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"error":    "cannot delete node from protected space",
+			"space_id": spaceID,
+			"reason":   "This space contains critical data (Claude's conversation memory)",
+		})
+		return
 	}
 
 	// Check for outgoing ABSTRACTS_TO edges (block deletion if present)

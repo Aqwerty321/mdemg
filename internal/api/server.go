@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -37,6 +38,8 @@ type Server struct {
 	consultant      *consulting.Service
 	gapDetector     *gaps.GapDetector
 	conversationSvc *conversation.Service
+	hiddenSvc       *hidden.Service // alias for handleConversationConsolidate
+	stopConsolidate chan struct{}
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -146,13 +149,72 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		}
 	}
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, conversationSvc: convSvc}
+	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, hiddenSvc: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, conversationSvc: convSvc}
 }
 
 // Shutdown gracefully stops background services
 func (s *Server) Shutdown() {
 	if s.apeScheduler != nil {
 		s.apeScheduler.Stop()
+	}
+	s.StopPeriodicConsolidation()
+}
+
+// StartPeriodicConsolidation starts a background goroutine that consolidates conversation memory
+// on a regular interval. Default interval is 5 minutes.
+func (s *Server) StartPeriodicConsolidation(spaceID string, interval time.Duration) {
+	if s.hiddenSvc == nil {
+		log.Println("periodic consolidation disabled: hidden service not available")
+		return
+	}
+	if interval <= 0 {
+		interval = 5 * time.Minute
+	}
+
+	s.stopConsolidate = make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		log.Printf("periodic conversation consolidation started (space=%s, interval=%v)", spaceID, interval)
+
+		for {
+			select {
+			case <-ticker.C:
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				result, err := s.hiddenSvc.RunFullConversationConsolidation(ctx, spaceID)
+				cancel()
+				if err != nil {
+					log.Printf("periodic consolidation error: %v", err)
+				} else {
+					themesCreated := 0
+					conceptsCreated := 0
+					if result.ThemeResult != nil {
+						themesCreated = result.ThemeResult.ThemesCreated
+					}
+					if result.ConceptResult != nil {
+						for _, count := range result.ConceptResult.ConceptsCreated {
+							conceptsCreated += count
+						}
+					}
+					if themesCreated > 0 || conceptsCreated > 0 {
+						log.Printf("periodic consolidation: %d themes, %d concepts created",
+							themesCreated, conceptsCreated)
+					}
+				}
+			case <-s.stopConsolidate:
+				log.Println("periodic consolidation stopped")
+				return
+			}
+		}
+	}()
+}
+
+// StopPeriodicConsolidation stops the background consolidation goroutine
+func (s *Server) StopPeriodicConsolidation() {
+	if s.stopConsolidate != nil {
+		close(s.stopConsolidate)
+		s.stopConsolidate = nil
 	}
 }
 
@@ -209,6 +271,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversation/correct", s.handleCorrect)
 	mux.HandleFunc("/v1/conversation/resume", s.handleResume)
 	mux.HandleFunc("/v1/conversation/recall", s.handleRecall)
+	mux.HandleFunc("/v1/conversation/consolidate", s.handleConversationConsolidate)
 
 	// Wrap mux with middleware stack
 	// Order: compression (outermost) -> logging (innermost)

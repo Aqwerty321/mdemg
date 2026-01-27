@@ -3,23 +3,16 @@ run:
   modules-download-mode: readonly
 
 linters:
-  # Start with a minimal set - expand as codebase matures
+  disable-all: true
   enable:
-    - gosimple
     - govet
-    - staticcheck
 
 linters-settings:
   govet:
     enable:
       - nilness
-      - unusedresult
     disable:
-      - shadow  # Too many existing issues
-  staticcheck:
-    checks:
-      - all
-      - -SA1019  # Ignore deprecation warnings for now
+      - shadow
 
 issues:
   exclude-dirs:

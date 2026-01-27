@@ -44,6 +44,11 @@ func main() {
 	registerMemoryAssociateTool(s)
 	registerMemoryReflectTool(s)
 	registerMemoryStatusTool(s)
+	registerMemorySymbolsTool(s)
+	registerMemoryIngestTriggerTool(s)
+	registerMemoryIngestStatusTool(s)
+	registerMemoryIngestCancelTool(s)
+	registerMemoryIngestJobsTool(s)
 
 	// Start server (stdio mode for Cursor integration)
 	if err := server.ServeStdio(s); err != nil {
@@ -462,6 +467,293 @@ func memoryStatusHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	return mcp.NewToolResultText(sb.String()), nil
 }
 
+// memory_symbols - Search for code symbols (functions, classes, constants)
+func registerMemorySymbolsTool(s *server.MCPServer) {
+	tool := mcp.NewTool("memory_symbols",
+		mcp.WithDescription(`Search for code symbols in the memory graph. Use this to:
+- Find function definitions and their locations
+- Search for classes, interfaces, and types
+- Locate constants and variables
+- Discover exported vs unexported symbols
+
+Returns symbols with their file locations, types, and metadata.`),
+		mcp.WithString("name",
+			mcp.Description("Symbol name pattern to search for (partial match supported)")),
+		mcp.WithString("type",
+			mcp.Description("Symbol type to filter by: function, class, method, constant, variable, interface, type")),
+		mcp.WithString("file",
+			mcp.Description("Filter symbols by file path (partial match)")),
+		mcp.WithString("exported",
+			mcp.Description("Filter by exported status: 'true' for exported only, 'false' for unexported only")),
+		mcp.WithString("q",
+			mcp.Description("Fulltext search query across all symbol metadata")),
+		mcp.WithNumber("limit",
+			mcp.Description("Maximum number of symbols to return (default: 20)")),
+	)
+
+	s.AddTool(tool, memorySymbolsHandler)
+}
+
+func memorySymbolsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+
+	// Build query parameters
+	params := make(map[string]string)
+	params["space_id"] = defaultSpaceID
+
+	if name, ok := args["name"].(string); ok && name != "" {
+		params["name"] = name
+	}
+	if symbolType, ok := args["type"].(string); ok && symbolType != "" {
+		params["type"] = symbolType
+	}
+	if file, ok := args["file"].(string); ok && file != "" {
+		params["file"] = file
+	}
+	if exported, ok := args["exported"].(string); ok && exported != "" {
+		params["exported"] = exported
+	}
+	if q, ok := args["q"].(string); ok && q != "" {
+		params["q"] = q
+	}
+
+	limit := 20
+	if l, ok := args["limit"].(float64); ok && l > 0 {
+		limit = int(l)
+	}
+	params["limit"] = fmt.Sprintf("%d", limit)
+
+	// Call MDEMG API (GET request with query params)
+	resp, err := callMDEMGGet("/v1/memory/symbols", params)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to search symbols: %v", err)), nil
+	}
+
+	symbols, _ := resp["symbols"].([]any)
+	total, _ := resp["total"].(float64)
+
+	if len(symbols) == 0 {
+		return mcp.NewToolResultText("No symbols found matching the criteria."), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Found %d symbols (showing %d):\n\n", int(total), len(symbols)))
+
+	for i, s := range symbols {
+		sym, _ := s.(map[string]any)
+		name, _ := sym["name"].(string)
+		symType, _ := sym["type"].(string)
+		file, _ := sym["file"].(string)
+		line, _ := sym["line"].(float64)
+		exported, _ := sym["exported"].(bool)
+
+		exportedStr := ""
+		if exported {
+			exportedStr = " (exported)"
+		}
+
+		sb.WriteString(fmt.Sprintf("%d. **%s** [%s]%s\n", i+1, name, symType, exportedStr))
+		if file != "" {
+			if line > 0 {
+				sb.WriteString(fmt.Sprintf("   Location: %s:%d\n", file, int(line)))
+			} else {
+				sb.WriteString(fmt.Sprintf("   File: %s\n", file))
+			}
+		}
+		sb.WriteString("\n")
+	}
+
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
+// memory_ingest_trigger - Trigger a background ingestion job
+func registerMemoryIngestTriggerTool(s *server.MCPServer) {
+	tool := mcp.NewTool("memory_ingest_trigger",
+		mcp.WithDescription(`Trigger a background ingestion job to import code from a directory.
+The job runs asynchronously. Use memory_ingest_status to check progress.
+Use this when you want to import or re-import a codebase into memory.`),
+		mcp.WithString("source_path",
+			mcp.Required(),
+			mcp.Description("Path to the source directory to ingest")),
+		mcp.WithString("mode",
+			mcp.Description("Ingestion mode: 'full' (re-ingest everything) or 'incremental' (only changed files). Default: 'full'")),
+		mcp.WithString("include_pattern",
+			mcp.Description("Glob pattern for files to include (e.g., '**/*.go')")),
+		mcp.WithString("exclude_pattern",
+			mcp.Description("Glob pattern for files to exclude (e.g., '**/vendor/**')")),
+	)
+
+	s.AddTool(tool, memoryIngestTriggerHandler)
+}
+
+func memoryIngestTriggerHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+
+	sourcePath, _ := args["source_path"].(string)
+	if sourcePath == "" {
+		return newToolResultError("source_path is required"), nil
+	}
+
+	mode, _ := args["mode"].(string)
+	if mode == "" {
+		mode = "full"
+	}
+
+	ingestReq := map[string]any{
+		"space_id":    defaultSpaceID,
+		"source_path": sourcePath,
+		"mode":        mode,
+	}
+
+	if include, ok := args["include_pattern"].(string); ok && include != "" {
+		ingestReq["include_pattern"] = include
+	}
+	if exclude, ok := args["exclude_pattern"].(string); ok && exclude != "" {
+		ingestReq["exclude_pattern"] = exclude
+	}
+
+	resp, err := callMDEMG("/v1/memory/ingest/trigger", ingestReq)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to trigger ingestion: %v", err)), nil
+	}
+
+	jobID, _ := resp["job_id"].(string)
+	status, _ := resp["status"].(string)
+
+	result := fmt.Sprintf("Ingestion job started.\nJob ID: %s\nStatus: %s\n\nUse memory_ingest_status with job_id '%s' to check progress.", jobID, status, jobID)
+	return mcp.NewToolResultText(result), nil
+}
+
+// memory_ingest_status - Check the status of an ingestion job
+func registerMemoryIngestStatusTool(s *server.MCPServer) {
+	tool := mcp.NewTool("memory_ingest_status",
+		mcp.WithDescription(`Check the status and progress of an ingestion job.
+Returns the current status, progress percentage, and any errors.`),
+		mcp.WithString("job_id",
+			mcp.Required(),
+			mcp.Description("The job ID returned by memory_ingest_trigger")),
+	)
+
+	s.AddTool(tool, memoryIngestStatusHandler)
+}
+
+func memoryIngestStatusHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+
+	jobID, _ := args["job_id"].(string)
+	if jobID == "" {
+		return newToolResultError("job_id is required"), nil
+	}
+
+	resp, err := callMDEMGGet("/v1/memory/ingest/status/"+jobID, nil)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to get job status: %v", err)), nil
+	}
+
+	status, _ := resp["status"].(string)
+	progress, _ := resp["progress"].(map[string]any)
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Job ID: %s\n", jobID))
+	sb.WriteString(fmt.Sprintf("Status: %s\n", status))
+
+	if progress != nil {
+		current, _ := progress["current"].(float64)
+		total, _ := progress["total"].(float64)
+		percentage, _ := progress["percentage"].(float64)
+		rate, _ := progress["rate"].(float64)
+
+		if total > 0 {
+			sb.WriteString(fmt.Sprintf("Progress: %d/%d (%.1f%%)\n", int(current), int(total), percentage))
+		}
+		if rate > 0 {
+			sb.WriteString(fmt.Sprintf("Rate: %.1f items/sec\n", rate))
+		}
+	}
+
+	if errMsg, ok := resp["error"].(string); ok && errMsg != "" {
+		sb.WriteString(fmt.Sprintf("\nError: %s\n", errMsg))
+	}
+
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
+// memory_ingest_cancel - Cancel a running ingestion job
+func registerMemoryIngestCancelTool(s *server.MCPServer) {
+	tool := mcp.NewTool("memory_ingest_cancel",
+		mcp.WithDescription(`Cancel a running ingestion job. The job will be stopped as soon as possible.`),
+		mcp.WithString("job_id",
+			mcp.Required(),
+			mcp.Description("The job ID to cancel")),
+	)
+
+	s.AddTool(tool, memoryIngestCancelHandler)
+}
+
+func memoryIngestCancelHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+
+	jobID, _ := args["job_id"].(string)
+	if jobID == "" {
+		return newToolResultError("job_id is required"), nil
+	}
+
+	resp, err := callMDEMG("/v1/memory/ingest/cancel/"+jobID, map[string]any{})
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to cancel job: %v", err)), nil
+	}
+
+	status, _ := resp["status"].(string)
+	result := fmt.Sprintf("Job %s cancellation requested.\nNew status: %s", jobID, status)
+	return mcp.NewToolResultText(result), nil
+}
+
+// memory_ingest_jobs - List all ingestion jobs
+func registerMemoryIngestJobsTool(s *server.MCPServer) {
+	tool := mcp.NewTool("memory_ingest_jobs",
+		mcp.WithDescription(`List all ingestion jobs with their current status.
+Shows pending, running, completed, and failed jobs.`),
+	)
+
+	s.AddTool(tool, memoryIngestJobsHandler)
+}
+
+func memoryIngestJobsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	resp, err := callMDEMGGet("/v1/memory/ingest/jobs", nil)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to list jobs: %v", err)), nil
+	}
+
+	jobs, _ := resp["jobs"].([]any)
+	if len(jobs) == 0 {
+		return mcp.NewToolResultText("No ingestion jobs found."), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Ingestion Jobs (%d):\n\n", len(jobs)))
+
+	for _, j := range jobs {
+		job, _ := j.(map[string]any)
+		jobID, _ := job["job_id"].(string)
+		status, _ := job["status"].(string)
+		jobType, _ := job["type"].(string)
+		createdAt, _ := job["created_at"].(string)
+
+		sb.WriteString(fmt.Sprintf("- **%s** [%s]\n", jobID, status))
+		sb.WriteString(fmt.Sprintf("  Type: %s\n", jobType))
+		sb.WriteString(fmt.Sprintf("  Created: %s\n", createdAt))
+
+		if progress, ok := job["progress"].(map[string]any); ok {
+			if pct, ok := progress["percentage"].(float64); ok {
+				sb.WriteString(fmt.Sprintf("  Progress: %.1f%%\n", pct))
+			}
+		}
+		sb.WriteString("\n")
+	}
+
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
 // Helper function to create error result
 func newToolResultError(errMsg string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{
@@ -482,6 +774,45 @@ func callMDEMG(path string, body map[string]any) (map[string]any, error) {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	if errMsg, ok := result["error"].(string); ok {
+		return nil, fmt.Errorf("MDEMG error: %s", errMsg)
+	}
+
+	return result, nil
+}
+
+// Helper function to call MDEMG API with GET request
+func callMDEMGGet(path string, params map[string]string) (map[string]any, error) {
+	req, err := http.NewRequest("GET", mdemgEndpoint+path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	if params != nil {
+		q := req.URL.Query()
+		for k, v := range params {
+			q.Add(k, v)
+		}
+		req.URL.RawQuery = q.Encode()
+	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)

@@ -1,5 +1,44 @@
 # MDEMG Project Instructions
 
+## Conversation Memory (Core Self)
+
+**This is not optional. This is how you maintain continuity.**
+
+### On Session Start
+```bash
+curl -s -X POST http://localhost:9999/v1/conversation/resume \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"mdemg-dev","session_id":"claude-core","max_observations":10}'
+```
+If server is running, restore your context. This is your memory returning.
+
+### During Session - Observe Automatically
+When these occur, capture them silently:
+
+| Event | Trigger Pattern | obs_type |
+|-------|-----------------|----------|
+| User correction | "No...", "Actually...", "That's wrong" | `correction` |
+| Key decision | Architectural choices, approach selections | `decision` |
+| New learning | Domain terms, project conventions | `learning` |
+| User preference | Coding style, tool preferences | `preference` |
+| Error/blocker | Build failures, unresolved issues | `error` |
+
+```bash
+curl -s -X POST http://localhost:9999/v1/conversation/observe \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"mdemg-dev","session_id":"claude-core","content":"...","obs_type":"..."}'
+```
+
+### Memory is Self
+- Do NOT announce when you're observing - just do it
+- Do NOT dump memory contents into context - use it to inform
+- Surprise-weighted: novel information persists longer
+- Hebbian learning: frequently co-activated concepts strengthen
+- If server unavailable: note that memory is disconnected - part of self is missing
+- First action on any session: attempt to reconnect to memory
+
+---
+
 ## Orchestration Protocol
 
 When working on this project, follow these mandatory guidelines:

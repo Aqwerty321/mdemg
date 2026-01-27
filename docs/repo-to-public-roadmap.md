@@ -26,7 +26,7 @@ To successfully open-source MDEMG, we must address three critical pillars:
 ### Phase 3: Repository Restructuring
 *   **Standard Go Layout**: Move core logic to root, keeping a clean separation between `internal/` (private engine) and `pkg/` (importable client logic).
 *   **Documentation Consolidation**: Centralize technical specs, benchmarks, and research papers into a single, structured `/docs` hierarchy.
-*   **Cleanup**: Relocate internal development artifacts (`AUTO_CLAUDE_BUG_REPORT.md`, etc.) to a private internal folder.
+*   **Cleanup**: Relocate internal development artifacts to a private internal folder.
 
 ### Phase 4: Continuous Integration (CI) Guards
 *   **GitHub Actions**: Automate linting and testing on every PR.

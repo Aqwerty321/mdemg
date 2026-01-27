@@ -1,30 +1,42 @@
 # MDEMG - Multi-Dimensional Emergent Memory Graph
 
-A long-term memory system for AI coding agents built on Neo4j with native vector indexes. Implements retrieval-augmented memory with spreading activation and Hebbian learning.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8.svg)](https://golang.org/)
+[![Neo4j](https://img.shields.io/badge/Neo4j-5.x-008CC1.svg)](https://neo4j.com/)
+
+A persistent memory system for AI coding agents built on Neo4j with native vector indexes. Implements semantic retrieval with hidden layer concept abstraction and Hebbian learning.
 
 ## Overview
 
-MDEMG provides persistent memory for AI agents running in IDEs like Cursor. It enables agents to:
-- Store observations, patterns, and decisions
-- Maintain an ongoing 'internal' dialog with the main coding agent
-- Intercept 'thoughts' from the coding agenet(s) to review against context specific knowledge maintained in mdemg
-- Recall relevant memories via semantic search
-- Build associative connections between concepts
-- Develop emergent behaviors over time
+MDEMG provides long-term memory for AI agents, enabling them to:
+
+- **Store observations**: Persist code patterns, decisions, and architectural knowledge
+- **Semantic recall**: Retrieve relevant memories via vector similarity search
+- **Concept abstraction**: Automatically form higher-level concepts from related memories (hidden layers)
+- **Associative learning**: Build connections between memories through Hebbian reinforcement
+- **LLM re-ranking**: Apply GPT-powered relevance scoring for improved retrieval quality
+
+## Key Features
+
+- **Multi-layer graph architecture**: Base observations (L0) → Hidden concepts (L1) → Abstract concepts (L2+)
+- **Hybrid search**: Combines vector similarity with graph traversal
+- **Plugin system**: Extensible via ingestion, reasoning, and APE (Autonomous Pattern Extraction) modules
+- **Evidence-based retrieval**: Returns symbol-level citations (file:line references) with results
+- **Capability gap detection**: Identifies missing knowledge areas for targeted improvement
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    aci-claude-go (CLI/TUI)                  │
+│                      AI Coding Agent                        │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
-│  │ Claude Agent │◄──►│ Memory Adapter│◄──►│ MDEMG Client │  │
-│  │ (Go Coder)   │    │ (internal)   │    │  (pkg/mdemg) │  │
+│  │   IDE/CLI    │◄──►│  MCP Server  │◄──►│ MDEMG Client │  │
+│  │  (Cursor)    │    │   (tools)    │    │    (HTTP)    │  │
 │  └──────────────┘    └──────────────┘    └──────┬───────┘  │
 └─────────────────────────────────────────────────┼──────────┘
                                                   │
                     ┌─────────────────────────────▼─────────┐
-                    │          MDEMG Service (:8082)        │
+                    │          MDEMG Service (:8090)        │
                     │  ┌─────────┐  ┌───────────────────┐  │
                     │  │Embedding│  │    Neo4j Graph    │  │
                     │  │ Provider│  │ (Vector + Graph)  │  │
@@ -32,18 +44,11 @@ MDEMG provides persistent memory for AI agents running in IDEs like Cursor. It e
                     └───────────────────────────────────────┘
 ```
 
-## Integration with aci-claude-go
-
-MDEMG is the primary long-term memory layer for the **aci-claude-go** autonomous framework. It facilitates:
-- **Internal Dialog Persistence**: Chronological thought threading across agents and sessions.
-- **Cross-Session Learning**: Automatic semantic retrieval of past decisions and patterns.
-- **Autonomous Self-Reflection**: System-triggered analysis of learned patterns to identify architectural drift.
-- **Subject Matter Expertise**: Acting as a cognitive substrate for the Planner, Coder, and QA agents.
-
 ## Quick Start
 
 ### Prerequisites
-- Go 1.25+
+
+- Go 1.21+
 - Docker (for Neo4j)
 - Ollama (for local embeddings) or OpenAI API key
 
@@ -54,45 +59,93 @@ MDEMG is the primary long-term memory layer for the **aci-claude-go** autonomous
 git clone https://github.com/reh3376/mdemg.git
 cd mdemg
 
+# Copy environment config
+cp .env.example .env
+# Edit .env with your settings (embedding provider, Neo4j credentials)
+
 # Start Neo4j
 docker compose up -d
 
-# Apply migrations
-for f in migrations/V*.cypher; do
-  docker exec -i mdemg-neo4j cypher-shell -u neo4j -p testpassword < "$f"
-done
+# Build the server
+go build -o bin/mdemg ./cmd/server
 
-# Install Ollama embedding model
-ollama pull nomic-embed-text
-
-# Start the service
-./start-mdemg.sh
+# Run the server
+./bin/mdemg
 ```
 
-## MCP Integration (aci-claude-go / Cursor)
+### Ingest a Codebase
 
-MDEMG provides an MCP server for seamless integration.
+```bash
+# Build the ingestion tool
+go build -o bin/ingest-codebase ./cmd/ingest-codebase
 
-**For aci-claude-go:**
-The framework utilizes `pkg/mdemg` directly via the `internal/agent/Memory` interface.
+# Ingest a codebase
+./bin/ingest-codebase --space-id=my-project --path=/path/to/repo
 
-**For Cursor IDE:**
-Add to `~/.cursor/mcp.json`:
+# Run consolidation to create concept layers
+curl -X POST http://localhost:8090/v1/memory/consolidate \
+  -H "Content-Type: application/json" \
+  -d '{"space_id": "my-project"}'
+```
+
+## API Endpoints
+
+### Core Operations
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/memory/retrieve` | POST | Semantic search with optional LLM re-ranking |
+| `/v1/memory/consult` | POST | SME-style Q&A with evidence citations |
+| `/v1/memory/ingest` | POST | Store a single observation |
+| `/v1/memory/ingest/batch` | POST | Store multiple observations |
+| `/v1/memory/consolidate` | POST | Trigger hidden layer creation |
+| `/v1/memory/stats` | GET | Per-space memory statistics |
+
+### Example: Retrieve
+
+```bash
+curl -X POST http://localhost:8090/v1/memory/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "space_id": "my-project",
+    "query": "How does authentication work?",
+    "top_k": 10,
+    "include_evidence": true
+  }'
+```
+
+### Example: Consult (SME Mode)
+
+```bash
+curl -X POST http://localhost:8090/v1/memory/consult \
+  -H "Content-Type: application/json" \
+  -d '{
+    "space_id": "my-project",
+    "context": "Investigating user session handling",
+    "question": "Where is the session timeout configured?",
+    "include_evidence": true
+  }'
+```
+
+## MCP Integration (Cursor IDE)
+
+MDEMG provides an MCP server for IDE integration. Add to `~/.cursor/mcp.json`:
+
 ```json
 {
   "mcpServers": {
     "mdemg": {
-      "command": "/path/to/mdemg/cmd/mcp-server/mdemg-mcp",
+      "command": "/path/to/mdemg/bin/mdemg-mcp",
       "args": [],
       "env": {
-        "MDEMG_ENDPOINT": "http://localhost:8082"
+        "MDEMG_ENDPOINT": "http://localhost:8090"
       }
     }
   }
 }
 ```
 
-## MCP Tools
+### MCP Tools
 
 | Tool | Purpose |
 |------|---------|
@@ -102,53 +155,44 @@ Add to `~/.cursor/mcp.json`:
 | `memory_reflect` | Deep exploration of a topic |
 | `memory_status` | Check system health |
 
-## Benchmarks & Performance
+## Performance
 
-MDEMG has been rigorously tested against large-scale industrial codebases, including **whk-wms** (792K LOC) and **plc-gbt** (Industrial Control Systems). The transition from the v4 baseline to the v11 production iteration resulted in a **29.3% improvement** in average retrieval quality and a **7.5x increase** in high-confidence architectural reasoning.
+MDEMG has been benchmarked on large industrial codebases (500K-800K LOC):
 
-**Key v11 Results (whk-wms):**
-*   **Average Retrieval Score**: 0.733 (vs 0.567 baseline)
-*   **High Confidence Rate (Score > 0.7)**: 75%
-*   **Retrieval Latency**: < 50ms
-*   **Token Efficiency**: 99.7% reduction in token cost per query.
-
-**Cross-Codebase Validation (plc-gbt):**
-*   **Average Retrieval Score**: 0.719
-*   **High Confidence Rate**: 58%
-*   **ICS-Specific Performance**: Verified 0.71+ scores for control loop and data model architecture.
-
-For a detailed breakdown of the technical evolution and performance metrics across all iterations, see the [Up-to-Date Benchmark Summary](docs/tests/UP_TO_DATE_BENCHMARK_SUMMARY.md).
-
-## Documentation
-
-- [Vision & Architecture](VISION.md) - Core philosophy and design
-- [Detailed Benchmarks](docs/tests/UP_TO_DATE_BENCHMARK_SUMMARY.md) - Evolution from v4 to v11
-- [Repo-to-Public Roadmap](docs/repo-to-public-roadmap.md) - Plan for open-source transition
-- [Architecture Details](docs/01_Architecture.md) - System design
-- [Graph Schema](docs/02_Graph_Schema.md) - Labels and relationships
-- [Retrieval & Scoring](docs/06_Retrieval_API_and_Scoring.md) - Scoring algorithm details
+| Metric | Value |
+|--------|-------|
+| Retrieval latency (warm) | ~50ms |
+| Top-10 relevance score | 0.73 avg |
+| High-confidence rate (>0.7) | 75% |
+| Evidence compliance | 100% (file:line refs) |
 
 ## Project Structure
 
 ```
 mdemg/
-├── cmd/                  # Binaries (Server, MCP, Ingest, etc.)
-├── internal/             # Private core logic (Retrieval, Learning, APE)
-├── pkg/                  # Importable Go client logic
-├── migrations/           # Neo4j schema migrations (Cypher)
-├── docs/                 # Technical documentation & Benchmarks
-├── docker-compose.yml    # Neo4j container
-└── start-mdemg.sh        # One-command startup
+├── cmd/                  # CLI tools (server, ingest, MCP, etc.)
+├── internal/             # Core logic
+│   ├── api/              # HTTP handlers
+│   ├── retrieval/        # Search algorithms
+│   ├── hidden/           # Concept abstraction
+│   ├── learning/         # Hebbian edges
+│   └── plugins/          # Plugin system
+├── docs/                 # Documentation
+├── migrations/           # Neo4j schema (Cypher)
+└── docker-compose.yml    # Neo4j container
 ```
 
-## Emergent Behaviors
+## Documentation
 
-Over time, the system is designed to develop:
-1. **Concept clustering** - Similar patterns grouping together
-2. **Cross-project transfer** - Knowledge flowing between projects
-3. **Workflow recognition** - Recognizing recurring patterns
-4. **Abstraction emergence** - General principles from specific examples
+- [Architecture](docs/01_Architecture.md) - System design and components
+- [Graph Schema](docs/02_Graph_Schema.md) - Neo4j labels and relationships
+- [Retrieval API](docs/06_Retrieval_API_and_Scoring.md) - Scoring algorithm details
+- [Plugin SDK](docs/11_Plugin_SDK.md) - Building custom plugins
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute.
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) for details.

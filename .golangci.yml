@@ -1,6 +1,9 @@
 run:
   timeout: 5m
   modules-download-mode: readonly
+  skip-dirs:
+    - docs
+    - archeive
 
 linters:
   enable:

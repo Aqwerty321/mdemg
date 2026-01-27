@@ -19,7 +19,7 @@ MDEMG is the **long-term memory engine** for [aci-claude-go](https://github.com/
 
 2. **Start the infrastructure:**
    ```bash
-   cd /Users/reh3376/mdemg
+   cd /path/to/mdemg
    ./start-mdemg.sh
    ```
    This starts Neo4j (if not running), sources `.env`, and launches the MDEMG service on :8082.
@@ -243,7 +243,7 @@ MDEMG provides AI agents with the **ANN equivalent of an internal dialog**—sim
 ./start-mdemg.sh
 
 # OR manually:
-cd /Users/reh3376/mdemg
+cd /path/to/mdemg
 docker compose up -d
 cd mdemg_build/service
 export NEO4J_URI=bolt://localhost:7687
@@ -315,7 +315,7 @@ The MCP server is configured in `~/.cursor/mcp.json`:
 {
   "mcpServers": {
     "mdemg": {
-      "command": "/Users/reh3376/mdemg/mdemg_build/mcp-server/mdemg-mcp",
+      "command": "/path/to/mdemg/bin/mdemg-mcp",
       "args": [],
       "env": {
         "MDEMG_ENDPOINT": "http://localhost:8082"

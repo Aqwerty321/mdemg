@@ -1,6 +1,6 @@
 # Architecture (Neo4j + Vector Indexes)
 
-> **See also:** [VISION.md](/Users/reh3376/mdemg/VISION.md) for the philosophical foundation and design principles.
+> **See also:** [VISION.md](../VISION.md) for the philosophical foundation and design principles.
 
 ## Core Philosophy
 

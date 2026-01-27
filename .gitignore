@@ -10,6 +10,7 @@
 *.pem
 
 # Go binaries
+bin/
 server
 ingest-codebase
 decay
@@ -38,6 +39,7 @@ coverage.txt
 
 # Claude config (user-specific)
 .claude/
+.claude_settings.json
 
 # OS files
 .DS_Store

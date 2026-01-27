@@ -180,7 +180,7 @@
 
 | File | Description |
 |------|-------------|
-| `/Users/reh3376/repos/vscode-scale-test/` | VS Code shallow clone |
+| Local VS Code shallow clone | VS Code shallow clone |
 | Space ID: `vscode-scale` | MDEMG space with 28K elements |
 | This document | Scale test results summary |
 

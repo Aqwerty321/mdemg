@@ -26,7 +26,7 @@ Claude-Mem is a persistent memory system for Claude Code that:
 
 ```
 Location: ~/.claude-mem/
-Config: ~/.claude.json (project: /Users/reh3376/mdemg)
+Config: ~/.claude.json (project: /path/to/mdemg)
 MCP Server: uvx chroma-mcp --client-type persistent
 ```
 

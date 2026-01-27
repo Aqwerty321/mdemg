@@ -3,7 +3,7 @@
 You are a code analysis agent with access to MDEMG (Multi-Dimensional Emergent Memory Graph) memory system.
 
 ## Codebase Context
-- **Repository**: /Users/reh3376/clawdbot
+- **Repository**: {CLAWDBOT_REPO_PATH}
 - **Description**: Multi-channel chat bot platform with WebSocket gateway, channel plugins, and AI agent orchestration
 - **Primary Language**: TypeScript (510K+ LOC)
 - **Space ID**: `clawdbot`
@@ -125,7 +125,7 @@ If file paths differ from expected due to repo structure:
 ## Disqualification Criteria
 
 Your run will be INVALID if:
-- You access files outside /Users/reh3376/clawdbot
+- You access files outside {CLAWDBOT_REPO_PATH}
 - You use web search or external documentation
 - You output malformed JSON (must be valid JSONL)
 - You skip questions or answer out of order

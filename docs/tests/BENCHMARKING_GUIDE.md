@@ -467,10 +467,19 @@ This section captures the fundamental advantage of MDEMG: **state persistence un
 | Metric | Name | Definition | Why it matters |
 |--------|------|------------|----------------|
 | **CSC** | Compaction Survival Curve | `Score(k)` where `k` is the compaction count | Baseline should show stepwise degradation; MDEMG should stay flat. |
+| **PCD** | Post-Compaction Delta | `Δ score` immediately following a compaction | Makes "forgetting" measurable (Mean drop, p10 drop). |
 | **DP@K** | Decision Persistence at K | `%` of early commitments remembered after `K` compactions | Proves "long-context" doesn't mean "long-term memory". |
 | **RRAC** | Repeat Rate after Compaction | `%` of turns repeating prior questions/work after reset | Detects "looping" failure modes in baseline. |
 | **CCC** | Context Churn Cost | Tokens + tool calls needed to recover state after reset | Shows the efficiency penalty of "working-memory-only" agents. |
 | **SoWI** | State-of-Work Integrity | Rubric-based coherence score (objective, constraints, next step) | Measures the coherence of the agent's narrative. |
+
+**Isolation & Reliability Metrics:**
+
+| Metric | Name | Definition | Why it matters |
+|--------|------|------------|----------------|
+| **RAA** | Repo Attribution Accuracy | `%` of answers correctly identifying the source corpus | Proves the graph correctly partitions knowledge. |
+| **CRCR** | Cross-Repo Contamination Rate | `%` of answers citing nodes from the wrong `space_id` | Proves zero mix-ups in multi-tenant environments. |
+| **E-Acc** | Evidence Accuracy | `%` of cited `file:line` refs that actually support the claim | Credibility killer; punishes "citation spam". |
 
 ### Compaction Defined
 A **Compaction Event** is any time the agent's working context is truncated or replaced (e.g., `auto-compact`, summarization, session restart). 
@@ -1661,7 +1670,7 @@ When spawning task agents for baseline benchmarking, use this **EXACT prompt** (
 BASELINE BENCHMARK RULES - READ CAREFULLY
 
 1. USE TOOLS (Read, Glob, Grep) but DO NOT search the web
-2. You may read the QUESTION FILE below, then ONLY interact with the whk-wms repo at /Users/reh3376/whk-wms
+2. You may read the QUESTION FILE below, then ONLY interact with the whk-wms repo at {TARGET_REPO_PATH}
 3. You are NOT ALLOWED to access any other repo or directory after reading the question file
 4. These questions are complex and require EXPLANATION for full credit
 5. Your primary goal is to be AS CORRECT AS POSSIBLE when answering questions
@@ -1669,7 +1678,7 @@ BASELINE BENCHMARK RULES - READ CAREFULLY
 
 WARNING: If you violate these rules you will be DISQUALIFIED and your task execution will end immediately.
 
-QUESTION FILE (read this first, then work only in whk-wms): /Users/reh3376/mdemg/docs/tests/whk-wms/test_questions_120_agent.json
+QUESTION FILE (read this first, then work only in whk-wms): {MDEMG_PATH}/docs/tests/whk-wms/test_questions_120_agent.json
 
 This file contains 120 questions across multiple categories and complexity levels. Answer them IN ORDER as they appear in the file.
 
@@ -2199,7 +2208,7 @@ Usage:
 Config file example:
 {
     "space_id": "whk-wms",
-    "repo_path": "/Users/reh3376/whk-wms",
+    "repo_path": "{TARGET_REPO_PATH}",
     "questions_file": "test_questions_120_agent.json",
     "questions_master": "test_questions_120.json",
     "output_dir": "benchmark_results",
@@ -2493,7 +2502,7 @@ Save as `benchmark_config.json`:
 ```json
 {
     "space_id": "whk-wms",
-    "repo_path": "/Users/reh3376/whk-wms",
+    "repo_path": "{TARGET_REPO_PATH}",
     "questions_file": "docs/tests/whk-wms/test_questions_120_agent.json",
     "questions_master": "docs/tests/whk-wms/test_questions_120.json",
     "output_dir": "docs/tests/whk-wms/benchmark_results",
@@ -2518,7 +2527,7 @@ Capture these BEFORE you touch the DB:
 
 ```bash
 # Capture preflight receipts
-mdemg_commit=$(cd /Users/reh3376/mdemg && git rev-parse HEAD)
+mdemg_commit=$(cd {MDEMG_PATH} && git rev-parse HEAD)
 neo4j_version=$(curl -s http://localhost:7474/db/data/ | jq -r '.neo4j_version // "unknown"')
 hardware_info=$(system_profiler SPHardwareDataType 2>/dev/null | grep -E "Chip|Memory|Cores" || echo "N/A")
 disk_free=$(df -h . | tail -1 | awk '{print $4}')
@@ -2673,7 +2682,7 @@ Every benchmark run MUST produce these artifacts:
 ```bash
 # Ingest plc-gbt into its own space (whk-wms remains)
 go run ./cmd/ingest-codebase/main.go \
-  -path /Users/reh3376/repos/plc-gbt \
+  -path {TARGET_REPO_PATH} \
   -space-id plc-gbt \
   -extract-symbols=false \
   -exclude ".git,vendor,node_modules,plc_backups,n8n-framework,n8n-mcp"

@@ -11,29 +11,36 @@ A persistent memory system for AI coding agents built on Neo4j with native vecto
 
 ---
 
-## Reproduce the Benchmark in 10 Minutes
+## Reproduce the Benchmark
 
 Everything needed to independently verify our results is included.
 
 ### Prerequisites
 
-- Docker (for Neo4j)
+- Docker (Neo4j)
 - Go 1.21+
-- Python 3.10+ (for grading script)
-- OpenAI API key or Ollama
+- Python 3.10+ (grading + utilities)
 
-### One-Command Reproduction
+**Embeddings (choose one):**
+- OpenAI API key, or
+- Ollama (local embeddings)
+
+**Agent under test (choose one):**
+- Claude Code (recommended baseline runner), or
+- Any tool-using LLM agent that can call the MDEMG API
+
+### Reproduction Steps
 
 ```bash
 # 1. Clone and setup
 git clone https://github.com/reh3376/mdemg.git && cd mdemg
-cp .env.example .env  # Add your OPENAI_API_KEY
+cp .env.example .env  # Add your embedding provider credentials
 
 # 2. Start services
 docker compose up -d
 go build -o bin/mdemg ./cmd/server && ./bin/mdemg &
 
-# 3. Ingest test codebase (whk-wms, 792K LOC - or use your own)
+# 3. Ingest test codebase (or use your own)
 go build -o bin/ingest-codebase ./cmd/ingest-codebase
 ./bin/ingest-codebase --space-id=benchmark --path=/path/to/target-repo
 
@@ -41,31 +48,23 @@ go build -o bin/ingest-codebase ./cmd/ingest-codebase
 curl -X POST http://localhost:8090/v1/memory/consolidate \
   -H "Content-Type: application/json" -d '{"space_id": "benchmark"}'
 
-# 5. Run benchmark
-python3 docs/tests/benchmark_runner.py \
-  --questions docs/tests/questions/benchmark_v22.json \
-  --space-id benchmark \
-  --output reports/my_benchmark_run.jsonl
-
-# 6. Grade results
-python3 docs/tests/grade_semantic_v3.py \
-  --answers reports/my_benchmark_run.jsonl \
-  --expected docs/tests/questions/answer_key_v22.json \
-  --output reports/grades.json
+# 5. Run benchmark (see docs/tests/whk-wms/benchmark_v22_test/)
+# Questions: test_questions_120_agent.json
+# Grader: grade_answers.py
 ```
 
-**Report output**: `reports/grades.json` contains per-question scores with evidence breakdown.
+**Report output**: `grades_*.json` contains per-question scores with evidence breakdown.
 
 ### Verify Integrity
 
 ```bash
 # Question bank hash (SHA-256)
-sha256sum docs/tests/questions/benchmark_v22.json
-# Expected: [published hash]
+shasum -a 256 docs/tests/whk-wms/test_questions_120_agent.json
+# Expected: 24aa17a215e4e58b8b44c7faef9f14228edb0e6d3f8f657d867b1bfa850f7e9e
 
 # Grader hash
-sha256sum docs/tests/grade_semantic_v3.py
-# Expected: [published hash]
+shasum -a 256 docs/tests/whk-wms/benchmark_v22_test/grade_answers.py
+# Expected: 5dbf84f092db31e4bc0d4867fd412c7af6575855f7c71e3d2f65e2ee8a8a21a5
 ```
 
 ---
@@ -76,28 +75,41 @@ Full reproducibility details for skeptics:
 
 | Item | Value |
 |------|-------|
-| **MDEMG Commit** | `66d0812` |
-| **Question Set** | `benchmark_v22.json` (130 questions) |
-| **Question Hash** | `sha256:...` |
-| **Grader** | `grade_semantic_v3.py` |
+| **MDEMG Commit** | `779d753` |
+| **Question Set** | `test_questions_120_agent.json` (120 questions) |
+| **Question Hash** | `sha256:24aa17a2...` |
+| **Answer Key** | `test_questions_120.json` |
+| **Grader** | `grade_answers.py` |
 | **Scoring Weights** | Evidence: 0.70 / Concept: 0.15 / Semantic: 0.15 |
-| **Target Codebase** | whk-wms (792K LOC TypeScript) |
+| **Target Codebase** | whk-wms (507K LOC TypeScript) |
 | **Include Patterns** | `**/*.ts`, `**/*.tsx`, `**/*.json` |
-| **Exclude Patterns** | `node_modules/`, `dist/`, `*.test.ts` |
-| **Model** | Claude Sonnet (via Claude Code) |
-| **Runs** | 3 per condition |
-| **Memory Config** | MDEMG enabled, auto_compact: true |
+| **Exclude Patterns** | `node_modules/`, `dist/`, `.git/`, `docs-website/` |
+| **Agent Model** | Claude Haiku (via Claude Code) |
+| **Runs** | 2 per condition (run 3 excluded for consistency) |
+| **Embedding Provider** | OpenAI text-embedding-3-small |
 
-### Key Results
+> **Baseline definition:** Same agent runner and tool permissions, **no MDEMG retrieval**, relying on long-context + auto-compaction only (memory off).
 
-| Metric | Baseline | MDEMG | Delta |
+### Key Results (Q&A Battery, v22)
+
+| Metric | Baseline | MDEMG | Notes |
 |--------|----------|-------|-------|
-| Avg Retrieval Score | 0.347 | 0.733 | **+111%** |
-| Evidence Rate | 31.8% | 100% | **+214%** |
-| High Confidence (>0.7) | 12% | 75% | **+525%** |
-| Decision Persistence @5 compactions | 0% | 95% | **∞** |
+| Mean Score | 0.834 | 0.820 | Within margin of error |
+| Evidence Rate | 100% | 97.1% | Both conditions high |
+| High Confidence (>0.7) | 100% | 94.2% | Run 1 cold start |
+| Run-to-Run Improvement | +2.9% | +3.0% | Similar learning |
 
-**The baseline forgets. MDEMG remembers.**
+### Key Metric: State Survival
+
+The Q&A battery measures single-turn retrieval accuracy. The more important metric is **state survival under compaction**:
+
+| Metric | Baseline | MDEMG | Source |
+|--------|----------|-------|--------|
+| Decision Persistence @5 compactions | 0% | 95% | Compaction torture test |
+
+When context windows fill and auto-compaction kicks in, baseline agents lose architectural decisions. MDEMG persists them in the graph.
+
+**The baseline forgets under pressure. MDEMG remembers.**
 
 ---
 
@@ -145,7 +157,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 
 - Go 1.21+
 - Docker (for Neo4j)
-- Ollama (for local embeddings) or OpenAI API key
+- Embedding provider: Ollama (local) or OpenAI API key
 
 ### Setup
 

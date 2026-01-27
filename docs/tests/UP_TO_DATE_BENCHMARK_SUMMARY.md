@@ -1,75 +1,101 @@
-# MDEMG Technical Benchmark Summary (v4 to v11)
+# MDEMG Benchmark Summary
 
-## 1. Executive Summary
-This document captures the performance trajectory of the MDEMG (Multi-Dimensional Emergent Memory Graph) framework across 3 major test batteries. The transition from the **v4 Baseline** to the **v11 All-Tracks Iteration** represents a fundamental shift from simple context retrieval to **reinforced cognitive reasoning.**
-
-**The Bottom Line**: MDEMG v11 achieved a **0.733 average score**, representing a **29.3% total lift** in retrieval quality and a **7.5x increase** in high-confidence (Score > 0.7) results compared to the v4 baseline.
-
----
-
-## 2. Phase-Based Performance (Opus 4.5)
-
-The test battery consisted of two phases executed on the **whk-wms** codebase (792K LOC, 3,288 files).
-
-### Phase 1: Repo Perception (Grep vs. Ingest)
-| System | Task | Completion Time | Result |
-| :--- | :--- | :--- | :--- |
-| **Baseline** | Standard Grep/Review | **1.5 min** | Temporary context window |
-| **MDEMG** | `ingestCodebase()` | 18 min | Durable, multi-layer graph |
-
-### Phase 2: Architectural Stress Test (100 Questions)
-Agents were tasked with answering 100 complex questions randomly selected from 399 verified scenarios.
-| System | Avg Completion | Questions Answered | Status |
-| :--- | :--- | :--- | :--- |
-| **Baseline** | 3.5 min | 2/100 | **Stalled** (Resource constraints) |
-| **MDEMG** | 10 min | **100/100** | **Complete** (API Retrieval) |
+**Version:** 3.0
+**Last Updated:** 2026-01-26
+**Canonical Format:** v22
 
 ---
 
-## 3. Iterative Evolution Table (v4 to v11)
+## 1. Canonical Benchmarks
 
-| Metric | v4 Baseline | v5 (P1) | v6 (P2) | v9 (P3+) | v10 Seed | v11 Current | **Net Change** |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Avg Score** | 0.567 | 0.569 | 0.580 | 0.619 | 0.699 | **0.733** | **+29.3%** |
-| **>0.7 Score Rate** | ~10% | 3% | 8% | 31% | 58% | **75%** | **+650%** |
-| **Business Logic** | 0.450 | 0.593 | 0.625 | 0.604 | 0.720 | **0.728** | **+61.7%** |
-| **Cross-Cutting** | 0.450 | 0.560 | 0.586 | 0.606 | 0.659 | **0.709** | **+57.5%** |
-| **Config Hits** | N/A | N/A | 25/100 | 32/100 | N/A | **N/A** | **+28% (v6-v9)** |
+MDEMG maintains two canonical benchmark suites in v22 format:
 
----
+| Benchmark | Codebase | Questions | Runs | Documentation |
+|-----------|----------|-----------|------|---------------|
+| **whk-wms v22** | whk-wms (507K LOC TypeScript) | 120 | 2 per condition | `whk-wms/benchmark_v22_test/BENCHMARK_RESULTS_V22.md` |
+| **clawdbot v1** | clawdbot (multi-service Python) | 130 | 3 per condition | `clawdbot/BENCHMARK_CLAWDBOT_V1.md` |
 
-## 4. Technical Metrics Analysis
-
-### **Efficiency & Latency**
-*   **Token Efficiency**: MDEMG used ~500 tokens per query vs. Baseline's ~150K total context—a **99.7% token reduction**.
-*   **Retrieval Latency**: Sustained **< 50ms** per query for deep graph-traversal recall.
-*   **Context Scalability**: MDEMG maintained a peak context size of **~131K tokens** efficiently via bounded API retrieval, whereas the baseline stalled at ~53K due to path/permission limits.
-
-### **Graph Maturation (v11 Statistics)**
-*   **Active Substrate**: **8,748 Hebbian learning edges** were created during the v11 run, reinforcing semantic paths based on actual query patterns.
-*   **Max Score**: Achievement of **0.866 peak accuracy**, indicating the system's ability to provide "Golden" answers for critical infrastructure queries.
-*   **Worst-Case Recovery**: Minimum scores improved by **154%** (from 0.087 to 0.221), ensuring the system remains useful even for the most obscure "edge-case" questions.
+All other benchmark directories are historical development artifacts and should not be used for comparison.
 
 ---
 
-## 5. Cross-Domain & Plugin Validation
+## 2. Key Results (whk-wms v22)
 
-### **Cross-Codebase Portability (plc-gbt)**
-Improvements were verified on **plc-gbt** (Industrial Control Systems), achieving a **0.719 average score** and verifying the engine's effectiveness in complex industrial automation domains.
+### Q&A Battery Performance
 
-### **Non-Code Ingestion (Linear Plugin Test)**
-To prove MDEMG is a general-purpose "Internal Dialog" substrate, we benchmarked the **Binary Sidecar Plugin** against an organization-wide Linear instance.
+| Metric | Baseline | MDEMG | Notes |
+|--------|----------|-------|-------|
+| Mean Score | 0.834 | 0.820 | Within margin of error |
+| Evidence Rate | 100% | 97.1% | Both conditions high |
+| High Confidence (>0.7) | 100% | 94.2% | Run 1 cold start |
+| Run-to-Run Improvement | +2.9% | +3.0% | Similar learning |
 
-*   **Data Ingested**: 1,948 items (Issues, Teams, Projects).
-*   **Structural Discovery**: Identified a 6-phase roadmap (P00-P05) and 36 semantic clusters.
-*   **Key Finding**: The system successfully linked technical code concerns to strategic decision chains, providing agents with "Why" context (rationale) alongside "How" context (code).
+**Observation:** Q&A battery is ECR-saturated (97-100% evidence compliance), limiting mean score differentiation on evidence dimension.
+
+### State Survival Under Compaction
+
+| Metric | Baseline | MDEMG | Source |
+|--------|----------|-------|--------|
+| Decision Persistence @5 compactions | 0% | 95% | Compaction torture test |
+
+**Key Insight:** Single-turn retrieval accuracy is comparable. The differentiator is state survival when context windows fill and auto-compaction occurs.
 
 ---
 
-## 6. Key Findings & Conclusion
+## 3. Test Configuration
 
-1.  **The Reliability Gap**: The v4 baseline proved that LLMs alone cannot maintain context across large repositories (0% independent completion rate). MDEMG's 100% completion rate validates the "Internal Dialog" substrate hypothesis.
-2.  **Emergent Utility**: The 5-layer hierarchy (Base → Clusters → Concepts) successfully identified **92 hidden patterns** and **3 high-level abstractions**, creating a navigable architectural map that traditional search tools lack.
-3.  **Cross-Domain Portability**: Improvements were verified not just on web stacks, but on **plc-gbt** (Industrial ICS), achieving similar results (0.719 avg score).
+### Reproducibility Hashes
 
-**Conclusion**: MDEMG v11 has transitioned from a retrieval aid into a high-performance **Modular Intelligence Engine**, providing a 72.8% net utility lift across its development lifecycle.
+| File | SHA-256 |
+|------|---------|
+| `test_questions_120_agent.json` | `24aa17a215e4e58b8b44c7faef9f14228edb0e6d3f8f657d867b1bfa850f7e9e` |
+| `grade_answers.py` | `5dbf84f092db31e4bc0d4867fd412c7af6575855f7c71e3d2f65e2ee8a8a21a5` |
+
+### Grading Formula
+
+```
+score = min(0.70 * evidence + 0.15 * semantic + 0.15 * concept + file_bonus, 1.0)
+```
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| Evidence | 70% | ECR score (file:line citations) |
+| Semantic | 15% | N-gram Jaccard similarity |
+| Concept | 15% | Technical concept overlap |
+| File Bonus | +10% | Correct file basename cited |
+
+### Baseline Definition
+
+Same agent runner and tool permissions, **no MDEMG retrieval**, relying on long-context + auto-compaction only (memory off).
+
+---
+
+## 4. Limitations
+
+- **Sample size:** n=2 per condition insufficient for statistical significance
+- **ECR ceiling effect:** High compliance rates limit mean score differentiation
+- **Single codebase type:** Results may not generalize to other languages/structures
+
+---
+
+## 5. Archived Historical Results
+
+Previous benchmark iterations (v4-v11, v20, v21) used different methodologies and grading formulas. These have been archived and should not be compared directly to v22 results.
+
+Key methodological differences:
+- Earlier versions used different question sets
+- Grading weights evolved across versions
+- Agent models varied (Haiku vs Sonnet vs Opus)
+- Cold start vs warm start configurations differed
+
+For current benchmarking, use only v22 format benchmarks with the canonical grading script.
+
+---
+
+## 6. Running Benchmarks
+
+See [BENCHMARKING_GUIDE.md](./BENCHMARKING_GUIDE.md) for detailed instructions on:
+- Setting up test environments
+- Running baseline vs MDEMG conditions
+- Grading and analyzing results
+- Avoiding answer contamination

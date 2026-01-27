@@ -1,0 +1,124 @@
+{
+  "questions": [
+    {
+      "id": 1,
+      "category": "architecture_structure",
+      "question": "Which module is responsible for managing the active plugin registry, and what Symbol is used to store its state globally?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 5,
+      "category": "architecture_structure",
+      "question": "What is the directory structure separation between src/channels/plugins/ and extensions/, and what determines which channels go in each location?",
+      "complexity": "system-wide"
+    },
+    {
+      "id": 10,
+      "category": "architecture_structure",
+      "question": "What is the purpose of src/agents/schema/typebox.ts, and what specific API does it wrap?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 21,
+      "category": "service_relationships",
+      "question": "When the gateway server receives an 'agent' RPC request, which command function does it invoke and in which file is that function imported from?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 25,
+      "category": "service_relationships",
+      "question": "What is the initialization order for channel plugins when the ChannelManager starts all channels?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 30,
+      "category": "service_relationships",
+      "question": "Which RPC methods are registered by the gateway server and where is the handler registry built?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 41,
+      "category": "business_logic_constraints",
+      "question": "What are the three valid ExecSecurity modes that can be assigned to tools.elevated.security, and what is the default value if not specified?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 45,
+      "category": "business_logic_constraints",
+      "question": "What security patterns are detected in external content to identify potential prompt injection attempts, and how many distinct patterns are checked?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 50,
+      "category": "business_logic_constraints",
+      "question": "What constraints are enforced on identity.avatar paths in agent configuration, and what specific validation ensures avatars cannot escape the workspace directory?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 61,
+      "category": "data_flow_integration",
+      "question": "When an agent emits an 'assistant' stream event with text data, what is the complete flow from event emission to WebSocket broadcast, including the intermediate buffering and throttling mechanism?",
+      "complexity": "system-wide"
+    },
+    {
+      "id": 65,
+      "category": "data_flow_integration",
+      "question": "When a chat request arrives via the OpenAI-compatible HTTP endpoint, how is the message history transformed and passed to the agent command executor?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 70,
+      "category": "data_flow_integration",
+      "question": "How does the gateway broadcast system filter events based on client scopes, specifically for exec approval events?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 81,
+      "category": "cross_cutting_concerns",
+      "question": "How does the subsystem logger format console output for non-JSON styles, and which file contains the logic for stripping redundant subsystem prefixes from log messages?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 85,
+      "category": "cross_cutting_concerns",
+      "question": "How is gateway authentication resolved from config and environment variables, and which authentication methods support Tailscale Serve mode?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 90,
+      "category": "cross_cutting_concerns",
+      "question": "How does the security audit system classify the severity of channel warnings, and what specific keywords trigger a 'critical' severity rating?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 101,
+      "category": "symbol-lookup",
+      "question": "What is the default handshake timeout in milliseconds for gateway connections?",
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 105,
+      "category": "symbol-lookup",
+      "question": "What is the tick interval in milliseconds for the gateway server's periodic operations?",
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 110,
+      "category": "symbol-lookup",
+      "question": "What is the default maximum age in days before a sandbox container is removed?",
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 115,
+      "category": "symbol-lookup",
+      "question": "What is the near-expiry threshold in milliseconds for external CLI auth tokens?",
+      "complexity": "computed_value"
+    },
+    {
+      "id": 120,
+      "category": "symbol-lookup",
+      "question": "What is the default maximum number of concurrent agents allowed?",
+      "complexity": "symbol-lookup"
+    }
+  ]
+}

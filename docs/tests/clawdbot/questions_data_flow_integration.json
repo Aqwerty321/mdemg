@@ -1,0 +1,224 @@
+[
+  {
+    "id": 61,
+    "category": "data_flow_integration",
+    "question": "When an agent emits an 'assistant' stream event with text data, what is the complete flow from event emission to WebSocket broadcast, including the intermediate buffering and throttling mechanism?",
+    "answer": "The flow is: (1) Agent emits event via emitAgentEvent in src/infra/agent-events.js, (2) Event is received by createAgentEventHandler in src/gateway/server-chat.ts:218, (3) Handler checks if event.stream === 'assistant' and extracts evt.data.text at line 252, (4) emitChatDelta is called (line 253) which buffers the text in chatRunState.buffers at line 137, (5) Throttling logic checks if now - last < 150ms at line 140, only sending if enough time has passed, (6) If sending, deltaSentAt map is updated at line 141, (7) Payload is constructed with state: 'delta' at lines 142-152, (8) broadcast('chat', payload) is called at line 155 which invokes createGatewayBroadcaster in src/gateway/server-broadcast.ts:30, (9) Broadcaster serializes frame and sends via WebSocket to all clients at lines 39-71.",
+    "required_files": [
+      "src/gateway/server-chat.ts",
+      "src/gateway/server-broadcast.ts",
+      "src/infra/agent-events.js"
+    ],
+    "complexity": "system-wide"
+  },
+  {
+    "id": 62,
+    "category": "data_flow_integration",
+    "question": "How does an incoming Discord message get normalized and routed to the auto-reply dispatcher, specifically tracking the transformation of the target identifier?",
+    "answer": "The flow is: (1) Discord plugin receives message and calls normalizeDiscordMessagingTarget in src/channels/plugins/normalize/discord.ts:3, (2) Function calls parseDiscordTarget with defaultKind: 'channel' at line 5 to parse target format, (3) Returns target.normalized at line 6 which standardizes format (e.g., 'discord:channel:123'), (4) This normalized target is passed to dispatchInboundMessage in src/auto-reply/dispatch.ts:17, (5) Context is finalized via finalizeInboundContext at line 24 which preserves the target field, (6) dispatchReplyFromConfig is called at line 25 with the finalized context, (7) The dispatcher uses this normalized target for routing replies back through the correct channel adapter.",
+    "required_files": [
+      "src/channels/plugins/normalize/discord.ts",
+      "src/auto-reply/dispatch.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 63,
+    "category": "data_flow_integration",
+    "question": "What is the complete path for memory search query data from the MemoryIndexManager.search() call through vector and keyword search to the merged hybrid results?",
+    "answer": "The flow is: (1) search() is called in src/memory/manager.ts:261 with query string, (2) Query is embedded via embedQueryWithTimeout at line 289 which calls provider.embedQuery with timeout wrapping, (3) Keyword search is performed via searchKeyword at line 286 if hybrid.enabled is true, which calls src/memory/manager-search.ts searchKeyword function using FTS_TABLE, (4) Vector search is performed via searchVector at line 292 if queryVec has non-zero values, calling searchVector in manager-search.ts which queries VECTOR_TABLE, (5) Both result sets are passed to mergeHybridResults at line 299 in src/memory/hybrid.ts, (6) Hybrid merge applies vectorWeight and textWeight to combine scores at lines 299-304, (7) Final filtered and sliced results are returned with scores >= minScore at line 306.",
+    "required_files": [
+      "src/memory/manager.ts",
+      "src/memory/manager-search.ts",
+      "src/memory/hybrid.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 64,
+    "category": "data_flow_integration",
+    "question": "How does a session transcript update propagate from file write to memory index synchronization, including the event listener mechanism?",
+    "answer": "The flow is: (1) appendAssistantMessageToSessionTranscript in src/config/sessions/transcript.ts:70 writes to sessionFile via SessionManager.appendMessage at line 98, (2) After successful write, emitSessionTranscriptUpdate is called at line 9 which iterates SESSION_TRANSCRIPT_LISTENERS, (3) The listener was registered by MemoryIndexManager.ensureSessionListener in src/memory/manager.ts:793 via onSessionTranscriptUpdate, (4) Listener callback receives update at line 794 and checks if file belongs to agent via isSessionFileForAgent at line 797, (5) If yes, scheduleSessionDirty is called at line 798 which adds file to sessionPendingFiles set and starts debounce timer, (6) After SESSION_DIRTY_DEBOUNCE_MS (5000ms), processSessionDeltaBatch is called at line 807, (7) Delta thresholds are checked and if met, sessionsDirtyFiles.add is called at line 830 and sync is triggered at line 839.",
+    "required_files": [
+      "src/config/sessions/transcript.ts",
+      "src/sessions/transcript-events.ts",
+      "src/memory/manager.ts"
+    ],
+    "complexity": "system-wide"
+  },
+  {
+    "id": 65,
+    "category": "data_flow_integration",
+    "question": "When a chat request arrives via the OpenAI-compatible HTTP endpoint, how is the message history transformed and passed to the agent command executor?",
+    "answer": "The flow is: (1) Request is received in src/gateway/openai-http.ts, body is parsed via readJsonBodyOrError, (2) coerceRequest extracts messages array at line 149, (3) buildAgentPrompt is called at line 67 which iterates messages, extracts system prompts, and builds conversationEntries array with normalized roles, (4) History is formatted using buildHistoryContextFromEntries at line 126 which creates \"Sender: body\" format, (5) Final message string and extraSystemPrompt are returned at lines 135-138, (6) agentCommand is invoked with the formatted message at the endpoint handler, (7) Agent receives consolidated prompt with history context inline.",
+    "required_files": [
+      "src/gateway/openai-http.ts",
+      "src/auto-reply/reply/history.js"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 66,
+    "category": "data_flow_integration",
+    "question": "How do channel outbound adapters route messages with thread context from the tool layer to Slack's API, preserving thread/topic routing?",
+    "answer": "The flow is: (1) Tool (e.g., createMessageTool in src/agents/clawdbot-tools.ts) is invoked with delivery target and message, (2) Tool resolves replyToId and threadId from agent context (currentThreadTs, agentThreadId) at lines 91-100, (3) sendText or sendMedia is called on the slackOutbound adapter in src/channels/plugins/outbound/slack.ts:8 or :18, (4) Adapter receives replyToId and threadId parameters, (5) threadTs is resolved with fallback logic: replyToId ?? (threadId != null ? String(threadId) : undefined) at line 11 or 21, (6) sendMessageSlack is called with threadTs parameter at line 12 or 22, (7) Slack API receives thread_ts ensuring reply stays in correct thread.",
+    "required_files": [
+      "src/agents/clawdbot-tools.ts",
+      "src/channels/plugins/outbound/slack.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 67,
+    "category": "data_flow_integration",
+    "question": "What is the complete event propagation path when an agent lifecycle transitions to 'end' phase, from event emission to client notification and cleanup?",
+    "answer": "The flow is: (1) Agent emits lifecycle event with phase: 'end' via emitAgentEvent, (2) createAgentEventHandler receives event at src/gateway/server-chat.ts:218, (3) lifecyclePhase is extracted at line 247 checking evt.stream === 'lifecycle' && evt.data.phase === 'end', (4) If sessionKey exists and not aborted, flow enters line 254 condition, (5) chatRunState.registry.shift is called at line 256 to dequeue the run entry, (6) emitChatFinal is invoked at line 261 with state: 'done' or 'error', (7) emitChatFinal broadcasts 'chat' event with state: 'final' at line 186-188, (8) broadcast propagates to all connected WebSocket clients via src/gateway/server-broadcast.ts:30, (9) clearAgentRunContext is called at line 289 to cleanup run tracking.",
+    "required_files": [
+      "src/gateway/server-chat.ts",
+      "src/gateway/server-broadcast.ts",
+      "src/infra/agent-events.js"
+    ],
+    "complexity": "system-wide"
+  },
+  {
+    "id": 68,
+    "category": "data_flow_integration",
+    "question": "How does embedding cache data flow from text chunk to cache storage, including the hash computation and cache key structure?",
+    "answer": "The flow is: (1) indexFile in src/memory/manager.ts:2080 calls embedChunksInBatches at line 2090, (2) embedChunksInBatches checks cache via loadEmbeddingCache at line 1639 which uses chunk.hash as key, (3) Cache query is performed at lines 1576-1584 using (provider, model, provider_key, hash) as compound key in EMBEDDING_CACHE_TABLE, (4) Cache miss triggers embedding generation at line 1660, (5) After embedding is generated, toCache array is populated at line 1666 with {hash, embedding} pairs, (6) upsertEmbeddingCache is called at line 1671 which executes INSERT...ON CONFLICT at lines 1594-1599, (7) Cache entry is stored with provider.id, provider.model, providerKey (computed from API config hash at lines 1675-1707), chunk.hash, JSON.stringify(embedding), dims, and updated_at timestamp.",
+    "required_files": [
+      "src/memory/manager.ts",
+      "src/memory/internal.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 69,
+    "category": "data_flow_integration",
+    "question": "What transformation occurs when chat attachments are parsed and converted to agent-compatible image content format?",
+    "answer": "The flow is: (1) parseMessageWithAttachments is called in src/gateway/chat-attachments.ts with message text and attachments array, (2) Function iterates attachments and checks type field, (3) For image types, data is extracted and ChatImageContent object is created with type: 'image', source: {type: 'base64', media_type, data}, (4) Text content and image content are combined into single content array, (5) This content array format matches Anthropic's Messages API structure with mixed text/image blocks, (6) Agent receives normalized content that can include both text and base64-encoded images in a single message.content field.",
+    "required_files": [
+      "src/gateway/chat-attachments.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 70,
+    "category": "data_flow_integration",
+    "question": "How does the gateway broadcast system filter events based on client scopes, specifically for exec approval events?",
+    "answer": "The flow is: (1) broadcast('exec.approval.requested', payload) is called from gateway method handlers, (2) createGatewayBroadcaster.broadcast in src/gateway/server-broadcast.ts:30 receives event and payload, (3) For each client, hasEventScope is called at line 59 to check authorization, (4) hasEventScope looks up event in EVENT_SCOPE_GUARDS at line 19 which maps 'exec.approval.requested' to [APPROVALS_SCOPE], (5) Client role is checked: must be 'operator' at line 22, (6) Client scopes array is checked for either ADMIN_SCOPE ('operator.admin') at line 24 or the required APPROVALS_SCOPE ('operator.approvals') at line 25, (7) If scope check fails, event is skipped for that client at line 59, (8) If passes, event is serialized and sent via WebSocket at lines 39-71.",
+    "required_files": [
+      "src/gateway/server-broadcast.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 71,
+    "category": "data_flow_integration",
+    "question": "Trace the data flow when memory files are synced to vector storage, including chunking, embedding, and vector table insertion.",
+    "answer": "The flow is: (1) syncMemoryFiles in src/memory/manager.ts:974 lists files and builds MemoryFileEntry objects at line 980, (2) indexFile is called at line 1012 for each changed file, (3) File content is read and passed to chunkMarkdown in src/memory/internal.ts which splits content by chunk.tokens and chunk.overlap settings at line 2085, (4) Chunks are passed to embedChunksWithBatch or embedChunksInBatches at lines 2088-2090, (5) For each chunk, embedding provider generates vector (OpenAI, Gemini, or local), (6) ensureVectorReady is called at line 2092 with sample.length to initialize VECTOR_TABLE with correct dimensions, (7) For each chunk, INSERT INTO chunks is executed at lines 2119-2141 storing id, path, source, start_line, end_line, hash, model, text, embedding JSON, updated_at, (8) If vectorReady and embedding.length > 0, INSERT INTO VECTOR_TABLE is executed at lines 2142-2148 with id and vectorToBlob(embedding) which converts Float32Array to Buffer.",
+    "required_files": [
+      "src/memory/manager.ts",
+      "src/memory/internal.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 72,
+    "category": "data_flow_integration",
+    "question": "How does the chat run registry manage concurrent chat sessions, from registration to final cleanup?",
+    "answer": "The flow is: (1) Chat request arrives and createChatRunRegistry in src/gateway/server-chat.ts:39 maintains chatRunSessions Map<sessionId, ChatRunEntry[]>, (2) On new request, registry.add is called at line 42 which appends {sessionKey, clientRunId} to queue for sessionId, (3) During agent execution, registry.peek at line 51 retrieves the first entry without removal for event routing, (4) Agent events are matched to sessionKey via chatLink at line 219 using registry.peek(evt.runId), (5) On lifecycle:end, registry.shift is called at line 256 to dequeue and remove entry, (6) If entry removed successfully, emitChatFinal is called at line 261 to send final response, (7) If aborted mid-run, registry.remove is called at line 283 with clientRunId and sessionKey to remove specific entry, (8) Buffers, deltaSentAt, and abortedRuns maps are cleaned up at lines 280-281.",
+    "required_files": [
+      "src/gateway/server-chat.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 73,
+    "category": "data_flow_integration",
+    "question": "When a channel plugin normalizes an inbound message, what are the key transformations applied to sender identity and conversation labels?",
+    "answer": "The flow is: (1) Channel plugin receives raw message with sender metadata, (2) sender-identity.ts normalization extracts userId, displayName, and channel-specific identifiers, (3) conversation-label.ts resolves group/channel name and creates normalized label (e.g., '#channel-name', 'DM: Username'), (4) location.ts determines if message is from group/DM/channel based on channel-specific ID patterns, (5) chat-type.ts classifies as 'dm', 'group', or 'channel', (6) All normalized fields are combined into MsgContext object, (7) Context is passed to dispatchInboundMessage with consistent structure regardless of source channel (Discord/Slack/Telegram/etc).",
+    "required_files": [
+      "src/channels/sender-identity.ts",
+      "src/channels/conversation-label.ts",
+      "src/channels/location.ts",
+      "src/channels/chat-type.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 74,
+    "category": "data_flow_integration",
+    "question": "How does the OpenAI batch embedding API request flow through custom_id mapping to final cache storage?",
+    "answer": "The flow is: (1) embedChunksWithOpenAiBatch in src/memory/manager.ts:1725 creates OpenAiBatchRequest array, (2) For each chunk, custom_id is generated as hashText of source:path:startLine:endLine:hash:index at line 1754, (3) Mapping stores {customId -> {index, hash}} at line 1757 to track chunk identity, (4) runOpenAiEmbeddingBatches in src/memory/batch-openai.ts submits batch job and polls for completion, (5) Results are returned as Map<custom_id, embedding> at line 1784, (6) For each result entry, mapping.get(customId) retrieves original {index, hash} at line 1788, (7) embeddings array is populated at mapped.index at line 1790, (8) toCache is built with {hash, embedding} at line 1791, (9) upsertEmbeddingCache is called at line 1793 to persist to EMBEDDING_CACHE_TABLE.",
+    "required_files": [
+      "src/memory/manager.ts",
+      "src/memory/batch-openai.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 75,
+    "category": "data_flow_integration",
+    "question": "What is the state synchronization mechanism between agent run sequence numbers and WebSocket broadcast events?",
+    "answer": "The flow is: (1) agentRunSeq Map<runId, number> tracks last sequence number per run in gateway context, (2) createAgentEventHandler receives AgentEventPayload with evt.seq at src/gateway/server-chat.ts:218, (3) Last known seq is retrieved via agentRunSeq.get(evt.runId) ?? 0 at line 226, (4) Sequence gap detection checks if evt.seq !== last + 1 at line 231, (5) If gap detected, error event is broadcast with 'seq gap' reason and expected/received values at lines 232-242, (6) agentRunSeq.set(evt.runId, evt.seq) updates tracked sequence at line 244, (7) Event is broadcast with original seq number preserved at line 245, (8) Clients can detect gaps by comparing consecutive seq numbers in received events.",
+    "required_files": [
+      "src/gateway/server-chat.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 76,
+    "category": "data_flow_integration",
+    "question": "How does the reply dispatcher coordinate typing indicators with buffered message delivery?",
+    "answer": "The flow is: (1) createReplyDispatcherWithTyping in src/auto-reply/reply/reply-dispatcher.ts creates buffered dispatcher with typing state, (2) When message sending begins, typing indicator is sent via typingStart callback, (3) Messages are queued in internal buffer with debounce/throttle logic, (4) Buffer accumulates text chunks to avoid rapid API calls, (5) When buffer flushes (on timeout or size threshold), typing indicator is maintained, (6) On final message delivery, markDispatchIdle is called which stops typing indicator, (7) This ensures typing indicator shows during composition but stops when message is sent, maintaining smooth UX across channels.",
+    "required_files": [
+      "src/auto-reply/reply/reply-dispatcher.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 77,
+    "category": "data_flow_integration",
+    "question": "Trace the transformation of tool execution results from bash output to agent message content.",
+    "answer": "The flow is: (1) Bash tool executes command via bash-tools.exec.ts, captures stdout/stderr, (2) Output is formatted with metadata (exit code, execution time, approval status), (3) Result is returned as tool_result content to agent via tool use response, (4) Agent processes tool_result in message history, (5) If configured for verbose mode, tool events are emitted via emitAgentEvent with stream: 'tool', (6) Tool results appear in agent's context window for next reasoning step, (7) If transcript recording is enabled, tool results are serialized to session transcript in JSONL format with type: 'message', role: 'tool'.",
+    "required_files": [
+      "src/agents/bash-tools.exec.ts",
+      "src/agents/bash-tools.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 78,
+    "category": "data_flow_integration",
+    "question": "How does the memory manager handle fallback from OpenAI embeddings to local embeddings when batch operations fail?",
+    "answer": "The flow is: (1) embedChunksWithOpenAiBatch attempts batch operation in src/memory/manager.ts:1725, (2) If batch fails (timeout, API error, quota), error is caught at line 2058, (3) recordBatchFailure is called at line 2062 which increments batchFailureCount and checks against BATCH_FAILURE_LIMIT, (4) If failure count >= BATCH_FAILURE_LIMIT or forceDisable is true, batch.enabled is set to false at line 2012, (5) Fallback to embedChunksInBatches is executed at line 2072 which uses non-batch embedding, (6) If shouldFallbackOnError detects embedding-related error at line 1237, activateFallbackProvider is called at line 1224, (7) Fallback provider (e.g., local) is initialized via createEmbeddingProvider at line 1276, (8) Full reindex is triggered with new provider at line 1226.",
+    "required_files": [
+      "src/memory/manager.ts",
+      "src/memory/embeddings.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 79,
+    "category": "data_flow_integration",
+    "question": "What is the message routing flow when a subagent is spawned via the sessions-spawn tool, from parent context to child session?",
+    "answer": "The flow is: (1) Parent agent invokes createSessionsSpawnTool in src/agents/clawdbot-tools.ts:127, (2) Tool extracts agentSessionKey, agentChannel, agentAccountId, agentTo, agentThreadId, agentGroupId from parent context at lines 128-137, (3) Spawn parameters (agent_id, model, message, announce_to) are validated, (4) Child session is created with inherited context: agentTo for routing, agentThreadId for thread preservation, agentChannel for reply path, (5) If announce_to is specified, routing target is resolved for status announcements, (6) Child agent starts with own session but can reply to parent's channel via inherited agentChannel reference, (7) Lifecycle events (agent:wait:start, agent:wait:result) are emitted to parent session for monitoring.",
+    "required_files": [
+      "src/agents/clawdbot-tools.ts",
+      "src/agents/tools/sessions-spawn-tool.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 80,
+    "category": "data_flow_integration",
+    "question": "How does session state propagate from config store updates to active WebSocket clients?",
+    "answer": "The flow is: (1) Session metadata is updated via updateSessionStore in src/config/sessions/store.ts which writes to sessions.json, (2) Session entry includes sessionKey, sessionId, agentId, model, verboseLevel, lastActive timestamp, (3) When gateway WebSocket clients connect, they subscribe to session updates via nodeSendToSession callback, (4) Session-specific events (chat, agent) are routed using sessionKey lookup at src/gateway/server-chat.ts:157, 188, 251, (5) nodeSendToSession filters clients by matching client.sessionBindings.has(sessionKey), (6) State updates (model changes, config reloads) trigger session:updated broadcast to subscribed clients, (7) Control UI clients receive real-time session state changes without polling.",
+    "required_files": [
+      "src/config/sessions/store.ts",
+      "src/gateway/server-chat.ts",
+      "src/gateway/server-methods/config.ts"
+    ],
+    "complexity": "system-wide"
+  }
+]

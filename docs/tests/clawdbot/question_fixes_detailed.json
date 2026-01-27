@@ -1,0 +1,106 @@
+{
+  "verification_date": "2026-01-26",
+  "total_issues": 9,
+  "fixes_required": [
+    {
+      "question_id": 16,
+      "category": "architecture_structure",
+      "issue_type": "wrong_line",
+      "problem": "Answer references src/cli/program.ts:47, but file only has 2 lines (it's a re-export file)",
+      "actual_location": "src/index.ts:47 imports buildProgram from src/cli/program.js",
+      "fix": "Update answer to reference src/index.ts:47 (the actual import) and src/cli/program/build-program.ts:7-17 (the implementation)",
+      "corrected_answer_snippet": "src/index.ts:47 imports buildProgram from src/cli/program.js. The buildProgram function is implemented in src/cli/program/build-program.ts:7-17, which creates a Commander program instance (line 8), configures help (line 12), registers preaction hooks (line 13), and registers commands (line 15)."
+    },
+    {
+      "question_id": 27,
+      "category": "service_relationships",
+      "issue_type": "missing_file",
+      "problem": "Answer references 'manager-search.ts' without path prefix",
+      "actual_location": "src/memory/manager-search.ts",
+      "fix": "Change 'manager-search.ts' to 'src/memory/manager-search.ts' in both answer text and required_files",
+      "corrected_required_files": ["src/memory/manager.ts", "src/agents/memory-search.ts", "src/memory/manager-search.ts"]
+    },
+    {
+      "question_id": 55,
+      "category": "business_logic_constraints",
+      "issue_type": "missing_file",
+      "problem": "Answer references 'src/config/config.js' but file is TypeScript",
+      "actual_location": "src/config/config.ts",
+      "fix": "Change all references from config.js to config.ts",
+      "corrected_required_files": ["src/security/audit.ts", "src/config/config.ts"]
+    },
+    {
+      "question_id": 56,
+      "category": "business_logic_constraints",
+      "issue_type": "missing_file",
+      "problem": "Answer references 'src/routing/session-key.js' but file is TypeScript",
+      "actual_location": "src/routing/session-key.ts",
+      "fix": "Change all references from session-key.js to session-key.ts",
+      "corrected_required_files": ["src/infra/exec-approvals.ts", "src/routing/session-key.ts"]
+    },
+    {
+      "question_id": 58,
+      "category": "business_logic_constraints",
+      "issue_type": "missing_file",
+      "problem": "Answer references 'src/pairing/pairing-store.js' but file is TypeScript",
+      "actual_location": "src/pairing/pairing-store.ts",
+      "fix": "Change all references from pairing-store.js to pairing-store.ts",
+      "corrected_required_files": ["src/security/audit.ts", "src/pairing/pairing-store.ts"]
+    },
+    {
+      "question_id": 61,
+      "category": "data_flow_integration",
+      "issue_type": "missing_file",
+      "problem": "Answer references 'src/infra/agent-events.js' but file is TypeScript",
+      "actual_location": "src/infra/agent-events.ts",
+      "fix": "Change all references from agent-events.js to agent-events.ts",
+      "corrected_required_files": ["src/gateway/server-chat.ts", "src/gateway/server-broadcast.ts", "src/infra/agent-events.ts"]
+    },
+    {
+      "question_id": 65,
+      "category": "data_flow_integration",
+      "issue_type": "missing_file",
+      "problem": "Answer references 'src/auto-reply/reply/history.js' but file is TypeScript",
+      "actual_location": "src/auto-reply/reply/history.ts",
+      "fix": "Change all references from history.js to history.ts",
+      "corrected_required_files": ["src/gateway/openai-http.ts", "src/auto-reply/reply/history.ts"]
+    },
+    {
+      "question_id": 67,
+      "category": "data_flow_integration",
+      "issue_type": "missing_file",
+      "problem": "Answer references 'src/infra/agent-events.js' but file is TypeScript",
+      "actual_location": "src/infra/agent-events.ts",
+      "fix": "Change all references from agent-events.js to agent-events.ts (duplicate of Q61)",
+      "corrected_required_files": ["src/gateway/server-chat.ts", "src/gateway/server-broadcast.ts", "src/infra/agent-events.ts"]
+    },
+    {
+      "question_id": 87,
+      "category": "cross_cutting_concerns",
+      "issue_type": "missing_file",
+      "problem": "Answer references 'config.diagnostics.cacheTrace.enabled' as a file, but it's a config property path",
+      "actual_location": "This is a property path, not a file. The answer should reference the actual file src/agents/cache-trace.ts where this config is accessed",
+      "fix": "This is not a file reference - it's a config property being accessed. Remove from required_files list, or add the actual config schema file if one exists.",
+      "corrected_required_files": ["src/agents/cache-trace.ts"],
+      "note": "The 'config.diagnostics.cacheTrace.enabled' was mistakenly extracted as a file:line reference. It's actually a property access pattern."
+    }
+  ],
+  "summary": {
+    "js_vs_ts_extensions": 6,
+    "missing_path_prefix": 1,
+    "wrong_file_reference": 1,
+    "config_property_mistaken_as_file": 1
+  },
+  "bulk_fix_pattern": {
+    "description": "Most issues are .js vs .ts extension mismatches. Apply regex replace pattern:",
+    "find_pattern": "\\.js(?=['\"\\)])",
+    "replace_pattern": ".ts",
+    "affected_questions": [55, 56, 58, 61, 65, 67],
+    "manual_review_required": [16, 27, 87]
+  },
+  "verification_status": {
+    "after_fixes": "121/130 verified OK (93.1%)",
+    "expected_after_fixes": "130/130 (100%)",
+    "confidence": "HIGH - all issues are straightforward file extension or path corrections"
+  }
+}

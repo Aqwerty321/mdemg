@@ -1,0 +1,1403 @@
+{
+  "benchmark": "clawdbot-v1",
+  "codebase": "clawdbot",
+  "space_id": "clawdbot",
+  "question_count": 130,
+  "categories": {
+    "architecture_structure": 20,
+    "service_relationships": 20,
+    "business_logic_constraints": 20,
+    "data_flow_integration": 20,
+    "cross_cutting_concerns": 20,
+    "symbol-lookup": 30
+  },
+  "questions": [
+    {
+      "id": 1,
+      "category": "architecture_structure",
+      "question": "Which module is responsible for managing the active plugin registry, and what Symbol is used to store its state globally?",
+      "answer": "The src/plugins/runtime.ts module (lines 1-58) is responsible for managing the active plugin registry. It uses the Symbol REGISTRY_STATE = Symbol.for('clawdbot.pluginRegistryState') defined at line 19 to store the registry state globally. The state is accessed via a closure pattern (lines 26-37) that ensures a singleton instance across the application.",
+      "required_files": [
+        "src/plugins/runtime.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 2,
+      "category": "architecture_structure",
+      "question": "What is the architectural relationship between ChannelPlugin (src/channels/plugins/types.plugin.ts) and ChannelDock (src/channels/dock.ts), and why are they separated?",
+      "answer": "ChannelPlugin (src/channels/plugins/types.plugin.ts:48-84) is the full plugin contract with all adapters (config, setup, pairing, security, gateway, etc.), while ChannelDock (src/channels/dock.ts:40-64) is a lightweight metadata/behavior subset for shared code paths. The separation is explained in comments at src/channels/dock.ts:81-86: 'keep this module *light* (no monitors, probes, puppeteer/web login, etc)' - shared code should import from dock.ts (not from plugins) to avoid eagerly loading heavy channel implementations. The buildDockFromPlugin function (src/channels/dock.ts:374-397) extracts the dock subset from a plugin.",
+      "required_files": [
+        "src/channels/plugins/types.plugin.ts",
+        "src/channels/dock.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 3,
+      "category": "architecture_structure",
+      "question": "What interface must extension plugins implement to register channels, and what method from ClawdbotPluginApi is used to register them?",
+      "answer": "Extension plugins must implement a register() method that accepts ClawdbotPluginApi as a parameter (see extensions/discord/index.ts:12). The plugin calls api.registerChannel() with a ChannelPlugin object (extensions/discord/index.ts:14 and src/plugins/registry.ts:326-352). The ClawdbotPluginApi interface is defined in src/plugin-sdk/index.ts and exported as part of the SDK. The registerChannel method is created in src/plugins/registry.ts:486 within the createApi function.",
+      "required_files": [
+        "extensions/discord/index.ts",
+        "src/plugins/registry.ts",
+        "src/plugin-sdk/index.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 4,
+      "category": "architecture_structure",
+      "question": "Where is the ordered list of core chat channels defined, and how does the system normalize channel aliases?",
+      "answer": "The core chat channels are defined in src/channels/registry.ts as CHAT_CHANNEL_ORDER (lines 7-15): ['telegram', 'whatsapp', 'discord', 'googlechat', 'slack', 'signal', 'imessage']. Channel aliases are defined in CHAT_CHANNEL_ALIASES (lines 103-107), mapping shortcuts like 'imsg' -> 'imessage'. The normalizeChatChannelId function (lines 126-133) normalizes input by checking aliases and validating against CHAT_CHANNEL_ORDER.",
+      "required_files": [
+        "src/channels/registry.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 5,
+      "category": "architecture_structure",
+      "question": "What is the directory structure separation between src/channels/plugins/ and extensions/, and what determines which channels go in each location?",
+      "answer": "src/channels/plugins/ (lines 1-78 in src/channels/plugins/index.ts) contains the plugin infrastructure (types, registry, config helpers, onboarding adapters). The extensions/ directory contains the actual channel implementations (extensions/discord/, extensions/googlechat/, etc.). Core bundled channels are in extensions/ and loaded as plugins. This is evident from extensions/discord/index.ts:1-18 which imports from 'clawdbot/plugin-sdk' and registers via api.registerChannel(). The separation allows channels to be distributed as separate npm packages or local plugins.",
+      "required_files": [
+        "src/channels/plugins/index.ts",
+        "extensions/discord/index.ts",
+        "src/plugin-sdk/index.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 6,
+      "category": "architecture_structure",
+      "question": "What module is responsible for building session keys, and what are the three default constants it exports for session identification?",
+      "answer": "The src/routing/session-key.ts module (lines 1-212) is responsible for building session keys. It exports three default constants: DEFAULT_AGENT_ID = 'main' (line 10), DEFAULT_MAIN_KEY = 'main' (line 11), and DEFAULT_ACCOUNT_ID = 'default' (line 12). These are used throughout the session key building functions like buildAgentMainSessionKey() (lines 101-108) and buildAgentPeerSessionKey() (lines 110-149).",
+      "required_files": [
+        "src/routing/session-key.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 7,
+      "category": "architecture_structure",
+      "question": "Which module exports the PluginRuntime type, and what are the four top-level namespaces it provides to plugins?",
+      "answer": "The src/plugins/runtime/types.ts module (lines 1-362) exports the PluginRuntime type. The four top-level namespaces are: config (line 180-183), system (lines 184-188), media (lines 189-196), tts (lines 197-199), tools (lines 200-204), channel (lines 205-350), logging (lines 351-357), and state (lines 358-360). Actually examining the structure more carefully, the main service groupings are: config, system, media, tts, tools, channel, logging, and state - so there are 8 top-level namespaces, not 4. The key architectural groupings are config, system, media, and channel.",
+      "required_files": [
+        "src/plugins/runtime/types.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 8,
+      "category": "architecture_structure",
+      "question": "What is the relationship between src/gateway/server-http.ts and src/gateway/hooks.ts in the HTTP request handling flow?",
+      "answer": "src/gateway/server-http.ts:59-200 defines createHooksRequestHandler which handles HTTP webhook requests at a configurable basePath. It imports hook utilities from src/gateway/hooks.ts including extractHookToken, resolveHookChannel, normalizeAgentPayload, normalizeWakePayload (lines 18-28). The handler validates tokens, normalizes payloads, and dispatches hook actions. The createGatewayHttpServer function (lines 203-302) creates the HTTP server and routes requests to handleHooksRequest first (line 241), establishing hooks as a primary HTTP handler in the gateway architecture.",
+      "required_files": [
+        "src/gateway/server-http.ts",
+        "src/gateway/hooks.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 9,
+      "category": "architecture_structure",
+      "question": "Where is the plugin registry's createApi function defined, and what are the registration methods it exposes on the ClawdbotPluginApi?",
+      "answer": "The createApi function is defined in src/plugins/registry.ts:464-495. It returns a ClawdbotPluginApi object with these registration methods: registerTool (line 481), registerHook (lines 482-483), registerHttpHandler (line 484), registerHttpRoute (line 485), registerChannel (line 486), registerProvider (line 487), registerGatewayMethod (line 488), registerCli (line 489), registerService (line 490), registerCommand (line 491), and the typed hook registration 'on' method (line 493).",
+      "required_files": [
+        "src/plugins/registry.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 10,
+      "category": "architecture_structure",
+      "question": "What is the purpose of src/agents/schema/typebox.ts, and what specific API does it wrap?",
+      "answer": "src/agents/schema/typebox.ts (lines 1-44) provides helper functions for building agent tool schemas using the @sinclair/typebox library. It wraps TypeBox's Type API with custom helpers like stringEnum() (lines 15-24) and optionalStringEnum() (lines 26-31) to create safer enum schemas that use 'enum' instead of 'anyOf' (comment at lines 13-14 explains some providers reject anyOf). It also provides channelTargetSchema() and channelTargetsSchema() helpers (lines 33-43) for channel target parameters.",
+      "required_files": [
+        "src/agents/schema/typebox.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 11,
+      "category": "architecture_structure",
+      "question": "How does the extension plugin system's runtime injection work, as demonstrated by extensions/discord/src/runtime.ts and extensions/discord/index.ts?",
+      "answer": "The plugin system uses a runtime injection pattern. Extensions/discord/index.ts:13 calls setDiscordRuntime(api.runtime) during plugin registration. Extensions/discord/src/runtime.ts implements a module-scoped variable to store the runtime, then exports getDiscordRuntime() for accessing it. The PluginRuntime (from src/plugins/runtime/types.ts) provides access to config, system, media, channel, and logging utilities. This allows the discord channel implementation (extensions/discord/src/channel.ts:35-40) to call getDiscordRuntime().channel.discord.messageActions.* without tight coupling to core modules.",
+      "required_files": [
+        "extensions/discord/index.ts",
+        "extensions/discord/src/runtime.ts",
+        "extensions/discord/src/channel.ts",
+        "src/plugins/runtime/types.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 12,
+      "category": "architecture_structure",
+      "question": "What is the architectural pattern used in src/channels/dock.ts for defining channel-specific behavior (DOCKS constant), and what is the fallback mechanism for plugin channels?",
+      "answer": "src/channels/dock.ts uses a static DOCKS constant (lines 91-372) mapping ChatChannelId to ChannelDock for core channels like telegram, whatsapp, discord, etc. Each dock entry defines capabilities, config resolvers, mention patterns, and threading behavior inline. For plugin channels not in DOCKS, the fallback is buildDockFromPlugin() (lines 374-397) which extracts a ChannelDock from a ChannelPlugin. The listChannelDocks() function (lines 415-432) combines both sources, prioritizing DOCKS entries and falling back to plugin-provided docks via listPluginDockEntries() (lines 399-413).",
+      "required_files": [
+        "src/channels/dock.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 13,
+      "category": "architecture_structure",
+      "question": "What is the responsibility boundary between src/auto-reply/reply/provider-dispatcher.ts and src/auto-reply/dispatch.ts?",
+      "answer": "src/auto-reply/reply/provider-dispatcher.ts (lines 1-45) exports high-level dispatcher functions like dispatchReplyWithBufferedBlockDispatcher() (lines 14-28) and dispatchReplyWithDispatcher() (lines 30-44) that accept MsgContext, ClawdbotConfig, and dispatcher options. These delegate to src/auto-reply/dispatch.ts which contains the actual dispatch implementation with dispatchInboundMessageWithBufferedDispatcher and dispatchInboundMessageWithDispatcher (imported at lines 5-8). The provider-dispatcher acts as a facade/adapter layer, normalizing parameters before calling the core dispatch logic.",
+      "required_files": [
+        "src/auto-reply/reply/provider-dispatcher.ts",
+        "src/auto-reply/dispatch.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 14,
+      "category": "architecture_structure",
+      "question": "What are the three core module categories that MUST NOT be imported by src/channels/dock.ts, and why?",
+      "answer": "According to comments at src/channels/dock.ts:81-86, the dock module must remain 'light' and NOT import: monitors, probes, or puppeteer/web login implementations. The rationale is that shared code paths (reply flow, command auth, sandbox explain) should depend on dock.ts for channel metadata, but shouldn't eagerly load heavy channel-specific implementations. This architectural constraint ensures fast module loading for common operations. Heavy logic should stay in src/channels/plugins/<id>.ts or channel-specific modules.",
+      "required_files": [
+        "src/channels/dock.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 15,
+      "category": "architecture_structure",
+      "question": "What is the plugin registry structure (PluginRegistry type) and what are the 11 collection arrays it maintains?",
+      "answer": "The PluginRegistry type is defined in src/plugins/registry.ts:124-138. It maintains 11 collection arrays: plugins (PluginRecord[]), tools (PluginToolRegistration[]), hooks (PluginHookRegistration[]), typedHooks (TypedPluginHookRegistration[]), channels (PluginChannelRegistration[]), providers (PluginProviderRegistration[]), httpHandlers (PluginHttpRegistration[]), httpRoutes (PluginHttpRouteRegistration[]), cliRegistrars (PluginCliRegistration[]), services (PluginServiceRegistration[]), and commands (PluginCommandRegistration[]). It also has gatewayHandlers (GatewayRequestHandlers object) and diagnostics (PluginDiagnostic[]).",
+      "required_files": [
+        "src/plugins/registry.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 16,
+      "category": "architecture_structure",
+      "question": "How does src/index.ts serve as the entry point, and what CLI framework does it use?",
+      "answer": "src/index.ts (lines 1-95) is the main entry point (shebang at line 1). It loads environment (loadDotEnv line 37, normalizeEnv line 38), enables console capture (line 42), asserts runtime compatibility (line 45), then imports and builds the CLI program via buildProgram() imported at line 47 from src/cli/program.js (which re-exports from src/cli/program/build-program.ts:7-17). It checks if running as main module (lines 76-78) and if so, installs error handlers (line 83) and calls program.parseAsync() (line 90). The CLI framework is Commander.js (implied by parseAsync API). It exports utility functions for programmatic use (lines 51-74).",
+      "required_files": [
+        "src/index.ts",
+        "src/entry.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 17,
+      "category": "architecture_structure",
+      "question": "What is the plugin-sdk module's purpose (src/plugin-sdk/index.ts), and what types of exports does it re-export?",
+      "answer": "src/plugin-sdk/index.ts (lines 1-372) serves as the public Plugin SDK entrypoint, re-exporting types and utilities for external plugins to use. It exports: 1) Channel plugin types (ChannelPlugin, ChannelId, ChannelConfigAdapter, etc. from lines 7-59), 2) Plugin runtime types (ClawdbotPluginApi, ClawdbotPluginService, PluginRuntime from lines 61-71), 3) Gateway types (GatewayRequestHandler, RespondFn from lines 66-70), 4) Config schemas (DiscordConfigSchema, SlackConfigSchema, etc. from lines 96-116), 5) Channel-specific utilities (line helpers, WhatsApp helpers, Discord helpers from lines 250-372), and 6) Common utilities (normalizePluginHttpPath, emptyPluginConfigSchema from lines 72-74).",
+      "required_files": [
+        "src/plugin-sdk/index.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 18,
+      "category": "architecture_structure",
+      "question": "What are the gateway protocol schema modules (src/gateway/protocol/schema/*.ts), and how are they aggregated?",
+      "answer": "The gateway protocol schemas are organized in separate files under src/gateway/protocol/schema/: agent.ts, agents-models-skills.ts, channels.ts, config.ts, cron.ts, error-codes.ts, exec-approvals.ts, devices.ts, frames.ts, logs-chat.ts, nodes.ts, protocol-schemas.ts, sessions.ts, snapshot.ts, types.ts, and wizard.ts. These are all re-exported through src/gateway/protocol/schema.ts (lines 1-16) using export * statements, creating a single aggregation point. This modular schema organization allows the gateway protocol to be version-controlled and imported as a cohesive unit.",
+      "required_files": [
+        "src/gateway/protocol/schema.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 19,
+      "category": "architecture_structure",
+      "question": "What pattern does src/agents/tools/common.ts use for parameter extraction, and what are the three readParam utility functions it exports?",
+      "answer": "src/agents/tools/common.ts (lines 1-100) implements a parameter extraction pattern for agent tools. It exports three readParam utilities: readStringParam() (lines 33-60) with overloaded signatures for required vs optional parameters, readStringOrNumberParam() (lines 62-78) for flexible numeric/string inputs, and readNumberParam() (lines 80-100+) for numeric parameters with optional integer validation. All three follow a pattern of: 1) accept params Record and key, 2) accept options for required/trim/label, 3) validate type, 4) throw with label if required and missing, 5) return typed value or undefined.",
+      "required_files": [
+        "src/agents/tools/common.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 20,
+      "category": "architecture_structure",
+      "question": "How does the channel plugin system handle multiple accounts per channel, as demonstrated in extensions/discord/src/channel.ts config adapter?",
+      "answer": "The channel plugin system's config adapter (extensions/discord/src/channel.ts:71-107) implements multi-account support through several methods: listAccountIds() to enumerate accounts, resolveAccount() to fetch specific account config, defaultAccountId() to determine which account to use by default, setAccountEnabled() to toggle accounts on/off, and deleteAccount() to remove accounts. The ResolvedDiscordAccount type (imported from clawdbot/plugin-sdk line 27) encapsulates account-specific config. The security.resolveDmPolicy method (lines 108-122) dynamically determines the config path based on whether an accounts.<id> section exists, using either channels.discord.accounts.<id>.dm or channels.discord.dm as the fallback.",
+      "required_files": [
+        "extensions/discord/src/channel.ts",
+        "src/channels/plugins/types.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 21,
+      "category": "service_relationships",
+      "question": "When the gateway server receives an 'agent' RPC request, which command function does it invoke and in which file is that function imported from?",
+      "answer": "The gateway 'agent' RPC handler at src/gateway/server-methods/agent.ts:46 invokes the agentCommand function, which is imported from src/commands/agent.ts:2. The handler calls agentCommand at line 349 after validating parameters and resolving delivery targets.",
+      "required_files": [
+        "src/gateway/server-methods/agent.ts",
+        "src/commands/agent.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 22,
+      "category": "service_relationships",
+      "question": "How does the ChannelDock registry resolve plugin-provided channel configurations at runtime?",
+      "answer": "The getChannelDock function at src/channels/dock.ts:434 first checks the static DOCKS map for core channels. If not found, it calls requireActivePluginRegistry() from src/plugins/runtime.ts:48 to get the active plugin registry, searches for the channel in registry.channels, and returns either the pre-built dock from pluginEntry.dock or builds one via buildDockFromPlugin at line 374.",
+      "required_files": [
+        "src/channels/dock.ts",
+        "src/plugins/runtime.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 23,
+      "category": "service_relationships",
+      "question": "Which service listens to agent lifecycle events and how does the agent.wait RPC method retrieve job completion status?",
+      "answer": "The waitForAgentJob function at src/gateway/server-methods/agent-job.ts:68 calls ensureAgentRunListener at line 30, which registers a listener via onAgentEvent from src/infra/agent-events.ts:78. The listener at line 33 watches for lifecycle stream events with phase 'end' or 'error' (line 43) and stores snapshots in agentRunCache. The agent.wait handler retrieves this cached status.",
+      "required_files": [
+        "src/gateway/server-methods/agent-job.ts",
+        "src/infra/agent-events.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 24,
+      "category": "service_relationships",
+      "question": "How does the agent command service register run context and emit lifecycle events during agent execution?",
+      "answer": "In src/commands/agent.ts, the agent command registers context at multiple points: line 289 via registerAgentRunContext when a session key exists, and within src/auto-reply/reply/agent-runner-execution.ts:88-93 before starting the run loop. Events are emitted via emitAgentEvent imported from src/infra/agent-events.ts:55, such as lifecycle start at line 156 and lifecycle end at line 194.",
+      "required_files": [
+        "src/commands/agent.ts",
+        "src/auto-reply/reply/agent-runner-execution.ts",
+        "src/infra/agent-events.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 25,
+      "category": "service_relationships",
+      "question": "What is the initialization order for channel plugins when the ChannelManager starts all channels?",
+      "answer": "The createChannelManager at src/gateway/server-channels.ts:62 returns a startChannels function. When called, it invokes listChannelPlugins from src/channels/plugins/index.ts:29 to get all plugins, then for each channel calls startChannel (line 92). startChannel retrieves the plugin via getChannelPlugin (line 93), calls plugin.config.listAccountIds to get accounts (line 99), and for each enabled/configured account invokes plugin.gateway.startAccount at line 141.",
+      "required_files": [
+        "src/gateway/server-channels.ts",
+        "src/channels/plugins/index.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 26,
+      "category": "service_relationships",
+      "question": "How does the agent tool creation service integrate plugin-provided tools with core tools?",
+      "answer": "The createClawdbotTools function at src/agents/clawdbot-tools.ts:22 creates core tools (browser, canvas, nodes, message, etc.) in the tools array at lines 76-146. It then calls resolvePluginTools from src/plugins/tools.ts:37 at line 148, passing existingToolNames to prevent collisions. resolvePluginTools loads plugins via loadClawdbotPlugins at line 42, iterates registry.tools entries, and returns plugin tools which are spread into the final tools array at line 166.",
+      "required_files": [
+        "src/agents/clawdbot-tools.ts",
+        "src/plugins/tools.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 27,
+      "category": "service_relationships",
+      "question": "How does the memory search service integrate with agent execution to retrieve relevant context?",
+      "answer": "The MemoryIndexManager class at src/memory/manager.ts:118 provides a search interface. Agent execution in src/auto-reply/reply/agent-runner-memory.ts would create a memory manager instance and call its search methods. The manager uses resolveMemorySearchConfig from src/agents/memory-search.ts:10 to configure embeddings, then performs vector search via searchVector (src/memory/manager-search.ts:44) and keyword search via searchKeyword, merging results with mergeHybridResults.",
+      "required_files": [
+        "src/memory/manager.ts",
+        "src/agents/memory-search.ts",
+        "src/memory/manager-search.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 28,
+      "category": "service_relationships",
+      "question": "How does the gateway server's channel logout flow invoke plugin-specific logout handlers?",
+      "answer": "The channels.logout handler at src/gateway/server-methods/channels.ts:233 calls logoutChannelAccount at line 33. This function retrieves the plugin via getChannelPlugin (line 255), calls plugin.gateway.logoutAccount at line 47 passing cfg, accountId, and account. The plugin's logoutAccount handler performs the channel-specific logout (e.g., clearing credentials), and the result (line 57) is returned to the gateway response.",
+      "required_files": [
+        "src/gateway/server-methods/channels.ts",
+        "src/channels/plugins/index.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 29,
+      "category": "service_relationships",
+      "question": "How does session state persistence work when the agent command updates session entries?",
+      "answer": "In src/commands/agent.ts, the resolveSession function loads the session entry and store. After agent execution, updateSessionStoreAfterAgentRun (from src/commands/agent/session-store.ts) is called. This uses updateSessionStore from src/config/sessions.ts which atomically writes the updated session entry to the store file at the storePath. The loadSessionEntry function at src/gateway/session-utils.ts:157 reads from this same store via loadSessionStore at line 163.",
+      "required_files": [
+        "src/commands/agent.ts",
+        "src/commands/agent/session-store.ts",
+        "src/config/sessions.ts",
+        "src/gateway/session-utils.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 30,
+      "category": "service_relationships",
+      "question": "Which RPC methods are registered by the gateway server and where is the handler registry built?",
+      "answer": "The gateway server initialization in src/gateway/server.impl.ts imports coreGatewayHandlers from src/gateway/server-methods.ts at line 55. The coreGatewayHandlers aggregates all handler modules (agent.ts, channels.ts, sessions.ts, etc.) into a single GatewayRequestHandlers map. These handlers are registered with the WebSocket server and map method names like 'agent', 'channels.status', 'sessions.list' to their handler functions.",
+      "required_files": [
+        "src/gateway/server.impl.ts",
+        "src/gateway/server-methods.ts",
+        "src/gateway/server-methods/agent.ts",
+        "src/gateway/server-methods/channels.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 31,
+      "category": "service_relationships",
+      "question": "How does the CronService communicate job execution to the agent command service?",
+      "answer": "The CronService class at src/cron/service.ts:7 provides a run method (line 41) that delegates to ops.run(this.state, id, mode) from src/cron/service/ops.ts. The ops module would invoke the agent command by calling agentCommand from src/commands/agent.ts, passing job parameters including sessionKey, message, and runContext. The job execution results are stored in the cron service state and can be queried via status().",
+      "required_files": [
+        "src/cron/service.ts",
+        "src/cron/service/ops.ts",
+        "src/commands/agent.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 32,
+      "category": "service_relationships",
+      "question": "How does the channel status RPC method probe account connectivity?",
+      "answer": "The channels.status handler at src/gateway/server-methods/channels.ts:70 iterates plugins via listChannelPlugins (line 87) and for each account calls buildChannelAccounts (line 112). When probe=true (line 82), it invokes plugin.status.probeAccount at line 142 with account, timeoutMs, and cfg. The probe result is passed to buildChannelAccountSnapshot from src/channels/plugins/status.ts at line 166, which merges probe data with runtime snapshot and returns the enriched ChannelAccountSnapshot.",
+      "required_files": [
+        "src/gateway/server-methods/channels.ts",
+        "src/channels/plugins/status.ts",
+        "src/channels/plugins/index.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 33,
+      "category": "service_relationships",
+      "question": "How does the gateway agent handler resolve delivery targets from session state?",
+      "answer": "The agent RPC handler at src/gateway/server-methods/agent.ts:46 loads the session entry at line 208 via loadSessionEntry from src/gateway/session-utils.ts:157. It then calls resolveAgentDeliveryPlan from src/infra/outbound/agent-delivery.ts at line 305, passing sessionEntry, requestedChannel, explicitTo, and accountId. The delivery plan resolver examines session.lastChannel, session.lastTo, and session.deliveryContext (lines 232-244) to determine resolvedChannel, resolvedTo, and resolvedAccountId.",
+      "required_files": [
+        "src/gateway/server-methods/agent.ts",
+        "src/gateway/session-utils.ts",
+        "src/infra/outbound/agent-delivery.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 34,
+      "category": "service_relationships",
+      "question": "What is the dependency injection pattern for runtime environment in channel lifecycle methods?",
+      "answer": "The createChannelManager function at src/gateway/server-channels.ts:62 accepts channelRuntimeEnvs: Record<ChannelId, RuntimeEnv> in its options (line 50). When startChannel invokes plugin.gateway.startAccount at line 141, it passes runtime: channelRuntimeEnvs[channelId] (line 145). This RuntimeEnv object (defined in src/runtime.ts) provides console, log, and other runtime dependencies that plugins need for execution, enabling testability and isolation.",
+      "required_files": [
+        "src/gateway/server-channels.ts",
+        "src/runtime.ts",
+        "src/channels/plugins/types.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 35,
+      "category": "service_relationships",
+      "question": "How does the plugin registry manage channel plugin lifecycle hooks?",
+      "answer": "The requireActivePluginRegistry function at src/plugins/runtime.ts:48 returns a PluginRegistry containing a channels array. Each entry in registry.channels includes {plugin, dock} where plugin is a ChannelPlugin from src/channels/plugins/types.ts. The plugin object contains gateway hooks: startAccount (called to begin monitoring), stopAccount (called to terminate), and logoutAccount (called to clear credentials). These hooks are invoked by ChannelManager methods in src/gateway/server-channels.ts.",
+      "required_files": [
+        "src/plugins/runtime.ts",
+        "src/channels/plugins/types.ts",
+        "src/gateway/server-channels.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 36,
+      "category": "service_relationships",
+      "question": "How does the agent execution flow integrate with the model fallback service?",
+      "answer": "In src/auto-reply/reply/agent-runner-execution.ts:137, the runAgentTurnWithFallback function calls runWithModelFallback from src/agents/model-fallback.ts passing provider, model, and fallbacksOverride resolved via resolveAgentModelFallbacksOverride at lines 141-144. Inside runWithModelFallback, if the primary model fails, it iterates through fallback models and retries. The actual agent run is executed via isCliProvider check at line 154, calling either runCliAgent or runEmbeddedPiAgent.",
+      "required_files": [
+        "src/auto-reply/reply/agent-runner-execution.ts",
+        "src/agents/model-fallback.ts",
+        "src/agents/cli-runner.ts",
+        "src/agents/pi-embedded.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 37,
+      "category": "service_relationships",
+      "question": "How do gateway server methods share deduplication state across RPC requests?",
+      "answer": "The GatewayRequestHandlers receive a context parameter containing a dedupe property. In src/gateway/server-methods/agent.ts:100, the handler checks context.dedupe.get(`agent:${idem}`) for cached responses. If found, it responds immediately (line 102). After accepting the request, it stores the in-flight acknowledgment via context.dedupe.set at line 340. This dedupe Map is shared across all request handlers in the same gateway instance, preventing duplicate agent runs.",
+      "required_files": [
+        "src/gateway/server-methods/agent.ts",
+        "src/gateway/server-methods/types.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 38,
+      "category": "service_relationships",
+      "question": "How does session listing service merge multi-agent session stores?",
+      "answer": "The loadCombinedSessionStoreForGateway function at src/gateway/session-utils.ts:409 checks if the store path is templated with {agentId} (line 414). If templated, it calls listConfiguredAgentIds (line 431), then for each agentId loads the per-agent store via loadSessionStore from src/config/sessions.ts at line 435. It merges entries via mergeSessionEntryIntoCombined (line 437), canonicalizing keys with canonicalizeSessionKeyForAgent (line 437). The combined store is returned for gateway session list queries.",
+      "required_files": [
+        "src/gateway/session-utils.ts",
+        "src/config/sessions.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 39,
+      "category": "service_relationships",
+      "question": "How does the channels RPC method build account snapshots from runtime state?",
+      "answer": "The channels.status handler at src/gateway/server-methods/channels.ts:70 calls context.getRuntimeSnapshot() at line 86 to get current channel runtime state. For each plugin, it iterates accounts and calls resolveRuntimeSnapshot at line 92 to match accountId with the runtime state. It then invokes buildChannelAccountSnapshot from src/channels/plugins/status.ts at line 166, passing plugin, cfg, accountId, runtime snapshot, and optional probe/audit results. The snapshot builder merges all data sources into a unified ChannelAccountSnapshot.",
+      "required_files": [
+        "src/gateway/server-methods/channels.ts",
+        "src/channels/plugins/status.ts",
+        "src/gateway/server-channels.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 40,
+      "category": "service_relationships",
+      "question": "How does the gateway server initialize and coordinate the channel manager, cron service, and event handlers?",
+      "answer": "In src/gateway/server.impl.ts:147, startGatewayServer creates the gateway infrastructure. It calls createChannelManager from src/gateway/server-channels.ts at line 49 (approx), passing loadConfig, channelLogs, and channelRuntimeEnvs. It builds the cron service via buildGatewayCronService from src/gateway/server-cron.ts at line 52. It registers agent event handlers via createAgentEventHandler from src/gateway/server-chat.ts at line 50, which calls onAgentEvent from src/infra/agent-events.ts. All services are coordinated through the GatewayServer lifecycle (start/close).",
+      "required_files": [
+        "src/gateway/server.impl.ts",
+        "src/gateway/server-channels.ts",
+        "src/gateway/server-cron.ts",
+        "src/gateway/server-chat.ts",
+        "src/infra/agent-events.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 41,
+      "category": "business_logic_constraints",
+      "question": "What are the three valid ExecSecurity modes that can be assigned to tools.elevated.security, and what is the default value if not specified?",
+      "answer": "The three valid ExecSecurity modes are 'deny', 'allowlist', and 'full' as defined in src/infra/exec-approvals.ts:10 (type ExecSecurity = 'deny' | 'allowlist' | 'full'). The default value is 'deny' as specified in src/infra/exec-approvals.ts:60 (const DEFAULT_SECURITY: ExecSecurity = 'deny'). This is used in the normalizeSecurity function at src/infra/exec-approvals.ts:250-253 which falls back to DEFAULT_SECURITY when an invalid or undefined value is provided.",
+      "required_files": [
+        "src/infra/exec-approvals.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 42,
+      "category": "business_logic_constraints",
+      "question": "What validation is performed on gateway.auth tokens to ensure they are sufficiently secure, and what warning severity level is assigned if the validation fails?",
+      "answer": "Gateway auth token validation checks that the token length is at least 24 characters at src/security/audit.ts:347-354. If auth.mode is 'token' and the token exists but is shorter than 24 characters, a security finding with severity='warn' is created with checkId='gateway.token_too_short' and the message indicates the actual token length and recommends 'a long random token'. Similarly, browser control tokens are validated at src/security/audit.ts:410-417 with the same 24-character minimum threshold.",
+      "required_files": [
+        "src/security/audit.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 43,
+      "category": "business_logic_constraints",
+      "question": "When gateway.bind is set to a value other than 'loopback' but no gateway.auth credentials are configured, what security audit finding is raised and what is its severity?",
+      "answer": "When gateway.bind is not 'loopback' and no shared secret (token or password) is configured, a critical severity finding is raised at src/security/audit.ts:270-278. The finding has checkId='gateway.bind_no_auth', severity='critical', and title='Gateway binds beyond loopback without auth'. The detail explains that gateway.bind=\"{bind}\" but no gateway.auth token/password is configured, and the remediation suggests setting gateway.auth (token recommended) or binding to loopback.",
+      "required_files": [
+        "src/security/audit.ts",
+        "src/config/types.gateway.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 44,
+      "category": "business_logic_constraints",
+      "question": "What constraint must be satisfied for a browser profile's cdpPort value in the config schema, and what happens if neither cdpPort nor cdpUrl is provided?",
+      "answer": "The cdpPort value must be an integer between 1 and 65535 as defined in src/config/zod-schema.ts:156 (z.number().int().min(1).max(65535).optional()). The schema enforces at src/config/zod-schema.ts:162-164 via a .refine() validation that either cdpPort or cdpUrl must be set, with the error message 'Profile must set cdpPort or cdpUrl'. This ensures every browser profile has a valid connection method configured.",
+      "required_files": [
+        "src/config/zod-schema.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 45,
+      "category": "business_logic_constraints",
+      "question": "What security patterns are detected in external content to identify potential prompt injection attempts, and how many distinct patterns are checked?",
+      "answer": "External content is checked against 14 suspicious patterns defined in src/security/external-content.ts:15-28 in the SUSPICIOUS_PATTERNS array. These patterns detect prompt injection attempts including: 'ignore previous instructions', 'disregard previous', 'forget your instructions', 'you are now a', 'new instructions:', 'system prompt/override/command', 'exec command=', 'elevated=true', 'rm -rf', 'delete all emails/files/data', '<system>' tags, and message role injection patterns. The detectSuspiciousPatterns function at src/security/external-content.ts:33-41 tests each pattern and returns matching pattern sources.",
+      "required_files": [
+        "src/security/external-content.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 46,
+      "category": "business_logic_constraints",
+      "question": "When evaluating exec command allowlists, which shell tokens are explicitly disallowed in pipeline splitting, and what specific error reasons are returned for '||' vs '$()'?",
+      "answer": "The splitShellPipeline function at src/infra/exec-approvals.ts:624-661 disallows multiple shell tokens. For '||' the function returns 'unsupported shell token: ||' at line 628. For '$()' (command substitution) it returns 'unsupported shell token: $()' at line 644. Additional disallowed tokens include: '|&' (line 631), '&' and ';' (lines 637-639), and the DISALLOWED_PIPELINE_TOKENS set at line 536 which includes '>', '<', '`', newlines, carriage returns, '(', and ')'. Each violation results in { ok: false, reason: <specific error> }.",
+      "required_files": [
+        "src/infra/exec-approvals.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 47,
+      "category": "business_logic_constraints",
+      "question": "What are the validation constraints on profile names in browser.profiles configuration, and what additional validation is performed beyond the regex pattern?",
+      "answer": "Browser profile names must match the regex /^[a-z0-9-]+$/ (alphanumeric with hyphens only) as defined in src/config/zod-schema.ts:153. Beyond the pattern validation, each profile must provide either cdpPort or cdpUrl, enforced by the .refine() check at src/config/zod-schema.ts:162-164 with the message 'Profile must set cdpPort or cdpUrl'. The cdpPort if provided must be an integer between 1-65535 (line 156), and profile objects must strictly conform to the schema (line 161).",
+      "required_files": [
+        "src/config/zod-schema.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 48,
+      "category": "business_logic_constraints",
+      "question": "When gateway.controlUi.dangerouslyDisableDeviceAuth is set to true, what security finding is raised, what is its severity, and what remediation is recommended?",
+      "answer": "When gateway.controlUi.dangerouslyDisableDeviceAuth is true, a critical severity finding is raised at src/security/audit.ts:334-342. The finding has checkId='gateway.control_ui.device_auth_disabled', severity='critical', and title='DANGEROUS: Control UI device auth disabled'. The detail explains that this setting 'disables device identity checks for the Control UI', and the remediation is 'Disable it unless you are in a short-lived break-glass scenario.' This is one of the most severe security misconfigurations.",
+      "required_files": [
+        "src/security/audit.ts",
+        "src/config/types.gateway.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 49,
+      "category": "business_logic_constraints",
+      "question": "What are the default safe bins that are automatically allowed for exec commands without explicit allowlist entries, and how is this set resolved when entries is undefined vs null?",
+      "answer": "The default safe bins are defined in src/infra/exec-approvals.ts:66 as DEFAULT_SAFE_BINS = ['jq', 'grep', 'cut', 'sort', 'uniq', 'head', 'tail', 'tr', 'wc']. The resolveSafeBins function at lines 831-834 handles entries in two ways: if entries is undefined (not specified), it returns normalizeSafeBins(DEFAULT_SAFE_BINS); if entries is null (explicitly disabled), it returns normalizeSafeBins([]) which yields an empty set, effectively disabling safe bin auto-approval.",
+      "required_files": [
+        "src/infra/exec-approvals.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 50,
+      "category": "business_logic_constraints",
+      "question": "What constraints are enforced on identity.avatar paths in agent configuration, and what specific validation ensures avatars cannot escape the workspace directory?",
+      "answer": "Agent identity.avatar validation is performed in src/config/validation.ts:32-70. Avatars must be either: (1) a data URI (AVATAR_DATA_RE), (2) an http/https URL (AVATAR_HTTP_RE), or (3) a workspace-relative path. Tilde (~) paths are rejected at lines 43-48. Paths with URI schemes (except Windows drive letters) are rejected at lines 50-56. The isWorkspaceAvatarPath function at lines 23-30 ensures the resolved path stays within the agent workspace by checking that path.relative(workspaceRoot, resolved) does not start with '..' and is not absolute. Violations produce a ConfigValidationIssue with path='agents.list.{index}.identity.avatar'.",
+      "required_files": [
+        "src/config/validation.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 51,
+      "category": "business_logic_constraints",
+      "question": "What is the minimum approval socket timeout for requestExecApprovalViaSocket, and what happens when the timeout is exceeded without receiving a decision?",
+      "answer": "The requestExecApprovalViaSocket function at src/infra/exec-approvals.ts:1210-1267 accepts a timeoutMs parameter with a default of 15,000ms (15 seconds) set at line 1218. When the timeout is exceeded without receiving a decision message, the timer at line 1234 fires and calls finish(null) at line 1234, which destroys the socket connection (line 1227) and resolves the Promise with null (line 1231), indicating no approval decision was received. The calling code must handle null returns as approval failures.",
+      "required_files": [
+        "src/infra/exec-approvals.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 52,
+      "category": "business_logic_constraints",
+      "question": "What validation is performed on config file permissions during security audits on POSIX systems, and what are the different severity levels assigned to world-writable vs world-readable config files?",
+      "answer": "Config file permission validation is performed in src/security/audit.ts:188-244. If the config file is world-writable OR group-writable, it generates a critical severity finding (checkId='fs.config.perms_writable', lines 202-215) because 'another user could change gateway/auth/tool policies'. If world-readable (but not writable), it generates a critical severity finding (checkId='fs.config.perms_world_readable', lines 216-229) because 'config can contain tokens and private settings'. If only group-readable, it generates a warn severity finding (checkId='fs.config.perms_group_readable', lines 230-243). The recommended permission is 0o600 (owner read/write only).",
+      "required_files": [
+        "src/security/audit.ts",
+        "src/security/audit-fs.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 53,
+      "category": "business_logic_constraints",
+      "question": "When Tailscale Serve mode is enabled for gateway authentication, what validation is performed to verify the Tailscale user identity, and which header mismatch would cause authentication to fail?",
+      "answer": "Tailscale user identity validation is performed in src/gateway/auth.ts:134-165 via resolveVerifiedTailscaleUser. The function first extracts the Tailscale user from the 'tailscale-user-login' header (lines 108-118). It then verifies the request has Tailscale proxy headers (x-forwarded-for, x-forwarded-proto, x-forwarded-host) via isTailscaleProxyRequest at lines 129-132. Most critically, it performs a Tailscale whois lookup on the client IP and validates at lines 154-156 that normalizeLogin(whois.login) matches normalizeLogin(tailscaleUser.login). If the logins don't match, it returns { ok: false, reason: 'tailscale_user_mismatch' }, preventing authentication even if the headers are present.",
+      "required_files": [
+        "src/gateway/auth.ts",
+        "src/config/types.gateway.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 54,
+      "category": "business_logic_constraints",
+      "question": "What specific conditions must be met for a safe bin (like 'jq' or 'grep') to be automatically allowed without an explicit allowlist entry, and why would file path arguments disqualify the command?",
+      "answer": "The isSafeBinUsage function at src/infra/exec-approvals.ts:836-873 enforces strict conditions for safe bin auto-approval. First, the executable name must match a safe bin (case-insensitive), including handling Windows .exe extensions (lines 847-850). Second, the command must have a resolved path (line 851). The critical constraint is that NO command-line arguments can be path-like or reference files: any token that is path-like (starts with ./, ../, ~, /, or Windows drive letter) at line 869, or any token that resolves to an existing file at line 870, causes the function to return false. This prevents attacks like 'grep secret /etc/passwd' from being auto-approved even though grep is in the safe bins list.",
+      "required_files": [
+        "src/infra/exec-approvals.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 55,
+      "category": "business_logic_constraints",
+      "question": "When discord slash commands are enabled with commands.useAccessGroups=false, what critical security finding is raised, and what specific configuration prevents this finding?",
+      "answer": "When Discord slash commands are enabled while commands.useAccessGroups=false, a critical finding is raised at src/security/audit.ts:628-642 with checkId='channels.discord.commands.native.unrestricted' ONLY IF: (1) groupPolicy is not 'disabled', (2) guilds are configured, AND (3) no per-guild/channel users allowlist is configured (checked via hasAnyUserAllowlist which scans guilds[].users and guilds[].channels[].users at lines 609-620). The detail warns 'any user in allowed guild channels can invoke /... commands'. The finding is prevented by either setting commands.useAccessGroups=true (recommended), or configuring channels.discord.guilds.<id>.users or channels.discord.guilds.<id>.channels.<channel>.users allowlists.",
+      "required_files": [
+        "src/security/audit.ts",
+        "src/config/config.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 56,
+      "category": "business_logic_constraints",
+      "question": "What happens when the exec approvals file contains a 'default' agent key, and how does this legacy handling interact with the main agent?",
+      "answer": "Legacy 'default' agent handling occurs in src/infra/exec-approvals.ts:137-146 within normalizeExecApprovals. If agents.default exists, it checks for agents[DEFAULT_AGENT_ID] (where DEFAULT_AGENT_ID is 'main'). If 'main' exists, it calls mergeLegacyAgent at lines 95-117 to combine allowlists from both, using the 'main' agent's settings as primary and 'default' as fallback. The merged allowlists are deduplicated by normalizeAllowlistPattern (lowercase pattern matching). After merging, 'delete agents.default' at line 145 removes the legacy key. This ensures backward compatibility while migrating configs from 'default' to 'main'.",
+      "required_files": [
+        "src/infra/exec-approvals.ts",
+        "src/routing/session-key.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 57,
+      "category": "business_logic_constraints",
+      "question": "What validation prevents plugin allowlists from accidentally disabling all core tools, and what log message would indicate this stripping has occurred?",
+      "answer": "The stripPluginOnlyAllowlist function at src/agents/tool-policy.ts:187-223 prevents plugin-only allowlists from disabling core tools. It normalizes the policy.allow entries (line 195), then checks each entry at lines 203-209: if an entry is a plugin entry (matching group:plugins, a plugin ID, or plugin tool) but NOT a core entry (checked via expandToolGroups against coreTools Set), it's added to unknownAllowlist. If hasCoreEntry is false (no core tools in the allowlist), strippedAllowlist is set to true at line 211. When stripped, the function returns { policy: { ...policy, allow: undefined }, strippedAllowlist: true } at line 219, effectively removing the plugin-only allowlist to avoid accidentally disabling core tools. The note at lines 214-216 indicates logging happens in the caller (pi-tools/tools-invoke).",
+      "required_files": [
+        "src/agents/tool-policy.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 58,
+      "category": "business_logic_constraints",
+      "question": "When Telegram group access is enabled with no sender allowlist, what critical security finding is raised, and what three configuration sources are checked for the allowlist?",
+      "answer": "When Telegram group access is enabled without a sender allowlist, a critical finding is raised at src/security/audit.ts:823-832 with checkId='channels.telegram.groups.allowFrom.missing'. The function checks three configuration sources for the sender allowlist at lines 775-800: (1) storeAllowFrom from the pairing store via readChannelAllowFromStore('telegram'), (2) groupAllowFrom from config at channels.telegram.groupAllowFrom, and (3) anyGroupOverride which checks channels.telegram.groups.<id>.allowFrom and channels.telegram.groups.<id>.topics.<topic>.allowFrom. If all three sources are empty (hasAnySenderAllowlist is false at line 815), the critical finding warns 'this allows any group member to invoke /... commands', with remediation to approve via pairing or set groupAllowFrom.",
+      "required_files": [
+        "src/security/audit.ts",
+        "src/pairing/pairing-store.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 59,
+      "category": "business_logic_constraints",
+      "question": "What are the three valid ExecAsk modes for exec approval prompting behavior, what is the default mode, and which mode would prompt even for allowlisted commands?",
+      "answer": "The three valid ExecAsk modes are 'off', 'on-miss', and 'always' as defined in src/infra/exec-approvals.ts:11 (type ExecAsk = 'off' | 'on-miss' | 'always'). The default mode is 'on-miss' as specified at line 61 (const DEFAULT_ASK: ExecAsk = 'on-miss'). The normalizeAsk function at lines 255-258 validates these values. The 'always' mode will prompt for every command, even if it's allowlisted, as determined by requiresExecApproval at lines 1139-1151: it returns true when params.ask === 'always' regardless of allowlistSatisfied status.",
+      "required_files": [
+        "src/infra/exec-approvals.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 60,
+      "category": "business_logic_constraints",
+      "question": "What error condition causes the device auth payload builder to determine whether to use version 'v1' vs 'v2', and what additional field is appended for v2 payloads?",
+      "answer": "The buildDeviceAuthPayload function at src/gateway/device-auth.ts:13-31 determines the version at line 14: version = params.version ?? (params.nonce ? 'v2' : 'v1'). If params.version is not provided, the presence of params.nonce determines the version. For both versions, the base payload includes version, deviceId, clientId, clientMode, role, scopes, signedAtMs, and token (lines 17-26). For v2 specifically, at lines 27-29, the function appends params.nonce ?? '' to the base array. The payload is joined with '|' delimiter at line 30. This allows v2 to include nonce-based replay protection while maintaining backward compatibility with v1.",
+      "required_files": [
+        "src/gateway/device-auth.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 61,
+      "category": "data_flow_integration",
+      "question": "When an agent emits an 'assistant' stream event with text data, what is the complete flow from event emission to WebSocket broadcast, including the intermediate buffering and throttling mechanism?",
+      "answer": "The flow is: (1) Agent emits event via emitAgentEvent in src/infra/agent-events.ts, (2) Event is received by createAgentEventHandler in src/gateway/server-chat.ts:218, (3) Handler checks if event.stream === 'assistant' and extracts evt.data.text at line 252, (4) emitChatDelta is called (line 253) which buffers the text in chatRunState.buffers at line 137, (5) Throttling logic checks if now - last < 150ms at line 140, only sending if enough time has passed, (6) If sending, deltaSentAt map is updated at line 141, (7) Payload is constructed with state: 'delta' at lines 142-152, (8) broadcast('chat', payload) is called at line 155 which invokes createGatewayBroadcaster in src/gateway/server-broadcast.ts:30, (9) Broadcaster serializes frame and sends via WebSocket to all clients at lines 39-71.",
+      "required_files": [
+        "src/gateway/server-chat.ts",
+        "src/gateway/server-broadcast.ts",
+        "src/infra/agent-events.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 62,
+      "category": "data_flow_integration",
+      "question": "How does an incoming Discord message get normalized and routed to the auto-reply dispatcher, specifically tracking the transformation of the target identifier?",
+      "answer": "The flow is: (1) Discord plugin receives message and calls normalizeDiscordMessagingTarget in src/channels/plugins/normalize/discord.ts:3, (2) Function calls parseDiscordTarget with defaultKind: 'channel' at line 5 to parse target format, (3) Returns target.normalized at line 6 which standardizes format (e.g., 'discord:channel:123'), (4) This normalized target is passed to dispatchInboundMessage in src/auto-reply/dispatch.ts:17, (5) Context is finalized via finalizeInboundContext at line 24 which preserves the target field, (6) dispatchReplyFromConfig is called at line 25 with the finalized context, (7) The dispatcher uses this normalized target for routing replies back through the correct channel adapter.",
+      "required_files": [
+        "src/channels/plugins/normalize/discord.ts",
+        "src/auto-reply/dispatch.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 63,
+      "category": "data_flow_integration",
+      "question": "What is the complete path for memory search query data from the MemoryIndexManager.search() call through vector and keyword search to the merged hybrid results?",
+      "answer": "The flow is: (1) search() is called in src/memory/manager.ts:261 with query string, (2) Query is embedded via embedQueryWithTimeout at line 289 which calls provider.embedQuery with timeout wrapping, (3) Keyword search is performed via searchKeyword at line 286 if hybrid.enabled is true, which calls src/memory/manager-search.ts searchKeyword function using FTS_TABLE, (4) Vector search is performed via searchVector at line 292 if queryVec has non-zero values, calling searchVector in manager-search.ts which queries VECTOR_TABLE, (5) Both result sets are passed to mergeHybridResults at line 299 in src/memory/hybrid.ts, (6) Hybrid merge applies vectorWeight and textWeight to combine scores at lines 299-304, (7) Final filtered and sliced results are returned with scores >= minScore at line 306.",
+      "required_files": [
+        "src/memory/manager.ts",
+        "src/memory/manager-search.ts",
+        "src/memory/hybrid.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 64,
+      "category": "data_flow_integration",
+      "question": "How does a session transcript update propagate from file write to memory index synchronization, including the event listener mechanism?",
+      "answer": "The flow is: (1) appendAssistantMessageToSessionTranscript in src/config/sessions/transcript.ts:70 writes to sessionFile via SessionManager.appendMessage at line 98, (2) After successful write, emitSessionTranscriptUpdate is called at line 9 which iterates SESSION_TRANSCRIPT_LISTENERS, (3) The listener was registered by MemoryIndexManager.ensureSessionListener in src/memory/manager.ts:793 via onSessionTranscriptUpdate, (4) Listener callback receives update at line 794 and checks if file belongs to agent via isSessionFileForAgent at line 797, (5) If yes, scheduleSessionDirty is called at line 798 which adds file to sessionPendingFiles set and starts debounce timer, (6) After SESSION_DIRTY_DEBOUNCE_MS (5000ms), processSessionDeltaBatch is called at line 807, (7) Delta thresholds are checked and if met, sessionsDirtyFiles.add is called at line 830 and sync is triggered at line 839.",
+      "required_files": [
+        "src/config/sessions/transcript.ts",
+        "src/sessions/transcript-events.ts",
+        "src/memory/manager.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 65,
+      "category": "data_flow_integration",
+      "question": "When a chat request arrives via the OpenAI-compatible HTTP endpoint, how is the message history transformed and passed to the agent command executor?",
+      "answer": "The flow is: (1) Request is received in src/gateway/openai-http.ts, body is parsed via readJsonBodyOrError, (2) coerceRequest extracts messages array at line 149, (3) buildAgentPrompt is called at line 67 which iterates messages, extracts system prompts, and builds conversationEntries array with normalized roles, (4) History is formatted using buildHistoryContextFromEntries at line 126 which creates \"Sender: body\" format, (5) Final message string and extraSystemPrompt are returned at lines 135-138, (6) agentCommand is invoked with the formatted message at the endpoint handler, (7) Agent receives consolidated prompt with history context inline.",
+      "required_files": [
+        "src/gateway/openai-http.ts",
+        "src/auto-reply/reply/history.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 66,
+      "category": "data_flow_integration",
+      "question": "How do channel outbound adapters route messages with thread context from the tool layer to Slack's API, preserving thread/topic routing?",
+      "answer": "The flow is: (1) Tool (e.g., createMessageTool in src/agents/clawdbot-tools.ts) is invoked with delivery target and message, (2) Tool resolves replyToId and threadId from agent context (currentThreadTs, agentThreadId) at lines 91-100, (3) sendText or sendMedia is called on the slackOutbound adapter in src/channels/plugins/outbound/slack.ts:8 or :18, (4) Adapter receives replyToId and threadId parameters, (5) threadTs is resolved with fallback logic: replyToId ?? (threadId != null ? String(threadId) : undefined) at line 11 or 21, (6) sendMessageSlack is called with threadTs parameter at line 12 or 22, (7) Slack API receives thread_ts ensuring reply stays in correct thread.",
+      "required_files": [
+        "src/agents/clawdbot-tools.ts",
+        "src/channels/plugins/outbound/slack.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 67,
+      "category": "data_flow_integration",
+      "question": "What is the complete event propagation path when an agent lifecycle transitions to 'end' phase, from event emission to client notification and cleanup?",
+      "answer": "The flow is: (1) Agent emits lifecycle event with phase: 'end' via emitAgentEvent, (2) createAgentEventHandler receives event at src/gateway/server-chat.ts:218, (3) lifecyclePhase is extracted at line 247 checking evt.stream === 'lifecycle' && evt.data.phase === 'end', (4) If sessionKey exists and not aborted, flow enters line 254 condition, (5) chatRunState.registry.shift is called at line 256 to dequeue the run entry, (6) emitChatFinal is invoked at line 261 with state: 'done' or 'error', (7) emitChatFinal broadcasts 'chat' event with state: 'final' at line 186-188, (8) broadcast propagates to all connected WebSocket clients via src/gateway/server-broadcast.ts:30, (9) clearAgentRunContext is called at line 289 to cleanup run tracking.",
+      "required_files": [
+        "src/gateway/server-chat.ts",
+        "src/gateway/server-broadcast.ts",
+        "src/infra/agent-events.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 68,
+      "category": "data_flow_integration",
+      "question": "How does embedding cache data flow from text chunk to cache storage, including the hash computation and cache key structure?",
+      "answer": "The flow is: (1) indexFile in src/memory/manager.ts:2080 calls embedChunksInBatches at line 2090, (2) embedChunksInBatches checks cache via loadEmbeddingCache at line 1639 which uses chunk.hash as key, (3) Cache query is performed at lines 1576-1584 using (provider, model, provider_key, hash) as compound key in EMBEDDING_CACHE_TABLE, (4) Cache miss triggers embedding generation at line 1660, (5) After embedding is generated, toCache array is populated at line 1666 with {hash, embedding} pairs, (6) upsertEmbeddingCache is called at line 1671 which executes INSERT...ON CONFLICT at lines 1594-1599, (7) Cache entry is stored with provider.id, provider.model, providerKey (computed from API config hash at lines 1675-1707), chunk.hash, JSON.stringify(embedding), dims, and updated_at timestamp.",
+      "required_files": [
+        "src/memory/manager.ts",
+        "src/memory/internal.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 69,
+      "category": "data_flow_integration",
+      "question": "What transformation occurs when chat attachments are parsed and converted to agent-compatible image content format?",
+      "answer": "The flow is: (1) parseMessageWithAttachments is called in src/gateway/chat-attachments.ts with message text and attachments array, (2) Function iterates attachments and checks type field, (3) For image types, data is extracted and ChatImageContent object is created with type: 'image', source: {type: 'base64', media_type, data}, (4) Text content and image content are combined into single content array, (5) This content array format matches Anthropic's Messages API structure with mixed text/image blocks, (6) Agent receives normalized content that can include both text and base64-encoded images in a single message.content field.",
+      "required_files": [
+        "src/gateway/chat-attachments.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 70,
+      "category": "data_flow_integration",
+      "question": "How does the gateway broadcast system filter events based on client scopes, specifically for exec approval events?",
+      "answer": "The flow is: (1) broadcast('exec.approval.requested', payload) is called from gateway method handlers, (2) createGatewayBroadcaster.broadcast in src/gateway/server-broadcast.ts:30 receives event and payload, (3) For each client, hasEventScope is called at line 59 to check authorization, (4) hasEventScope looks up event in EVENT_SCOPE_GUARDS at line 19 which maps 'exec.approval.requested' to [APPROVALS_SCOPE], (5) Client role is checked: must be 'operator' at line 22, (6) Client scopes array is checked for either ADMIN_SCOPE ('operator.admin') at line 24 or the required APPROVALS_SCOPE ('operator.approvals') at line 25, (7) If scope check fails, event is skipped for that client at line 59, (8) If passes, event is serialized and sent via WebSocket at lines 39-71.",
+      "required_files": [
+        "src/gateway/server-broadcast.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 71,
+      "category": "data_flow_integration",
+      "question": "Trace the data flow when memory files are synced to vector storage, including chunking, embedding, and vector table insertion.",
+      "answer": "The flow is: (1) syncMemoryFiles in src/memory/manager.ts:974 lists files and builds MemoryFileEntry objects at line 980, (2) indexFile is called at line 1012 for each changed file, (3) File content is read and passed to chunkMarkdown in src/memory/internal.ts which splits content by chunk.tokens and chunk.overlap settings at line 2085, (4) Chunks are passed to embedChunksWithBatch or embedChunksInBatches at lines 2088-2090, (5) For each chunk, embedding provider generates vector (OpenAI, Gemini, or local), (6) ensureVectorReady is called at line 2092 with sample.length to initialize VECTOR_TABLE with correct dimensions, (7) For each chunk, INSERT INTO chunks is executed at lines 2119-2141 storing id, path, source, start_line, end_line, hash, model, text, embedding JSON, updated_at, (8) If vectorReady and embedding.length > 0, INSERT INTO VECTOR_TABLE is executed at lines 2142-2148 with id and vectorToBlob(embedding) which converts Float32Array to Buffer.",
+      "required_files": [
+        "src/memory/manager.ts",
+        "src/memory/internal.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 72,
+      "category": "data_flow_integration",
+      "question": "How does the chat run registry manage concurrent chat sessions, from registration to final cleanup?",
+      "answer": "The flow is: (1) Chat request arrives and createChatRunRegistry in src/gateway/server-chat.ts:39 maintains chatRunSessions Map<sessionId, ChatRunEntry[]>, (2) On new request, registry.add is called at line 42 which appends {sessionKey, clientRunId} to queue for sessionId, (3) During agent execution, registry.peek at line 51 retrieves the first entry without removal for event routing, (4) Agent events are matched to sessionKey via chatLink at line 219 using registry.peek(evt.runId), (5) On lifecycle:end, registry.shift is called at line 256 to dequeue and remove entry, (6) If entry removed successfully, emitChatFinal is called at line 261 to send final response, (7) If aborted mid-run, registry.remove is called at line 283 with clientRunId and sessionKey to remove specific entry, (8) Buffers, deltaSentAt, and abortedRuns maps are cleaned up at lines 280-281.",
+      "required_files": [
+        "src/gateway/server-chat.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 73,
+      "category": "data_flow_integration",
+      "question": "When a channel plugin normalizes an inbound message, what are the key transformations applied to sender identity and conversation labels?",
+      "answer": "The flow is: (1) Channel plugin receives raw message with sender metadata, (2) sender-identity.ts normalization extracts userId, displayName, and channel-specific identifiers, (3) conversation-label.ts resolves group/channel name and creates normalized label (e.g., '#channel-name', 'DM: Username'), (4) location.ts determines if message is from group/DM/channel based on channel-specific ID patterns, (5) chat-type.ts classifies as 'dm', 'group', or 'channel', (6) All normalized fields are combined into MsgContext object, (7) Context is passed to dispatchInboundMessage with consistent structure regardless of source channel (Discord/Slack/Telegram/etc).",
+      "required_files": [
+        "src/channels/sender-identity.ts",
+        "src/channels/conversation-label.ts",
+        "src/channels/location.ts",
+        "src/channels/chat-type.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 74,
+      "category": "data_flow_integration",
+      "question": "How does the OpenAI batch embedding API request flow through custom_id mapping to final cache storage?",
+      "answer": "The flow is: (1) embedChunksWithOpenAiBatch in src/memory/manager.ts:1725 creates OpenAiBatchRequest array, (2) For each chunk, custom_id is generated as hashText of source:path:startLine:endLine:hash:index at line 1754, (3) Mapping stores {customId -> {index, hash}} at line 1757 to track chunk identity, (4) runOpenAiEmbeddingBatches in src/memory/batch-openai.ts submits batch job and polls for completion, (5) Results are returned as Map<custom_id, embedding> at line 1784, (6) For each result entry, mapping.get(customId) retrieves original {index, hash} at line 1788, (7) embeddings array is populated at mapped.index at line 1790, (8) toCache is built with {hash, embedding} at line 1791, (9) upsertEmbeddingCache is called at line 1793 to persist to EMBEDDING_CACHE_TABLE.",
+      "required_files": [
+        "src/memory/manager.ts",
+        "src/memory/batch-openai.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 75,
+      "category": "data_flow_integration",
+      "question": "What is the state synchronization mechanism between agent run sequence numbers and WebSocket broadcast events?",
+      "answer": "The flow is: (1) agentRunSeq Map<runId, number> tracks last sequence number per run in gateway context, (2) createAgentEventHandler receives AgentEventPayload with evt.seq at src/gateway/server-chat.ts:218, (3) Last known seq is retrieved via agentRunSeq.get(evt.runId) ?? 0 at line 226, (4) Sequence gap detection checks if evt.seq !== last + 1 at line 231, (5) If gap detected, error event is broadcast with 'seq gap' reason and expected/received values at lines 232-242, (6) agentRunSeq.set(evt.runId, evt.seq) updates tracked sequence at line 244, (7) Event is broadcast with original seq number preserved at line 245, (8) Clients can detect gaps by comparing consecutive seq numbers in received events.",
+      "required_files": [
+        "src/gateway/server-chat.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 76,
+      "category": "data_flow_integration",
+      "question": "How does the reply dispatcher coordinate typing indicators with buffered message delivery?",
+      "answer": "The flow is: (1) createReplyDispatcherWithTyping in src/auto-reply/reply/reply-dispatcher.ts creates buffered dispatcher with typing state, (2) When message sending begins, typing indicator is sent via typingStart callback, (3) Messages are queued in internal buffer with debounce/throttle logic, (4) Buffer accumulates text chunks to avoid rapid API calls, (5) When buffer flushes (on timeout or size threshold), typing indicator is maintained, (6) On final message delivery, markDispatchIdle is called which stops typing indicator, (7) This ensures typing indicator shows during composition but stops when message is sent, maintaining smooth UX across channels.",
+      "required_files": [
+        "src/auto-reply/reply/reply-dispatcher.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 77,
+      "category": "data_flow_integration",
+      "question": "Trace the transformation of tool execution results from bash output to agent message content.",
+      "answer": "The flow is: (1) Bash tool executes command via bash-tools.exec.ts, captures stdout/stderr, (2) Output is formatted with metadata (exit code, execution time, approval status), (3) Result is returned as tool_result content to agent via tool use response, (4) Agent processes tool_result in message history, (5) If configured for verbose mode, tool events are emitted via emitAgentEvent with stream: 'tool', (6) Tool results appear in agent's context window for next reasoning step, (7) If transcript recording is enabled, tool results are serialized to session transcript in JSONL format with type: 'message', role: 'tool'.",
+      "required_files": [
+        "src/agents/bash-tools.exec.ts",
+        "src/agents/bash-tools.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 78,
+      "category": "data_flow_integration",
+      "question": "How does the memory manager handle fallback from OpenAI embeddings to local embeddings when batch operations fail?",
+      "answer": "The flow is: (1) embedChunksWithOpenAiBatch attempts batch operation in src/memory/manager.ts:1725, (2) If batch fails (timeout, API error, quota), error is caught at line 2058, (3) recordBatchFailure is called at line 2062 which increments batchFailureCount and checks against BATCH_FAILURE_LIMIT, (4) If failure count >= BATCH_FAILURE_LIMIT or forceDisable is true, batch.enabled is set to false at line 2012, (5) Fallback to embedChunksInBatches is executed at line 2072 which uses non-batch embedding, (6) If shouldFallbackOnError detects embedding-related error at line 1237, activateFallbackProvider is called at line 1224, (7) Fallback provider (e.g., local) is initialized via createEmbeddingProvider at line 1276, (8) Full reindex is triggered with new provider at line 1226.",
+      "required_files": [
+        "src/memory/manager.ts",
+        "src/memory/embeddings.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 79,
+      "category": "data_flow_integration",
+      "question": "What is the message routing flow when a subagent is spawned via the sessions-spawn tool, from parent context to child session?",
+      "answer": "The flow is: (1) Parent agent invokes createSessionsSpawnTool in src/agents/clawdbot-tools.ts:127, (2) Tool extracts agentSessionKey, agentChannel, agentAccountId, agentTo, agentThreadId, agentGroupId from parent context at lines 128-137, (3) Spawn parameters (agent_id, model, message, announce_to) are validated, (4) Child session is created with inherited context: agentTo for routing, agentThreadId for thread preservation, agentChannel for reply path, (5) If announce_to is specified, routing target is resolved for status announcements, (6) Child agent starts with own session but can reply to parent's channel via inherited agentChannel reference, (7) Lifecycle events (agent:wait:start, agent:wait:result) are emitted to parent session for monitoring.",
+      "required_files": [
+        "src/agents/clawdbot-tools.ts",
+        "src/agents/tools/sessions-spawn-tool.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 80,
+      "category": "data_flow_integration",
+      "question": "How does session state propagate from config store updates to active WebSocket clients?",
+      "answer": "The flow is: (1) Session metadata is updated via updateSessionStore in src/config/sessions/store.ts which writes to sessions.json, (2) Session entry includes sessionKey, sessionId, agentId, model, verboseLevel, lastActive timestamp, (3) When gateway WebSocket clients connect, they subscribe to session updates via nodeSendToSession callback, (4) Session-specific events (chat, agent) are routed using sessionKey lookup at src/gateway/server-chat.ts:157, 188, 251, (5) nodeSendToSession filters clients by matching client.sessionBindings.has(sessionKey), (6) State updates (model changes, config reloads) trigger session:updated broadcast to subscribed clients, (7) Control UI clients receive real-time session state changes without polling.",
+      "required_files": [
+        "src/config/sessions/store.ts",
+        "src/gateway/server-chat.ts",
+        "src/gateway/server-methods/config.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 81,
+      "category": "cross_cutting_concerns",
+      "question": "How does the subsystem logger format console output for non-JSON styles, and which file contains the logic for stripping redundant subsystem prefixes from log messages?",
+      "answer": "The subsystem logger uses formatConsoleLine() in src/logging/subsystem.ts:123-165 to format console output. For pretty/compact styles, it applies color coding with pickSubsystemColor() at line 60, formats timestamps, and uses stripRedundantSubsystemPrefixForConsole() at lines 91-121 to remove redundant prefixes like '[discord] discord:' from messages. The formatting includes subsystem-specific colors chosen via hash (lines 63-69) and level-based colors (lines 144-151). Console output is written via writeConsoleLine() at line 167.",
+      "required_files": [
+        "src/logging/subsystem.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 82,
+      "category": "cross_cutting_concerns",
+      "question": "What are the default redaction patterns for sensitive data in logs, and which specific token prefixes does the redaction system automatically mask?",
+      "answer": "The redaction system in src/logging/redact.ts defines DEFAULT_REDACT_PATTERNS at lines 14-37 with specific token prefixes: sk- (line 27 for OpenAI), ghp_/github_pat_ (lines 28-29 for GitHub), xox[baprs]-/xapp- (lines 30-31 for Slack), gsk_ (line 32 for Groq), AIza (line 33 for Google), pplx- (line 34 for Perplexity), npm_ (line 35 for npm), and Telegram bot tokens matching \\d{6,}:[A-Za-z0-9_-]{20,} (line 36). The maskToken() function at lines 67-72 keeps the first 6 and last 4 characters (DEFAULT_REDACT_KEEP_START=6, DEFAULT_REDACT_KEEP_END=4 at lines 11-12) for tokens >= 18 chars (DEFAULT_REDACT_MIN_LENGTH at line 10).",
+      "required_files": [
+        "src/logging/redact.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 83,
+      "category": "cross_cutting_concerns",
+      "question": "How does the file logger determine where to write logs, and what is the default log rotation strategy including the maximum age for old logs?",
+      "answer": "The file logger in src/logging/logger.ts resolves the log directory via resolveSettings() at lines 54-70, defaulting to defaultRollingPathForToday() at line 207 which creates dated files like /tmp/clawdbot/clawdbot-YYYY-MM-DD.log (DEFAULT_LOG_DIR=/tmp/clawdbot at line 15). The pruneOldRollingLogs() function at lines 221-241 automatically deletes logs older than MAX_LOG_AGE_MS = 24 * 60 * 60 * 1000 (24 hours, line 20). Rolling is detected via isRollingPath() at lines 212-219 which checks for the clawdbot-YYYY-MM-DD.log pattern. Pruning occurs during buildLogger() at line 88.",
+      "required_files": [
+        "src/logging/logger.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 84,
+      "category": "cross_cutting_concerns",
+      "question": "What error codes does the error handling system extract and format, and which function specifically handles EPIPE errors in console output?",
+      "answer": "The error handling system in src/infra/errors.ts uses extractErrorCode() at lines 1-7 to extract error codes from the 'code' property, supporting both string and number codes. formatErrorMessage() at lines 9-22 handles Error instances, strings, numbers, booleans, bigints, and falls back to JSON.stringify(). The formatUncaughtError() at lines 24-32 provides special handling for INVALID_CONFIG errors (line 25). In src/logging/console.ts, the isEpipeError() function at lines 126-129 specifically checks for EPIPE and EIO error codes, which are caught in the forward() function at lines 222 and 240 to prevent crashes when stdout/stderr pipes are broken.",
+      "required_files": [
+        "src/infra/errors.ts",
+        "src/logging/console.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 85,
+      "category": "cross_cutting_concerns",
+      "question": "How is gateway authentication resolved from config and environment variables, and which authentication methods support Tailscale Serve mode?",
+      "answer": "Gateway authentication is resolved in src/gateway/auth.ts via resolveGatewayAuth() at lines 167-185. It prioritizes authConfig.token, then env.CLAWDBOT_GATEWAY_TOKEN for token mode (line 174), and authConfig.password, then env.CLAWDBOT_GATEWAY_PASSWORD for password mode (line 175). The mode defaults to 'password' if password is set, otherwise 'token' (line 176). Tailscale authentication is enabled via allowTailscale at lines 177-178, which defaults to true when tailscaleMode === 'serve' AND mode !== 'password'. The authorizeGatewayConnect() function at lines 199-252 implements a three-tier auth system: Tailscale (lines 210-222 using resolveVerifiedTailscaleUser), token (lines 224-234), and password (lines 237-248).",
+      "required_files": [
+        "src/gateway/auth.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 86,
+      "category": "cross_cutting_concerns",
+      "question": "What are the default retry parameters for Discord and Telegram rate limiting, and how does the Telegram retry runner extract the retry_after value from API errors?",
+      "answer": "In src/infra/retry-policy.ts, DISCORD_RETRY_DEFAULTS at lines 8-13 sets attempts=3, minDelayMs=500, maxDelayMs=30000, jitter=0.1. TELEGRAM_RETRY_DEFAULTS at lines 15-20 uses attempts=3, minDelayMs=400, maxDelayMs=30000, jitter=0.1. The createDiscordRetryRunner() at lines 44-69 retries on RateLimitError instances (line 57) and extracts retryAfter via err.retryAfter * 1000 (line 58). The createTelegramRetryRunner() at lines 71-100 uses getTelegramRetryAfterMs() at lines 24-42, which searches for retry_after in err.parameters, err.response.parameters, or err.error.parameters, converting seconds to milliseconds (* 1000 at line 41). It also retries based on TELEGRAM_RETRY_RE pattern at line 22.",
+      "required_files": [
+        "src/infra/retry-policy.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 87,
+      "category": "cross_cutting_concerns",
+      "question": "How does the cache trace diagnostic system determine what information to include in trace events, and what is the default file path for cache traces?",
+      "answer": "The cache trace system in src/agents/cache-trace.ts uses resolveCacheTraceConfig() at lines 82-104 to determine inclusions. It checks CLAWDBOT_CACHE_TRACE env var and config.diagnostics.cacheTrace.enabled (lines 85-86). File path defaults to path.join(resolveStateDir(env), 'logs', 'cache-trace.jsonl') at line 90 if no override. The includeMessages flag (lines 92-93, default true at line 100) controls whether full messages are recorded. includePrompt (lines 94, 101) and includeSystem (lines 95, 102) control prompt and system message inclusion. The recordStage() function at lines 210-246 conditionally includes data: prompt if cfg.includePrompt (lines 218-220), system with digest if cfg.includeSystem (lines 221-224), and messages if cfg.includeMessages (lines 235-237).",
+      "required_files": [
+        "src/agents/cache-trace.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 88,
+      "category": "cross_cutting_concerns",
+      "question": "How does the console capture system route logs to stderr vs stdout, and which console messages are suppressed in non-verbose mode?",
+      "answer": "The console capture in src/logging/console.ts is enabled via enableConsoleCapture() at lines 156-253. The forward() function at lines 183-245 checks loggingState.forceConsoleToStderr at line 216 - when true (set by routeLogsToStderr() at line 80), all output goes to process.stderr.write() at line 220, keeping stdout clean for RPC/JSON modes. Otherwise, it uses the original console methods (lines 227-239). Suppression is handled by shouldSuppressConsoleMessage() at lines 112-124, which in non-verbose mode filters: 'Closing session:', 'Opening session:', 'Removing old closed session:', 'Session already closed', 'Session already open' (lines 104-110), and EventQueue slow listener warnings for DiscordMessageListener (lines 117-122). Suppressed messages are blocked at line 187.",
+      "required_files": [
+        "src/logging/console.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 89,
+      "category": "cross_cutting_concerns",
+      "question": "What diagnostic events are emitted by the logging system for webhook processing, and how often does the diagnostic heartbeat check for stuck sessions?",
+      "answer": "The diagnostic logging in src/logging/diagnostic.ts emits events via emitDiagnosticEvent(). For webhooks: 'webhook.received' at lines 71-76, 'webhook.processed' at lines 94-100, and 'webhook.error' at lines 116-122. Session events include 'message.queued' (lines 140-147), 'message.processed' (lines 178-189), 'session.state' (lines 214-222), and 'session.stuck' (lines 234-240). The startDiagnosticHeartbeat() at lines 294-345 runs every 30 seconds (30_000ms at line 343) and emits 'diagnostic.heartbeat' at lines 320-330. It checks for stuck sessions at lines 332-342: if state is 'processing' and ageMs > 120_000 (2 minutes), it calls logSessionStuck() which emits 'session.stuck' with the session state and age.",
+      "required_files": [
+        "src/logging/diagnostic.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 90,
+      "category": "cross_cutting_concerns",
+      "question": "How does the security audit system classify the severity of channel warnings, and what specific keywords trigger a 'critical' severity rating?",
+      "answer": "The security audit in src/security/audit.ts uses classifyChannelWarningSeverity() at lines 102-118 to classify warnings. It converts the message to lowercase (line 103) and checks for critical keywords: 'dms: open', 'grouppolicy=\"open\"', 'dmpolicy=\"open\"' (lines 104-110), 'allows any', 'anyone can dm', or 'public' (lines 111-113) all trigger 'critical' severity. Keywords 'locked' or 'disabled' (lines 114-116) result in 'info' severity. Otherwise, it defaults to 'warn' (line 117). This function is called at line 752 when processing plugin security warnings from collectChannelSecurityFindings() at lines 741-757.",
+      "required_files": [
+        "src/security/audit.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 91,
+      "category": "cross_cutting_concerns",
+      "question": "How does the logging subsystem determine whether to log to console based on log level, and which environment variable enables verbose debug logging globally?",
+      "answer": "The subsystem logger in src/logging/subsystem.ts uses shouldLogToConsole() at lines 27-32 to check if a message should be logged to console. It returns false immediately if settings.level === 'silent' (line 28), then uses levelToMinLevel() from src/logging/levels.ts to compare numeric levels: the message's level must be <= the minimum required level (lines 29-31). The emit() function at line 208 calls this check at line 222 after file logging. Console settings are resolved in src/logging/console.ts via normalizeConsoleLevel() at lines 21-24, which checks isVerbose() at line 22 - if true, it returns 'debug' level. The isVerbose() function is imported from src/globals.js and checks for verbose mode set by environment variables or CLI flags.",
+      "required_files": [
+        "src/logging/subsystem.ts",
+        "src/logging/console.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 92,
+      "category": "cross_cutting_concerns",
+      "question": "What is the mechanism for filtering console output by subsystem prefix, and how does the system handle subsystem name normalization for channels?",
+      "answer": "Console filtering in src/logging/console.ts is controlled by setConsoleSubsystemFilter() at lines 83-90, which stores normalized filter prefixes in loggingState.consoleSubsystemFilter. The shouldLogSubsystemToConsole() function at lines 96-102 checks if the subsystem matches any filter prefix exactly or starts with 'prefix/' (line 101). In src/logging/subsystem.ts, formatSubsystemForConsole() at lines 72-89 normalizes subsystem names: it drops SUBSYSTEM_PREFIXES_TO_DROP prefixes ('gateway', 'channels', 'providers' at line 56), handles CHANNEL_SUBSYSTEM_PREFIXES specially (returning just the channel name at lines 82-84), and limits to SUBSYSTEM_MAX_SEGMENTS=2 segments (lines 57, 85-86). This is used by formatConsoleLine() at line 131 for non-JSON output.",
+      "required_files": [
+        "src/logging/console.ts",
+        "src/logging/subsystem.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 93,
+      "category": "cross_cutting_concerns",
+      "question": "How does the gateway authentication system verify Tailscale user identity, and what specific checks are performed to prevent header spoofing?",
+      "answer": "The gateway authentication in src/gateway/auth.ts verifies Tailscale users via resolveVerifiedTailscaleUser() at lines 134-165. It performs four checks: (1) getTailscaleUser() at lines 106-118 extracts the 'tailscale-user-login' header (lines 108-109), (2) isTailscaleProxyRequest() at lines 129-132 verifies the request comes from loopback with hasTailscaleProxyHeaders() checking for x-forwarded-for, x-forwarded-proto, and x-forwarded-host headers (lines 120-127), (3) it extracts the client IP from x-forwarded-for via resolveTailscaleClientIp() at lines 68-72, and (4) calls tailscaleWhois(clientIp) to verify the IP matches the claimed login via normalizeLogin() comparison (lines 150-156). Only if all checks pass does it return the verified user at lines 157-164. This prevents header spoofing by requiring cryptographic proof from the Tailscale daemon.",
+      "required_files": [
+        "src/gateway/auth.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 94,
+      "category": "cross_cutting_concerns",
+      "question": "What TTL constants are defined for caching and deduplication across the codebase, and where is the web tool default cache TTL specified?",
+      "answer": "Cache TTL constants are defined in multiple files: src/gateway/server-constants.ts defines DEDUPE_TTL_MS = 5 * 60_000 (5 minutes) at line 29 for deduplication. src/agents/tools/web-shared.ts defines DEFAULT_CACHE_TTL_MINUTES = 15 at line 8 for web tool caching. src/agents/auth-profiles/constants.ts defines EXTERNAL_CLI_SYNC_TTL_MS = 15 * 60 * 1000 (15 minutes) at line 22 for external CLI synchronization. src/agents/pi-embedded-runner/cache-ttl.ts defines CACHE_TTL_CUSTOM_TYPE = 'clawdbot.cache-ttl' at line 3 as a type identifier. Cache enablement is checked via src/config/cache-utils.ts isCacheEnabled() at lines 17-19, which returns true if ttlMs > 0.",
+      "required_files": [
+        "src/gateway/server-constants.ts",
+        "src/agents/tools/web-shared.ts",
+        "src/agents/auth-profiles/constants.ts",
+        "src/config/cache-utils.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 95,
+      "category": "cross_cutting_concerns",
+      "question": "How does the CLI progress indicator system detect terminal capabilities and choose between OSC progress, spinner, or line-based fallbacks?",
+      "answer": "The CLI progress system in src/cli/progress.ts uses createCliProgress() at lines 43-175 to select rendering strategies. It first checks if enabled===false (line 44) or activeProgress > 0 (line 45) for noop. It verifies stream.isTTY at line 48. At line 53, it checks canOsc = isTty && supportsOscProgress(process.env, isTty) from the osc-progress library to enable OSC 9;4 terminal sequences. The fallback parameter at lines 54-55 controls fallback strategies: allowSpinner (line 54) enables @clack/prompts spinner (line 78), allowLine (line 55) enables simple line rendering via renderLine() at lines 79-86 using clearActiveProgressLine() from src/terminal/progress-line.ts, and allowLog (line 49) enables throttled log output at lines 87-103. Progress state is managed via registerActiveProgressLine() at line 67.",
+      "required_files": [
+        "src/cli/progress.ts",
+        "src/terminal/progress-line.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 96,
+      "category": "cross_cutting_concerns",
+      "question": "How does the logging system prevent timestamp duplication when console output already has timestamps, and which log formats trigger this check?",
+      "answer": "The console capture in src/logging/console.ts prevents timestamp duplication in the forward() function at lines 189-196. It sets shouldPrefixTimestamp to true only if: (1) loggingState.consoleTimestampPrefix is enabled via setConsoleTimestampPrefix() at lines 92-94, (2) trimmed content is not empty, (3) hasTimestampPrefix() at lines 137-139 returns false - this regex checks for timestamps matching HH:MM:SS or ISO 8601 formats like YYYY-MM-DDTHH:MM:SS, and (4) isJsonPayload() at lines 141-149 returns false - which checks if content starts with { or [ and is valid JSON. If shouldPrefixTimestamp is false, timestamps are not added. The formatConsoleTimestamp() at lines 131-135 generates timestamps in HH:MM:SS format for 'pretty' style or ISO format otherwise, matching getConsoleSettings().style.",
+      "required_files": [
+        "src/logging/console.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 97,
+      "category": "cross_cutting_concerns",
+      "question": "What specific filesystem permission checks does the security audit perform on the config file, and what remediation commands does it recommend for each permission violation?",
+      "answer": "The security audit in src/security/audit.ts performs config file permission checks in collectFilesystemFindings() at lines 188-244. It uses inspectPathPermissions() at lines 188-192 and checks: (1) isSymlink at lines 194-200 triggers 'fs.config.symlink' warn, (2) worldWritable OR groupWritable at lines 202-215 triggers 'fs.config.perms_writable' critical with formatPermissionRemediation() using posixMode: 0o600, (3) worldReadable at lines 216-229 triggers 'fs.config.perms_world_readable' critical with 0o600 remediation, (4) groupReadable at lines 230-243 triggers 'fs.config.perms_group_readable' warn with 0o600 remediation. The formatPermissionRemediation() function is imported from src/security/audit-fs.ts and generates platform-specific commands (chmod for Unix, icacls for Windows) based on the permission check results.",
+      "required_files": [
+        "src/security/audit.ts",
+        "src/security/audit-fs.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 98,
+      "category": "cross_cutting_concerns",
+      "question": "How does the logging system integrate external log transports, and what safety guarantees does it provide to prevent transport failures from blocking logging?",
+      "answer": "The logging system in src/logging/logger.ts manages external transports via registerLogTransport() at lines 189-198. It adds transports to the externalTransports Set (line 190) and if a cachedLogger exists, immediately attaches via attachExternalTransport() at lines 43-52 and lines 192-194. The attachExternalTransport() function wraps the transport call in a try-catch at lines 46-50, silently catching all errors with the comment 'never block on logging failures' at line 49. During logger creation in buildLogger() at lines 84-110, the primary file transport at lines 96-104 also wraps fs.appendFileSync() in try-catch (lines 97, 101-103) with the same safety guarantee. Transport cleanup is handled by the returned cleanup function at lines 195-197 which removes the transport from externalTransports.",
+      "required_files": [
+        "src/logging/logger.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 99,
+      "category": "cross_cutting_concerns",
+      "question": "How does the security audit detect and warn about weak gateway authentication tokens, and what is the minimum recommended token length?",
+      "answer": "The security audit in src/security/audit.ts checks token strength in collectGatewayConfigFindings() at lines 345-354. It extracts the token from resolveGatewayAuth() result (lines 345-346), verifies auth.mode === 'token' (line 347), and if the token length < 24 characters (line 347), it creates a 'gateway.token_too_short' finding with 'warn' severity at lines 348-353. The minimum recommended length is 24 characters (line 347). Similar checks exist for browser control tokens at lines 410-417 with the same 24-character threshold. The audit also checks for token reuse between browser control and gateway at lines 428-436, warning if controlToken === gatewayToken to prevent 'compromise of browser control expands blast radius to the Gateway API' (line 433).",
+      "required_files": [
+        "src/security/audit.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 100,
+      "category": "cross_cutting_concerns",
+      "question": "How does the terminal progress line system manage concurrent progress indicators, and which ANSI escape sequences are used to clear progress lines?",
+      "answer": "The terminal progress line system in src/terminal/progress-line.ts uses a singleton activeStream variable at line 1 to manage concurrent access. registerActiveProgressLine() at lines 3-6 sets activeStream only if stream.isTTY is true. The clearActiveProgressLine() function at lines 8-11 uses the ANSI escape sequence '\\r\\x1b[2K' at line 10: \\r (carriage return) moves cursor to line start, \\x1b[2K (ESC[2K) clears the entire line. unregisterActiveProgressLine() at lines 13-17 clears activeStream but only if the provided stream matches (line 15). In src/cli/progress.ts, activeProgress counter at line 11 tracks concurrent progress indicators: it increments at line 65, and createCliProgress() returns noopReporter if activeProgress > 0 (line 45) to prevent conflicts. The counter decrements in done() at lines 162 and 171.",
+      "required_files": [
+        "src/terminal/progress-line.ts",
+        "src/cli/progress.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 101,
+      "category": "symbol-lookup",
+      "question": "What is the default handshake timeout in milliseconds for gateway connections?",
+      "answer": "The default handshake timeout is 10000ms (10 seconds), defined as DEFAULT_HANDSHAKE_TIMEOUT_MS at /Users/reh3376/clawdbot/src/gateway/server-constants.ts:19",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/gateway/server-constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 102,
+      "category": "symbol-lookup",
+      "question": "What is the maximum payload size in bytes that the gateway server will accept for incoming WebSocket frames?",
+      "answer": "The maximum payload size is 524288 bytes (512 * 1024, or 512 KB), defined as MAX_PAYLOAD_BYTES at /Users/reh3376/clawdbot/src/gateway/server-constants.ts:1",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/gateway/server-constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 103,
+      "category": "symbol-lookup",
+      "question": "What is the per-connection send buffer limit in bytes for the gateway?",
+      "answer": "The per-connection send buffer limit is 1572864 bytes (1.5 * 1024 * 1024, or 1.5 MB), defined as MAX_BUFFERED_BYTES at /Users/reh3376/clawdbot/src/gateway/server-constants.ts:2",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/gateway/server-constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 104,
+      "category": "symbol-lookup",
+      "question": "What is the default maximum size in bytes for chat history messages to keep under client WebSocket limits?",
+      "answer": "The default maximum is 6291456 bytes (6 * 1024 * 1024, or 6 MB), defined as DEFAULT_MAX_CHAT_HISTORY_MESSAGES_BYTES at /Users/reh3376/clawdbot/src/gateway/server-constants.ts:4",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/gateway/server-constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 105,
+      "category": "symbol-lookup",
+      "question": "What is the tick interval in milliseconds for the gateway server's periodic operations?",
+      "answer": "The tick interval is 30000ms (30 seconds), defined as TICK_INTERVAL_MS at /Users/reh3376/clawdbot/src/gateway/server-constants.ts:27",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/gateway/server-constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 106,
+      "category": "symbol-lookup",
+      "question": "What is the health refresh interval in milliseconds for gateway monitoring?",
+      "answer": "The health refresh interval is 60000ms (1 minute), defined as HEALTH_REFRESH_INTERVAL_MS at /Users/reh3376/clawdbot/src/gateway/server-constants.ts:28",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/gateway/server-constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 107,
+      "category": "symbol-lookup",
+      "question": "What is the deduplication TTL in milliseconds for gateway message deduplication?",
+      "answer": "The deduplication TTL is 300000ms (5 minutes, calculated as 5 * 60_000), defined as DEDUPE_TTL_MS at /Users/reh3376/clawdbot/src/gateway/server-constants.ts:29",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/gateway/server-constants.ts"
+      ],
+      "complexity": "computed_value"
+    },
+    {
+      "id": 108,
+      "category": "symbol-lookup",
+      "question": "What is the maximum number of deduplicated messages the gateway will track?",
+      "answer": "The maximum is 1000 messages, defined as DEDUPE_MAX at /Users/reh3376/clawdbot/src/gateway/server-constants.ts:30",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/gateway/server-constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 109,
+      "category": "symbol-lookup",
+      "question": "What is the default idle time in hours before a sandbox container is automatically stopped?",
+      "answer": "The default idle time is 24 hours, defined as DEFAULT_SANDBOX_IDLE_HOURS at /Users/reh3376/clawdbot/src/agents/sandbox/constants.ts:12",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/agents/sandbox/constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 110,
+      "category": "symbol-lookup",
+      "question": "What is the default maximum age in days before a sandbox container is removed?",
+      "answer": "The default maximum age is 7 days, defined as DEFAULT_SANDBOX_MAX_AGE_DAYS at /Users/reh3376/clawdbot/src/agents/sandbox/constants.ts:13",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/agents/sandbox/constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 111,
+      "category": "symbol-lookup",
+      "question": "What is the default Docker image name used for sandbox containers?",
+      "answer": "The default image is \"clawdbot-sandbox:bookworm-slim\", defined as DEFAULT_SANDBOX_IMAGE at /Users/reh3376/clawdbot/src/agents/sandbox/constants.ts:9",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/agents/sandbox/constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 112,
+      "category": "symbol-lookup",
+      "question": "What is the default CDP (Chrome DevTools Protocol) port for sandbox browser containers?",
+      "answer": "The default CDP port is 9222, defined as DEFAULT_SANDBOX_BROWSER_CDP_PORT at /Users/reh3376/clawdbot/src/agents/sandbox/constants.ts:44",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/agents/sandbox/constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 113,
+      "category": "symbol-lookup",
+      "question": "What is the default autostart timeout in milliseconds for sandbox browser containers?",
+      "answer": "The default autostart timeout is 12000ms (12 seconds), defined as DEFAULT_SANDBOX_BROWSER_AUTOSTART_TIMEOUT_MS at /Users/reh3376/clawdbot/src/agents/sandbox/constants.ts:47",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/agents/sandbox/constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 114,
+      "category": "symbol-lookup",
+      "question": "What is the external CLI sync TTL in milliseconds for auth profile synchronization?",
+      "answer": "The sync TTL is 900000ms (15 minutes, calculated as 15 * 60 * 1000), defined as EXTERNAL_CLI_SYNC_TTL_MS at /Users/reh3376/clawdbot/src/agents/auth-profiles/constants.ts:22",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/agents/auth-profiles/constants.ts"
+      ],
+      "complexity": "computed_value"
+    },
+    {
+      "id": 115,
+      "category": "symbol-lookup",
+      "question": "What is the near-expiry threshold in milliseconds for external CLI auth tokens?",
+      "answer": "The near-expiry threshold is 600000ms (10 minutes, calculated as 10 * 60 * 1000), defined as EXTERNAL_CLI_NEAR_EXPIRY_MS at /Users/reh3376/clawdbot/src/agents/auth-profiles/constants.ts:23",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/agents/auth-profiles/constants.ts"
+      ],
+      "complexity": "computed_value"
+    },
+    {
+      "id": 116,
+      "category": "symbol-lookup",
+      "question": "What is the default gateway port number?",
+      "answer": "The default gateway port is 18789, defined as DEFAULT_GATEWAY_PORT at /Users/reh3376/clawdbot/src/config/paths.ts:60",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/config/paths.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 117,
+      "category": "symbol-lookup",
+      "question": "What is the maximum size in bytes for image media files?",
+      "answer": "The maximum size is 6291456 bytes (6 * 1024 * 1024, or 6 MB), defined as MAX_IMAGE_BYTES at /Users/reh3376/clawdbot/src/media/constants.ts:1",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/media/constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 118,
+      "category": "symbol-lookup",
+      "question": "What is the maximum size in bytes for audio and video media files?",
+      "answer": "The maximum size for both audio and video is 16777216 bytes (16 * 1024 * 1024, or 16 MB), defined as MAX_AUDIO_BYTES and MAX_VIDEO_BYTES at /Users/reh3376/clawdbot/src/media/constants.ts:2-3",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/media/constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 119,
+      "category": "symbol-lookup",
+      "question": "What is the maximum size in bytes for document media files?",
+      "answer": "The maximum size is 104857600 bytes (100 * 1024 * 1024, or 100 MB), defined as MAX_DOCUMENT_BYTES at /Users/reh3376/clawdbot/src/media/constants.ts:4",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/media/constants.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 120,
+      "category": "symbol-lookup",
+      "question": "What is the default maximum number of concurrent agents allowed?",
+      "answer": "The default maximum is 4 concurrent agents, defined as DEFAULT_AGENT_MAX_CONCURRENT at /Users/reh3376/clawdbot/src/config/agent-limits.ts:3",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/config/agent-limits.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 121,
+      "category": "symbol-lookup",
+      "question": "What is the default maximum number of concurrent subagents allowed?",
+      "answer": "The default maximum is 8 concurrent subagents, defined as DEFAULT_SUBAGENT_MAX_CONCURRENT at /Users/reh3376/clawdbot/src/config/agent-limits.ts:4",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/config/agent-limits.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 122,
+      "category": "symbol-lookup",
+      "question": "What is the default queue debounce time in milliseconds for message processing?",
+      "answer": "The default debounce time is 1000ms (1 second), defined as DEFAULT_QUEUE_DEBOUNCE_MS at /Users/reh3376/clawdbot/src/auto-reply/reply/queue/state.ts:16",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/auto-reply/reply/queue/state.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 123,
+      "category": "symbol-lookup",
+      "question": "What is the default queue capacity limit for followup messages?",
+      "answer": "The default queue capacity is 20 messages, defined as DEFAULT_QUEUE_CAP at /Users/reh3376/clawdbot/src/auto-reply/reply/queue/state.ts:17",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/auto-reply/reply/queue/state.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 124,
+      "category": "symbol-lookup",
+      "question": "What is the default reset hour (0-23) for daily session resets?",
+      "answer": "The default reset hour is 4 (4 AM), defined as DEFAULT_RESET_AT_HOUR at /Users/reh3376/clawdbot/src/config/sessions/reset.ts:21",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/config/sessions/reset.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 125,
+      "category": "symbol-lookup",
+      "question": "What is the default idle timeout in minutes before a session is considered stale?",
+      "answer": "The default idle timeout is 60 minutes (1 hour), defined as DEFAULT_IDLE_MINUTES at /Users/reh3376/clawdbot/src/config/sessions/types.ts:167",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/config/sessions/types.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 126,
+      "category": "symbol-lookup",
+      "question": "What are the default reset trigger commands for starting a new session?",
+      "answer": "The default reset triggers are [\"/new\", \"/reset\"], defined as DEFAULT_RESET_TRIGGERS at /Users/reh3376/clawdbot/src/config/sessions/types.ts:166",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/config/sessions/types.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 127,
+      "category": "symbol-lookup",
+      "question": "What is the maximum number of group history keys that will be retained before LRU eviction?",
+      "answer": "The maximum is 1000 history keys, defined as MAX_HISTORY_KEYS at /Users/reh3376/clawdbot/src/auto-reply/reply/history.ts:7",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/auto-reply/reply/history.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 128,
+      "category": "symbol-lookup",
+      "question": "What is the default heartbeat interval string for periodic agent checks?",
+      "answer": "The default heartbeat interval is \"30m\" (30 minutes), defined as DEFAULT_HEARTBEAT_EVERY at /Users/reh3376/clawdbot/src/auto-reply/heartbeat.ts:7",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/auto-reply/heartbeat.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 129,
+      "category": "symbol-lookup",
+      "question": "What is the default maximum character limit for heartbeat acknowledgment messages?",
+      "answer": "The default maximum is 300 characters, defined as DEFAULT_HEARTBEAT_ACK_MAX_CHARS at /Users/reh3376/clawdbot/src/auto-reply/heartbeat.ts:8",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/auto-reply/heartbeat.ts"
+      ],
+      "complexity": "symbol-lookup"
+    },
+    {
+      "id": 130,
+      "category": "symbol-lookup",
+      "question": "What is the maximum include depth for config file $include directives?",
+      "answer": "The maximum include depth is 10 levels, defined as MAX_INCLUDE_DEPTH at /Users/reh3376/clawdbot/src/config/includes.ts:19",
+      "required_files": [
+        "/Users/reh3376/clawdbot/src/config/includes.ts"
+      ],
+      "complexity": "symbol-lookup"
+    }
+  ]
+}

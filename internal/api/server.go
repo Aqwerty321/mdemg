@@ -12,6 +12,7 @@ import (
 	"mdemg/internal/ape"
 	"mdemg/internal/config"
 	"mdemg/internal/consulting"
+	"mdemg/internal/conversation"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/gaps"
 	"mdemg/internal/hidden"
@@ -35,6 +36,7 @@ type Server struct {
 	symbolStore     *symbols.Store
 	consultant      *consulting.Service
 	gapDetector     *gaps.GapDetector
+	conversationSvc *conversation.Service
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -119,6 +121,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	gapDet := gaps.NewGapDetector(driver, gapCfg)
 	log.Printf("Gap detector initialized (threshold: %.2f, minOccurrences: %d)", gapCfg.LowScoreThreshold, gapCfg.MinOccurrences)
 
+	// Initialize conversation service (Phase 1: Observation Capture with Surprise Detection)
+	var convSvc *conversation.Service
+	if emb != nil {
+		convSvc = conversation.NewService(driver, emb)
+		log.Printf("Conversation service initialized")
+	} else {
+		log.Printf("Conversation service disabled (requires embedder)")
+	}
+
 	// Initialize APE scheduler
 	var apeSched *ape.Scheduler
 	if pluginMgr != nil {
@@ -135,7 +146,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		}
 	}
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet}
+	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, conversationSvc: convSvc}
 }
 
 // Shutdown gracefully stops background services
@@ -192,6 +203,12 @@ func (s *Server) Routes() http.Handler {
 
 	// System metrics endpoints
 	mux.HandleFunc("/v1/system/pool-metrics", s.handlePoolMetrics)
+
+	// Conversation memory endpoints (Phase 1-5: Observation Capture, Resume, Recall)
+	mux.HandleFunc("/v1/conversation/observe", s.handleObserve)
+	mux.HandleFunc("/v1/conversation/correct", s.handleCorrect)
+	mux.HandleFunc("/v1/conversation/resume", s.handleResume)
+	mux.HandleFunc("/v1/conversation/recall", s.handleRecall)
 
 	// Wrap mux with middleware stack
 	// Order: compression (outermost) -> logging (innermost)

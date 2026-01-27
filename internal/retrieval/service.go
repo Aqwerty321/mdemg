@@ -1058,3 +1058,257 @@ func expRecency(updatedAt time.Time, rho float64) float64 {
 	age := time.Since(updatedAt).Hours() / 24.0
 	return math.Exp(-rho * age)
 }
+
+// =============================================================================
+// PHASE 5: CONTEXT-AWARE RETRIEVAL
+// =============================================================================
+// Blends conversation knowledge into retrieval results by:
+// 1. Finding relevant conversation observations/themes/concepts
+// 2. Using spreading activation through the concept hierarchy
+// 3. Boosting results that have supporting conversation knowledge
+
+// ConversationContextResult represents conversation knowledge that supports retrieval
+type ConversationContextResult struct {
+	NodeID  string
+	Type    string  // conversation_observation, conversation_theme, emergent_concept
+	Content string
+	Score   float64
+	Layer   int
+}
+
+// RetrieveWithConversationContext extends Retrieve with conversation knowledge blending.
+// When enabled, it finds relevant conversation knowledge and boosts results that
+// are semantically connected to prior learnings.
+func (s *Service) RetrieveWithConversationContext(ctx context.Context, req models.RetrieveRequest, boostFactor float64) (models.RetrieveResponse, error) {
+	// First, get standard retrieval results
+	resp, err := s.Retrieve(ctx, req)
+	if err != nil {
+		return resp, err
+	}
+
+	if len(resp.Results) == 0 {
+		return resp, nil
+	}
+
+	// Default boost factor
+	if boostFactor <= 0 {
+		boostFactor = 1.2
+	}
+
+	// Find relevant conversation knowledge
+	conversationContext, err := s.findRelevantConversationContext(ctx, req.SpaceID, req.QueryEmbedding, 10)
+	if err != nil {
+		// Log warning but continue with unmodified results
+		log.Printf("WARN: failed to find conversation context, returning unmodified results: %v", err)
+		return resp, nil
+	}
+
+	if len(conversationContext) == 0 {
+		return resp, nil
+	}
+
+	// Apply conversation-based boosting via spreading activation
+	resp = s.applyConversationBoost(ctx, req.SpaceID, resp, conversationContext, boostFactor)
+
+	// Add debug info
+	if resp.Debug == nil {
+		resp.Debug = make(map[string]any)
+	}
+	resp.Debug["conversation_context_count"] = len(conversationContext)
+	resp.Debug["conversation_boost_factor"] = boostFactor
+
+	return resp, nil
+}
+
+// findRelevantConversationContext finds conversation knowledge relevant to the query
+func (s *Service) findRelevantConversationContext(ctx context.Context, spaceID string, embedding []float32, topK int) ([]ConversationContextResult, error) {
+	if len(embedding) == 0 {
+		return nil, nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Query conversation nodes (observations, themes, concepts) by vector similarity
+	cypher := `
+CALL db.index.vector.queryNodes($index, $k, $q)
+YIELD node, score
+WHERE node.space_id = $spaceId
+  AND node.role_type IN ['conversation_observation', 'conversation_theme', 'emergent_concept']
+  AND NOT coalesce(node.is_archived, false)
+RETURN node.node_id AS nodeId, node.role_type AS roleType,
+       coalesce(node.summary, node.content, node.name, '') AS content,
+       node.layer AS layer, score
+ORDER BY score DESC
+LIMIT $k`
+
+	params := map[string]any{
+		"spaceId": spaceID,
+		"k":       topK * 2, // Fetch more, filter to topK
+		"q":       embedding,
+		"index":   s.cfg.VectorIndexName,
+	}
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		var results []ConversationContextResult
+		for res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("nodeId")
+			roleType, _ := rec.Get("roleType")
+			content, _ := rec.Get("content")
+			layer, _ := rec.Get("layer")
+			sc, _ := rec.Get("score")
+
+			results = append(results, ConversationContextResult{
+				NodeID:  fmt.Sprint(nodeID),
+				Type:    fmt.Sprint(roleType),
+				Content: fmt.Sprint(content),
+				Score:   toFloat64(sc, 0),
+				Layer:   toInt(layer, 0),
+			})
+
+			if len(results) >= topK {
+				break
+			}
+		}
+		return results, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]ConversationContextResult), nil
+}
+
+// applyConversationBoost boosts retrieval results that are connected to conversation knowledge
+// Uses spreading activation through GENERALIZES and ABSTRACTS_TO edges
+func (s *Service) applyConversationBoost(ctx context.Context, spaceID string, resp models.RetrieveResponse, conversationContext []ConversationContextResult, boostFactor float64) models.RetrieveResponse {
+	if len(conversationContext) == 0 || len(resp.Results) == 0 {
+		return resp
+	}
+
+	// Build a map of conversation context scores by node ID
+	contextScores := make(map[string]float64)
+	for _, cc := range conversationContext {
+		contextScores[cc.NodeID] = cc.Score
+	}
+
+	// Find nodes that are connected to conversation context via edges
+	connectedNodes, err := s.findConversationConnectedNodes(ctx, spaceID, conversationContext)
+	if err != nil {
+		log.Printf("WARN: failed to find conversation-connected nodes: %v", err)
+		return resp
+	}
+
+	// Apply boost to results that are connected to conversation context
+	for i := range resp.Results {
+		nodeID := resp.Results[i].NodeID
+
+		// Check if directly in context
+		if score, ok := contextScores[nodeID]; ok {
+			// Boost based on conversation context score
+			boost := 1.0 + (boostFactor-1.0)*score
+			resp.Results[i].Score *= boost
+			continue
+		}
+
+		// Check if connected via edges
+		if connectionStrength, ok := connectedNodes[nodeID]; ok {
+			// Boost based on connection strength (decayed by hops)
+			boost := 1.0 + (boostFactor-1.0)*connectionStrength*0.5
+			resp.Results[i].Score *= boost
+		}
+	}
+
+	// Re-sort by score after boosting
+	sortResultsByScore(resp.Results)
+
+	return resp
+}
+
+// findConversationConnectedNodes finds code nodes connected to conversation context
+// Returns a map of node_id -> connection_strength (0.0-1.0)
+func (s *Service) findConversationConnectedNodes(ctx context.Context, spaceID string, conversationContext []ConversationContextResult) (map[string]float64, error) {
+	if len(conversationContext) == 0 {
+		return nil, nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Extract conversation node IDs
+	convNodeIDs := make([]string, len(conversationContext))
+	convScores := make(map[string]float64)
+	for i, cc := range conversationContext {
+		convNodeIDs[i] = cc.NodeID
+		convScores[cc.NodeID] = cc.Score
+	}
+
+	// Find code nodes connected to conversation nodes through CO_ACTIVATED_WITH edges
+	// This leverages the Hebbian learning edges that connect observations to code
+	cypher := `
+UNWIND $convNodeIds AS convId
+MATCH (conv:MemoryNode {space_id: $spaceId, node_id: convId})
+      -[r:CO_ACTIVATED_WITH]-
+      (code:MemoryNode {space_id: $spaceId})
+WHERE code.role_type IS NULL OR code.role_type NOT IN ['conversation_observation', 'conversation_theme', 'emergent_concept']
+WITH code.node_id AS codeNodeId, convId, r.weight AS weight
+RETURN codeNodeId, convId, weight
+ORDER BY weight DESC
+LIMIT 100`
+
+	params := map[string]any{
+		"spaceId":     spaceID,
+		"convNodeIds": convNodeIDs,
+	}
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		connections := make(map[string]float64)
+		for res.Next(ctx) {
+			rec := res.Record()
+			codeNodeID, _ := rec.Get("codeNodeId")
+			convID, _ := rec.Get("convId")
+			weight, _ := rec.Get("weight")
+
+			codeID := fmt.Sprint(codeNodeID)
+			convIDStr := fmt.Sprint(convID)
+			w := toFloat64(weight, 0)
+
+			// Combine edge weight with conversation context score
+			convScore := convScores[convIDStr]
+			connectionStrength := w * convScore
+
+			// Keep the strongest connection
+			if existing, ok := connections[codeID]; !ok || connectionStrength > existing {
+				connections[codeID] = connectionStrength
+			}
+		}
+		return connections, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.(map[string]float64), nil
+}
+
+// sortResultsByScore sorts retrieval results by score in descending order
+func sortResultsByScore(results []models.RetrieveResult) {
+	for i := 0; i < len(results)-1; i++ {
+		for j := i + 1; j < len(results); j++ {
+			if results[i].Score < results[j].Score {
+				results[i], results[j] = results[j], results[i]
+			}
+		}
+	}
+}

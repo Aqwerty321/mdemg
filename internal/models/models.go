@@ -479,6 +479,36 @@ type ConsolidateResponse struct {
 	Enabled             bool    `json:"enabled"` // Whether hidden layer is enabled
 }
 
+// ObserveRequest - request for POST /v1/conversation/observe
+// Captures a significant conversation observation with surprise detection.
+type ObserveRequest struct {
+	SpaceID   string         `json:"space_id" validate:"required,min=1,max=256"`
+	SessionID string         `json:"session_id" validate:"required,min=1"`
+	Content   string         `json:"content" validate:"required,min=1"`
+	ObsType   string         `json:"obs_type,omitempty"` // decision, learning, preference, etc.
+	Tags      []string       `json:"tags,omitempty"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
+}
+
+// ObserveResponse - response from POST /v1/conversation/observe
+type ObserveResponse struct {
+	ObsID           string             `json:"obs_id"`
+	NodeID          string             `json:"node_id"`
+	SurpriseScore   float64            `json:"surprise_score"`
+	SurpriseFactors map[string]float64 `json:"surprise_factors"`
+	Summary         string             `json:"summary,omitempty"`
+}
+
+// CorrectRequest - request for POST /v1/conversation/correct
+// Captures an explicit user correction with high surprise score.
+type CorrectRequest struct {
+	SpaceID   string `json:"space_id" validate:"required,min=1,max=256"`
+	SessionID string `json:"session_id" validate:"required,min=1"`
+	Incorrect string `json:"incorrect" validate:"required,min=1"`
+	Correct   string `json:"correct" validate:"required,min=1"`
+	Context   string `json:"context,omitempty"`
+}
+
 // IngestTriggerRequest - request for POST /v1/memory/ingest/trigger
 // Triggers a background codebase re-ingestion job.
 type IngestTriggerRequest struct {
@@ -530,4 +560,107 @@ type IngestProgress struct {
 	Percentage float64 `json:"percentage"`
 	Phase      string  `json:"phase,omitempty"` // discovery, ingestion, consolidation
 	Rate       string  `json:"rate,omitempty"`  // e.g., "15.2 elements/sec"
+}
+
+// =============================================================================
+// PHASE 5: CONTEXT-AWARE RETRIEVAL AND SKILL INTEGRATION
+// =============================================================================
+// These types support conversation memory resume/recall operations and
+// context-aware retrieval that blends conversation knowledge into results.
+
+// ResumeRequest - request for POST /v1/conversation/resume
+// Restores context after context compaction by retrieving recent observations,
+// themes, and emergent concepts.
+type ResumeRequest struct {
+	SpaceID          string `json:"space_id" validate:"required,min=1,max=256"`
+	SessionID        string `json:"session_id,omitempty"`        // Optional: filter to specific session
+	IncludeTasks     bool   `json:"include_tasks,omitempty"`     // Include task-type observations
+	IncludeDecisions bool   `json:"include_decisions,omitempty"` // Include decision-type observations
+	IncludeLearnings bool   `json:"include_learnings,omitempty"` // Include learning-type observations
+	MaxObservations  int    `json:"max_observations,omitempty"`  // Max observations to return (default: 20)
+}
+
+// ResumeResponse - response from POST /v1/conversation/resume
+// Provides context restoration after context compaction.
+type ResumeResponse struct {
+	SpaceID          string                  `json:"space_id"`
+	SessionID        string                  `json:"session_id,omitempty"`
+	Observations     []ConversationObsResult `json:"observations"`
+	Themes           []ConversationThemeResult `json:"themes"`
+	EmergentConcepts []EmergentConceptResult `json:"emergent_concepts"`
+	Summary          string                  `json:"summary"` // Generated context summary
+	Debug            map[string]any          `json:"debug,omitempty"`
+}
+
+// ConversationObsResult represents a conversation observation in resume/recall responses
+type ConversationObsResult struct {
+	NodeID        string    `json:"node_id"`
+	ObsType       string    `json:"obs_type"`       // decision, learning, preference, error, task, correction
+	Content       string    `json:"content"`
+	Summary       string    `json:"summary"`
+	SessionID     string    `json:"session_id"`
+	SurpriseScore float64   `json:"surprise_score"` // How novel/surprising (0.0-1.0)
+	Score         float64   `json:"score,omitempty"` // Relevance score (for recall)
+	Tags          []string  `json:"tags,omitempty"`
+	CreatedAt     string    `json:"created_at"`
+}
+
+// ConversationThemeResult represents a conversation theme in resume/recall responses
+type ConversationThemeResult struct {
+	NodeID           string  `json:"node_id"`
+	Name             string  `json:"name"`
+	Summary          string  `json:"summary"`
+	MemberCount      int     `json:"member_count"`
+	DominantObsType  string  `json:"dominant_obs_type,omitempty"`
+	AvgSurpriseScore float64 `json:"avg_surprise_score"`
+	Score            float64 `json:"score,omitempty"` // Relevance score (for recall)
+}
+
+// EmergentConceptResult represents an emergent concept in resume/recall responses
+type EmergentConceptResult struct {
+	NodeID       string   `json:"node_id"`
+	Name         string   `json:"name"`
+	Summary      string   `json:"summary"`
+	Layer        int      `json:"layer"` // 2 for first level, 3+ for higher
+	Keywords     []string `json:"keywords,omitempty"`
+	SessionCount int      `json:"session_count,omitempty"` // Number of sessions represented
+	Score        float64  `json:"score,omitempty"`         // Relevance score (for recall)
+}
+
+// RecallRequest - request for POST /v1/conversation/recall
+// Retrieves relevant conversation knowledge via semantic query.
+type RecallRequest struct {
+	SpaceID         string    `json:"space_id" validate:"required,min=1,max=256"`
+	Query           string    `json:"query" validate:"required,min=1,max=2000"`     // Natural language query
+	QueryEmbedding  []float32 `json:"query_embedding,omitempty"`                   // Optional: pre-computed embedding
+	TopK            int       `json:"top_k,omitempty"`                             // Max results (default: 10)
+	IncludeThemes   bool      `json:"include_themes,omitempty"`                    // Include conversation themes
+	IncludeConcepts bool      `json:"include_concepts,omitempty"`                  // Include emergent concepts
+}
+
+// RecallResponse - response from POST /v1/conversation/recall
+// Returns relevant conversation knowledge based on semantic query.
+type RecallResponse struct {
+	SpaceID string         `json:"space_id"`
+	Query   string         `json:"query"`
+	Results []RecallResult `json:"results"`
+	Debug   map[string]any `json:"debug,omitempty"`
+}
+
+// RecallResult represents a single result from conversation recall
+type RecallResult struct {
+	Type     string  `json:"type"`     // conversation_observation, conversation_theme, emergent_concept
+	NodeID   string  `json:"node_id"`
+	Content  string  `json:"content"`  // For observations: content, for themes/concepts: summary
+	Score    float64 `json:"score"`    // Relevance score (0.0-1.0)
+	Layer    int     `json:"layer"`    // 0 for observations, 1 for themes, 2+ for concepts
+	Metadata map[string]any `json:"metadata,omitempty"` // Additional metadata
+}
+
+// ContextRetrieveRequest extends RetrieveRequest with conversation context options
+// Used internally when blending conversation knowledge into retrieval.
+type ContextRetrieveRequest struct {
+	RetrieveRequest                       // Embedded base request
+	BlendConversationContext bool         `json:"blend_conversation_context,omitempty"` // Enable conversation blending
+	ConversationBoostFactor  float64      `json:"conversation_boost_factor,omitempty"`  // Boost factor for conversation-supported results (default: 1.2)
 }

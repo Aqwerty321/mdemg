@@ -254,3 +254,122 @@ type UpperLayerNode struct {
 	CreatedAt    time.Time
 	InferredAt   time.Time // When the type was last inferred
 }
+
+// =============================================================================
+// CONVERSATION HIDDEN LAYER TYPES (Phase 3)
+// =============================================================================
+// Conversation observations cluster into themes, similar to how code files
+// cluster into concepts. These are kept separate from code clustering.
+
+// ConversationObservation represents a conversation_observation node for clustering
+type ConversationObservation struct {
+	NodeID        string
+	SpaceID       string
+	ObsType       string    // decision, correction, learning, preference, error, task
+	Content       string    // The observation content
+	Summary       string    // Brief summary of the observation
+	Embedding     []float64 // Semantic embedding
+	SurpriseScore float64   // How novel/surprising the information is (0.0-1.0)
+	SessionID     string    // Which session this came from
+	Tags          []string  // Additional tags
+}
+
+// ConversationTheme represents a conversation_theme node in layer 1
+// Themes emerge from clustering related conversation observations
+type ConversationTheme struct {
+	NodeID           string
+	SpaceID          string
+	Name             string    // Generated theme name
+	Summary          string    // Generated summary describing the theme
+	Embedding        []float64 // Centroid of clustered observations
+	MemberCount      int       // Number of observations in this theme
+	DominantObsType  string    // Most common observation type in the theme
+	AvgSurpriseScore float64   // Average surprise score of members
+}
+
+// ConversationThemeResult holds the results of conversation theme clustering
+type ConversationThemeResult struct {
+	ThemesCreated     int                  // Number of new conversation_theme nodes created
+	EdgesCreated      int                  // Number of GENERALIZES edges created
+	ThemeSummaries    []string             // Summaries of created themes
+	ObservationsUsed  int                  // Total observations that were clustered
+	NoiseObservations int                  // Observations that didn't fit any cluster
+}
+
+// ConversationConsolidationResult holds results from conversation-specific consolidation
+type ConversationConsolidationResult struct {
+	ThemeResult    *ConversationThemeResult
+	ConceptResult  *EmergentConceptResult
+	ForwardPass    *ForwardPassResult
+	TotalDuration  time.Duration
+}
+
+// =============================================================================
+// PHASE 4: EMERGENT CONCEPT FORMATION TYPES
+// =============================================================================
+// Emergent concepts (Layer 2+) form from clustering conversation_theme nodes.
+// These represent higher-level abstractions spanning multiple themes across sessions.
+
+// EmergentConcept represents an emergent_concept node in layer 2+
+// Emergent concepts form from clustering related conversation themes
+type EmergentConcept struct {
+	NodeID           string
+	SpaceID          string
+	Layer            int       // 2 for first level, 3 for higher, etc.
+	Name             string    // Generated concept name
+	Summary          string    // High-level summary of what this concept represents
+	Embedding        []float64 // Centroid of clustered themes/concepts
+	MemberCount      int       // Number of themes/concepts in this cluster
+	Keywords         []string  // Aggregated keywords from member themes
+	AvgSurpriseScore float64   // Average surprise score from member themes
+	SessionCount     int       // Number of distinct sessions represented
+}
+
+// EmergentConceptResult holds the results of emergent concept clustering
+type EmergentConceptResult struct {
+	ConceptsCreated   map[int]int // layer -> count of concepts created
+	EdgesCreated      int         // Number of ABSTRACTS_TO edges created
+	ThemesUsed        int         // Total themes that were clustered
+	NoiseThemes       int         // Themes that didn't fit any cluster
+	ConceptSummaries  []string    // Summaries of created concepts
+	MaxLayerReached   int         // Highest layer with concepts
+}
+
+// ConversationThemeForClustering represents a conversation_theme node for clustering into emergent concepts
+type ConversationThemeForClustering struct {
+	NodeID               string
+	SpaceID              string
+	Name                 string
+	Summary              string
+	Embedding            []float64
+	MessagePassEmbedding []float64
+	MemberCount          int
+	AvgSurpriseScore     float64
+	SessionIDs           []string // Sessions represented by this theme
+	Keywords             []string
+}
+
+// EmergentConceptNode represents an emergent concept node for higher-layer clustering
+// Used when clustering L2 concepts into L3, L3 into L4, etc.
+type EmergentConceptNode struct {
+	NodeID               string
+	SpaceID              string
+	Layer                int
+	Name                 string
+	Summary              string
+	Embedding            []float64
+	MessagePassEmbedding []float64
+	Keywords             []string
+	SessionCount         int
+}
+
+// ConceptHierarchyNode represents a node at any layer for hierarchy traversal
+type ConceptHierarchyNode struct {
+	NodeID    string
+	SpaceID   string
+	Layer     int
+	RoleType  string // conversation_observation, conversation_theme, emergent_concept
+	Name      string
+	Summary   string
+	Embedding []float64
+}

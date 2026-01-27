@@ -27,6 +27,7 @@ type pair struct {
 
 // ApplyCoactivation performs bounded, regularized learning updates.
 // DB writes are intentionally limited to small deltas.
+// Supports both code nodes and conversation_observation nodes with surprise-based weighting.
 func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp models.RetrieveResponse) error {
 	if spaceID == "" || len(resp.Results) < 2 {
 		return nil
@@ -109,20 +110,46 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 		// - ON MATCH SET updates timestamps and evidence count
 		// - Weight is calculated using Hebbian formula after MERGE
 		// - Symmetric edges are created in both directions
+		// - For conversation_observation nodes, applies surprise-based initial weight
 		cypher := `UNWIND $pairs AS p
 MATCH (a:MemoryNode {space_id:$spaceId, node_id:p.src})
 MATCH (b:MemoryNode {space_id:$spaceId, node_id:p.dst})
-WITH a,b, (p.ai * p.aj) AS prod
+WITH a,b, (p.ai * p.aj) AS prod,
+     coalesce(a.surprise_score, 0.0) AS surpriseA,
+     coalesce(b.surprise_score, 0.0) AS surpriseB,
+     coalesce(a.role_type, '') AS roleA,
+     coalesce(b.role_type, '') AS roleB,
+     coalesce(a.obs_type, '') AS obsTypeA,
+     coalesce(b.obs_type, '') AS obsTypeB,
+     coalesce(a.session_id, '') AS sessionA,
+     coalesce(b.session_id, '') AS sessionB
+// Calculate surprise factor (for conversation nodes)
+WITH a,b,prod,surpriseA,surpriseB,roleA,roleB,obsTypeA,obsTypeB,sessionA,sessionB,
+     CASE
+       WHEN roleA = 'conversation_observation' OR roleB = 'conversation_observation' THEN
+         CASE
+           WHEN surpriseA >= 0.7 OR surpriseB >= 0.7 THEN 2.0  // HIGH surprise
+           WHEN surpriseA >= 0.4 OR surpriseB >= 0.4 THEN 1.5  // MEDIUM surprise
+           ELSE 1.0  // NORMAL
+         END
+       ELSE 1.0  // Code nodes use standard factor
+     END AS surpriseFactor
+// Calculate initial weight based on surprise factor
+WITH a,b,prod,surpriseA,surpriseB,roleA,roleB,obsTypeA,obsTypeB,sessionA,sessionB,surpriseFactor,
+     0.10 * surpriseFactor AS initialWeight
 // forward edge: create or update
 MERGE (a)-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(b)
 ON CREATE SET r.edge_id=randomUUID(), r.created_at=datetime(), r.updated_at=datetime(),
-              r.last_activated_at=datetime(), r.status='active', r.weight=0.10,
-              r.evidence_count=1, r.version=1, r.dim_coactivation=1.0, r.decay_rate=0.001
+              r.last_activated_at=datetime(), r.status='active', r.weight=initialWeight,
+              r.evidence_count=1, r.version=1, r.dim_coactivation=1.0, r.decay_rate=0.001,
+              r.surprise_factor=surpriseFactor,
+              r.session_id=CASE WHEN sessionA <> '' THEN sessionA WHEN sessionB <> '' THEN sessionB ELSE '' END,
+              r.obs_type=CASE WHEN obsTypeA <> '' THEN obsTypeA WHEN obsTypeB <> '' THEN obsTypeB ELSE '' END
 ON MATCH SET r.updated_at=datetime(), r.last_activated_at=datetime(),
              r.evidence_count=coalesce(r.evidence_count,0)+1, r.version=coalesce(r.version,0)+1
-WITH a,b,prod,r
-WITH a,b,prod,r,
-     coalesce(r.weight,0.10) AS w
+WITH a,b,prod,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r
+WITH a,b,prod,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r,
+     coalesce(r.weight,initialWeight) AS w
 // Apply Hebbian weight update: new_w = (1-μ)*w + η*prod, clamped to [wmin,wmax]
 SET r.weight = CASE
   WHEN ((1-$mu)*w + $eta*prod) < $wmin THEN $wmin
@@ -133,7 +160,10 @@ END
 MERGE (b)-[rr:CO_ACTIVATED_WITH {space_id:$spaceId}]->(a)
 ON CREATE SET rr.edge_id=randomUUID(), rr.created_at=datetime(), rr.updated_at=datetime(),
               rr.last_activated_at=datetime(), rr.status='active', rr.weight=r.weight,
-              rr.evidence_count=1, rr.version=1, rr.dim_coactivation=1.0, rr.decay_rate=0.001
+              rr.evidence_count=1, rr.version=1, rr.dim_coactivation=1.0, rr.decay_rate=0.001,
+              rr.surprise_factor=surpriseFactor,
+              rr.session_id=CASE WHEN sessionA <> '' THEN sessionA WHEN sessionB <> '' THEN sessionB ELSE '' END,
+              rr.obs_type=CASE WHEN obsTypeA <> '' THEN obsTypeA WHEN obsTypeB <> '' THEN obsTypeB ELSE '' END
 ON MATCH SET rr.updated_at=datetime(), rr.last_activated_at=datetime(),
              rr.evidence_count=coalesce(rr.evidence_count,0)+1, rr.version=coalesce(rr.version,0)+1, rr.weight=r.weight
 RETURN count(*) AS updated;`
@@ -146,6 +176,136 @@ RETURN count(*) AS updated;`
 		}
 		return nil, res.Err()
 	})
+	return err
+}
+
+// CoactivateSession creates CO_ACTIVATED_WITH edges between all observations in a session.
+// Links observations together based on:
+// - Temporal proximity (closer in time = stronger edge)
+// - Surprise scores (high surprise observations get stronger connections)
+// This enables session-based learning where related observations reinforce each other.
+func (s *Service) CoactivateSession(ctx context.Context, spaceID, sessionID string) error {
+	if spaceID == "" || sessionID == "" {
+		return nil
+	}
+
+	// Get Hebbian learning parameters
+	eta := s.cfg.LearningEta
+	if eta <= 0 {
+		eta = 0.02
+	}
+	mu := s.cfg.LearningMu
+	if mu <= 0 {
+		mu = 0.01
+	}
+	wmin := s.cfg.LearningWMin
+	wmax := s.cfg.LearningWMax
+	if wmax <= wmin {
+		wmin, wmax = 0.0, 1.0
+	}
+
+	params := map[string]any{
+		"spaceId":   spaceID,
+		"sessionId": sessionID,
+		"eta":       eta,
+		"mu":        mu,
+		"wmin":      wmin,
+		"wmax":      wmax,
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Find all conversation_observation nodes in the session
+		// Create edges weighted by temporal proximity and surprise
+		cypher := `
+MATCH (obs:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})
+WHERE obs.session_id = $sessionId
+WITH obs ORDER BY obs.created_at
+WITH collect(obs) AS observations
+
+// Generate pairs from observations
+UNWIND range(0, size(observations)-1) AS i
+UNWIND range(i+1, size(observations)-1) AS j
+WITH observations[i] AS a, observations[j] AS b,
+     duration.inSeconds(observations[i].created_at, observations[j].created_at).seconds AS timeDiffSec
+
+// Calculate temporal proximity weight (closer = higher, max 1 hour window)
+WITH a, b, timeDiffSec,
+     CASE
+       WHEN timeDiffSec <= 0 THEN 1.0
+       WHEN timeDiffSec > 3600 THEN 0.1  // Beyond 1 hour = low proximity
+       ELSE 1.0 - (toFloat(timeDiffSec) / 3600.0) * 0.9  // Linear decay over 1 hour
+     END AS temporalProximity
+
+// Calculate surprise factor
+WITH a, b, temporalProximity,
+     coalesce(a.surprise_score, 0.0) AS surpriseA,
+     coalesce(b.surprise_score, 0.0) AS surpriseB,
+     CASE
+       WHEN coalesce(a.surprise_score, 0.0) >= 0.7 OR coalesce(b.surprise_score, 0.0) >= 0.7 THEN 2.0
+       WHEN coalesce(a.surprise_score, 0.0) >= 0.4 OR coalesce(b.surprise_score, 0.0) >= 0.4 THEN 1.5
+       ELSE 1.0
+     END AS surpriseFactor
+
+// Calculate combined activation (temporal proximity * surprise boost)
+WITH a, b, temporalProximity, surpriseFactor,
+     temporalProximity AS activation,
+     0.10 * surpriseFactor AS initialWeight
+
+// Create forward edge
+MERGE (a)-[r:CO_ACTIVATED_WITH {space_id: $spaceId}]->(b)
+ON CREATE SET r.edge_id=randomUUID(), r.created_at=datetime(), r.updated_at=datetime(),
+              r.last_activated_at=datetime(), r.status='active', r.weight=initialWeight,
+              r.evidence_count=1, r.version=1, r.dim_coactivation=1.0, r.decay_rate=0.001,
+              r.surprise_factor=surpriseFactor,
+              r.session_id=$sessionId,
+              r.obs_type=coalesce(a.obs_type, b.obs_type, ''),
+              r.temporal_proximity=temporalProximity
+ON MATCH SET r.updated_at=datetime(), r.last_activated_at=datetime(),
+             r.evidence_count=coalesce(r.evidence_count,0)+1,
+             r.version=coalesce(r.version,0)+1
+
+// Calculate new weight with temporal proximity factor
+WITH a, b, r, activation, temporalProximity, surpriseFactor, initialWeight,
+     coalesce(r.weight, initialWeight) AS w,
+     activation * activation AS prod
+
+// Apply Hebbian update with temporal weighting
+SET r.weight = CASE
+  WHEN ((1-$mu)*w + $eta*prod) < $wmin THEN $wmin
+  WHEN ((1-$mu)*w + $eta*prod) > $wmax THEN $wmax
+  ELSE ((1-$mu)*w + $eta*prod)
+END
+
+// Create reverse edge (symmetry)
+MERGE (b)-[rr:CO_ACTIVATED_WITH {space_id: $spaceId}]->(a)
+ON CREATE SET rr.edge_id=randomUUID(), rr.created_at=datetime(), rr.updated_at=datetime(),
+              rr.last_activated_at=datetime(), rr.status='active', rr.weight=r.weight,
+              rr.evidence_count=1, rr.version=1, rr.dim_coactivation=1.0, rr.decay_rate=0.001,
+              rr.surprise_factor=surpriseFactor,
+              rr.session_id=$sessionId,
+              rr.obs_type=coalesce(a.obs_type, b.obs_type, ''),
+              rr.temporal_proximity=temporalProximity
+ON MATCH SET rr.updated_at=datetime(), rr.last_activated_at=datetime(),
+             rr.evidence_count=coalesce(rr.evidence_count,0)+1,
+             rr.version=coalesce(rr.version,0)+1, rr.weight=r.weight
+
+RETURN count(*) AS edges_created
+`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			count, _ := rec.Get("edges_created")
+			return count, nil
+		}
+		return int64(0), res.Err()
+	})
+
 	return err
 }
 
@@ -233,16 +393,18 @@ func (s *Service) PruneDecayedEdges(ctx context.Context, spaceID string) (int64,
 
 	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		// Find and delete CO_ACTIVATED_WITH edges where decayed weight < threshold
-		// Uses evidence-based decay: effectiveDecay = baseDecay / sqrt(evidenceCount)
+		// Uses evidence-based decay: effectiveDecay = baseDecay / sqrt(evidenceCount * surpriseFactor)
 		// Edges with more evidence (frequently co-activated) decay slower
+		// Edges with high surprise factor decay slower (surprising information persists longer)
 		cypher := `MATCH (a:MemoryNode {space_id:$spaceId})-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(b:MemoryNode {space_id:$spaceId})
 WITH r,
      duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days AS daysSinceActive,
      coalesce(r.weight, 0.0) AS rawWeight,
-     coalesce(r.evidence_count, 1) AS evidenceCount
-WITH r, daysSinceActive, rawWeight, evidenceCount,
+     coalesce(r.evidence_count, 1) AS evidenceCount,
+     coalesce(r.surprise_factor, 1.0) AS surpriseFactor
+WITH r, daysSinceActive, rawWeight, evidenceCount, surpriseFactor,
      CASE WHEN daysSinceActive > 0 THEN
-       rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount))) ^ daysSinceActive)
+       rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) ^ daysSinceActive)
      ELSE rawWeight END AS decayedWeight
 WHERE decayedWeight < $pruneThreshold
 DELETE r
@@ -347,22 +509,26 @@ func (s *Service) GetLearningEdgeStats(ctx context.Context, spaceID string) (map
 	defer sess.Close(ctx)
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		// Uses evidence-based decay: effectiveDecay = baseDecay / sqrt(evidenceCount)
+		// Uses evidence-based decay with surprise factor: effectiveDecay = baseDecay / sqrt(evidenceCount * surpriseFactor)
 		cypher := `MATCH (a:MemoryNode {space_id:$spaceId})-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(b:MemoryNode {space_id:$spaceId})
 WITH r,
      duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days AS daysSinceActive,
      coalesce(r.weight, 0.0) AS rawWeight,
-     coalesce(r.evidence_count, 1) AS evidenceCount
-WITH r, daysSinceActive, rawWeight, evidenceCount,
+     coalesce(r.evidence_count, 1) AS evidenceCount,
+     coalesce(r.surprise_factor, 1.0) AS surpriseFactor
+WITH r, daysSinceActive, rawWeight, evidenceCount, surpriseFactor,
      CASE WHEN daysSinceActive > 0 THEN
-       rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount))) ^ daysSinceActive)
+       rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) ^ daysSinceActive)
      ELSE rawWeight END AS decayedWeight
 RETURN count(r) AS total_edges,
        avg(rawWeight) AS avg_raw_weight,
        avg(decayedWeight) AS avg_decayed_weight,
        avg(evidenceCount) AS avg_evidence_count,
        max(evidenceCount) AS max_evidence_count,
+       avg(surpriseFactor) AS avg_surprise_factor,
+       max(surpriseFactor) AS max_surprise_factor,
        sum(CASE WHEN evidenceCount >= 5 THEN 1 ELSE 0 END) AS strong_edges,
+       sum(CASE WHEN surpriseFactor >= 1.5 THEN 1 ELSE 0 END) AS surprising_edges,
        sum(CASE WHEN decayedWeight < $pruneThreshold THEN 1 ELSE 0 END) AS edges_below_threshold,
        avg(daysSinceActive) AS avg_days_since_active,
        max(daysSinceActive) AS max_days_since_active`

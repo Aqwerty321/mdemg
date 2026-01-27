@@ -3031,3 +3031,1636 @@ func (s *Service) getUIPatternSummary(pattern string) string {
 	}
 	return "UI pattern: " + pattern
 }
+
+// =============================================================================
+// PHASE 3: CONVERSATION HIDDEN LAYER CLUSTERING
+// =============================================================================
+// Clusters conversation_observation nodes into conversation_theme nodes (Layer 1).
+// This is kept separate from code file clustering to maintain clear boundaries
+// between code knowledge and conversation knowledge.
+
+// ClusterConversations performs DBSCAN clustering on conversation_observation nodes
+// and creates conversation_theme nodes from the resulting clusters.
+// This is the conversation equivalent of CreateHiddenNodes.
+func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*ConversationThemeResult, error) {
+	if !s.cfg.HiddenLayerEnabled {
+		return &ConversationThemeResult{}, nil
+	}
+
+	result := &ConversationThemeResult{}
+
+	// Step 1: Fetch orphan conversation observations (no GENERALIZES to theme yet)
+	observations, err := s.fetchOrphanConversationObservations(ctx, spaceID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch orphan conversation observations: %w", err)
+	}
+
+	if len(observations) < s.cfg.HiddenLayerMinSamples {
+		return result, nil // Not enough data to cluster
+	}
+
+	result.ObservationsUsed = len(observations)
+
+	// Step 2: Filter to observations with embeddings
+	validObs := make([]ConversationObservation, 0, len(observations))
+	for _, obs := range observations {
+		if len(obs.Embedding) > 0 {
+			validObs = append(validObs, obs)
+		}
+	}
+
+	if len(validObs) < s.cfg.HiddenLayerMinSamples {
+		return result, nil
+	}
+
+	// Step 3: Run DBSCAN clustering on observation embeddings
+	embeddings := make([][]float64, len(validObs))
+	for i, obs := range validObs {
+		embeddings[i] = obs.Embedding
+	}
+
+	labels := DBSCAN(embeddings, s.cfg.HiddenLayerClusterEps, s.cfg.HiddenLayerMinSamples)
+	clusters, noise := groupObservationsByCluster(validObs, labels)
+	result.NoiseObservations = len(noise)
+
+	// Step 4: Get existing theme count for unique naming
+	existingCount, err := s.countConversationThemes(ctx, spaceID)
+	if err != nil {
+		return nil, fmt.Errorf("count existing conversation themes: %w", err)
+	}
+
+	// Step 5: Create theme nodes for each cluster
+	themeID := 0
+	for _, members := range clusters {
+		if result.ThemesCreated >= s.cfg.HiddenLayerMaxHidden {
+			break
+		}
+
+		if len(members) < s.cfg.HiddenLayerMinSamples {
+			continue
+		}
+
+		// Compute centroid
+		clusterEmbeddings := make([][]float64, len(members))
+		for i, m := range members {
+			clusterEmbeddings[i] = m.Embedding
+		}
+		centroid := ComputeCentroid(clusterEmbeddings)
+		if centroid == nil {
+			continue
+		}
+
+		// Generate theme summary from observation content
+		summary := generateConversationThemeSummary(members)
+
+		// Find dominant observation type and average surprise score
+		dominantType, avgSurprise := analyzeClusterMetadata(members)
+
+		// Create unique name
+		uniqueID := existingCount + themeID
+		name := fmt.Sprintf("ConvTheme-%s-%d", sanitizeThemeName(summary), uniqueID)
+
+		// Create the theme node and GENERALIZES edges
+		edgesCreated, err := s.createConversationThemeWithEdges(ctx, spaceID, name, summary, centroid, members, dominantType, avgSurprise)
+		if err != nil {
+			return result, fmt.Errorf("create conversation theme %s: %w", name, err)
+		}
+
+		result.ThemesCreated++
+		result.EdgesCreated += edgesCreated
+		result.ThemeSummaries = append(result.ThemeSummaries, summary)
+		themeID++
+	}
+
+	return result, nil
+}
+
+// fetchOrphanConversationObservations retrieves conversation_observation nodes without a theme
+func (s *Service) fetchOrphanConversationObservations(ctx context.Context, spaceID string) ([]ConversationObservation, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Query for conversation_observation nodes that don't have a GENERALIZES edge to a theme
+	var cypher string
+	if s.cfg.HiddenLayerBatchSize > 0 {
+		cypher = fmt.Sprintf(`
+MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation', layer: 0})
+WHERE NOT (o)-[:GENERALIZES]->(:MemoryNode {role_type: 'conversation_theme'})
+  AND o.embedding IS NOT NULL
+RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
+       o.summary AS summary, o.embedding AS embedding, o.surprise_score AS surpriseScore,
+       o.session_id AS sessionId, o.tags AS tags
+LIMIT %d`, s.cfg.HiddenLayerBatchSize)
+	} else {
+		cypher = `
+MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation', layer: 0})
+WHERE NOT (o)-[:GENERALIZES]->(:MemoryNode {role_type: 'conversation_theme'})
+  AND o.embedding IS NOT NULL
+RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
+       o.summary AS summary, o.embedding AS embedding, o.surprise_score AS surpriseScore,
+       o.session_id AS sessionId, o.tags AS tags`
+	}
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+
+		var observations []ConversationObservation
+		for res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("nodeId")
+			obsType, _ := rec.Get("obsType")
+			content, _ := rec.Get("content")
+			summary, _ := rec.Get("summary")
+			embedding, _ := rec.Get("embedding")
+			surpriseScore, _ := rec.Get("surpriseScore")
+			sessionID, _ := rec.Get("sessionId")
+			tags, _ := rec.Get("tags")
+
+			observations = append(observations, ConversationObservation{
+				NodeID:        asString(nodeID),
+				SpaceID:       spaceID,
+				ObsType:       asString(obsType),
+				Content:       asString(content),
+				Summary:       asString(summary),
+				Embedding:     asFloat64Slice(embedding),
+				SurpriseScore: asFloat64(surpriseScore),
+				SessionID:     asString(sessionID),
+				Tags:          asStringSlice(tags),
+			})
+		}
+		return observations, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]ConversationObservation), nil
+}
+
+// countConversationThemes returns the current count of conversation theme nodes
+func (s *Service) countConversationThemes(ctx context.Context, spaceID string) (int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `
+MATCH (t:MemoryNode {space_id: $spaceId, role_type: 'conversation_theme'})
+RETURN count(t) AS cnt`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			cnt, _ := rec.Get("cnt")
+			return asInt(cnt), res.Err()
+		}
+		return 0, res.Err()
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return result.(int), nil
+}
+
+// createConversationThemeWithEdges creates a conversation_theme node and GENERALIZES edges
+func (s *Service) createConversationThemeWithEdges(ctx context.Context, spaceID, name, summary string, centroid []float64, members []ConversationObservation, dominantType string, avgSurprise float64) (int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	memberIDs := make([]string, len(members))
+	for i, m := range members {
+		memberIDs[i] = m.NodeID
+	}
+
+	cypher := `
+CREATE (t:MemoryNode {
+  space_id: $spaceId,
+  node_id: randomUUID(),
+  name: $name,
+  layer: 1,
+  role_type: 'conversation_theme',
+  summary: $summary,
+  embedding: $centroid,
+  message_pass_embedding: $centroid,
+  aggregation_count: $memberCount,
+  dominant_obs_type: $dominantType,
+  avg_surprise_score: $avgSurprise,
+  stability_score: 1.0,
+  last_forward_pass: datetime(),
+  created_at: datetime(),
+  updated_at: datetime(),
+  version: 1
+})
+WITH t
+UNWIND $memberIds AS memberId
+MATCH (o:MemoryNode {space_id: $spaceId, node_id: memberId})
+WITH t, o,
+     CASE WHEN t.embedding IS NOT NULL AND o.embedding IS NOT NULL
+          THEN 1.0 - point.distance(o.embedding, t.embedding) / 2.0
+          ELSE 0.5
+     END AS similarity
+CREATE (o)-[:GENERALIZES {
+  space_id: $spaceId,
+  edge_id: randomUUID(),
+  weight: similarity,
+  similarity_score: similarity,
+  created_at: datetime(),
+  updated_at: datetime()
+}]->(t)
+RETURN t.node_id AS themeId, count(o) AS edgeCount`
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":      spaceID,
+			"name":         name,
+			"summary":      summary,
+			"centroid":     centroid,
+			"memberCount":  len(members),
+			"memberIds":    memberIDs,
+			"dominantType": dominantType,
+			"avgSurprise":  avgSurprise,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			edgeCount, _ := rec.Get("edgeCount")
+			return asInt(edgeCount), res.Err()
+		}
+		return 0, res.Err()
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return result.(int), nil
+}
+
+// groupObservationsByCluster groups conversation observations by their DBSCAN cluster labels
+func groupObservationsByCluster(observations []ConversationObservation, labels []int) (map[int][]ConversationObservation, []ConversationObservation) {
+	clusters := make(map[int][]ConversationObservation)
+	var noise []ConversationObservation
+
+	for i, label := range labels {
+		if label == -1 {
+			noise = append(noise, observations[i])
+		} else {
+			clusters[label] = append(clusters[label], observations[i])
+		}
+	}
+
+	return clusters, noise
+}
+
+// generateConversationThemeSummary creates a summary for a conversation theme
+// Uses keyword extraction and observation type analysis (no LLM calls)
+func generateConversationThemeSummary(members []ConversationObservation) string {
+	if len(members) == 0 {
+		return "Empty conversation theme"
+	}
+
+	// Extract keywords from all member content
+	keywords := extractKeywordsFromObservations(members)
+
+	// Get dominant observation type
+	dominantType, _ := analyzeClusterMetadata(members)
+
+	// Build summary based on type and keywords
+	var summary strings.Builder
+
+	// Start with type-based prefix
+	switch dominantType {
+	case "decision":
+		summary.WriteString("Decisions about ")
+	case "correction":
+		summary.WriteString("Corrections regarding ")
+	case "learning":
+		summary.WriteString("Learning about ")
+	case "preference":
+		summary.WriteString("Preferences for ")
+	case "error":
+		summary.WriteString("Error patterns in ")
+	case "task":
+		summary.WriteString("Tasks related to ")
+	default:
+		summary.WriteString("Observations about ")
+	}
+
+	// Add top keywords
+	if len(keywords) > 0 {
+		topKeywords := keywords
+		if len(topKeywords) > 5 {
+			topKeywords = topKeywords[:5]
+		}
+		summary.WriteString(strings.Join(topKeywords, ", "))
+	} else {
+		summary.WriteString("various topics")
+	}
+
+	// Add member count
+	summary.WriteString(fmt.Sprintf(" (%d observations)", len(members)))
+
+	return summary.String()
+}
+
+// extractKeywordsFromObservations extracts important keywords from observation content
+func extractKeywordsFromObservations(observations []ConversationObservation) []string {
+	// Build word frequency map
+	wordFreq := make(map[string]int)
+
+	// Common stop words to filter out
+	stopWords := map[string]bool{
+		"the": true, "a": true, "an": true, "and": true, "or": true, "but": true,
+		"is": true, "are": true, "was": true, "were": true, "be": true, "been": true,
+		"being": true, "have": true, "has": true, "had": true, "do": true, "does": true,
+		"did": true, "will": true, "would": true, "could": true, "should": true,
+		"may": true, "might": true, "must": true, "shall": true, "can": true,
+		"to": true, "of": true, "in": true, "for": true, "on": true, "with": true,
+		"at": true, "by": true, "from": true, "as": true, "into": true, "through": true,
+		"that": true, "which": true, "who": true, "whom": true, "this": true, "these": true,
+		"those": true, "it": true, "its": true, "they": true, "them": true, "their": true,
+		"we": true, "us": true, "our": true, "you": true, "your": true, "he": true,
+		"she": true, "him": true, "her": true, "his": true, "hers": true, "i": true,
+		"me": true, "my": true, "not": true, "no": true, "yes": true, "if": true,
+		"then": true, "else": true, "when": true, "where": true, "why": true, "how": true,
+		"all": true, "each": true, "every": true, "both": true, "few": true, "more": true,
+		"most": true, "other": true, "some": true, "such": true, "only": true, "own": true,
+		"same": true, "so": true, "than": true, "too": true, "very": true, "just": true,
+		"also": true, "now": true, "use": true, "used": true, "using": true,
+	}
+
+	for _, obs := range observations {
+		// Tokenize content
+		content := strings.ToLower(obs.Content + " " + obs.Summary)
+		words := strings.FieldsFunc(content, func(r rune) bool {
+			return !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-')
+		})
+
+		for _, word := range words {
+			// Filter short words and stop words
+			if len(word) >= 3 && !stopWords[word] {
+				wordFreq[word]++
+			}
+		}
+	}
+
+	// Sort by frequency and return top keywords
+	type wordCount struct {
+		word  string
+		count int
+	}
+	counts := make([]wordCount, 0, len(wordFreq))
+	for word, count := range wordFreq {
+		counts = append(counts, wordCount{word, count})
+	}
+
+	// Sort by count descending
+	for i := 0; i < len(counts)-1; i++ {
+		for j := i + 1; j < len(counts); j++ {
+			if counts[j].count > counts[i].count {
+				counts[i], counts[j] = counts[j], counts[i]
+			}
+		}
+	}
+
+	// Extract top words
+	result := make([]string, 0, min(10, len(counts)))
+	for i := 0; i < len(counts) && i < 10; i++ {
+		if counts[i].count >= 2 { // Only include words that appear at least twice
+			result = append(result, counts[i].word)
+		}
+	}
+
+	return result
+}
+
+// analyzeClusterMetadata determines dominant observation type and average surprise score
+func analyzeClusterMetadata(members []ConversationObservation) (dominantType string, avgSurprise float64) {
+	if len(members) == 0 {
+		return "unknown", 0.0
+	}
+
+	// Count observation types
+	typeCounts := make(map[string]int)
+	totalSurprise := 0.0
+
+	for _, m := range members {
+		typeCounts[m.ObsType]++
+		totalSurprise += m.SurpriseScore
+	}
+
+	// Find dominant type
+	maxCount := 0
+	for obsType, count := range typeCounts {
+		if count > maxCount {
+			maxCount = count
+			dominantType = obsType
+		}
+	}
+
+	// Calculate average surprise
+	avgSurprise = totalSurprise / float64(len(members))
+
+	return dominantType, avgSurprise
+}
+
+// sanitizeThemeName creates a safe name fragment from the summary
+func sanitizeThemeName(summary string) string {
+	// Extract first meaningful words from summary
+	words := strings.Fields(summary)
+	if len(words) == 0 {
+		return "misc"
+	}
+
+	// Skip type prefixes like "Decisions about"
+	startIdx := 0
+	skipWords := map[string]bool{
+		"decisions": true, "corrections": true, "learning": true,
+		"preferences": true, "error": true, "errors": true, "tasks": true,
+		"observations": true, "about": true, "regarding": true, "for": true,
+		"related": true, "to": true, "patterns": true, "in": true,
+	}
+
+	for i, w := range words {
+		if !skipWords[strings.ToLower(w)] {
+			startIdx = i
+			break
+		}
+	}
+
+	// Take up to 3 meaningful words
+	endIdx := startIdx + 3
+	if endIdx > len(words) {
+		endIdx = len(words)
+	}
+
+	result := strings.Join(words[startIdx:endIdx], "-")
+
+	// Clean up the result
+	cleaned := ""
+	for _, ch := range result {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') || ch == '-' {
+			cleaned += string(ch)
+		}
+	}
+
+	if len(cleaned) > 30 {
+		cleaned = cleaned[:30]
+	}
+	if cleaned == "" {
+		return "misc"
+	}
+
+	return strings.ToLower(cleaned)
+}
+
+// asStringSlice converts an interface to a string slice
+func asStringSlice(v any) []string {
+	if v == nil {
+		return nil
+	}
+	if arr, ok := v.([]any); ok {
+		result := make([]string, 0, len(arr))
+		for _, item := range arr {
+			if s, ok := item.(string); ok {
+				result = append(result, s)
+			}
+		}
+		return result
+	}
+	if arr, ok := v.([]string); ok {
+		return arr
+	}
+	return nil
+}
+
+// RunConversationConsolidation performs consolidation specifically for conversation data
+// This can be called independently or as part of the main consolidation
+func (s *Service) RunConversationConsolidation(ctx context.Context, spaceID string) (*ConversationConsolidationResult, error) {
+	start := time.Now()
+	result := &ConversationConsolidationResult{}
+
+	// Step 1: Cluster conversation observations into themes
+	themeResult, err := s.ClusterConversations(ctx, spaceID)
+	if err != nil {
+		return nil, fmt.Errorf("cluster conversations: %w", err)
+	}
+	result.ThemeResult = themeResult
+
+	// Step 2: Run forward pass to update theme embeddings if any were created
+	if themeResult.ThemesCreated > 0 {
+		fwdResult, err := s.forwardPassConversationThemes(ctx, spaceID)
+		if err != nil {
+			return nil, fmt.Errorf("forward pass conversation themes: %w", err)
+		}
+		result.ForwardPass = fwdResult
+	}
+
+	result.TotalDuration = time.Since(start)
+	return result, nil
+}
+
+// forwardPassConversationThemes updates conversation theme embeddings by aggregating from observations
+func (s *Service) forwardPassConversationThemes(ctx context.Context, spaceID string) (*ForwardPassResult, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	start := time.Now()
+
+	cypher := `
+MATCH (t:MemoryNode {space_id: $spaceId, role_type: 'conversation_theme', layer: 1})
+MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})-[r:GENERALIZES]->(t)
+WHERE o.embedding IS NOT NULL
+WITH t, collect({emb: o.embedding, weight: coalesce(r.weight, 1.0)}) AS neighbors
+WHERE size(neighbors) > 0
+WITH t, neighbors,
+     reduce(totalW = 0.0, n IN neighbors | totalW + n.weight) AS totalWeight
+WITH t, neighbors, totalWeight,
+     [i IN range(0, size(t.embedding)-1) |
+       reduce(sum = 0.0, n IN neighbors | sum + n.emb[i] * n.weight) / totalWeight
+     ] AS aggregated
+SET t.message_pass_embedding = [i IN range(0, size(t.embedding)-1) |
+      $alpha * coalesce(t.embedding[i], 0) + $beta * aggregated[i]
+    ],
+    t.last_forward_pass = datetime(),
+    t.aggregation_count = size(neighbors)
+RETURN count(t) AS updated`
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+			"alpha":   s.cfg.HiddenLayerForwardAlpha,
+			"beta":    s.cfg.HiddenLayerForwardBeta,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			updated, _ := rec.Get("updated")
+			return asInt(updated), res.Err()
+		}
+		return 0, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &ForwardPassResult{
+		HiddenNodesUpdated: result.(int),
+		Duration:           time.Since(start),
+	}, nil
+}
+
+// GenerateConversationSummaries creates summaries for conversation theme nodes
+func (s *Service) GenerateConversationSummaries(ctx context.Context, spaceID string) (int, error) {
+	if !s.cfg.HiddenLayerEnabled {
+		return 0, nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Update conversation themes without summaries
+	cypher := `
+MATCH (t:MemoryNode {space_id: $spaceId, role_type: 'conversation_theme', layer: 1})
+WHERE t.summary IS NULL OR t.summary = ''
+MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})-[:GENERALIZES]->(t)
+WITH t, count(o) AS memberCount,
+     collect(DISTINCT o.obs_type) AS obsTypes,
+     collect(DISTINCT CASE WHEN o.summary IS NOT NULL AND o.summary <> '' THEN o.summary ELSE null END)[0..5] AS sampleSummaries
+SET t.summary = 'Conversation theme of ' + toString(memberCount) + ' observations. ' +
+    'Types: ' + reduce(s = '', tp IN obsTypes | s + CASE WHEN s = '' THEN '' ELSE ', ' END + tp) +
+    CASE WHEN size(sampleSummaries) > 0
+      THEN '. Examples: ' + reduce(s = '', sm IN [x IN sampleSummaries WHERE x IS NOT NULL] | s + CASE WHEN s = '' THEN '' ELSE '; ' END + sm)
+      ELSE ''
+    END,
+    t.updated_at = datetime()
+RETURN count(t) AS updated`
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			updated, _ := rec.Get("updated")
+			return asInt(updated), res.Err()
+		}
+		return 0, res.Err()
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return result.(int), nil
+}
+
+// =============================================================================
+// PHASE 4: EMERGENT CONCEPT FORMATION
+// =============================================================================
+// Emergent concepts form from clustering conversation_theme nodes (L1) into
+// higher-level emergent_concept nodes (L2+). This creates a hierarchy:
+// L0: conversation_observation (raw learnings)
+// L1: conversation_theme (clustered observations)
+// L2+: emergent_concept (higher-level abstractions)
+
+// ClusterEmergentConcepts clusters conversation themes (L1) into emergent concepts (L2+).
+// This method supports multi-layer clustering:
+//   - L1 themes -> L2 emergent concepts
+//   - L2 concepts -> L3 emergent concepts
+//   - etc.
+//
+// Cross-session learning: Themes from different sessions can cluster together,
+// forming concepts that represent understanding spanning multiple conversations.
+func (s *Service) ClusterEmergentConcepts(ctx context.Context, spaceID string, targetLayer int) (*EmergentConceptResult, error) {
+	if !s.cfg.HiddenLayerEnabled {
+		return &EmergentConceptResult{ConceptsCreated: make(map[int]int)}, nil
+	}
+
+	if targetLayer < 2 {
+		return nil, fmt.Errorf("target layer must be >= 2 for emergent concepts")
+	}
+
+	result := &EmergentConceptResult{
+		ConceptsCreated: make(map[int]int),
+	}
+
+	sourceLayer := targetLayer - 1
+
+	// Fetch source nodes based on layer
+	var sourceNodes []EmergentConceptNode
+	var err error
+
+	if sourceLayer == 1 {
+		// Clustering themes (L1) into emergent concepts (L2)
+		themes, err := s.fetchOrphanConversationThemes(ctx, spaceID, targetLayer)
+		if err != nil {
+			return nil, fmt.Errorf("fetch orphan conversation themes: %w", err)
+		}
+		// Convert themes to EmergentConceptNode for unified handling
+		sourceNodes = convertThemesToConceptNodes(themes)
+		result.ThemesUsed = len(sourceNodes)
+	} else {
+		// Clustering emergent concepts (L2+) into higher layer concepts
+		sourceNodes, err = s.fetchOrphanEmergentConcepts(ctx, spaceID, sourceLayer, targetLayer)
+		if err != nil {
+			return nil, fmt.Errorf("fetch orphan emergent concepts layer %d: %w", sourceLayer, err)
+		}
+	}
+
+	// Calculate ADAPTIVE parameters - constraints loosen as layers increase
+	// This mirrors the behavior in CreateConceptNodes for code clustering
+	layerFactor := float64(targetLayer - 1) // 1 for L2, 2 for L3, etc.
+
+	// Epsilon grows with layer: base * (1 + 0.4*layer)
+	// Higher layers should cluster more freely as concepts become more abstract
+	adaptiveEps := s.cfg.HiddenLayerClusterEps * (1.0 + 0.4*layerFactor)
+	if adaptiveEps > 0.6 {
+		adaptiveEps = 0.6 // Cap to maintain semantic coherence
+	}
+
+	// MinSamples shrinks with layer: base - layer (min 2)
+	// Emergent concepts need at least 3 themes/concepts to form (configurable)
+	minSamplesForConcepts := 3 // Default: require 3 themes to form an emergent concept
+	adaptiveMinSamples := minSamplesForConcepts - int(layerFactor-1)
+	if adaptiveMinSamples < 2 {
+		adaptiveMinSamples = 2 // Minimum 2 nodes to form a cluster
+	}
+
+	if len(sourceNodes) < adaptiveMinSamples {
+		return result, nil // Not enough data to cluster
+	}
+
+	// Filter to nodes with embeddings, prefer message_pass_embedding
+	validNodes := make([]EmergentConceptNode, 0, len(sourceNodes))
+	for _, node := range sourceNodes {
+		emb := node.Embedding
+		if len(node.MessagePassEmbedding) > 0 {
+			emb = node.MessagePassEmbedding
+		}
+		if len(emb) > 0 {
+			node.Embedding = emb // Store effective embedding
+			validNodes = append(validNodes, node)
+		}
+	}
+
+	if len(validNodes) < adaptiveMinSamples {
+		return result, nil
+	}
+
+	// Run DBSCAN clustering
+	embeddings := make([][]float64, len(validNodes))
+	for i, n := range validNodes {
+		embeddings[i] = n.Embedding
+	}
+
+	labels := DBSCAN(embeddings, adaptiveEps, adaptiveMinSamples)
+	clusters, noise := groupEmergentConceptsByCluster(validNodes, labels)
+	result.NoiseThemes = len(noise)
+
+	// Get existing emergent concept count for unique naming
+	existingCount, err := s.countEmergentConcepts(ctx, spaceID, targetLayer)
+	if err != nil {
+		return nil, fmt.Errorf("count existing emergent concepts layer %d: %w", targetLayer, err)
+	}
+
+	// Create emergent concept nodes for each cluster
+	conceptID := 0
+	for _, members := range clusters {
+		if len(members) < adaptiveMinSamples {
+			continue
+		}
+
+		// Compute centroid
+		clusterEmbeddings := make([][]float64, len(members))
+		for i, m := range members {
+			clusterEmbeddings[i] = m.Embedding
+		}
+		centroid := ComputeCentroid(clusterEmbeddings)
+		if centroid == nil {
+			continue
+		}
+
+		// Generate elevated summary from member summaries
+		summary := generateEmergentConceptSummary(members, targetLayer)
+
+		// Aggregate keywords from members
+		keywords := aggregateKeywordsFromConcepts(members)
+
+		// Calculate aggregate metadata
+		avgSurprise, sessionCount := calculateEmergentConceptMetadata(members)
+
+		// Create unique name
+		uniqueID := existingCount + conceptID
+		name := fmt.Sprintf("EmergentConcept-L%d-%s-%d", targetLayer, sanitizeConceptName(summary), uniqueID)
+
+		// Create the emergent concept node and ABSTRACTS_TO edges
+		edgesCreated, err := s.createEmergentConceptWithEdges(ctx, spaceID, name, summary, centroid, members, keywords, avgSurprise, sessionCount, targetLayer)
+		if err != nil {
+			return result, fmt.Errorf("create emergent concept %s: %w", name, err)
+		}
+
+		result.ConceptsCreated[targetLayer]++
+		result.EdgesCreated += edgesCreated
+		result.ConceptSummaries = append(result.ConceptSummaries, summary)
+		if targetLayer > result.MaxLayerReached {
+			result.MaxLayerReached = targetLayer
+		}
+		conceptID++
+	}
+
+	return result, nil
+}
+
+// convertThemesToConceptNodes converts ConversationThemeForClustering to EmergentConceptNode
+func convertThemesToConceptNodes(themes []ConversationThemeForClustering) []EmergentConceptNode {
+	nodes := make([]EmergentConceptNode, len(themes))
+	for i, t := range themes {
+		nodes[i] = EmergentConceptNode{
+			NodeID:               t.NodeID,
+			SpaceID:              t.SpaceID,
+			Layer:                1,
+			Name:                 t.Name,
+			Summary:              t.Summary,
+			Embedding:            t.Embedding,
+			MessagePassEmbedding: t.MessagePassEmbedding,
+			Keywords:             t.Keywords,
+			SessionCount:         len(t.SessionIDs),
+		}
+	}
+	return nodes
+}
+
+// fetchOrphanConversationThemes retrieves conversation themes without ABSTRACTS_TO edge to target layer
+func (s *Service) fetchOrphanConversationThemes(ctx context.Context, spaceID string, targetLayer int) ([]ConversationThemeForClustering, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `
+MATCH (t:MemoryNode {space_id: $spaceId, role_type: 'conversation_theme', layer: 1})
+WHERE NOT (t)-[:ABSTRACTS_TO]->(:MemoryNode {layer: $targetLayer, role_type: 'emergent_concept'})
+  AND (t.embedding IS NOT NULL OR t.message_pass_embedding IS NOT NULL)
+OPTIONAL MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})-[:GENERALIZES]->(t)
+WITH t, collect(DISTINCT o.session_id) AS sessionIds
+RETURN t.node_id AS nodeId, t.name AS name, t.summary AS summary,
+       t.embedding AS embedding, t.message_pass_embedding AS messagePassEmbedding,
+       t.aggregation_count AS memberCount, t.avg_surprise_score AS avgSurprise,
+       sessionIds`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":     spaceID,
+			"targetLayer": targetLayer,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		var themes []ConversationThemeForClustering
+		for res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("nodeId")
+			name, _ := rec.Get("name")
+			summary, _ := rec.Get("summary")
+			embedding, _ := rec.Get("embedding")
+			msgPassEmb, _ := rec.Get("messagePassEmbedding")
+			memberCount, _ := rec.Get("memberCount")
+			avgSurprise, _ := rec.Get("avgSurprise")
+			sessionIDs, _ := rec.Get("sessionIds")
+
+			themes = append(themes, ConversationThemeForClustering{
+				NodeID:               asString(nodeID),
+				SpaceID:              spaceID,
+				Name:                 asString(name),
+				Summary:              asString(summary),
+				Embedding:            asFloat64Slice(embedding),
+				MessagePassEmbedding: asFloat64Slice(msgPassEmb),
+				MemberCount:          asInt(memberCount),
+				AvgSurpriseScore:     asFloat64(avgSurprise),
+				SessionIDs:           asStringSlice(sessionIDs),
+			})
+		}
+		return themes, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]ConversationThemeForClustering), nil
+}
+
+// fetchOrphanEmergentConcepts retrieves emergent concepts at sourceLayer without ABSTRACTS_TO to targetLayer
+func (s *Service) fetchOrphanEmergentConcepts(ctx context.Context, spaceID string, sourceLayer, targetLayer int) ([]EmergentConceptNode, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `
+MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'emergent_concept', layer: $sourceLayer})
+WHERE NOT (c)-[:ABSTRACTS_TO]->(:MemoryNode {layer: $targetLayer, role_type: 'emergent_concept'})
+  AND (c.embedding IS NOT NULL OR c.message_pass_embedding IS NOT NULL)
+RETURN c.node_id AS nodeId, c.name AS name, c.summary AS summary,
+       c.embedding AS embedding, c.message_pass_embedding AS messagePassEmbedding,
+       c.keywords AS keywords, c.session_count AS sessionCount`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":     spaceID,
+			"sourceLayer": sourceLayer,
+			"targetLayer": targetLayer,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		var concepts []EmergentConceptNode
+		for res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("nodeId")
+			name, _ := rec.Get("name")
+			summary, _ := rec.Get("summary")
+			embedding, _ := rec.Get("embedding")
+			msgPassEmb, _ := rec.Get("messagePassEmbedding")
+			keywords, _ := rec.Get("keywords")
+			sessionCount, _ := rec.Get("sessionCount")
+
+			concepts = append(concepts, EmergentConceptNode{
+				NodeID:               asString(nodeID),
+				SpaceID:              spaceID,
+				Layer:                sourceLayer,
+				Name:                 asString(name),
+				Summary:              asString(summary),
+				Embedding:            asFloat64Slice(embedding),
+				MessagePassEmbedding: asFloat64Slice(msgPassEmb),
+				Keywords:             asStringSlice(keywords),
+				SessionCount:         asInt(sessionCount),
+			})
+		}
+		return concepts, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]EmergentConceptNode), nil
+}
+
+// countEmergentConcepts returns the count of emergent concept nodes at a specific layer
+func (s *Service) countEmergentConcepts(ctx context.Context, spaceID string, layer int) (int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `
+MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'emergent_concept', layer: $layer})
+RETURN count(c) AS cnt`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+			"layer":   layer,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			cnt, _ := rec.Get("cnt")
+			return asInt(cnt), res.Err()
+		}
+		return 0, res.Err()
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return result.(int), nil
+}
+
+// groupEmergentConceptsByCluster groups nodes by their DBSCAN cluster labels
+func groupEmergentConceptsByCluster(nodes []EmergentConceptNode, labels []int) (map[int][]EmergentConceptNode, []EmergentConceptNode) {
+	clusters := make(map[int][]EmergentConceptNode)
+	var noise []EmergentConceptNode
+
+	for i, label := range labels {
+		if label == -1 {
+			noise = append(noise, nodes[i])
+		} else {
+			clusters[label] = append(clusters[label], nodes[i])
+		}
+	}
+
+	return clusters, noise
+}
+
+// generateEmergentConceptSummary creates an elevated summary from member summaries
+// The summary represents a higher-level abstraction of the underlying themes
+func generateEmergentConceptSummary(members []EmergentConceptNode, layer int) string {
+	if len(members) == 0 {
+		return "Empty emergent concept"
+	}
+
+	// Extract keywords from all member summaries
+	keywords := aggregateKeywordsFromConcepts(members)
+
+	// Build summary with elevation language based on layer
+	var summary strings.Builder
+
+	// Layer-appropriate prefix
+	switch {
+	case layer == 2:
+		summary.WriteString("Emerging pattern: ")
+	case layer == 3:
+		summary.WriteString("Core understanding: ")
+	case layer >= 4:
+		summary.WriteString("Foundational principle: ")
+	}
+
+	// Add top keywords
+	if len(keywords) > 0 {
+		topKeywords := keywords
+		if len(topKeywords) > 4 {
+			topKeywords = topKeywords[:4]
+		}
+		summary.WriteString(strings.Join(topKeywords, ", "))
+	} else {
+		// Fall back to extracting concepts from member names
+		concepts := extractConceptsFromNames(members)
+		if len(concepts) > 0 {
+			summary.WriteString(strings.Join(concepts, ", "))
+		} else {
+			summary.WriteString("diverse observations")
+		}
+	}
+
+	// Add member count
+	summary.WriteString(fmt.Sprintf(" (%d themes, L%d)", len(members), layer))
+
+	return summary.String()
+}
+
+// extractConceptsFromNames extracts meaningful concept words from member node names
+func extractConceptsFromNames(members []EmergentConceptNode) []string {
+	wordFreq := make(map[string]int)
+
+	for _, m := range members {
+		// Extract words from name and summary
+		words := strings.FieldsFunc(m.Name+" "+m.Summary, func(r rune) bool {
+			return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9'))
+		})
+
+		skipWords := map[string]bool{
+			"convtheme": true, "emergentconcept": true, "hidden": true, "concept": true,
+			"about": true, "the": true, "and": true, "for": true, "with": true,
+			"observations": true, "themes": true, "pattern": true, "emerging": true,
+		}
+
+		for _, word := range words {
+			w := strings.ToLower(word)
+			if len(w) >= 3 && !skipWords[w] {
+				wordFreq[w]++
+			}
+		}
+	}
+
+	// Sort by frequency
+	type wordCount struct {
+		word  string
+		count int
+	}
+	counts := make([]wordCount, 0, len(wordFreq))
+	for word, count := range wordFreq {
+		counts = append(counts, wordCount{word, count})
+	}
+
+	// Sort descending by count
+	for i := 0; i < len(counts)-1; i++ {
+		for j := i + 1; j < len(counts); j++ {
+			if counts[j].count > counts[i].count {
+				counts[i], counts[j] = counts[j], counts[i]
+			}
+		}
+	}
+
+	// Return top words
+	result := make([]string, 0, 3)
+	for i := 0; i < len(counts) && i < 3; i++ {
+		if counts[i].count >= 2 {
+			result = append(result, counts[i].word)
+		}
+	}
+
+	return result
+}
+
+// aggregateKeywordsFromConcepts combines keywords from all members and returns top ones
+func aggregateKeywordsFromConcepts(members []EmergentConceptNode) []string {
+	wordFreq := make(map[string]int)
+
+	for _, m := range members {
+		// Add member's keywords
+		for _, kw := range m.Keywords {
+			wordFreq[strings.ToLower(kw)]++
+		}
+
+		// Also extract keywords from summary if no keywords stored
+		if len(m.Keywords) == 0 && m.Summary != "" {
+			words := strings.FieldsFunc(strings.ToLower(m.Summary), func(r rune) bool {
+				return !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'))
+			})
+
+			stopWords := map[string]bool{
+				"the": true, "and": true, "for": true, "about": true, "with": true,
+				"observations": true, "theme": true, "themes": true, "pattern": true,
+				"learning": true, "decisions": true, "preferences": true, "emerging": true,
+			}
+
+			for _, word := range words {
+				if len(word) >= 3 && !stopWords[word] {
+					wordFreq[word]++
+				}
+			}
+		}
+	}
+
+	// Sort and return top keywords
+	type wordCount struct {
+		word  string
+		count int
+	}
+	counts := make([]wordCount, 0, len(wordFreq))
+	for word, count := range wordFreq {
+		counts = append(counts, wordCount{word, count})
+	}
+
+	// Sort descending
+	for i := 0; i < len(counts)-1; i++ {
+		for j := i + 1; j < len(counts); j++ {
+			if counts[j].count > counts[i].count {
+				counts[i], counts[j] = counts[j], counts[i]
+			}
+		}
+	}
+
+	// Return top keywords
+	result := make([]string, 0, 10)
+	for i := 0; i < len(counts) && i < 10; i++ {
+		result = append(result, counts[i].word)
+	}
+
+	return result
+}
+
+// calculateEmergentConceptMetadata calculates aggregate metadata for an emergent concept
+func calculateEmergentConceptMetadata(members []EmergentConceptNode) (avgSurprise float64, sessionCount int) {
+	if len(members) == 0 {
+		return 0.0, 0
+	}
+
+	// Track unique sessions (approximate by summing session counts)
+	totalSessions := 0
+	for _, m := range members {
+		totalSessions += m.SessionCount
+	}
+
+	// Session count is an approximation (could have overlap)
+	sessionCount = totalSessions
+	if sessionCount > len(members)*2 {
+		// Cap at reasonable estimate to avoid over-counting
+		sessionCount = len(members) * 2
+	}
+
+	// avgSurprise would need to be fetched from DB for themes
+	// For now, return 0 as it's recalculated during creation
+	return 0.0, sessionCount
+}
+
+// sanitizeConceptName creates a safe name fragment from the summary
+func sanitizeConceptName(summary string) string {
+	words := strings.Fields(summary)
+	if len(words) == 0 {
+		return "misc"
+	}
+
+	// Skip prefix words (check without punctuation)
+	skipWords := map[string]bool{
+		"emerging": true, "pattern": true, "core": true, "understanding": true,
+		"foundational": true, "principle": true, "about": true, "the": true,
+	}
+
+	// Helper to strip punctuation from a word for comparison
+	stripPunctuation := func(w string) string {
+		result := ""
+		for _, ch := range w {
+			if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
+				result += string(ch)
+			}
+		}
+		return result
+	}
+
+	startIdx := len(words) // Default to end if all are skip words
+	for i, w := range words {
+		cleanWord := stripPunctuation(strings.ToLower(w))
+		if cleanWord != "" && !skipWords[cleanWord] {
+			startIdx = i
+			break
+		}
+	}
+
+	// If all words were skip words, return misc
+	if startIdx >= len(words) {
+		return "misc"
+	}
+
+	// Take up to 2 meaningful words
+	endIdx := startIdx + 2
+	if endIdx > len(words) {
+		endIdx = len(words)
+	}
+
+	result := strings.Join(words[startIdx:endIdx], "-")
+
+	// Clean up - remove non-alphanumeric except dash
+	cleaned := ""
+	for _, ch := range result {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') || ch == '-' {
+			cleaned += string(ch)
+		}
+	}
+
+	if len(cleaned) > 25 {
+		cleaned = cleaned[:25]
+	}
+	if cleaned == "" {
+		return "misc"
+	}
+
+	return strings.ToLower(cleaned)
+}
+
+// createEmergentConceptWithEdges creates an emergent_concept node and ABSTRACTS_TO edges
+func (s *Service) createEmergentConceptWithEdges(ctx context.Context, spaceID, name, summary string, centroid []float64, members []EmergentConceptNode, keywords []string, avgSurprise float64, sessionCount, layer int) (int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	memberIDs := make([]string, len(members))
+	for i, m := range members {
+		memberIDs[i] = m.NodeID
+	}
+
+	cypher := `
+CREATE (c:MemoryNode {
+  space_id: $spaceId,
+  node_id: randomUUID(),
+  name: $name,
+  layer: $layer,
+  role_type: 'emergent_concept',
+  summary: $summary,
+  embedding: $centroid,
+  message_pass_embedding: $centroid,
+  keywords: $keywords,
+  aggregation_count: $memberCount,
+  avg_surprise_score: $avgSurprise,
+  session_count: $sessionCount,
+  stability_score: 1.0,
+  last_forward_pass: datetime(),
+  created_at: datetime(),
+  updated_at: datetime(),
+  version: 1
+})
+WITH c
+UNWIND $memberIds AS memberId
+MATCH (m:MemoryNode {space_id: $spaceId, node_id: memberId})
+WITH c, m,
+     CASE WHEN c.embedding IS NOT NULL AND m.embedding IS NOT NULL
+          THEN 1.0 - point.distance(m.embedding, c.embedding) / 2.0
+          ELSE 0.5
+     END AS similarity
+CREATE (m)-[:ABSTRACTS_TO {
+  space_id: $spaceId,
+  edge_id: randomUUID(),
+  weight: similarity,
+  similarity_score: similarity,
+  created_at: datetime(),
+  updated_at: datetime()
+}]->(c)
+RETURN c.node_id AS conceptId, count(m) AS edgeCount`
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":      spaceID,
+			"name":         name,
+			"layer":        layer,
+			"summary":      summary,
+			"centroid":     centroid,
+			"keywords":     keywords,
+			"memberCount":  len(members),
+			"memberIds":    memberIDs,
+			"avgSurprise":  avgSurprise,
+			"sessionCount": sessionCount,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			edgeCount, _ := rec.Get("edgeCount")
+			return asInt(edgeCount), res.Err()
+		}
+		return 0, res.Err()
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return result.(int), nil
+}
+
+// RunFullConversationConsolidation performs complete conversation consolidation including emergent concepts
+// This extends RunConversationConsolidation to include:
+// 1. L0 observations -> L1 themes (ClusterConversations)
+// 2. L1 themes -> L2 emergent concepts (ClusterEmergentConcepts)
+// 3. L2 concepts -> L3 concepts, etc. (iterative ClusterEmergentConcepts)
+func (s *Service) RunFullConversationConsolidation(ctx context.Context, spaceID string) (*ConversationConsolidationResult, error) {
+	start := time.Now()
+	result := &ConversationConsolidationResult{
+		ConceptResult: &EmergentConceptResult{
+			ConceptsCreated: make(map[int]int),
+		},
+	}
+
+	// Step 1: Cluster conversation observations into themes (L0 -> L1)
+	themeResult, err := s.ClusterConversations(ctx, spaceID)
+	if err != nil {
+		return nil, fmt.Errorf("cluster conversations: %w", err)
+	}
+	result.ThemeResult = themeResult
+
+	// Step 2: Run forward pass to update theme embeddings
+	if themeResult.ThemesCreated > 0 {
+		fwdResult, err := s.forwardPassConversationThemes(ctx, spaceID)
+		if err != nil {
+			return nil, fmt.Errorf("forward pass conversation themes: %w", err)
+		}
+		result.ForwardPass = fwdResult
+	}
+
+	// Step 3: Multi-layer emergent concept clustering (L1 -> L2, L2 -> L3, etc.)
+	maxLayers := 5 // Reasonable depth limit for conversation concepts
+	for targetLayer := 2; targetLayer <= maxLayers; targetLayer++ {
+		conceptResult, err := s.ClusterEmergentConcepts(ctx, spaceID, targetLayer)
+		if err != nil {
+			return nil, fmt.Errorf("cluster emergent concepts layer %d: %w", targetLayer, err)
+		}
+
+		// Merge results
+		for layer, count := range conceptResult.ConceptsCreated {
+			result.ConceptResult.ConceptsCreated[layer] += count
+		}
+		result.ConceptResult.EdgesCreated += conceptResult.EdgesCreated
+		result.ConceptResult.ConceptSummaries = append(result.ConceptResult.ConceptSummaries, conceptResult.ConceptSummaries...)
+		if conceptResult.MaxLayerReached > result.ConceptResult.MaxLayerReached {
+			result.ConceptResult.MaxLayerReached = conceptResult.MaxLayerReached
+		}
+
+		// Run forward pass if concepts were created
+		if conceptResult.ConceptsCreated[targetLayer] > 0 {
+			_, err = s.forwardPassEmergentConcepts(ctx, spaceID, targetLayer)
+			if err != nil {
+				return nil, fmt.Errorf("forward pass emergent concepts layer %d: %w", targetLayer, err)
+			}
+		}
+	}
+
+	result.TotalDuration = time.Since(start)
+	return result, nil
+}
+
+// forwardPassEmergentConcepts updates emergent concept embeddings by aggregating from children
+func (s *Service) forwardPassEmergentConcepts(ctx context.Context, spaceID string, layer int) (*ForwardPassResult, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	start := time.Now()
+
+	// The source for L2 is conversation_theme, for L3+ it's emergent_concept
+	var cypher string
+	if layer == 2 {
+		cypher = `
+MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'emergent_concept', layer: 2})
+MATCH (t:MemoryNode {space_id: $spaceId, role_type: 'conversation_theme'})-[r:ABSTRACTS_TO]->(c)
+WHERE t.embedding IS NOT NULL OR t.message_pass_embedding IS NOT NULL
+WITH c, collect({
+  emb: coalesce(t.message_pass_embedding, t.embedding),
+  weight: coalesce(r.weight, 1.0)
+}) AS neighbors
+WHERE size(neighbors) > 0
+WITH c, neighbors,
+     reduce(totalW = 0.0, n IN neighbors | totalW + n.weight) AS totalWeight
+WITH c, neighbors, totalWeight,
+     [i IN range(0, size(c.embedding)-1) |
+       reduce(sum = 0.0, n IN neighbors | sum + n.emb[i] * n.weight) / totalWeight
+     ] AS aggregated
+SET c.message_pass_embedding = [i IN range(0, size(c.embedding)-1) |
+      $alpha * coalesce(c.embedding[i], 0) + $beta * aggregated[i]
+    ],
+    c.last_forward_pass = datetime(),
+    c.aggregation_count = size(neighbors)
+RETURN count(c) AS updated`
+	} else {
+		// For L3+, aggregate from lower-layer emergent concepts
+		cypher = `
+MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'emergent_concept', layer: $layer})
+MATCH (m:MemoryNode {space_id: $spaceId, role_type: 'emergent_concept', layer: $sourceLayer})-[r:ABSTRACTS_TO]->(c)
+WHERE m.embedding IS NOT NULL OR m.message_pass_embedding IS NOT NULL
+WITH c, collect({
+  emb: coalesce(m.message_pass_embedding, m.embedding),
+  weight: coalesce(r.weight, 1.0)
+}) AS neighbors
+WHERE size(neighbors) > 0
+WITH c, neighbors,
+     reduce(totalW = 0.0, n IN neighbors | totalW + n.weight) AS totalWeight
+WITH c, neighbors, totalWeight,
+     [i IN range(0, size(c.embedding)-1) |
+       reduce(sum = 0.0, n IN neighbors | sum + n.emb[i] * n.weight) / totalWeight
+     ] AS aggregated
+SET c.message_pass_embedding = [i IN range(0, size(c.embedding)-1) |
+      $alpha * coalesce(c.embedding[i], 0) + $beta * aggregated[i]
+    ],
+    c.last_forward_pass = datetime(),
+    c.aggregation_count = size(neighbors)
+RETURN count(c) AS updated`
+	}
+
+	params := map[string]any{
+		"spaceId": spaceID,
+		"alpha":   s.cfg.HiddenLayerForwardAlpha,
+		"beta":    s.cfg.HiddenLayerForwardBeta,
+	}
+	if layer > 2 {
+		params["layer"] = layer
+		params["sourceLayer"] = layer - 1
+	}
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			updated, _ := rec.Get("updated")
+			return asInt(updated), res.Err()
+		}
+		return 0, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &ForwardPassResult{
+		ConceptNodesUpdated: result.(int),
+		Duration:            time.Since(start),
+	}, nil
+}
+
+// =============================================================================
+// RETRIEVAL INTEGRATION HOOKS (Phase 5 Preparation)
+// =============================================================================
+// These functions prepare for Phase 5: Context-Aware Retrieval
+
+// FindEmergentConceptsForSpace retrieves all emergent concepts in a space
+func (s *Service) FindEmergentConceptsForSpace(ctx context.Context, spaceID string) ([]EmergentConcept, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `
+MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'emergent_concept'})
+RETURN c.node_id AS nodeId, c.layer AS layer, c.name AS name, c.summary AS summary,
+       c.embedding AS embedding, c.aggregation_count AS memberCount,
+       c.keywords AS keywords, c.avg_surprise_score AS avgSurprise, c.session_count AS sessionCount
+ORDER BY c.layer DESC, c.aggregation_count DESC`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+
+		var concepts []EmergentConcept
+		for res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("nodeId")
+			layer, _ := rec.Get("layer")
+			name, _ := rec.Get("name")
+			summary, _ := rec.Get("summary")
+			embedding, _ := rec.Get("embedding")
+			memberCount, _ := rec.Get("memberCount")
+			keywords, _ := rec.Get("keywords")
+			avgSurprise, _ := rec.Get("avgSurprise")
+			sessionCount, _ := rec.Get("sessionCount")
+
+			concepts = append(concepts, EmergentConcept{
+				NodeID:           asString(nodeID),
+				SpaceID:          spaceID,
+				Layer:            asInt(layer),
+				Name:             asString(name),
+				Summary:          asString(summary),
+				Embedding:        asFloat64Slice(embedding),
+				MemberCount:      asInt(memberCount),
+				Keywords:         asStringSlice(keywords),
+				AvgSurpriseScore: asFloat64(avgSurprise),
+				SessionCount:     asInt(sessionCount),
+			})
+		}
+		return concepts, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]EmergentConcept), nil
+}
+
+// TraverseConceptToObservations traverses from an emergent concept down to its source observations
+// This enables spreading activation through the concept hierarchy
+func (s *Service) TraverseConceptToObservations(ctx context.Context, spaceID, conceptNodeID string, maxDepth int) ([]ConceptHierarchyNode, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	if maxDepth <= 0 {
+		maxDepth = 5 // Default max depth
+	}
+
+	// Use variable-length path to traverse down through ABSTRACTS_TO and GENERALIZES edges
+	cypher := `
+MATCH path = (c:MemoryNode {space_id: $spaceId, node_id: $nodeId})<-[:ABSTRACTS_TO|GENERALIZES*1..` + fmt.Sprintf("%d", maxDepth) + `]-(n:MemoryNode)
+WITH DISTINCT n
+RETURN n.node_id AS nodeId, n.layer AS layer, n.role_type AS roleType,
+       n.name AS name, n.summary AS summary, n.embedding AS embedding
+ORDER BY n.layer DESC`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+			"nodeId":  conceptNodeID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		var nodes []ConceptHierarchyNode
+		for res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("nodeId")
+			layer, _ := rec.Get("layer")
+			roleType, _ := rec.Get("roleType")
+			name, _ := rec.Get("name")
+			summary, _ := rec.Get("summary")
+			embedding, _ := rec.Get("embedding")
+
+			nodes = append(nodes, ConceptHierarchyNode{
+				NodeID:    asString(nodeID),
+				SpaceID:   spaceID,
+				Layer:     asInt(layer),
+				RoleType:  asString(roleType),
+				Name:      asString(name),
+				Summary:   asString(summary),
+				Embedding: asFloat64Slice(embedding),
+			})
+		}
+		return nodes, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]ConceptHierarchyNode), nil
+}
+
+// FindRelatedConcepts finds emergent concepts similar to a query embedding
+// This supports spreading activation for retrieval
+func (s *Service) FindRelatedConcepts(ctx context.Context, spaceID string, queryEmbedding []float64, minLayer int, topK int) ([]EmergentConcept, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	if topK <= 0 {
+		topK = 10
+	}
+	if minLayer < 2 {
+		minLayer = 2
+	}
+
+	// Use cosine similarity to find related concepts
+	cypher := fmt.Sprintf(`
+MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'emergent_concept'})
+WHERE c.layer >= $minLayer AND c.embedding IS NOT NULL
+WITH c,
+     reduce(dot = 0.0, i IN range(0, size(c.embedding)-1) |
+       dot + c.embedding[i] * $queryEmb[i]) /
+     (sqrt(reduce(sq = 0.0, i IN range(0, size(c.embedding)-1) | sq + c.embedding[i] * c.embedding[i])) *
+      sqrt(reduce(sq = 0.0, i IN range(0, size($queryEmb)-1) | sq + $queryEmb[i] * $queryEmb[i]))) AS similarity
+WHERE similarity > 0.5
+RETURN c.node_id AS nodeId, c.layer AS layer, c.name AS name, c.summary AS summary,
+       c.embedding AS embedding, c.aggregation_count AS memberCount,
+       c.keywords AS keywords, c.avg_surprise_score AS avgSurprise, c.session_count AS sessionCount,
+       similarity
+ORDER BY similarity DESC
+LIMIT %d`, topK)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":  spaceID,
+			"queryEmb": queryEmbedding,
+			"minLayer": minLayer,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		var concepts []EmergentConcept
+		for res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("nodeId")
+			layer, _ := rec.Get("layer")
+			name, _ := rec.Get("name")
+			summary, _ := rec.Get("summary")
+			embedding, _ := rec.Get("embedding")
+			memberCount, _ := rec.Get("memberCount")
+			keywords, _ := rec.Get("keywords")
+			avgSurprise, _ := rec.Get("avgSurprise")
+			sessionCount, _ := rec.Get("sessionCount")
+
+			concepts = append(concepts, EmergentConcept{
+				NodeID:           asString(nodeID),
+				SpaceID:          spaceID,
+				Layer:            asInt(layer),
+				Name:             asString(name),
+				Summary:          asString(summary),
+				Embedding:        asFloat64Slice(embedding),
+				MemberCount:      asInt(memberCount),
+				Keywords:         asStringSlice(keywords),
+				AvgSurpriseScore: asFloat64(avgSurprise),
+				SessionCount:     asInt(sessionCount),
+			})
+		}
+		return concepts, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]EmergentConcept), nil
+}

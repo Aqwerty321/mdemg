@@ -1,0 +1,326 @@
+package conversation
+
+import (
+	"context"
+	"math"
+	"regexp"
+	"strings"
+	"unicode"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+)
+
+// Embedder interface for computing embeddings (matches internal/embeddings.Embedder)
+type Embedder interface {
+	Embed(ctx context.Context, text string) ([]float32, error)
+	Dimensions() int
+	Name() string
+}
+
+// SurpriseDetector detects novel/surprising information
+type SurpriseDetector struct {
+	embedder Embedder
+	driver   neo4j.DriverWithContext
+}
+
+// NewSurpriseDetector creates a new surprise detector
+func NewSurpriseDetector(embedder Embedder, driver neo4j.DriverWithContext) *SurpriseDetector {
+	return &SurpriseDetector{
+		embedder: embedder,
+		driver:   driver,
+	}
+}
+
+// correctionPatterns are phrases that indicate user corrections
+var correctionPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)\bno,?\s+(that'?s?\s+)?wrong\b`),
+	regexp.MustCompile(`(?i)\bactually,?\s+(it'?s?\s+)?`),
+	regexp.MustCompile(`(?i)\byou'?re\s+mistaken\b`),
+	regexp.MustCompile(`(?i)\bcorrection:?\b`),
+	regexp.MustCompile(`(?i)\bnot\s+\w+,?\s+but\s+\w+\b`),
+	regexp.MustCompile(`(?i)\bthat'?s?\s+incorrect\b`),
+	regexp.MustCompile(`(?i)\blet me correct\b`),
+	regexp.MustCompile(`(?i)\bI meant\b`),
+}
+
+// DetectSurprise computes overall surprise score (0.0-1.0)
+func (d *SurpriseDetector) DetectSurprise(ctx context.Context, obs Observation) (float64, SurpriseFactors, error) {
+	factors := SurpriseFactors{}
+
+	// 1. Term novelty - check for domain-specific terminology
+	factors.TermNovelty = d.computeTermNovelty(obs.Content)
+
+	// 2. Correction detection - check if user explicitly corrected
+	factors.CorrectionScore = d.detectCorrection(obs.Content)
+
+	// 3. Contradiction check - check if contradicts existing knowledge
+	contradictionScore, err := d.checkContradictions(ctx, obs)
+	if err != nil {
+		// Don't fail, just log and continue
+		contradictionScore = 0.0
+	}
+	factors.ContradictionScore = contradictionScore
+
+	// 4. Embedding novelty - check distance from known concepts
+	if len(obs.Embedding) > 0 {
+		embNovelty, err := d.computeEmbeddingNovelty(ctx, obs.SpaceID, obs.Embedding)
+		if err != nil {
+			// Don't fail, just log and continue
+			embNovelty = 0.0
+		}
+		factors.EmbeddingNovelty = embNovelty
+	}
+
+	// Compute weighted overall surprise score
+	// Correction is strongest signal (0.4 weight)
+	// Term novelty and embedding novelty are moderate (0.25 each)
+	// Contradiction is weakest (0.1)
+	overallScore := (factors.CorrectionScore * 0.4) +
+		(factors.TermNovelty * 0.25) +
+		(factors.EmbeddingNovelty * 0.25) +
+		(factors.ContradictionScore * 0.1)
+
+	// Clamp to [0.0, 1.0]
+	if overallScore > 1.0 {
+		overallScore = 1.0
+	}
+	if overallScore < 0.0 {
+		overallScore = 0.0
+	}
+
+	return overallScore, factors, nil
+}
+
+// computeTermNovelty checks for domain-specific terminology
+// Returns 0.0-1.0 based on presence of:
+// - Capitalized technical terms (CamelCase, PascalCase)
+// - Acronyms (uppercase sequences)
+// - Special naming patterns (snake_case, kebab-case with context)
+func (d *SurpriseDetector) computeTermNovelty(content string) float64 {
+	words := strings.Fields(content)
+	if len(words) == 0 {
+		return 0.0
+	}
+
+	noveltyScore := 0.0
+	noveltyCount := 0
+
+	for _, word := range words {
+		// Remove punctuation
+		cleaned := strings.TrimFunc(word, func(r rune) bool {
+			return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' && r != '-'
+		})
+
+		if len(cleaned) < 2 {
+			continue
+		}
+
+		// Check for PascalCase/CamelCase (e.g., BlueSeerData, myCustomClass)
+		if containsMixedCase(cleaned) {
+			noveltyScore += 0.3
+			noveltyCount++
+			continue
+		}
+
+		// Check for ACRONYMS (2+ uppercase letters)
+		if isAcronym(cleaned) {
+			noveltyScore += 0.4
+			noveltyCount++
+			continue
+		}
+
+		// Check for snake_case or kebab-case with technical context
+		if (strings.Contains(cleaned, "_") || strings.Contains(cleaned, "-")) && len(cleaned) > 5 {
+			noveltyScore += 0.2
+			noveltyCount++
+			continue
+		}
+
+		// Check for technical suffixes
+		technicalSuffixes := []string{"API", "SDK", "ORM", "DB", "Service", "Manager", "Handler"}
+		for _, suffix := range technicalSuffixes {
+			if strings.HasSuffix(cleaned, suffix) {
+				noveltyScore += 0.25
+				noveltyCount++
+				break
+			}
+		}
+	}
+
+	// Normalize by word count, but cap the influence of rare terms
+	if noveltyCount == 0 {
+		return 0.0
+	}
+
+	avgNovelty := noveltyScore / float64(len(words))
+
+	// Boost if significant portion of words are novel
+	noveltyRatio := float64(noveltyCount) / float64(len(words))
+	if noveltyRatio > 0.3 {
+		avgNovelty *= 1.5
+	}
+
+	// Clamp to [0.0, 1.0]
+	if avgNovelty > 1.0 {
+		return 1.0
+	}
+	return avgNovelty
+}
+
+// containsMixedCase checks if a word has mixed case (PascalCase, camelCase)
+func containsMixedCase(word string) bool {
+	hasUpper := false
+	hasLower := false
+
+	for _, r := range word {
+		if unicode.IsUpper(r) {
+			hasUpper = true
+		}
+		if unicode.IsLower(r) {
+			hasLower = true
+		}
+		if hasUpper && hasLower {
+			return true
+		}
+	}
+	return false
+}
+
+// isAcronym checks if a word is an acronym (2+ uppercase letters)
+func isAcronym(word string) bool {
+	if len(word) < 2 {
+		return false
+	}
+
+	upperCount := 0
+	for _, r := range word {
+		if unicode.IsUpper(r) {
+			upperCount++
+		}
+	}
+
+	return upperCount >= 2 && upperCount == len(word)
+}
+
+// detectCorrection checks if this is an explicit correction
+func (d *SurpriseDetector) detectCorrection(content string) float64 {
+	for _, pattern := range correctionPatterns {
+		if pattern.MatchString(content) {
+			return 0.9 // High surprise for corrections
+		}
+	}
+	return 0.0
+}
+
+// checkContradictions checks if obs contradicts existing knowledge
+func (d *SurpriseDetector) checkContradictions(ctx context.Context, obs Observation) (float64, error) {
+	// For Phase 1, implement simple heuristic
+	// Future: Use semantic similarity to find conflicting nodes
+
+	// If no embedding, can't check contradictions
+	if len(obs.Embedding) == 0 {
+		return 0.0, nil
+	}
+
+	// TODO Phase 2: Query for similar observations and check for semantic conflicts
+	// For now, return 0.0 (no contradiction detection in Phase 1)
+	return 0.0, nil
+}
+
+// computeEmbeddingNovelty checks embedding distance from known concepts
+func (d *SurpriseDetector) computeEmbeddingNovelty(ctx context.Context, spaceID string, embedding []float32) (float64, error) {
+	// Query Neo4j for average cosine similarity with existing conversation observations
+	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode {space_id: $spaceId})
+			WHERE n.role_type = 'conversation_observation'
+			  AND n.embedding IS NOT NULL
+			WITH n
+			LIMIT 50
+			RETURN avg(vector.similarity.cosine(n.embedding, $embedding)) as avgSimilarity,
+			       count(n) as nodeCount
+		`
+		params := map[string]any{
+			"spaceId":   spaceID,
+			"embedding": embedding,
+		}
+
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		if res.Next(ctx) {
+			rec := res.Record()
+			avgSim, _ := rec.Get("avgSimilarity")
+			count, _ := rec.Get("nodeCount")
+
+			return map[string]any{
+				"avgSimilarity": avgSim,
+				"nodeCount":     count,
+			}, nil
+		}
+
+		return map[string]any{
+			"avgSimilarity": nil,
+			"nodeCount":     int64(0),
+		}, res.Err()
+	})
+
+	if err != nil {
+		return 0.0, err
+	}
+
+	resultMap := result.(map[string]any)
+	nodeCount := resultMap["nodeCount"].(int64)
+
+	// If no existing observations, this is very novel
+	if nodeCount == 0 {
+		return 0.8, nil
+	}
+
+	avgSim := resultMap["avgSimilarity"]
+	if avgSim == nil {
+		return 0.8, nil
+	}
+
+	avgSimilarity := avgSim.(float64)
+
+	// Convert similarity (high = familiar) to novelty (high = unfamiliar)
+	// Cosine similarity ranges from -1 to 1, typically 0 to 1 for our use case
+	// Novelty = 1 - similarity
+	novelty := 1.0 - avgSimilarity
+
+	// Clamp to [0.0, 1.0]
+	if novelty < 0.0 {
+		return 0.0, nil
+	}
+	if novelty > 1.0 {
+		return 1.0, nil
+	}
+
+	return novelty, nil
+}
+
+// cosineSimilarity computes cosine similarity between two vectors
+func cosineSimilarity(a, b []float32) float64 {
+	if len(a) != len(b) {
+		return 0.0
+	}
+
+	var dotProduct, normA, normB float64
+	for i := range a {
+		dotProduct += float64(a[i]) * float64(b[i])
+		normA += float64(a[i]) * float64(a[i])
+		normB += float64(b[i]) * float64(b[i])
+	}
+
+	if normA == 0 || normB == 0 {
+		return 0.0
+	}
+
+	return dotProduct / (math.Sqrt(normA) * math.Sqrt(normB))
+}

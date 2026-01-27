@@ -7,8 +7,14 @@
 | `/v1/memory/retrieve` | POST | Query memories with vector search + graph expansion |
 | `/v1/memory/ingest` | POST | Ingest a single observation |
 | `/v1/memory/ingest/batch` | POST | Bulk ingest up to 100 observations |
+| `/v1/memory/ingest/trigger` | POST | Start a background re-ingestion job |
+| `/v1/memory/ingest/status/{job_id}` | GET | Check ingestion job progress |
+| `/v1/memory/ingest/cancel/{job_id}` | POST | Cancel a running ingestion job |
+| `/v1/memory/ingest/jobs` | GET | List all ingestion jobs |
+| `/v1/memory/symbols` | GET | Search code symbols (functions, classes, constants) |
 | `/v1/memory/reflect` | POST | Deep context exploration (3-stage traversal) |
 | `/v1/metrics` | GET | Graph health metrics and statistics |
+| `/v1/system/pool-metrics` | GET | Neo4j connection pool and runtime metrics |
 | `/healthz` | GET | Liveness probe |
 | `/readyz` | GET | Readiness probe with system status |
 
@@ -153,7 +159,173 @@ Bulk ingest up to 100 observations in a single request.
 
 ---
 
-## 4) Reflect Endpoint
+## 4) Symbol Search Endpoint
+
+`GET /v1/memory/symbols`
+
+Search for code symbols extracted during codebase ingestion.
+
+### Query Parameters
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `space_id` | Yes | - | Memory space to search |
+| `name` | No | - | Symbol name pattern (supports `*` wildcard for prefix matching) |
+| `type` | No | - | Filter by type: `const`, `var`, `function`, `class`, `method`, `interface`, `enum` |
+| `file` | No | - | Filter by file path (partial match) |
+| `exported` | No | - | Filter by exported status (`true`/`false`) |
+| `q` | No | - | Fulltext search across all symbol metadata |
+| `limit` | No | 50 | Maximum results (max 500) |
+
+### Response
+```json
+{
+  "symbols": [
+    {
+      "name": "HandleLogin",
+      "type": "function",
+      "file": "internal/auth/handlers.go",
+      "line": 42,
+      "exported": true,
+      "signature": "func HandleLogin(w http.ResponseWriter, r *http.Request)"
+    }
+  ],
+  "total": 1
+}
+```
+
+**Use Case:** Find specific constants, function signatures, or type definitions with file:line evidence for grounded retrieval.
+
+---
+
+## 5) Background Ingestion Endpoints
+
+### Trigger Ingestion Job
+
+`POST /v1/memory/ingest/trigger`
+
+Start a background re-ingestion job (non-blocking).
+
+### Request Body
+```json
+{
+  "space_id": "my-project",
+  "path": "/path/to/repo",
+  "incremental": true,
+  "consolidate": true,
+  "extract_symbols": true
+}
+```
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `space_id` | Yes | - | Target memory space |
+| `path` | Yes | - | Path to source directory |
+| `incremental` | No | false | Only ingest changed files |
+| `consolidate` | No | false | Run consolidation after ingestion |
+| `extract_symbols` | No | true | Extract code symbols |
+
+### Response
+```json
+{
+  "job_id": "abc-123-def",
+  "status": "pending"
+}
+```
+
+### Check Job Status
+
+`GET /v1/memory/ingest/status/{job_id}`
+
+### Response
+```json
+{
+  "job_id": "abc-123-def",
+  "status": "running",
+  "progress": {
+    "current": 45,
+    "total": 120,
+    "percentage": 37.5,
+    "rate": 2.3
+  }
+}
+```
+
+**Job States:** `pending` → `running` → `completed` | `failed` | `cancelled`
+
+### Cancel Job
+
+`POST /v1/memory/ingest/cancel/{job_id}`
+
+### Response
+```json
+{
+  "job_id": "abc-123-def",
+  "status": "cancelled"
+}
+```
+
+### List All Jobs
+
+`GET /v1/memory/ingest/jobs`
+
+### Response
+```json
+{
+  "jobs": [
+    {
+      "job_id": "abc-123-def",
+      "type": "ingest",
+      "status": "completed",
+      "created_at": "2026-01-27T10:00:00Z",
+      "progress": {
+        "current": 120,
+        "total": 120,
+        "percentage": 100
+      }
+    }
+  ]
+}
+```
+
+**Use Case:** User-triggered re-ingestion without blocking the API, with status polling for progress updates.
+
+---
+
+## 6) Pool Metrics Endpoint
+
+`GET /v1/system/pool-metrics`
+
+Returns Neo4j connection pool statistics and Go runtime metrics.
+
+### Response
+```json
+{
+  "connection_pool": {
+    "active_connections": 5,
+    "idle_connections": 10,
+    "total_acquired": 1250
+  },
+  "runtime": {
+    "goroutines": 42,
+    "heap_alloc_mb": 128.5,
+    "num_gc": 15
+  }
+}
+```
+
+**Configuration:**
+```
+NEO4J_MAX_POOL_SIZE=100           # Max connections (default: 100)
+NEO4J_ACQUIRE_TIMEOUT_SEC=60      # Connection acquire timeout (default: 60)
+NEO4J_MAX_CONN_LIFETIME_SEC=3600  # Max connection lifetime (default: 3600)
+NEO4J_CONN_IDLE_TIMEOUT_SEC=0     # Idle timeout, 0=disabled (default: 0)
+```
+
+**Use Case:** Monitor and tune database connection behavior for production workloads.
+
+---
+
+## 8) Reflect Endpoint
 
 `POST /v1/memory/reflect`
 
@@ -218,7 +390,7 @@ Deep context exploration using 3-stage traversal for comprehensive topic underst
 
 ---
 
-## 5) Metrics Endpoint
+## 9) Metrics Endpoint
 
 `GET /v1/metrics?space_id=ide-agent`
 
@@ -262,7 +434,7 @@ Returns graph health metrics and statistics.
 
 ---
 
-## 6) Health Check Endpoints
+## 10) Health Check Endpoints
 
 ### Liveness Probe
 `GET /healthz`

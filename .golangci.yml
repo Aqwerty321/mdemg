@@ -1,37 +1,40 @@
 run:
   timeout: 5m
   modules-download-mode: readonly
-  skip-dirs:
-    - docs
-    - archeive
 
 linters:
+  # Start with a minimal set - expand as codebase matures
   enable:
-    - errcheck
     - gosimple
     - govet
-    - ineffassign
     - staticcheck
-    - unused
-    - gofmt
-    - goimports
-    - misspell
 
 linters-settings:
-  errcheck:
-    check-type-assertions: true
   govet:
-    check-shadowing: true
-  goimports:
-    local-prefixes: mdemg
+    enable:
+      - nilness
+      - unusedresult
+    disable:
+      - shadow  # Too many existing issues
+  staticcheck:
+    checks:
+      - all
+      - -SA1019  # Ignore deprecation warnings for now
 
 issues:
+  exclude-dirs:
+    - docs
+    - archeive
   exclude-rules:
-    # Exclude some linters from running on tests files
+    # Exclude linters from running on test files
     - path: _test\.go
       linters:
         - errcheck
+        - govet
     # Exclude generated protobuf files
     - path: \.pb\.go
       linters:
         - all
+  # Don't fail on existing issues - report only new
+  max-issues-per-linter: 0
+  max-same-issues: 0

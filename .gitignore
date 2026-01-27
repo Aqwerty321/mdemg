@@ -14,13 +14,13 @@ private/
 
 # Go binaries
 bin/
-server
-ingest-codebase
-decay
-consolidate
-prune
-mdemg-server
-mdemg-mcp
+/server
+/ingest-codebase
+/decay
+/consolidate
+/prune
+/mdemg-server
+/mdemg-mcp
 *.exe
 *.exe~
 *.dll
@@ -75,11 +75,11 @@ temp/
 *.log
 logs/
 
-# Compiled binaries
-server
-ingest-codebase
-decay
-consolidate
-prune
-mdemg-server
-mdemg-mcp
+# Compiled binaries (root level only)
+/server
+/ingest-codebase
+/decay
+/consolidate
+/prune
+/mdemg-server
+/mdemg-mcp

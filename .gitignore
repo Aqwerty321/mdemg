@@ -1,3 +1,6 @@
+# Private content (not for public repo)
+private/
+
 # Environment and secrets
 .env
 *.env

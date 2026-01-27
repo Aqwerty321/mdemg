@@ -25,7 +25,7 @@ func (s *Server) handleCapabilityGaps(w http.ResponseWriter, r *http.Request) {
 	// Get gaps from store
 	gapsList, err := s.gapDetector.GetStore().ListGaps(ctx, gaps.GapStatus(status), gapType)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "list capability gaps")
 		return
 	}
 
@@ -106,7 +106,7 @@ func (s *Server) handleCapabilityGapDismiss(w http.ResponseWriter, r *http.Reque
 	// Check if gap exists
 	gap, err := s.gapDetector.GetStore().GetGap(ctx, gapID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "get capability gap")
 		return
 	}
 	if gap == nil {
@@ -116,7 +116,7 @@ func (s *Server) handleCapabilityGapDismiss(w http.ResponseWriter, r *http.Reque
 
 	// Update status
 	if err := s.gapDetector.GetStore().UpdateGapStatus(ctx, gapID, gaps.GapStatusDismissed); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "dismiss capability gap")
 		return
 	}
 
@@ -145,7 +145,7 @@ func (s *Server) handleCapabilityGapAddress(w http.ResponseWriter, r *http.Reque
 	// Check if gap exists
 	gap, err := s.gapDetector.GetStore().GetGap(ctx, gapID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "get capability gap")
 		return
 	}
 	if gap == nil {
@@ -155,7 +155,7 @@ func (s *Server) handleCapabilityGapAddress(w http.ResponseWriter, r *http.Reque
 
 	// Update status
 	if err := s.gapDetector.GetStore().UpdateGapStatus(ctx, gapID, gaps.GapStatusAddressed); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "address capability gap")
 		return
 	}
 
@@ -191,7 +191,7 @@ func (s *Server) handleFeedback(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if err := s.gapDetector.ProcessFeedback(ctx, req); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "process feedback")
 		return
 	}
 
@@ -214,7 +214,7 @@ func (s *Server) handleGapAnalyze(w http.ResponseWriter, r *http.Request) {
 
 	gapsList, err := s.gapDetector.RunFullAnalysis(ctx, spaceID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "gap analysis")
 		return
 	}
 
@@ -295,7 +295,7 @@ func (s *Server) handleCapabilityGapGet(w http.ResponseWriter, r *http.Request) 
 
 	gap, err := s.gapDetector.GetStore().GetGap(ctx, gapID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "get capability gap")
 		return
 	}
 	if gap == nil {

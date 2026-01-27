@@ -216,6 +216,24 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
+// sanitizeError logs the detailed error for debugging but returns a generic
+// message suitable for client responses. This prevents internal details
+// (stack traces, file paths, database errors) from leaking to clients.
+func sanitizeError(err error, operation string) string {
+	// Log the full error for debugging
+	log.Printf("ERROR [%s]: %v", operation, err)
+	// Return generic message to client
+	return "internal error during " + operation
+}
+
+// writeInternalError writes a sanitized internal server error response.
+// The detailed error is logged but not exposed to the client.
+func writeInternalError(w http.ResponseWriter, err error, operation string) {
+	writeJSON(w, http.StatusInternalServerError, map[string]any{
+		"error": sanitizeError(err, operation),
+	})
+}
+
 func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()

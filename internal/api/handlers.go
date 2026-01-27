@@ -59,9 +59,7 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 		}
 		emb, err := s.embedder.Embed(r.Context(), req.QueryText)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"error": fmt.Sprintf("failed to generate embedding: %v", err),
-			})
+			writeInternalError(w, err, "embedding generation")
 			return
 		}
 		req.QueryEmbedding = emb
@@ -324,7 +322,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	// Execute metrics queries
 	resp, err := s.queryMetrics(ctx, spaceID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "metrics query")
 		return
 	}
 
@@ -592,7 +590,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.queryStats(ctx, spaceID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "stats query")
 		return
 	}
 
@@ -924,9 +922,7 @@ func (s *Server) handleReflect(w http.ResponseWriter, r *http.Request) {
 		}
 		emb, err := s.embedder.Embed(r.Context(), req.Topic)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"error": fmt.Sprintf("failed to generate embedding: %v", err),
-			})
+			writeInternalError(w, err, "embedding generation")
 			return
 		}
 		req.TopicEmbedding = emb
@@ -978,9 +974,7 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 	if !req.SkipClustering {
 		created, err := s.hiddenLayer.CreateHiddenNodes(r.Context(), req.SpaceID)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"error": fmt.Sprintf("failed to create hidden nodes: %v", err),
-			})
+			writeInternalError(w, err, "hidden node creation")
 			return
 		}
 		resp.HiddenNodesCreated = created
@@ -1050,9 +1044,7 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 	if !req.SkipForward {
 		fwdResult, err := s.hiddenLayer.ForwardPass(r.Context(), req.SpaceID)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"error": fmt.Sprintf("failed in forward pass: %v", err),
-			})
+			writeInternalError(w, err, "forward pass")
 			return
 		}
 		resp.HiddenNodesUpdated = fwdResult.HiddenNodesUpdated
@@ -1067,9 +1059,7 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 		for targetLayer := 2; targetLayer <= maxLayers; targetLayer++ {
 			conceptCreated, err := s.hiddenLayer.CreateConceptNodes(r.Context(), req.SpaceID, targetLayer)
 			if err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{
-					"error": fmt.Sprintf("failed to create concept nodes layer %d: %v", targetLayer, err),
-				})
+				writeInternalError(w, err, fmt.Sprintf("concept node creation layer %d", targetLayer))
 				return
 			}
 			// Don't break on zero - upper layers may still form clusters
@@ -1079,9 +1069,7 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 				// Run forward pass to update new concept embeddings
 				fwdResult, err := s.hiddenLayer.ForwardPass(r.Context(), req.SpaceID)
 				if err != nil {
-					writeJSON(w, http.StatusInternalServerError, map[string]any{
-						"error": fmt.Sprintf("failed in forward pass after layer %d: %v", targetLayer, err),
-					})
+					writeInternalError(w, err, fmt.Sprintf("forward pass after layer %d", targetLayer))
 					return
 				}
 				resp.ConceptNodesUpdated += fwdResult.ConceptNodesUpdated
@@ -1093,9 +1081,7 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 	if !req.SkipBackward {
 		bwdResult, err := s.hiddenLayer.BackwardPass(r.Context(), req.SpaceID)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"error": fmt.Sprintf("failed in backward pass: %v", err),
-			})
+			writeInternalError(w, err, "backward pass")
 			return
 		}
 		// Add to existing count if forward pass was also run
@@ -1220,7 +1206,7 @@ RETURN n.node_id AS node_id,
 	})
 
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "archive node")
 		return
 	}
 
@@ -1301,7 +1287,7 @@ RETURN n.node_id AS node_id,
 	})
 
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "unarchive node")
 		return
 	}
 
@@ -1482,7 +1468,7 @@ RETURN count(*) > 0 AS has_abstractions`
 	})
 
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "check node abstractions")
 		return
 	}
 
@@ -1542,7 +1528,7 @@ DETACH DELETE n`
 	})
 
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "delete node")
 		return
 	}
 
@@ -1573,16 +1559,14 @@ func (s *Server) handleLearningPrune(w http.ResponseWriter, r *http.Request) {
 	// Prune decayed edges (below threshold after time decay)
 	decayedDeleted, err := s.learner.PruneDecayedEdges(ctx, spaceID)
 	if err != nil {
-		log.Printf("ERROR: PruneDecayedEdges failed for space %s: %v", spaceID, err)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "prune decayed edges")
 		return
 	}
 
 	// Prune excess edges per node (above cap)
 	excessDeleted, err := s.learner.PruneExcessEdgesPerNode(ctx, spaceID)
 	if err != nil {
-		log.Printf("ERROR: PruneExcessEdgesPerNode failed for space %s: %v", spaceID, err)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "prune excess edges")
 		return
 	}
 
@@ -1615,7 +1599,7 @@ func (s *Server) handleConsult(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.consultant.Consult(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "consult")
 		return
 	}
 
@@ -1641,7 +1625,7 @@ func (s *Server) handleSuggest(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.consultant.Suggest(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "suggest")
 		return
 	}
 
@@ -1666,8 +1650,7 @@ func (s *Server) handleLearningStats(w http.ResponseWriter, r *http.Request) {
 
 	stats, err := s.learner.GetLearningEdgeStats(ctx, spaceID)
 	if err != nil {
-		log.Printf("ERROR: GetLearningEdgeStats failed for space %s: %v", spaceID, err)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "learning stats")
 		return
 	}
 

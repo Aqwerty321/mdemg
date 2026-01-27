@@ -108,7 +108,7 @@ func (s *Server) handleModuleSync(w http.ResponseWriter, r *http.Request) {
 		Config:   req.Config,
 	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "module sync")
 		return
 	}
 
@@ -125,7 +125,7 @@ func (s *Server) handleModuleSync(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+			writeInternalError(w, err, "module sync stream")
 			return
 		}
 

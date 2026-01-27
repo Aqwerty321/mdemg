@@ -138,9 +138,7 @@ func (s *Server) handlePluginCreate(w http.ResponseWriter, r *http.Request) {
 
 	result, err := scaffold.Generate(cfg)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{
-			"error": "failed to generate plugin: " + err.Error(),
-		})
+		writeInternalError(w, err, "generate plugin scaffold")
 		return
 	}
 
@@ -198,9 +196,7 @@ func (s *Server) handlePluginList(w http.ResponseWriter, r *http.Request) {
 	pluginsDir := s.cfg.PluginsDir
 	entries, err := os.ReadDir(pluginsDir)
 	if err != nil && !os.IsNotExist(err) {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{
-			"error": "failed to read plugins directory: " + err.Error(),
-		})
+		writeInternalError(w, err, "read plugins directory")
 		return
 	}
 
@@ -356,9 +352,7 @@ func (s *Server) handlePluginValidate(w http.ResponseWriter, r *http.Request, pl
 	// Validate manifest
 	manifestValidation, err := plugins.ValidateManifest(pluginDir)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{
-			"error": "manifest validation error: " + err.Error(),
-		})
+		writeInternalError(w, err, "manifest validation")
 		return
 	}
 	resp.Manifest = manifestValidation

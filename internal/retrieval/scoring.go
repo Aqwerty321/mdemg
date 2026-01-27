@@ -333,6 +333,11 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 	if len(items) > topK {
 		items = items[:topK]
 	}
+
+	// Apply percentile-based normalized confidence
+	// This makes confidence immune to learning edge density changes
+	ApplyNormalizedConfidence(items)
+
 	return items
 }
 
@@ -367,4 +372,86 @@ type ScoreBreakdown struct {
 type ScoredCandidate struct {
 	models.RetrieveResult
 	Breakdown ScoreBreakdown `json:"breakdown"`
+}
+
+// ApplyNormalizedConfidence computes percentile-based confidence for each result.
+// This makes confidence immune to learning edge density changes (the "activation dilution" problem).
+//
+// Instead of using absolute score thresholds (which degrade as CO_ACTIVATED_WITH edges accumulate),
+// we compute each result's percentile rank within the current result set.
+//
+// Confidence levels:
+//   - HIGH: top 10% (percentile >= 90)
+//   - MEDIUM: middle 40-90% (percentile >= 40)
+//   - LOW: bottom 40% (percentile < 40)
+func ApplyNormalizedConfidence(items []ScoredCandidate) {
+	n := len(items)
+	if n == 0 {
+		return
+	}
+
+	// Items are already sorted by score descending
+	// Compute percentile for each item based on rank
+	// Formula: percentile = 100 * (n-1-rank) / (n-1)
+	// - Rank 0 (best) = 100th percentile
+	// - Rank n-1 (worst) = 0th percentile
+	for i := range items {
+		rank := i
+		var percentile float64
+		if n == 1 {
+			percentile = 100.0 // Single result gets top percentile
+		} else {
+			percentile = 100.0 * float64(n-1-rank) / float64(n-1)
+		}
+
+		items[i].NormalizedConfidence = math.Round(percentile*10) / 10 // Round to 1 decimal
+
+		// Assign confidence level based on percentile
+		switch {
+		case percentile >= 90:
+			items[i].ConfidenceLevel = "HIGH"
+		case percentile >= 40:
+			items[i].ConfidenceLevel = "MEDIUM"
+		default:
+			items[i].ConfidenceLevel = "LOW"
+		}
+	}
+}
+
+// ConfidenceLevelFromPercentile returns the confidence level for a given percentile.
+// Exported for use in other packages that may need to compute confidence levels.
+func ConfidenceLevelFromPercentile(percentile float64) string {
+	switch {
+	case percentile >= 90:
+		return "HIGH"
+	case percentile >= 40:
+		return "MEDIUM"
+	default:
+		return "LOW"
+	}
+}
+
+// ApplyNormalizedConfidenceToResults applies percentile-based confidence to final results.
+// This should be called AFTER all post-processing (reasoning modules, reranking, truncation)
+// to ensure the confidence levels reflect the final ordering.
+func ApplyNormalizedConfidenceToResults(results []models.RetrieveResult) {
+	n := len(results)
+	if n == 0 {
+		return
+	}
+
+	// Results are already sorted by score descending
+	// Compute percentile for each result based on rank
+	for i := range results {
+		rank := i
+		var percentile float64
+		if n == 1 {
+			percentile = 100.0
+		} else {
+			percentile = 100.0 * float64(n-1-rank) / float64(n-1)
+		}
+
+		results[i].NormalizedConfidence = math.Round(percentile*10) / 10
+		results[i].ConfidenceLevel = ConfidenceLevelFromPercentile(percentile)
+	}
 }

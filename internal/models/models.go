@@ -12,6 +12,12 @@ type RetrieveRequest struct {
 	JiminyEnabled   bool `json:"jiminy_enabled,omitempty"`   // Enable explainable retrieval (adds rationale + score breakdown)
 	IncludeEvidence bool `json:"include_evidence,omitempty"` // Include symbol evidence for each result
 
+	// File type filtering (applied at query time, not ingest time)
+	// These filter results based on file path extensions.
+	IncludeExtensions []string `json:"include_extensions,omitempty"` // Only include files with these extensions (e.g., ["java", "go", "py"])
+	ExcludeExtensions []string `json:"exclude_extensions,omitempty"` // Exclude files with these extensions (e.g., ["md", "txt"])
+	CodeOnly          bool     `json:"code_only,omitempty"`          // Shorthand: exclude common non-code files (md, txt, json, yaml, etc.)
+
 	PolicyContext map[string]any `json:"policy_context,omitempty"`
 }
 
@@ -21,6 +27,10 @@ type RetrieveResult struct {
 	Name    string  `json:"name"`
 	Summary string  `json:"summary"`
 	Score   float64 `json:"score"`
+
+	// Normalized confidence metrics (immune to learning edge density)
+	NormalizedConfidence float64 `json:"normalized_confidence,omitempty"` // Percentile rank 0-100
+	ConfidenceLevel      string  `json:"confidence_level,omitempty"`      // HIGH/MEDIUM/LOW based on percentile
 
 	VectorSim  float64             `json:"vector_sim,omitempty"`
 	Activation float64             `json:"activation,omitempty"`

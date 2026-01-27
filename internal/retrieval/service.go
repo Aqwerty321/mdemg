@@ -22,6 +22,60 @@ type Service struct {
 	queryCache        *QueryCache
 }
 
+// FileFilter specifies file extension filtering for retrieval queries.
+// This helps focus code-related queries on actual source code files.
+type FileFilter struct {
+	IncludeExtensions []string // Only include files with these extensions (e.g., ["java", "go"])
+	ExcludeExtensions []string // Exclude files with these extensions (e.g., ["md", "txt"])
+}
+
+// CodeOnlyExclusions returns the standard exclusions for code-focused queries.
+// These are common non-code file types that often pollute code search results.
+var CodeOnlyExclusions = []string{"md", "txt", "json", "yaml", "yml", "toml", "xml", "csv", "lock", "sum"}
+
+// NewFileFilterFromRequest creates a FileFilter from retrieval request parameters.
+func NewFileFilterFromRequest(req models.RetrieveRequest) FileFilter {
+	filter := FileFilter{
+		IncludeExtensions: req.IncludeExtensions,
+		ExcludeExtensions: req.ExcludeExtensions,
+	}
+	// CodeOnly is a convenience shorthand that adds common non-code exclusions
+	if req.CodeOnly {
+		filter.ExcludeExtensions = append(filter.ExcludeExtensions, CodeOnlyExclusions...)
+	}
+	return filter
+}
+
+// IsEmpty returns true if no filters are specified.
+func (f FileFilter) IsEmpty() bool {
+	return len(f.IncludeExtensions) == 0 && len(f.ExcludeExtensions) == 0
+}
+
+// BuildCypherFilter returns the Cypher WHERE clause fragment for file filtering.
+// Returns empty string if no filters are specified.
+func (f FileFilter) BuildCypherFilter() string {
+	if f.IsEmpty() {
+		return ""
+	}
+
+	clauses := []string{}
+
+	// Include filter: path must end with one of the specified extensions
+	if len(f.IncludeExtensions) > 0 {
+		clauses = append(clauses, `ANY(ext IN $includeExtensions WHERE node.path ENDS WITH ('.' + ext))`)
+	}
+
+	// Exclude filter: path must NOT end with any of the specified extensions
+	if len(f.ExcludeExtensions) > 0 {
+		clauses = append(clauses, `NOT ANY(ext IN $excludeExtensions WHERE node.path ENDS WITH ('.' + ext))`)
+	}
+
+	if len(clauses) == 1 {
+		return " AND " + clauses[0]
+	}
+	return " AND (" + clauses[0] + " AND " + clauses[1] + ")"
+}
+
 func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
 	// Initialize query cache with configurable TTL (default: 5 minutes, capacity: 500)
 	cacheTTL := time.Duration(cfg.QueryCacheTTLSeconds) * time.Second
@@ -122,8 +176,11 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		log.Printf("Query cache MISS for space=%s", req.SpaceID)
 	}
 
+	// Build file filter from request
+	filter := NewFileFilterFromRequest(req)
+
 	// 1) Vector recall
-	vectorCands, err := s.vectorRecall(ctx, req.SpaceID, req.QueryEmbedding, candK)
+	vectorCands, err := s.vectorRecall(ctx, req.SpaceID, req.QueryEmbedding, candK, filter)
 	if err != nil {
 		return models.RetrieveResponse{}, err
 	}
@@ -132,7 +189,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	var cands []Candidate
 	bm25Count := 0
 	if s.cfg.HybridRetrievalEnabled && req.QueryText != "" {
-		bm25Results, bm25Err := s.BM25Search(ctx, req.SpaceID, req.QueryText, s.cfg.BM25TopK)
+		bm25Results, bm25Err := s.BM25Search(ctx, req.SpaceID, req.QueryText, s.cfg.BM25TopK, filter)
 		if bm25Err != nil {
 			// Log warning but continue with vector-only results
 			log.Printf("WARN: BM25 search failed, using vector-only: %v", bm25Err)
@@ -293,6 +350,11 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		results = results[:topK]
 	}
 
+	// Apply normalized confidence to final results
+	// This must happen AFTER all post-processing (reasoning modules, reranking, truncation)
+	// to ensure percentiles reflect the final ordering
+	ApplyNormalizedConfidenceToResults(results)
+
 	// Generate Jiminy explanations if enabled
 	if req.JiminyEnabled && scoredCands != nil {
 		// Create a map for quick lookup
@@ -367,21 +429,33 @@ type SimilarNode struct {
 	Score  float64
 }
 
-func (s *Service) vectorRecall(ctx context.Context, spaceID string, q []float32, k int) ([]Candidate, error) {
+func (s *Service) vectorRecall(ctx context.Context, spaceID string, q []float32, k int, filter FileFilter) ([]Candidate, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
 	params := map[string]any{
 		"spaceId": spaceID,
-		"k": k,
-		"q": q,
-		"index": s.cfg.VectorIndexName,
+		"k":       k,
+		"q":       q,
+		"index":   s.cfg.VectorIndexName,
+	}
+
+	// Add filter parameters if specified
+	filterClause := ""
+	if !filter.IsEmpty() {
+		filterClause = filter.BuildCypherFilter()
+		if len(filter.IncludeExtensions) > 0 {
+			params["includeExtensions"] = filter.IncludeExtensions
+		}
+		if len(filter.ExcludeExtensions) > 0 {
+			params["excludeExtensions"] = filter.ExcludeExtensions
+		}
 	}
 
 	cypher := `WITH $q AS q
 CALL db.index.vector.queryNodes($index, $k, q)
 YIELD node, score
-WHERE node.space_id = $spaceId AND NOT coalesce(node.is_archived, false)
+WHERE node.space_id = $spaceId AND NOT coalesce(node.is_archived, false)` + filterClause + `
 RETURN node.node_id AS node_id,
        node.path AS path,
        node.name AS name,

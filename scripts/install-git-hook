@@ -1,0 +1,103 @@
+#!/bin/bash
+# Install MDEMG git hooks in a repository
+#
+# Usage: install-git-hook [options] [repo-path]
+#
+# Options:
+#   -s, --space-id ID     Set space ID for the hook (default: repo basename)
+#   -e, --endpoint URL    Set MDEMG endpoint (default: http://localhost:8090)
+#   -f, --force           Overwrite existing hook
+#   -h, --help            Show this help message
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HOOK_SOURCE="$SCRIPT_DIR/mdemg-git-hook"
+
+# Default values
+SPACE_ID=""
+ENDPOINT=""
+FORCE=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -s|--space-id)
+            SPACE_ID="$2"
+            shift 2
+            ;;
+        -e|--endpoint)
+            ENDPOINT="$2"
+            shift 2
+            ;;
+        -f|--force)
+            FORCE=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: install-git-hook [options] [repo-path]"
+            echo ""
+            echo "Install MDEMG git hooks in a repository."
+            echo ""
+            echo "Options:"
+            echo "  -s, --space-id ID     Set space ID for the hook (default: repo basename)"
+            echo "  -e, --endpoint URL    Set MDEMG endpoint (default: http://localhost:8090)"
+            echo "  -f, --force           Overwrite existing hook"
+            echo "  -h, --help            Show this help message"
+            exit 0
+            ;;
+        *)
+            REPO_PATH="$1"
+            shift
+            ;;
+    esac
+done
+
+# Default to current directory
+REPO_PATH="${REPO_PATH:-.}"
+
+# Verify it's a git repo
+if [ ! -d "$REPO_PATH/.git" ]; then
+    echo "Error: $REPO_PATH is not a git repository"
+    exit 1
+fi
+
+HOOK_DIR="$REPO_PATH/.git/hooks"
+HOOK_DEST="$HOOK_DIR/post-commit"
+
+# Check for existing hook
+if [ -f "$HOOK_DEST" ] && [ "$FORCE" = false ]; then
+    echo "Error: post-commit hook already exists at $HOOK_DEST"
+    echo "Use --force to overwrite"
+    exit 1
+fi
+
+# Create hooks directory if needed
+mkdir -p "$HOOK_DIR"
+
+# Copy hook script
+cp "$HOOK_SOURCE" "$HOOK_DEST"
+chmod +x "$HOOK_DEST"
+
+# Add configuration if provided
+if [ -n "$SPACE_ID" ] || [ -n "$ENDPOINT" ]; then
+    # Create a wrapper that sets env vars
+    cat > "$HOOK_DEST" << EOF
+#!/bin/bash
+# MDEMG Git Hook (installed by install-git-hook)
+export MDEMG_SPACE_ID="${SPACE_ID:-\$(basename \$(git rev-parse --show-toplevel))}"
+export MDEMG_ENDPOINT="${ENDPOINT:-http://localhost:8090}"
+
+$(cat "$HOOK_SOURCE")
+EOF
+    chmod +x "$HOOK_DEST"
+fi
+
+echo "MDEMG post-commit hook installed at $HOOK_DEST"
+echo ""
+echo "Configuration:"
+echo "  Space ID: ${SPACE_ID:-<auto-detect from repo name>}"
+echo "  Endpoint: ${ENDPOINT:-http://localhost:8090}"
+echo ""
+echo "The hook will run incremental ingestion after each commit."
+echo "Set MDEMG_DISABLED=true to temporarily disable."

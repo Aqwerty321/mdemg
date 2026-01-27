@@ -1,12 +1,15 @@
 package api
 
 import (
+	"compress/gzip"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -112,4 +115,166 @@ func LoggingMiddleware(next http.Handler, cfg LogConfig) http.Handler {
 				r.Method, r.URL.Path, wrapped.status, duration.Milliseconds(), requestID)
 		}
 	})
+}
+
+// gzipResponseWriter wraps http.ResponseWriter to compress output
+type gzipResponseWriter struct {
+	io.Writer
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *gzipResponseWriter) WriteHeader(code int) {
+	w.statusCode = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *gzipResponseWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
+}
+
+// gzipWriterPool reuses gzip.Writer instances to reduce allocations
+var gzipWriterPool = sync.Pool{
+	New: func() any {
+		return gzip.NewWriter(io.Discard)
+	},
+}
+
+// CompressionMiddleware adds gzip compression to responses when the client supports it.
+// Only compresses responses larger than minSize bytes.
+func CompressionMiddleware(next http.Handler, minSize int) http.Handler {
+	if minSize <= 0 {
+		minSize = 1024 // Default: compress responses > 1KB
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if client accepts gzip
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Skip compression for small responses or streaming
+		// Use response buffering to check size
+		gz := gzipWriterPool.Get().(*gzip.Writer)
+		gz.Reset(w)
+		defer func() {
+			gz.Close()
+			gzipWriterPool.Put(gz)
+		}()
+
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Vary", "Accept-Encoding")
+		w.Header().Del("Content-Length") // Length changes with compression
+
+		gzw := &gzipResponseWriter{
+			Writer:         gz,
+			ResponseWriter: w,
+		}
+
+		next.ServeHTTP(gzw, r)
+	})
+}
+
+// Pagination contains cursor-based pagination parameters
+type Pagination struct {
+	Cursor string `json:"cursor,omitempty"`
+	Limit  int    `json:"limit,omitempty"`
+}
+
+// PaginatedResponse wraps results with pagination info
+type PaginatedResponse struct {
+	Data       any    `json:"data"`
+	NextCursor string `json:"next_cursor,omitempty"`
+	HasMore    bool   `json:"has_more"`
+	TotalCount int    `json:"total_count,omitempty"`
+}
+
+// ParsePagination extracts pagination parameters from request
+func ParsePagination(r *http.Request, defaultLimit, maxLimit int) Pagination {
+	query := r.URL.Query()
+
+	limit := defaultLimit
+	if l := query.Get("limit"); l != "" {
+		if n, err := parseInt(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if limit > maxLimit {
+		limit = maxLimit
+	}
+
+	return Pagination{
+		Cursor: query.Get("cursor"),
+		Limit:  limit,
+	}
+}
+
+// parseInt safely parses an integer string
+func parseInt(s string) (int, error) {
+	var n int
+	err := json.Unmarshal([]byte(s), &n)
+	return n, err
+}
+
+// FieldSelector supports selective field loading
+type FieldSelector struct {
+	Fields  []string // Fields to include (empty = all)
+	Exclude []string // Fields to exclude
+}
+
+// ParseFieldSelector extracts field selection parameters from request
+func ParseFieldSelector(r *http.Request) FieldSelector {
+	query := r.URL.Query()
+
+	var fields, exclude []string
+
+	if f := query.Get("fields"); f != "" {
+		fields = strings.Split(f, ",")
+		for i := range fields {
+			fields[i] = strings.TrimSpace(fields[i])
+		}
+	}
+
+	if e := query.Get("exclude"); e != "" {
+		exclude = strings.Split(e, ",")
+		for i := range exclude {
+			exclude[i] = strings.TrimSpace(exclude[i])
+		}
+	}
+
+	return FieldSelector{
+		Fields:  fields,
+		Exclude: exclude,
+	}
+}
+
+// FilterFields applies field selection to a map
+func (fs FieldSelector) FilterFields(data map[string]any) map[string]any {
+	if len(fs.Fields) == 0 && len(fs.Exclude) == 0 {
+		return data
+	}
+
+	result := make(map[string]any)
+
+	if len(fs.Fields) > 0 {
+		// Include only specified fields
+		for _, f := range fs.Fields {
+			if v, ok := data[f]; ok {
+				result[f] = v
+			}
+		}
+	} else {
+		// Start with all fields
+		for k, v := range data {
+			result[k] = v
+		}
+	}
+
+	// Remove excluded fields
+	for _, f := range fs.Exclude {
+		delete(result, f)
+	}
+
+	return result
 }

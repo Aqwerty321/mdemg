@@ -468,3 +468,56 @@ type ConsolidateResponse struct {
 	DurationMs          float64 `json:"duration_ms"`
 	Enabled             bool    `json:"enabled"` // Whether hidden layer is enabled
 }
+
+// IngestTriggerRequest - request for POST /v1/memory/ingest/trigger
+// Triggers a background codebase re-ingestion job.
+type IngestTriggerRequest struct {
+	SpaceID         string   `json:"space_id" validate:"required,min=1,max=256"`
+	Path            string   `json:"path" validate:"required,min=1"`
+	BatchSize       int      `json:"batch_size,omitempty"`       // Items per batch (default: 100)
+	Workers         int      `json:"workers,omitempty"`          // Parallel workers (default: 4)
+	TimeoutSeconds  int      `json:"timeout_seconds,omitempty"`  // HTTP timeout (default: 300)
+	ExtractSymbols  *bool    `json:"extract_symbols,omitempty"`  // Extract code symbols (default: true)
+	Consolidate     *bool    `json:"consolidate,omitempty"`      // Run consolidation after (default: true)
+	IncludeTests    bool     `json:"include_tests,omitempty"`    // Include test files
+	IncludeMarkdown *bool    `json:"include_md,omitempty"`       // Include markdown (default: true)
+	IncludeTS       *bool    `json:"include_ts,omitempty"`       // Include TypeScript/JS (default: true)
+	IncludePython   *bool    `json:"include_py,omitempty"`       // Include Python (default: true)
+	Incremental     bool     `json:"incremental,omitempty"`      // Only changed files
+	SinceCommit     string   `json:"since_commit,omitempty"`     // Git commit for incremental (default: HEAD~1)
+	ArchiveDeleted  *bool    `json:"archive_deleted,omitempty"`  // Archive deleted file nodes (default: true)
+	ExcludeDirs     []string `json:"exclude_dirs,omitempty"`     // Directories to skip
+	Limit           int      `json:"limit,omitempty"`            // Max elements to ingest (0 = no limit)
+	DryRun          bool     `json:"dry_run,omitempty"`          // Preview without ingesting
+}
+
+// IngestTriggerResponse - response from POST /v1/memory/ingest/trigger
+type IngestTriggerResponse struct {
+	JobID     string `json:"job_id"`
+	SpaceID   string `json:"space_id"`
+	Status    string `json:"status"`
+	Message   string `json:"message,omitempty"`
+	CreatedAt string `json:"created_at"`
+}
+
+// IngestJobStatusResponse - response from GET /v1/memory/ingest/status/{job_id}
+type IngestJobStatusResponse struct {
+	JobID       string         `json:"job_id"`
+	SpaceID     string         `json:"space_id,omitempty"`
+	Status      string         `json:"status"`
+	Progress    IngestProgress `json:"progress"`
+	Result      map[string]any `json:"result,omitempty"`
+	Error       string         `json:"error,omitempty"`
+	StartedAt   string         `json:"started_at,omitempty"`
+	CompletedAt string         `json:"completed_at,omitempty"`
+	CreatedAt   string         `json:"created_at"`
+}
+
+// IngestProgress tracks progress of an ingest job.
+type IngestProgress struct {
+	Total      int     `json:"total"`
+	Current    int     `json:"current"`
+	Percentage float64 `json:"percentage"`
+	Phase      string  `json:"phase,omitempty"` // discovery, ingestion, consolidation
+	Rate       string  `json:"rate,omitempty"`  // e.g., "15.2 elements/sec"
+}

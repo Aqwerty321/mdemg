@@ -1,0 +1,74 @@
+#!/bin/bash
+# MDEMG Git Hook - Incremental ingestion on commit
+#
+# This script triggers incremental ingestion when files are committed.
+# Install as a post-commit hook: cp scripts/mdemg-git-hook .git/hooks/post-commit
+#
+# Configuration (environment variables):
+#   MDEMG_SPACE_ID     - Target space ID (default: basename of repo)
+#   MDEMG_ENDPOINT     - MDEMG API endpoint (default: http://localhost:8090)
+#   MDEMG_INGEST_BIN   - Path to ingest-codebase binary (default: mdemg ingest-codebase in PATH)
+#   MDEMG_SKIP_PATTERNS - Comma-separated patterns to skip (default: .git,node_modules,vendor)
+#   MDEMG_VERBOSE      - Enable verbose output (default: false)
+#   MDEMG_DISABLED     - Set to "true" to disable the hook
+
+set -e
+
+# Exit if disabled
+if [ "$MDEMG_DISABLED" = "true" ]; then
+    exit 0
+fi
+
+# Configuration
+REPO_ROOT=$(git rev-parse --show-toplevel)
+SPACE_ID="${MDEMG_SPACE_ID:-$(basename "$REPO_ROOT")}"
+ENDPOINT="${MDEMG_ENDPOINT:-http://localhost:8090}"
+VERBOSE="${MDEMG_VERBOSE:-false}"
+SKIP_PATTERNS="${MDEMG_SKIP_PATTERNS:-.git,node_modules,vendor,.worktrees}"
+
+# Find ingest-codebase binary
+if [ -n "$MDEMG_INGEST_BIN" ]; then
+    INGEST_BIN="$MDEMG_INGEST_BIN"
+elif command -v ingest-codebase &> /dev/null; then
+    INGEST_BIN="ingest-codebase"
+elif [ -f "$REPO_ROOT/bin/ingest-codebase" ]; then
+    INGEST_BIN="$REPO_ROOT/bin/ingest-codebase"
+else
+    echo "mdemg-git-hook: ingest-codebase not found. Set MDEMG_INGEST_BIN or add to PATH."
+    exit 1
+fi
+
+# Check if MDEMG server is reachable
+if ! curl -s --connect-timeout 2 "$ENDPOINT/healthz" > /dev/null 2>&1; then
+    if [ "$VERBOSE" = "true" ]; then
+        echo "mdemg-git-hook: MDEMG server not reachable at $ENDPOINT, skipping"
+    fi
+    exit 0
+fi
+
+# Get the commit we just made
+COMMIT_SHA=$(git rev-parse HEAD)
+COMMIT_MSG=$(git log -1 --pretty=format:%s)
+
+# Build arguments
+ARGS=(
+    --path "$REPO_ROOT"
+    --space-id "$SPACE_ID"
+    --endpoint "$ENDPOINT"
+    --incremental
+    --since "HEAD~1"
+    --archive-deleted
+    --exclude "$SKIP_PATTERNS"
+)
+
+if [ "$VERBOSE" = "true" ]; then
+    ARGS+=(--verbose)
+    echo "mdemg-git-hook: Ingesting changes from commit $COMMIT_SHA: $COMMIT_MSG"
+fi
+
+# Run incremental ingestion (in background to not block commit)
+nohup "$INGEST_BIN" "${ARGS[@]}" > /dev/null 2>&1 &
+
+if [ "$VERBOSE" = "true" ]; then
+    echo "mdemg-git-hook: Incremental ingestion started for space '$SPACE_ID'"
+fi

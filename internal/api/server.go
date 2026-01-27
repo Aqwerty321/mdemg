@@ -177,18 +177,37 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/suggest", s.handleSuggest)
 	mux.HandleFunc("/v1/memory/cache/stats", s.handleCacheStats)
 	mux.HandleFunc("/v1/memory/query/metrics", s.handleQueryMetrics)
+	mux.HandleFunc("/v1/memory/symbols", s.handleSymbolSearch)
+
+	// Ingestion job management endpoints
+	mux.HandleFunc("/v1/memory/ingest/trigger", s.handleIngestTrigger)
+	mux.HandleFunc("/v1/memory/ingest/status/", s.handleIngestStatus)
+	mux.HandleFunc("/v1/memory/ingest/cancel/", s.handleIngestCancel)
+	mux.HandleFunc("/v1/memory/ingest/jobs", s.handleIngestJobs)
 
 	// Capability gap detection endpoints
 	mux.HandleFunc("/v1/system/capability-gaps", s.handleCapabilityGaps)
 	mux.HandleFunc("/v1/system/capability-gaps/", s.handleCapabilityGapOperation)
 	mux.HandleFunc("/v1/feedback", s.handleFeedback)
 
-	// Wrap mux with logging middleware
+	// System metrics endpoints
+	mux.HandleFunc("/v1/system/pool-metrics", s.handlePoolMetrics)
+
+	// Wrap mux with middleware stack
+	// Order: compression (outermost) -> logging (innermost)
 	logCfg := LogConfig{
 		Format:     s.cfg.LogFormat,
 		SkipHealth: s.cfg.LogSkipHealth,
 	}
-	return LoggingMiddleware(mux, logCfg)
+
+	handler := LoggingMiddleware(mux, logCfg)
+
+	// Enable gzip compression for responses > 1KB when CompressionEnabled
+	if s.cfg.CompressionEnabled {
+		handler = CompressionMiddleware(handler, s.cfg.CompressionMinSize)
+	}
+
+	return handler
 }
 
 // handleNodeOperation routes requests under /v1/memory/nodes/{node_id}/... to the appropriate handler

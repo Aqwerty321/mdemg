@@ -134,6 +134,18 @@ type Config struct {
 	GapMinOccurrences      int     // Min occurrences to create a gap (default: 3)
 	GapAnalysisWindowHours int     // Time window for pattern analysis in hours (default: 24)
 	GapMetricsWindowSize   int     // Number of queries to keep in history (default: 1000)
+
+	// Data transmission optimization settings (Phase 10.3)
+	CompressionEnabled  bool // Enable gzip compression for responses (default: true)
+	CompressionMinSize  int  // Minimum response size in bytes to compress (default: 1024)
+	PaginationMaxLimit  int  // Maximum items per page (default: 500)
+	PaginationDefLimit  int  // Default items per page (default: 50)
+
+	// Neo4j connection pool settings (Phase 10.4)
+	Neo4jMaxPoolSize         int // Maximum connections in pool (default: 100)
+	Neo4jAcquireTimeoutSec   int // Connection acquire timeout in seconds (default: 60)
+	Neo4jMaxConnLifetimeSec  int // Maximum connection lifetime in seconds (default: 3600)
+	Neo4jConnIdleTimeoutSec  int // Connection idle timeout in seconds (default: 0 = disabled)
 }
 
 func FromEnv() (Config, error) {
@@ -658,6 +670,39 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("GAP_METRICS_WINDOW_SIZE must be >= 100")
 	}
 
+	// Data transmission optimization settings
+	compressionEnabled := getBool("COMPRESSION_ENABLED", true)
+	compressionMinSize, err := atoi("COMPRESSION_MIN_SIZE", 1024)
+	if err != nil {
+		return Config{}, err
+	}
+	paginationMaxLimit, err := atoi("PAGINATION_MAX_LIMIT", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	paginationDefLimit, err := atoi("PAGINATION_DEFAULT_LIMIT", 50)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// Neo4j connection pool settings
+	neo4jMaxPoolSize, err := atoi("NEO4J_MAX_POOL_SIZE", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	neo4jAcquireTimeout, err := atoi("NEO4J_ACQUIRE_TIMEOUT_SEC", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	neo4jMaxConnLifetime, err := atoi("NEO4J_MAX_CONN_LIFETIME_SEC", 3600)
+	if err != nil {
+		return Config{}, err
+	}
+	neo4jConnIdleTimeout, err := atoi("NEO4J_CONN_IDLE_TIMEOUT_SEC", 0)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -751,5 +796,13 @@ func FromEnv() (Config, error) {
 		GapMinOccurrences:         gapMinOccurrences,
 		GapAnalysisWindowHours:    gapAnalysisWindowHours,
 		GapMetricsWindowSize:      gapMetricsWindowSize,
+		CompressionEnabled:        compressionEnabled,
+		CompressionMinSize:        compressionMinSize,
+		PaginationMaxLimit:        paginationMaxLimit,
+		PaginationDefLimit:        paginationDefLimit,
+		Neo4jMaxPoolSize:          neo4jMaxPoolSize,
+		Neo4jAcquireTimeoutSec:    neo4jAcquireTimeout,
+		Neo4jMaxConnLifetimeSec:   neo4jMaxConnLifetime,
+		Neo4jConnIdleTimeoutSec:   neo4jConnIdleTimeout,
 	}, nil
 }

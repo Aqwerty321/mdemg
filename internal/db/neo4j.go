@@ -3,16 +3,86 @@ package db
 import (
 	"context"
 	"fmt"
+	"log"
+	"sync/atomic"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	nconfig "github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"mdemg/internal/config"
 )
 
+// ConnectionPoolMetrics tracks connection pool statistics
+type ConnectionPoolMetrics struct {
+	ActiveConnections  int64 `json:"active_connections"`
+	IdleConnections    int64 `json:"idle_connections"`
+	WaitingRequests    int64 `json:"waiting_requests"`
+	TotalAcquired      int64 `json:"total_acquired"`
+	TotalCreated       int64 `json:"total_created"`
+	TotalClosed        int64 `json:"total_closed"`
+	TotalFailedAcquire int64 `json:"total_failed_acquire"`
+}
+
+var poolMetrics atomic.Pointer[ConnectionPoolMetrics]
+
+func init() {
+	poolMetrics.Store(&ConnectionPoolMetrics{})
+}
+
+// GetPoolMetrics returns current connection pool statistics
+func GetPoolMetrics() ConnectionPoolMetrics {
+	return *poolMetrics.Load()
+}
+
 func NewDriver(cfg config.Config) (neo4j.DriverWithContext, error) {
-	driver, err := neo4j.NewDriverWithContext(cfg.Neo4jURI, neo4j.BasicAuth(cfg.Neo4jUser, cfg.Neo4jPass, ""))
+	// Configure connection pool options
+	configurator := func(conf *nconfig.Config) {
+		// Connection pool size (default: 100)
+		if cfg.Neo4jMaxPoolSize > 0 {
+			conf.MaxConnectionPoolSize = cfg.Neo4jMaxPoolSize
+		} else {
+			conf.MaxConnectionPoolSize = 100
+		}
+
+		// Connection acquisition timeout (default: 60s)
+		if cfg.Neo4jAcquireTimeoutSec > 0 {
+			conf.ConnectionAcquisitionTimeout = time.Duration(cfg.Neo4jAcquireTimeoutSec) * time.Second
+		} else {
+			conf.ConnectionAcquisitionTimeout = 60 * time.Second
+		}
+
+		// Maximum connection lifetime (default: 1 hour)
+		if cfg.Neo4jMaxConnLifetimeSec > 0 {
+			conf.MaxConnectionLifetime = time.Duration(cfg.Neo4jMaxConnLifetimeSec) * time.Second
+		} else {
+			conf.MaxConnectionLifetime = 1 * time.Hour
+		}
+
+		// Connection idle timeout (default: disabled)
+		if cfg.Neo4jConnIdleTimeoutSec > 0 {
+			conf.ConnectionLivenessCheckTimeout = time.Duration(cfg.Neo4jConnIdleTimeoutSec) * time.Second
+		}
+
+		// Socket connect timeout (default: 5s)
+		conf.SocketConnectTimeout = 5 * time.Second
+
+		// Socket keep alive (default: true)
+		conf.SocketKeepalive = true
+	}
+
+	driver, err := neo4j.NewDriverWithContext(
+		cfg.Neo4jURI,
+		neo4j.BasicAuth(cfg.Neo4jUser, cfg.Neo4jPass, ""),
+		configurator,
+	)
 	if err != nil {
 		return nil, err
 	}
+
+	// Log pool configuration
+	log.Printf("Neo4j connection pool configured (max=%d, acquire_timeout=%ds)",
+		cfg.Neo4jMaxPoolSize, cfg.Neo4jAcquireTimeoutSec)
+
 	return driver, nil
 }
 

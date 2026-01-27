@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/anomaly"
 	"mdemg/internal/db"
+	"mdemg/internal/jobs"
 	"mdemg/internal/models"
 	"mdemg/internal/retrieval"
 	"mdemg/internal/symbols"
@@ -1684,4 +1687,454 @@ func (s *Server) handleQueryMetrics(w http.ResponseWriter, r *http.Request) {
 
 	stats := retrieval.GetQueryMetrics()
 	writeJSON(w, http.StatusOK, stats)
+}
+
+// handleSymbolSearch handles GET /v1/memory/symbols
+// Query params:
+//   - space_id (required): Memory space to search
+//   - name: Symbol name pattern (supports * wildcard for prefix match)
+//   - type: Filter by symbol type (const, var, function, class, etc.)
+//   - file: Filter by file path
+//   - exported: Filter by exported status (true/false)
+//   - limit: Maximum results (default 50, max 500)
+//   - q: Fulltext search query (alternative to name pattern)
+func (s *Server) handleSymbolSearch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse query parameters
+	query := r.URL.Query()
+	spaceID := query.Get("space_id")
+	if spaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query parameter is required"})
+		return
+	}
+
+	name := query.Get("name")
+	symbolType := query.Get("type")
+	filePath := query.Get("file")
+	exportedStr := query.Get("exported")
+	fulltextQuery := query.Get("q")
+
+	// Parse limit with default and max constraints
+	limit := 50
+	if limitStr := query.Get("limit"); limitStr != "" {
+		if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil || limit < 1 {
+			limit = 50
+		}
+		if limit > 500 {
+			limit = 500
+		}
+	}
+
+	ctx := r.Context()
+
+	// Check if symbol store is available
+	if s.symbolStore == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "symbol store not initialized"})
+		return
+	}
+
+	var allSymbols []symbols.SymbolRecord
+	var err error
+
+	// Route to appropriate query method based on parameters
+	switch {
+	case fulltextQuery != "":
+		// Fulltext search takes priority
+		results, searchErr := s.symbolStore.FulltextSearch(ctx, spaceID, fulltextQuery, limit)
+		if searchErr != nil {
+			writeInternalError(w, searchErr, "symbol fulltext search")
+			return
+		}
+		for _, r := range results {
+			allSymbols = append(allSymbols, r.Symbol)
+		}
+
+	case filePath != "":
+		// File-specific query
+		allSymbols, err = s.symbolStore.QueryByFile(ctx, spaceID, filePath)
+		if err != nil {
+			writeInternalError(w, err, "symbol file query")
+			return
+		}
+
+	case symbolType != "" && name == "":
+		// Type-only query
+		allSymbols, err = s.symbolStore.QueryByType(ctx, spaceID, symbolType, limit)
+		if err != nil {
+			writeInternalError(w, err, "symbol type query")
+			return
+		}
+
+	case name != "":
+		// Name pattern query - handle wildcard
+		searchName := name
+		if strings.HasSuffix(name, "*") {
+			searchName = strings.TrimSuffix(name, "*")
+		}
+		allSymbols, err = s.symbolStore.QueryByName(ctx, spaceID, searchName, limit)
+		if err != nil {
+			writeInternalError(w, err, "symbol name query")
+			return
+		}
+
+	default:
+		// No specific filter - return error (don't allow unbounded queries)
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": "at least one of name, type, file, or q parameter is required",
+		})
+		return
+	}
+
+	// Apply additional filters
+	var filtered []symbols.SymbolRecord
+	for _, sym := range allSymbols {
+		// Filter by type if specified (when not already the primary filter)
+		if symbolType != "" && filePath != "" && sym.SymbolType != symbolType {
+			continue
+		}
+		if symbolType != "" && name != "" && sym.SymbolType != symbolType {
+			continue
+		}
+
+		// Filter by exported status if specified
+		if exportedStr != "" {
+			wantExported := exportedStr == "true"
+			if sym.Exported != wantExported {
+				continue
+			}
+		}
+
+		filtered = append(filtered, sym)
+	}
+
+	// Apply limit after filtering
+	if len(filtered) > limit {
+		filtered = filtered[:limit]
+	}
+
+	// Build response
+	symbolsResponse := make([]map[string]any, 0, len(filtered))
+	for _, sym := range filtered {
+		symMap := map[string]any{
+			"name":        sym.Name,
+			"type":        sym.SymbolType,
+			"file_path":   sym.FilePath,
+			"line_number": sym.LineNumber,
+			"exported":    sym.Exported,
+		}
+		// Include optional fields only if non-empty
+		if sym.Value != "" {
+			symMap["value"] = sym.Value
+		}
+		if sym.RawValue != "" {
+			symMap["raw_value"] = sym.RawValue
+		}
+		if sym.DocComment != "" {
+			symMap["doc_comment"] = sym.DocComment
+		}
+		if sym.Signature != "" {
+			symMap["signature"] = sym.Signature
+		}
+		if sym.EndLine > 0 {
+			symMap["end_line"] = sym.EndLine
+		}
+		if sym.TypeAnnotation != "" {
+			symMap["type_annotation"] = sym.TypeAnnotation
+		}
+		symbolsResponse = append(symbolsResponse, symMap)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"space_id": spaceID,
+		"symbols":  symbolsResponse,
+		"count":    len(symbolsResponse),
+	})
+}
+
+// handleIngestTrigger handles POST /v1/memory/ingest/trigger
+// Triggers a background codebase re-ingestion job.
+func (s *Server) handleIngestTrigger(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req models.IngestTriggerRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if !validateRequest(w, &req) {
+		return
+	}
+
+	// Generate job ID
+	jobID := "ingest-" + uuid.New().String()[:8]
+
+	// Build job configuration
+	config := map[string]any{
+		"space_id": req.SpaceID,
+		"path":     req.Path,
+	}
+
+	// Apply defaults
+	batchSize := 100
+	if req.BatchSize > 0 {
+		batchSize = req.BatchSize
+	}
+	config["batch_size"] = batchSize
+
+	workers := 4
+	if req.Workers > 0 {
+		workers = req.Workers
+	}
+	config["workers"] = workers
+
+	timeout := 300
+	if req.TimeoutSeconds > 0 {
+		timeout = req.TimeoutSeconds
+	}
+	config["timeout_seconds"] = timeout
+
+	extractSymbols := true
+	if req.ExtractSymbols != nil {
+		extractSymbols = *req.ExtractSymbols
+	}
+	config["extract_symbols"] = extractSymbols
+
+	consolidate := true
+	if req.Consolidate != nil {
+		consolidate = *req.Consolidate
+	}
+	config["consolidate"] = consolidate
+
+	config["include_tests"] = req.IncludeTests
+	config["incremental"] = req.Incremental
+	config["dry_run"] = req.DryRun
+
+	if req.SinceCommit != "" {
+		config["since_commit"] = req.SinceCommit
+	}
+	if len(req.ExcludeDirs) > 0 {
+		config["exclude_dirs"] = req.ExcludeDirs
+	}
+	if req.Limit > 0 {
+		config["limit"] = req.Limit
+	}
+
+	// Create job
+	queue := jobs.GetQueue()
+	job, ctx := queue.CreateJob(jobID, "ingest-codebase", config)
+
+	// Start background ingestion
+	go s.runIngestJob(ctx, job)
+
+	// Return job reference
+	writeJSON(w, http.StatusAccepted, models.IngestTriggerResponse{
+		JobID:     jobID,
+		SpaceID:   req.SpaceID,
+		Status:    string(jobs.StatusPending),
+		Message:   "Ingestion job created. Use GET /v1/memory/ingest/status/" + jobID + " to check progress.",
+		CreatedAt: job.CreatedAt.Format(time.RFC3339),
+	})
+}
+
+// runIngestJob executes the ingestion job in the background.
+// This is a simplified version that delegates to the ingest-codebase logic.
+func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
+	queue := jobs.GetQueue()
+	queue.StartJob(job.ID)
+
+	// For now, this is a stub that shows the job lifecycle.
+	// Full implementation would call the ingest-codebase logic.
+
+	job.UpdateProgress(0, "initializing")
+
+	// Simulate job progress (replace with actual ingest logic)
+	// In a full implementation, this would:
+	// 1. Walk the codebase
+	// 2. Parse files and extract elements
+	// 3. Batch ingest via s.retriever.BatchIngestObservations
+	// 4. Run consolidation if enabled
+
+	spaceID, _ := job.Config["space_id"].(string)
+	path, _ := job.Config["path"].(string)
+
+	log.Printf("Ingestion job %s started for space=%s path=%s", job.ID, spaceID, path)
+
+	// Mark as completed with stub result
+	job.Complete(map[string]any{
+		"space_id":     spaceID,
+		"path":         path,
+		"status":       "stub",
+		"message":      "Job infrastructure ready. Full implementation pending.",
+		"elements":     0,
+		"consolidated": false,
+	})
+
+	log.Printf("Ingestion job %s completed (stub)", job.ID)
+}
+
+// handleIngestStatus handles GET /v1/memory/ingest/status/{job_id}
+// Returns the status and progress of an ingestion job.
+func (s *Server) handleIngestStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract job_id from path: /v1/memory/ingest/status/{job_id}
+	path := strings.TrimPrefix(r.URL.Path, "/v1/memory/ingest/status/")
+	jobID := path
+	if jobID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "job_id required in path"})
+		return
+	}
+
+	// Look up job
+	queue := jobs.GetQueue()
+	job, ok := queue.GetJob(jobID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "job not found: " + jobID})
+		return
+	}
+
+	snapshot := job.GetSnapshot()
+
+	// Build response
+	resp := models.IngestJobStatusResponse{
+		JobID:     snapshot.ID,
+		Status:    string(snapshot.Status),
+		CreatedAt: snapshot.CreatedAt.Format(time.RFC3339),
+		Progress: models.IngestProgress{
+			Total:      snapshot.Progress.Total,
+			Current:    snapshot.Progress.Current,
+			Percentage: snapshot.Progress.Percentage,
+			Phase:      snapshot.Progress.Phase,
+			Rate:       snapshot.Progress.Rate,
+		},
+	}
+
+	if spaceID, ok := snapshot.Config["space_id"].(string); ok {
+		resp.SpaceID = spaceID
+	}
+
+	if snapshot.StartedAt != nil {
+		resp.StartedAt = snapshot.StartedAt.Format(time.RFC3339)
+	}
+	if snapshot.CompletedAt != nil {
+		resp.CompletedAt = snapshot.CompletedAt.Format(time.RFC3339)
+	}
+	if snapshot.Result != nil {
+		resp.Result = snapshot.Result
+	}
+	if snapshot.Error != "" {
+		resp.Error = snapshot.Error
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleIngestCancel handles POST /v1/memory/ingest/cancel/{job_id}
+// Cancels a running ingestion job.
+func (s *Server) handleIngestCancel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract job_id from path: /v1/memory/ingest/cancel/{job_id}
+	path := strings.TrimPrefix(r.URL.Path, "/v1/memory/ingest/cancel/")
+	jobID := path
+	if jobID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "job_id required in path"})
+		return
+	}
+
+	// Cancel job
+	queue := jobs.GetQueue()
+	if queue.CancelJob(jobID) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"job_id":  jobID,
+			"status":  "cancelled",
+			"message": "Job cancellation requested",
+		})
+	} else {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "job not found or already completed: " + jobID})
+	}
+}
+
+// handleIngestJobs handles GET /v1/memory/ingest/jobs
+// Lists all ingestion jobs.
+func (s *Server) handleIngestJobs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	queue := jobs.GetQueue()
+	jobList := queue.ListJobs("ingest-codebase")
+
+	// Convert to response format
+	respJobs := make([]map[string]any, 0, len(jobList))
+	for _, job := range jobList {
+		jobMap := map[string]any{
+			"job_id":     job.ID,
+			"status":     string(job.Status),
+			"created_at": job.CreatedAt.Format(time.RFC3339),
+			"progress": map[string]any{
+				"total":      job.Progress.Total,
+				"current":    job.Progress.Current,
+				"percentage": job.Progress.Percentage,
+				"phase":      job.Progress.Phase,
+			},
+		}
+		if spaceID, ok := job.Config["space_id"].(string); ok {
+			jobMap["space_id"] = spaceID
+		}
+		if job.StartedAt != nil {
+			jobMap["started_at"] = job.StartedAt.Format(time.RFC3339)
+		}
+		if job.CompletedAt != nil {
+			jobMap["completed_at"] = job.CompletedAt.Format(time.RFC3339)
+		}
+		respJobs = append(respJobs, jobMap)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"jobs":  respJobs,
+		"count": len(respJobs),
+	})
+}
+
+// handlePoolMetrics handles GET /v1/system/pool-metrics
+// Returns Neo4j connection pool and Go runtime metrics.
+func (s *Server) handlePoolMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get connection pool metrics
+	poolMetrics := db.GetPoolMetrics()
+
+	// Get Go runtime memory stats
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"connection_pool": poolMetrics,
+		"runtime": map[string]any{
+			"goroutines":      runtime.NumGoroutine(),
+			"heap_alloc_mb":   float64(memStats.HeapAlloc) / 1024 / 1024,
+			"heap_sys_mb":     float64(memStats.HeapSys) / 1024 / 1024,
+			"heap_objects":    memStats.HeapObjects,
+			"gc_pause_ns":     memStats.PauseNs[(memStats.NumGC+255)%256],
+			"gc_total_pause_ms": float64(memStats.PauseTotalNs) / 1e6,
+			"num_gc":          memStats.NumGC,
+		},
+	})
 }

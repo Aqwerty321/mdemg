@@ -107,7 +107,7 @@ jobs:
           export NEO4J_URI=bolt://localhost:7687
           export NEO4J_USER=neo4j
           export NEO4J_PASS=testpassword
-          export PORT=8082
+          export LISTEN_ADDR=:8082
           export EMBEDDING_PROVIDER=
           export REQUIRED_SCHEMA_VERSION=10
           ./bin/mdemg &

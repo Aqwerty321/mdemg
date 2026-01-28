@@ -3,6 +3,11 @@
 This roadmap expands the language parser phases into concrete, reviewable tasks.
 It is designed to improve parser precision without destabilizing existing ingestion.
 
+**Last Updated:** 2026-01-28
+**Version:** 1.1 (with amendments)
+
+---
+
 ## Phase 0: Baseline Spec and Invariants
 
 Goal: lock down current behavior so improvements are explicit and safe.
@@ -30,6 +35,92 @@ Tasks:
   - Phase0_Task4.3: Evidence requirements
     - required: path, start_line, end_line, signature, stable_id
     - recommended: file_sha256, span_hash, repo_commit
+  - Phase0_Task4.4: Extend CodeElement struct with evidence fields (AMENDMENT 1)
+    - Phase0_Task4.4.1: Add StartLine, EndLine, StableID, Signature fields
+    - Phase0_Task4.4.2: Add ElementKind field (distinct from Kind for taxonomy clarity)
+    - Phase0_Task4.4.3: Update all existing parsers to populate new fields
+    - Phase0_Task4.4.4: Verify backward compatibility (empty values acceptable initially)
+  - Phase0_Task4.5: Document Kind vs ElementKind taxonomy (AMENDMENT 2)
+    - Phase0_Task4.5.1: Create mapping table (Kind → ElementKind)
+    - Phase0_Task4.5.2: Update parser README with taxonomy guide
+    - Phase0_Task4.5.3: Add ElementKind auto-derivation helper function
+- Phase0_Task5: Build Context Registry design (AMENDMENT 3)
+  - Phase0_Task5.1: Define BuildContext struct
+  - Phase0_Task5.2: Define BuildContextParser interface
+  - Phase0_Task5.3: Define ContextAwareParser interface (optional extension)
+  - Phase0_Task5.4: Identify build file patterns per language:
+    - CUDA: CMakeLists.txt, Makefile, *.cmake
+    - C/C++: CMakeLists.txt, Makefile, configure.ac, meson.build
+    - Rust: Cargo.toml, build.rs
+    - Python: setup.py, pyproject.toml, setup.cfg
+    - Java: pom.xml, build.gradle, build.gradle.kts
+  - Phase0_Task5.5: Define context gathering order (build files first, then sources)
+
+### CodeElement Schema (v2)
+
+```go
+type CodeElement struct {
+    // Existing fields (preserved for backward compatibility)
+    Name     string
+    Kind     string   // Code construct: "function", "class", "struct", etc.
+    Path     string
+    Content  string
+    Summary  string
+    Package  string
+    FilePath string
+    Tags     []string
+    Concerns []string
+    Symbols  []Symbol
+
+    // New fields (v2)
+    ElementKind string // Ingestion unit type: "file", "symbol", "section", "keypath_fact", "unit", "snippet", "migration", "kernel", "other"
+    StartLine   int    // First line of element in source file
+    EndLine     int    // Last line of element in source file
+    StableID    string // Deterministic ID: hash(space_id + path + element_kind + qualname + start_line + end_line)
+    Signature   string // Human-readable signature
+}
+```
+
+### Kind vs ElementKind Taxonomy
+
+| Kind (code construct) | ElementKind (ingestion unit) | Notes |
+|-----------------------|------------------------------|-------|
+| function | symbol | Standard code symbol |
+| class | symbol | Standard code symbol |
+| struct | symbol | Standard code symbol |
+| interface | symbol | Standard code symbol |
+| enum | symbol | Standard code symbol |
+| trait | symbol | Standard code symbol |
+| module | unit | Represents a compilation unit |
+| config | keypath_fact | Config file key-value |
+| doc | section | Documentation section |
+| kernel | kernel | CUDA/GPU kernel |
+| migration | migration | SQL/schema migration |
+
+### BuildContext Interface
+
+```go
+// BuildContext holds cross-file build metadata gathered during ingestion
+type BuildContext struct {
+    CompilerFlags map[string][]string // path pattern → flags
+    IncludePaths  []string            // Global include paths
+    Defines       map[string]string   // Preprocessor defines
+    BuildSystem   string              // "cmake", "make", "bazel", "cargo", etc.
+    SourceRoot    string              // Root path for resolving includes
+}
+
+// BuildContextParser extracts build context from build files
+type BuildContextParser interface {
+    CanParseBuildFile(path string) bool
+    ParseBuildFile(root, path string) (*BuildContext, error)
+}
+
+// ContextAwareParser extends LanguageParser with build context support
+type ContextAwareParser interface {
+    LanguageParser
+    ParseFileWithContext(root, path string, extractSymbols bool, ctx *BuildContext) ([]CodeElement, error)
+}
+```
 
 Tests:
 - Phase0_Test0: Baseline snapshot tests for each existing parser (element count, symbol count).
@@ -37,6 +128,14 @@ Tests:
 - Phase0_Test2: Fallback parsing tests for YAML and env files.
 - Phase0_Test3: Parsing type coverage tests per existing parser.
 - Phase0_Test4: Evidence shape sanity (line ranges, stable_id determinism, signature non-empty).
+- Phase0_Test5: CodeElement v2 field population tests (AMENDMENT 1)
+  - All parsers populate StartLine/EndLine for non-file elements
+  - StableID is deterministic across 3 runs
+  - ElementKind defaults to "symbol" for code constructs
+- Phase0_Test6: BuildContext extraction tests (AMENDMENT 3)
+  - CMakeLists.txt → CompilerFlags extraction
+  - Makefile → Include path extraction
+  - Context determinism across runs
 
 Deliverable:
 - Phase0_Deliverable0: Parser baseline spec with accepted invariants and allowed changes.
@@ -45,6 +144,8 @@ Deliverable:
     - Contract fields validated across fixtures (3 runs, deterministic)
     - Evidence shape sanity passes (line bounds, stable_id deterministic)
     - Baseline outputs captured and reviewed
+    - CodeElement v2 schema implemented and backward compatible
+    - BuildContext interface defined (implementation deferred to Phase 3)
 
 ---
 
@@ -135,10 +236,11 @@ Tasks:
   - Phase2_Task1.2: tool config
   - Phase2_Task1.3: dependency metadata
 - Phase2_Task2: CUDA parsing targets
-  - Phase2_Task2.1: kernels
-  - Phase2_Task2.2: device functions
+  - Phase2_Task2.1: kernels (__global__)
+  - Phase2_Task2.2: device functions (__device__)
   - Phase2_Task2.3: host wrappers
-  - Phase2_Task2.4: launch sites
+  - Phase2_Task2.4: launch sites (<<<>>>)
+  - Phase2_Task2.5: shared memory declarations (__shared__)
 - Phase2_Task3: Shell parsing targets
   - Phase2_Task3.1: env exports
   - Phase2_Task3.2: command pipelines
@@ -164,6 +266,104 @@ Deliverable:
     - Checklist reviewed and approved
     - Parsing targets map to planned parser tasks
     - Coverage includes CUDA and build-context inputs
+
+---
+
+## Phase 2.5: Minimal Performance Guards (AMENDMENT 5)
+
+Goal: enable ingestion of large repos (PyTorch, Megatron-LM) without OOM or timeout.
+
+**Rationale:** PyTorch has 500K+ LOC. Performance controls in Phase 7 are too late.
+This phase provides minimal guardrails to unblock large-repo benchmarking.
+
+Tasks:
+- Phase2.5_Task0: Per-file element cap
+  - Default: 500 elements/file
+  - Flag: --max-elements-per-file=500
+- Phase2.5_Task1: Per-file symbol cap
+  - Default: 1000 symbols/file
+  - Flag: --max-symbols-per-file=1000
+- Phase2.5_Task2: File size early exit
+  - Default: 1MB
+  - Flag: --max-file-size=1048576
+  - Skip files exceeding limit with warning
+- Phase2.5_Task3: Directory exclusion patterns
+  - Default: vendor, node_modules, .git, __pycache__, build, dist, target
+  - Flag: --exclude-dirs=vendor,node_modules,.git
+- Phase2.5_Task4: Exclusion presets (AMENDMENT 6)
+  - Phase2.5_Task4.1: Define preset schema
+  - Phase2.5_Task4.2: Add --preset=<name> CLI flag
+  - Phase2.5_Task4.3: Allow preset + overrides
+
+### Exclusion Presets
+
+```yaml
+presets:
+  default:
+    exclude_dirs:
+      - .git
+      - node_modules
+      - vendor
+      - __pycache__
+      - .venv
+      - venv
+      - build
+      - dist
+      - target
+    exclude_patterns:
+      - "*.min.js"
+      - "*.bundle.js"
+      - "*.pyc"
+    max_file_size: 1048576  # 1MB
+
+  ml_cuda:
+    inherit: default
+    exclude_dirs:
+      - third_party
+      - data
+      - datasets
+      - checkpoints
+      - logs
+      - wandb
+      - outputs
+      - .cache
+    exclude_patterns:
+      - "*.pt"
+      - "*.pth"
+      - "*.onnx"
+      - "*.bin"
+      - "*.safetensors"
+      - "*.npy"
+      - "*.npz"
+    max_file_size: 524288  # 512KB - ML repos have big generated files
+
+  web_monorepo:
+    inherit: default
+    exclude_dirs:
+      - .next
+      - .nuxt
+      - .output
+      - coverage
+      - storybook-static
+    exclude_patterns:
+      - "*.chunk.js"
+      - "*.map"
+```
+
+Tests:
+- Phase2.5_Test0: Cap enforcement (file with 1000 functions capped at 500)
+- Phase2.5_Test1: Early exit for large files (>1MB skipped)
+- Phase2.5_Test2: Exclusion pattern matching
+- Phase2.5_Test3: Preset loading and inheritance
+- Phase2.5_Test4: Preset + override combination
+
+Deliverable:
+- Phase2.5_Deliverable0: Basic guardrails for large-codebase ingestion
+  - Done means:
+    - Caps enforced without crash
+    - PyTorch shallow clone ingests successfully with ml_cuda preset
+    - Megatron-LM ingests successfully with ml_cuda preset
+    - No parser changes required (caps applied post-parse)
 
 ---
 
@@ -195,12 +395,15 @@ Tasks:
     - keys matching default|defaults|env|image|version|port|timeout|limit|memory|cpu
     - shortest path depth first
     - stable lexical order tie-break
-- Phase3_Task2: CUDA parser
+- Phase3_Task2: CUDA parser (AMENDMENT 4 - enhanced)
   - Parsing types: kernels, device functions, host wrappers, launch sites
-  - Phase3_Task2.1: Extract kernel definitions (__global__) and launches (<<<>>>)
-  - Phase3_Task2.2: Capture device/shared memory constants and guards
-  - Phase3_Task2.3: Parse .cu/.cuh and detect nvcc flags from build files
-  - Phase3_Task2.4: Build Context Registry (v1) for compile flags and include paths
+  - Phase3_Task2.1: Extract kernel definitions (__global__) → Symbol.Type = "kernel"
+  - Phase3_Task2.2: Extract device functions (__device__) → Symbol.Type = "device_function"
+  - Phase3_Task2.3: Extract kernel launches (<<<>>>) → Tag as "launch_site" in element
+  - Phase3_Task2.4: Capture shared memory declarations (__shared__)
+  - Phase3_Task2.5: Parse .cu/.cuh files with C++ base parser fallback
+  - Phase3_Task2.6: Integrate BuildContext for nvcc flags (if available)
+  - Phase3_Task2.7: Build Context Registry (v1) for compile flags and include paths
 - Phase3_Task3: Shell parser (bash/sh/zsh)
   - Parsing types: env exports, command pipelines, conditionals, functions
   - Phase3_Task3.1: Extract env exports, commands, and conditionals
@@ -225,11 +428,26 @@ Tasks:
   - Phase3_Task6.1: Extract labels, rel types, constraints/index creation
   - Phase3_Task6.2: Capture parameter names and query shapes
 
+### Extended Symbol.Type Values (AMENDMENT 4)
+
+Current:
+```
+"constant", "function", "class", "interface", "variable"
+```
+
+Extended:
+```
+"constant", "function", "class", "interface", "variable",
+"struct", "enum", "method", "macro", "kernel", "device_function", "typedef"
+```
+
 Tests:
 - Phase3_Test0: Parser unit tests with fixtures per new language.
 - Phase3_Test1: Golden element/symbol counts for new parsers.
 - Phase3_Test2: File extension routing tests for new parsers.
 - Phase3_Test3: Variant fixture packs (minimal, variant, nasty) with stable IDs.
+- Phase3_Test4: CUDA kernel extraction accuracy tests
+- Phase3_Test5: CUDA launch site detection tests
 
 Deliverable:
 - Phase3_Deliverable0: New parser files + baseline tests for each new language.
@@ -238,6 +456,7 @@ Deliverable:
     - Variant fixtures deterministic across 3 runs
     - Element counts within caps and stable
     - New parsers do not change existing outputs
+    - CUDA parser extracts kernels from Megatron-LM/PyTorch
 
 ---
 
@@ -347,20 +566,24 @@ Deliverable:
 
 ---
 
-## Phase 7: Performance and Scaling Controls
+## Phase 7: Performance and Scaling Controls (Extended)
 
 Goal: control ingestion size and runtime for large repos.
 
+Note: Basic guardrails are in Phase 2.5. This phase adds advanced controls.
+
 Tasks:
-- Phase7_Task0: Per-file element caps.
-- Phase7_Task1: Per-file symbol caps.
-- Phase7_Task2: Size-based early exit for oversized files.
+- Phase7_Task0: Per-file element caps (refinement of Phase 2.5).
+- Phase7_Task1: Per-file symbol caps (refinement of Phase 2.5).
+- Phase7_Task2: Size-based early exit for oversized files (refinement of Phase 2.5).
 - Phase7_Task3: Optional sampling mode for huge directories.
 - Phase7_Task4: Embedding policy controls (what to embed vs skip).
-- Phase7_Task5: Exclusion policy presets
+- Phase7_Task5: Exclusion policy presets (refinement of Phase 2.5)
   - default
   - ml_cuda
   - web_monorepo
+- Phase7_Task6: Incremental ingestion (only changed files)
+- Phase7_Task7: Parallel parsing with worker pool
 
 Tests:
 - Phase7_Test0: Cap enforcement tests (element/symbol limits).
@@ -368,6 +591,8 @@ Tests:
 - Phase7_Test2: Sampling mode determinism tests.
 - Phase7_Test3: Embedding policy determinism tests.
 - Phase7_Test4: Exclusion preset determinism tests.
+- Phase7_Test5: Incremental ingestion correctness tests.
+- Phase7_Test6: Parallel parsing determinism tests.
 
 Deliverable:
 - Phase7_Deliverable0: Guardrails for large-codebase ingestion.
@@ -375,6 +600,7 @@ Deliverable:
     - Guardrail tests pass in CI
     - Exclusion presets deterministic and documented
     - Embedding policy enforced with no regressions
+    - Incremental mode works for re-ingestion
 
 ---
 
@@ -382,3 +608,23 @@ Deliverable:
 
 Each phase should be reviewed and accepted before implementation begins.
 No phase should alter existing ingestion outputs without explicit approval.
+
+---
+
+## Amendment History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2026-01-28 | Initial roadmap |
+| 1.1 | 2026-01-28 | Merged amendments: CodeElement v2, Kind/ElementKind taxonomy, BuildContext, Symbol.Type extension, Phase 2.5 performance guards, exclusion presets |
+
+---
+
+## Critical Path for CUDA Repos
+
+```
+Phase 0 (baseline + schema)
+    → Phase 2.5 (performance guards with ml_cuda preset)
+    → Phase 3 Task 2 (CUDA parser)
+    → Benchmark Megatron-LM / PyTorch
+```

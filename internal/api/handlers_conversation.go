@@ -155,6 +155,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		IncludeDecisions: req.IncludeDecisions,
 		IncludeLearnings: req.IncludeLearnings,
 		MaxObservations:  req.MaxObservations,
+		RequestingUserID: req.RequestingUserID,
 	}
 
 	resp, err := s.conversationSvc.Resume(r.Context(), internalReq)
@@ -205,12 +206,13 @@ func (s *Server) handleRecall(w http.ResponseWriter, r *http.Request) {
 
 	// Convert to internal type
 	internalReq := conversation.RecallRequest{
-		SpaceID:         req.SpaceID,
-		Query:           req.Query,
-		QueryEmbedding:  req.QueryEmbedding,
-		TopK:            req.TopK,
-		IncludeThemes:   req.IncludeThemes,
-		IncludeConcepts: req.IncludeConcepts,
+		SpaceID:          req.SpaceID,
+		Query:            req.Query,
+		QueryEmbedding:   req.QueryEmbedding,
+		TopK:             req.TopK,
+		IncludeThemes:    req.IncludeThemes,
+		IncludeConcepts:  req.IncludeConcepts,
+		RequestingUserID: req.RequestingUserID,
 	}
 
 	resp, err := s.conversationSvc.Recall(r.Context(), internalReq)

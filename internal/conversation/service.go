@@ -351,6 +351,177 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 	return err
 }
 
+// createRefersToEdges creates REFERS_TO edges from an observation to referenced nodes/symbols.
+// This enables cross-module linking between conversation observations and code elements.
+func (s *Service) createRefersToEdges(ctx context.Context, spaceID, fromNodeID string, referenceIDs []string) (int, error) {
+	if len(referenceIDs) == 0 {
+		return 0, nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Create REFERS_TO edges to any existing nodes/symbols with matching IDs
+		// This will link to both MemoryNodes and SymbolNodes
+		cypher := `
+			MATCH (from:MemoryNode {space_id: $spaceId, node_id: $fromNodeId})
+			UNWIND $referenceIds as refId
+			OPTIONAL MATCH (memNode:MemoryNode {space_id: $spaceId, node_id: refId})
+			OPTIONAL MATCH (symNode:SymbolNode {space_id: $spaceId, symbol_id: refId})
+			WITH from, refId, coalesce(memNode, symNode) as target
+			WHERE target IS NOT NULL
+			MERGE (from)-[r:REFERS_TO]->(target)
+			ON CREATE SET r.created_at = datetime($now),
+			              r.evidence_count = 1
+			ON MATCH SET r.evidence_count = r.evidence_count + 1,
+			             r.updated_at = datetime($now)
+			RETURN count(r) as edgesCreated
+		`
+
+		params := map[string]any{
+			"spaceId":      spaceID,
+			"fromNodeId":   fromNodeID,
+			"referenceIds": referenceIDs,
+			"now":          time.Now().UTC().Format(time.RFC3339),
+		}
+
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+
+		if res.Next(ctx) {
+			count, _ := res.Record().Get("edgesCreated")
+			return count.(int64), nil
+		}
+
+		return int64(0), res.Err()
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return int(result.(int64)), nil
+}
+
+// GetReferencesFromObservation retrieves all nodes/symbols referenced by an observation.
+func (s *Service) GetReferencesFromObservation(ctx context.Context, spaceID, observationNodeID string) ([]ReferenceResult, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (obs:MemoryNode {space_id: $spaceId, node_id: $nodeId})-[r:REFERS_TO]->(target)
+			RETURN target.node_id as nodeId,
+			       coalesce(target.symbol_id, '') as symbolId,
+			       coalesce(target.name, target.content, '') as name,
+			       labels(target) as labels,
+			       r.evidence_count as evidenceCount
+		`
+
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+			"nodeId":  observationNodeID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		var refs []ReferenceResult
+		for res.Next(ctx) {
+			rec := res.Record()
+			refs = append(refs, ReferenceResult{
+				NodeID:        asString(rec, "nodeId"),
+				SymbolID:      asString(rec, "symbolId"),
+				Name:          asString(rec, "name"),
+				Type:          getNodeType(asStringSlice(rec, "labels")),
+				EvidenceCount: int(asInt64(rec, "evidenceCount")),
+			})
+		}
+		return refs, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]ReferenceResult), nil
+}
+
+// GetObservationsReferencingNode retrieves observations that reference a specific node/symbol.
+func (s *Service) GetObservationsReferencingNode(ctx context.Context, spaceID, targetID string) ([]ObservationResult, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Query for observations referencing either a MemoryNode or SymbolNode
+		cypher := `
+			MATCH (obs:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})-[:REFERS_TO]->(target)
+			WHERE target.node_id = $targetId OR target.symbol_id = $targetId
+			RETURN obs.node_id as nodeId,
+			       obs.obs_type as obsType,
+			       obs.content as content,
+			       obs.summary as summary,
+			       obs.session_id as sessionId,
+			       obs.surprise_score as surpriseScore,
+			       obs.tags as tags,
+			       toString(obs.created_at) as createdAt
+			ORDER BY obs.created_at DESC
+		`
+
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":  spaceID,
+			"targetId": targetID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		var observations []ObservationResult
+		for res.Next(ctx) {
+			rec := res.Record()
+			observations = append(observations, ObservationResult{
+				NodeID:        asString(rec, "nodeId"),
+				ObsType:       asString(rec, "obsType"),
+				Content:       asString(rec, "content"),
+				Summary:       asString(rec, "summary"),
+				SessionID:     asString(rec, "sessionId"),
+				SurpriseScore: asFloat64(rec, "surpriseScore"),
+				Tags:          asStringSlice(rec, "tags"),
+				CreatedAt:     asString(rec, "createdAt"),
+			})
+		}
+		return observations, res.Err()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result.([]ObservationResult), nil
+}
+
+// ReferenceResult represents a target of a REFERS_TO relationship
+type ReferenceResult struct {
+	NodeID        string `json:"node_id,omitempty"`
+	SymbolID      string `json:"symbol_id,omitempty"`
+	Name          string `json:"name"`
+	Type          string `json:"type"` // memory_node, symbol_node
+	EvidenceCount int    `json:"evidence_count"`
+}
+
+// getNodeType determines the type of node from its labels
+func getNodeType(labels []string) string {
+	for _, label := range labels {
+		if label == "SymbolNode" {
+			return "symbol"
+		}
+		if label == "MemoryNode" {
+			return "memory"
+		}
+	}
+	return "unknown"
+}
+
 // updateSurpriseScore updates the surprise score for a node
 func (s *Service) updateSurpriseScore(ctx context.Context, nodeID string, score float64) error {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
@@ -431,6 +602,9 @@ type ResumeRequest struct {
 	IncludeDecisions bool   `json:"include_decisions,omitempty"`
 	IncludeLearnings bool   `json:"include_learnings,omitempty"`
 	MaxObservations  int    `json:"max_observations,omitempty"`
+
+	// Visibility filtering (CMS v2)
+	RequestingUserID string `json:"requesting_user_id,omitempty"`
 }
 
 // JiminyRationale explains WHY specific state was rehydrated during resume.
@@ -497,6 +671,9 @@ type RecallRequest struct {
 	TopK            int       `json:"top_k,omitempty"`
 	IncludeThemes   bool      `json:"include_themes,omitempty"`
 	IncludeConcepts bool      `json:"include_concepts,omitempty"`
+
+	// Visibility filtering (CMS v2)
+	RequestingUserID string `json:"requesting_user_id,omitempty"`
 }
 
 // RecallResponse is the response from conversation recall
@@ -538,8 +715,8 @@ func (s *Service) Resume(ctx context.Context, req ResumeRequest) (*ResumeRespons
 		Debug:            make(map[string]any),
 	}
 
-	// Step 1: Fetch recent observations
-	observations, err := s.fetchRecentObservations(ctx, req.SpaceID, req.SessionID, maxObs, req.IncludeTasks, req.IncludeDecisions, req.IncludeLearnings)
+	// Step 1: Fetch recent observations (with visibility filtering)
+	observations, err := s.fetchRecentObservations(ctx, req.SpaceID, req.SessionID, req.RequestingUserID, maxObs, req.IncludeTasks, req.IncludeDecisions, req.IncludeLearnings)
 	if err != nil {
 		return nil, fmt.Errorf("fetch recent observations: %w", err)
 	}
@@ -609,8 +786,8 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 		return nil, fmt.Errorf("no embedding provided and embedder not available")
 	}
 
-	// Step 1: Find similar conversation observations
-	obsResults, err := s.findSimilarObservations(ctx, req.SpaceID, embedding, topK)
+	// Step 1: Find similar conversation observations (with visibility filtering)
+	obsResults, err := s.findSimilarObservations(ctx, req.SpaceID, req.RequestingUserID, embedding, topK)
 	if err != nil {
 		return nil, fmt.Errorf("find similar observations: %w", err)
 	}
@@ -646,7 +823,8 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 }
 
 // fetchRecentObservations retrieves recent conversation observations
-func (s *Service) fetchRecentObservations(ctx context.Context, spaceID, sessionID string, limit int, includeTasks, includeDecisions, includeLearnings bool) ([]ObservationResult, error) {
+// If requestingUserID is set, applies visibility filtering (private observations only visible to owner)
+func (s *Service) fetchRecentObservations(ctx context.Context, spaceID, sessionID, requestingUserID string, limit int, includeTasks, includeDecisions, includeLearnings bool) ([]ObservationResult, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
@@ -673,19 +851,27 @@ func (s *Service) fetchRecentObservations(ctx context.Context, spaceID, sessionI
 		sessionFilter = " AND o.session_id = $sessionId"
 	}
 
+	// Build visibility filter - private observations only visible to owner
+	// If requestingUserID is empty, no visibility filter (backward compatible)
+	visibilityFilter := ""
+	if requestingUserID != "" {
+		visibilityFilter = " AND (coalesce(o.visibility, 'global') <> 'private' OR o.user_id = $requestingUserId)"
+	}
+
 	cypher := fmt.Sprintf(`
 MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})
-WHERE o.layer = 0%s%s
+WHERE o.layer = 0%s%s%s
 RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
        o.summary AS summary, o.session_id AS sessionId, o.surprise_score AS surpriseScore,
        o.tags AS tags, toString(o.created_at) AS createdAt
 ORDER BY o.created_at DESC
-LIMIT $limit`, sessionFilter, typeFilter)
+LIMIT $limit`, sessionFilter, typeFilter, visibilityFilter)
 
 	params := map[string]any{
-		"spaceId":   spaceID,
-		"sessionId": sessionID,
-		"limit":     limit,
+		"spaceId":          spaceID,
+		"sessionId":        sessionID,
+		"requestingUserId": requestingUserID,
+		"limit":            limit,
 	}
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -820,9 +1006,15 @@ LIMIT 10`
 }
 
 // findSimilarObservations finds observations similar to the query embedding
-func (s *Service) findSimilarObservations(ctx context.Context, spaceID string, embedding []float32, topK int) ([]RecallResult, error) {
+func (s *Service) findSimilarObservations(ctx context.Context, spaceID, requestingUserID string, embedding []float32, topK int) ([]RecallResult, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
+
+	// Build visibility filter - private observations only visible to owner
+	visibilityFilter := ""
+	if requestingUserID != "" {
+		visibilityFilter = " AND (coalesce(node.visibility, 'global') <> 'private' OR node.user_id = $requestingUserId)"
+	}
 
 	// Use vector similarity search on conversation_observation nodes
 	cypher := fmt.Sprintf(`
@@ -831,17 +1023,18 @@ YIELD node, score
 WHERE node.space_id = $spaceId
   AND node.role_type = 'conversation_observation'
   AND node.layer = 0
-  AND NOT coalesce(node.is_archived, false)
+  AND NOT coalesce(node.is_archived, false)%s
 RETURN node.node_id AS nodeId, node.content AS content, node.summary AS summary,
        node.obs_type AS obsType, node.surprise_score AS surpriseScore,
        node.session_id AS sessionId, score
 ORDER BY score DESC
-LIMIT $topK`, s.vectorIndexName)
+LIMIT $topK`, s.vectorIndexName, visibilityFilter)
 
 	params := map[string]any{
-		"spaceId":   spaceID,
-		"embedding": embedding,
-		"topK":      topK,
+		"spaceId":          spaceID,
+		"requestingUserId": requestingUserID,
+		"embedding":        embedding,
+		"topK":             topK,
 	}
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -1282,6 +1475,26 @@ func asInt(rec *neo4j.Record, key string) int {
 		return v
 	case float64:
 		return int(v)
+	default:
+		return 0
+	}
+}
+
+func asInt64(rec *neo4j.Record, key string) int64 {
+	if rec == nil {
+		return 0
+	}
+	val, ok := rec.Get(key)
+	if !ok || val == nil {
+		return 0
+	}
+	switch v := val.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
 	default:
 		return 0
 	}

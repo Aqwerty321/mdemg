@@ -179,6 +179,7 @@ func (c *ContextCooler) ApplyDecay(ctx context.Context, spaceID string) (int, er
 	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		// Apply decay to volatile nodes not updated in the last day
 		// Decay is proportional to days since last update
+		// Neo4j uses ^ for exponentiation, not power()
 		cypher := `
 			MATCH (n:MemoryNode {space_id: $spaceId})
 			WHERE n.role_type = 'conversation_observation'
@@ -188,7 +189,7 @@ func (c *ContextCooler) ApplyDecay(ctx context.Context, spaceID string) (int, er
 			     duration.between(n.updated_at, datetime()).days as daysInactive,
 			     coalesce(n.stability_score, 0.1) as currentStability
 			WITH n, daysInactive, currentStability,
-			     currentStability * power(1.0 - $decayRate, daysInactive) as newStability
+			     currentStability * ((1.0 - $decayRate) ^ daysInactive) as newStability
 			SET n.stability_score = newStability,
 			    n.decay_applied_at = datetime()
 			RETURN count(n) as decayedCount

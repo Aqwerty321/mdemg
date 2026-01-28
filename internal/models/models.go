@@ -592,6 +592,9 @@ type ResumeRequest struct {
 	IncludeDecisions bool   `json:"include_decisions,omitempty"` // Include decision-type observations
 	IncludeLearnings bool   `json:"include_learnings,omitempty"` // Include learning-type observations
 	MaxObservations  int    `json:"max_observations,omitempty"`  // Max observations to return (default: 20)
+
+	// Visibility filtering (CMS v2)
+	RequestingUserID string `json:"requesting_user_id,omitempty"` // Filter private observations to this user
 }
 
 // JiminyRationale explains WHY specific state was rehydrated during resume.
@@ -655,11 +658,14 @@ type EmergentConceptResult struct {
 // Retrieves relevant conversation knowledge via semantic query.
 type RecallRequest struct {
 	SpaceID         string    `json:"space_id" validate:"required,min=1,max=256"`
-	Query           string    `json:"query" validate:"required,min=1,max=2000"`     // Natural language query
-	QueryEmbedding  []float32 `json:"query_embedding,omitempty"`                   // Optional: pre-computed embedding
-	TopK            int       `json:"top_k,omitempty"`                             // Max results (default: 10)
-	IncludeThemes   bool      `json:"include_themes,omitempty"`                    // Include conversation themes
-	IncludeConcepts bool      `json:"include_concepts,omitempty"`                  // Include emergent concepts
+	Query           string    `json:"query" validate:"required,min=1,max=2000"` // Natural language query
+	QueryEmbedding  []float32 `json:"query_embedding,omitempty"`                // Optional: pre-computed embedding
+	TopK            int       `json:"top_k,omitempty"`                          // Max results (default: 10)
+	IncludeThemes   bool      `json:"include_themes,omitempty"`                 // Include conversation themes
+	IncludeConcepts bool      `json:"include_concepts,omitempty"`               // Include emergent concepts
+
+	// Visibility filtering (CMS v2)
+	RequestingUserID string `json:"requesting_user_id,omitempty"` // Filter private observations to this user
 }
 
 // RecallResponse - response from POST /v1/conversation/recall

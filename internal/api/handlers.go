@@ -2233,7 +2233,8 @@ func (s *Server) handleIngestJobs(w http.ResponseWriter, r *http.Request) {
 
 	// Convert to response format
 	respJobs := make([]map[string]any, 0, len(jobList))
-	for _, job := range jobList {
+	for i := range jobList {
+		job := &jobList[i] // Use pointer to avoid copying mutex
 		jobMap := map[string]any{
 			"job_id":     job.ID,
 			"status":     string(job.Status),

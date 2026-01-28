@@ -71,6 +71,33 @@ jobs:
           timeout 60s bash -c 'until curl -s http://localhost:7687 > /dev/null; do sleep 2; done' || true
           # Note: Neo4j bolt port doesn't respond to HTTP, but we can check if it is open
           timeout 60s bash -c 'until printf "" 2>>/dev/null >/dev/tcp/localhost/7687; do sleep 2; done'
+          # Additional wait for Neo4j to fully initialize
+          sleep 5
+
+      - name: Apply Neo4j migrations
+        run: |
+          # Install cypher-shell
+          wget -q https://dist.neo4j.org/cypher-shell/cypher-shell-5.15.0.zip -O /tmp/cypher-shell.zip
+          unzip -q /tmp/cypher-shell.zip -d /tmp
+          chmod +x /tmp/cypher-shell-5.15.0/bin/cypher-shell
+
+          # Apply each migration in order
+          for migration in migrations/V*.cypher; do
+            echo "Applying $migration..."
+            /tmp/cypher-shell-5.15.0/bin/cypher-shell \
+              -a bolt://localhost:7687 \
+              -u neo4j \
+              -p testpassword \
+              --file "$migration"
+          done
+
+          # Verify schema version
+          echo "Verifying schema version..."
+          /tmp/cypher-shell-5.15.0/bin/cypher-shell \
+            -a bolt://localhost:7687 \
+            -u neo4j \
+            -p testpassword \
+            "MATCH (s:SchemaMeta {key:'schema'}) RETURN s.current_version AS version"
 
       - name: Build server for integration tests
         run: go build -o bin/mdemg ./cmd/server
@@ -82,6 +109,7 @@ jobs:
           export NEO4J_PASS=testpassword
           export PORT=8082
           export EMBEDDING_PROVIDER=
+          export REQUIRED_SCHEMA_VERSION=10
           ./bin/mdemg &
           # Wait for server to be ready
           timeout 30s bash -c 'until curl -s http://localhost:8082/healthz > /dev/null 2>&1; do sleep 1; done'

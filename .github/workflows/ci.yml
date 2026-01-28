@@ -72,6 +72,21 @@ jobs:
           # Note: Neo4j bolt port doesn't respond to HTTP, but we can check if it is open
           timeout 60s bash -c 'until printf "" 2>>/dev/null >/dev/tcp/localhost/7687; do sleep 2; done'
 
+      - name: Build server for integration tests
+        run: go build -o bin/mdemg ./cmd/server
+
+      - name: Start MDEMG server
+        run: |
+          export NEO4J_URI=bolt://localhost:7687
+          export NEO4J_USER=neo4j
+          export NEO4J_PASS=testpassword
+          export PORT=8082
+          export EMBEDDING_PROVIDER=
+          ./bin/mdemg &
+          # Wait for server to be ready
+          timeout 30s bash -c 'until curl -s http://localhost:8082/healthz > /dev/null 2>&1; do sleep 1; done'
+          echo "MDEMG server is ready"
+
       - name: Run Integration Tests
         run: go test -v -tags=integration ./tests/integration/...
 

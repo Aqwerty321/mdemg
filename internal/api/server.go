@@ -37,11 +37,13 @@ type Server struct {
 	symbolStore     *symbols.Store
 	consultant      *consulting.Service
 	gapDetector     *gaps.GapDetector
+	gapInterviewer  *gaps.GapInterviewer
 	conversationSvc *conversation.Service
 	contextCooler   *conversation.ContextCooler
 	hiddenSvc       *hidden.Service // alias for handleConversationConsolidate
 	stopConsolidate chan struct{}
 	stopCooler      chan struct{}
+	stopInterviewer chan struct{}
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -126,6 +128,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	gapDet := gaps.NewGapDetector(driver, gapCfg)
 	log.Printf("Gap detector initialized (threshold: %.2f, minOccurrences: %d)", gapCfg.LowScoreThreshold, gapCfg.MinOccurrences)
 
+	// Initialize gap interviewer for weekly gap interview processing
+	gapInt := gaps.NewGapInterviewer(driver)
+	log.Printf("Gap interviewer initialized")
+
 	// Initialize conversation service (Phase 1: Observation Capture with Surprise Detection)
 	var convSvc *conversation.Service
 	var ctxCooler *conversation.ContextCooler
@@ -158,7 +164,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		}
 	}
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, hiddenSvc: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, conversationSvc: convSvc, contextCooler: ctxCooler}
+	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, hiddenSvc: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, gapInterviewer: gapInt, conversationSvc: convSvc, contextCooler: ctxCooler}
 }
 
 // Shutdown gracefully stops background services
@@ -168,6 +174,7 @@ func (s *Server) Shutdown() {
 	}
 	s.StopPeriodicConsolidation()
 	s.StopContextCoolerProcessing()
+	s.StopWeeklyGapInterviews()
 }
 
 // StartPeriodicConsolidation starts a background goroutine that consolidates conversation memory
@@ -283,6 +290,55 @@ func (s *Server) StopContextCoolerProcessing() {
 	}
 }
 
+// StartWeeklyGapInterviews starts a background goroutine that runs gap interviews
+// on a weekly schedule. Default interval is 7 days.
+func (s *Server) StartWeeklyGapInterviews(interval time.Duration) {
+	if s.gapInterviewer == nil {
+		log.Println("Weekly gap interviews disabled: interviewer not available")
+		return
+	}
+	if interval <= 0 {
+		interval = 7 * 24 * time.Hour // Default: weekly
+	}
+
+	s.stopInterviewer = make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		log.Printf("Weekly gap interviews started (interval=%v)", interval)
+
+		for {
+			select {
+			case <-ticker.C:
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+
+				cfg := gaps.DefaultInterviewConfig()
+				result, err := s.gapInterviewer.RunWeeklyInterview(ctx, cfg)
+				cancel()
+
+				if err != nil {
+					log.Printf("Weekly gap interview error: %v", err)
+				} else if result.PromptsGenerated > 0 {
+					log.Printf("Weekly gap interview: analyzed=%d gaps, generated=%d prompts, high_priority=%d",
+						result.TotalGapsAnalyzed, result.PromptsGenerated, result.HighPriorityCount)
+				}
+			case <-s.stopInterviewer:
+				log.Println("Weekly gap interviews stopped")
+				return
+			}
+		}
+	}()
+}
+
+// StopWeeklyGapInterviews stops the background gap interview goroutine
+func (s *Server) StopWeeklyGapInterviews() {
+	if s.stopInterviewer != nil {
+		close(s.stopInterviewer)
+		s.stopInterviewer = nil
+	}
+}
+
 // TriggerAPEEvent triggers APE modules subscribed to the given event
 func (s *Server) TriggerAPEEvent(event string) {
 	if s.apeScheduler != nil {
@@ -331,6 +387,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/system/capability-gaps", s.handleCapabilityGaps)
 	mux.HandleFunc("/v1/system/capability-gaps/", s.handleCapabilityGapOperation)
 	mux.HandleFunc("/v1/feedback", s.handleFeedback)
+
+	// Gap interview endpoints (weekly APE job for addressing capability gaps)
+	mux.HandleFunc("/v1/system/gap-interviews", s.handleGapInterviews)
+	mux.HandleFunc("/v1/system/gap-interviews/", s.handleGapInterviewOperation)
 
 	// System metrics endpoints
 	mux.HandleFunc("/v1/system/pool-metrics", s.handlePoolMetrics)

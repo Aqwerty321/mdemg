@@ -330,3 +330,232 @@ func extractGapID(path, suffix string) string {
 	path = strings.TrimPrefix(path, "/v1/system/capability-gaps/")
 	return path
 }
+
+// =============================================================================
+// GAP INTERVIEW ENDPOINTS
+// =============================================================================
+
+// handleGapInterviews handles GET /v1/system/gap-interviews
+// Returns pending interview prompts
+func (s *Server) handleGapInterviews(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.gapInterviewer == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "gap interviewer not available",
+		})
+		return
+	}
+
+	spaceID := r.URL.Query().Get("space_id")
+	ctx := r.Context()
+
+	prompts, err := s.gapInterviewer.GetPendingPrompts(ctx, spaceID)
+	if err != nil {
+		writeInternalError(w, err, "get pending prompts")
+		return
+	}
+
+	// Get stats
+	stats, err := s.gapInterviewer.GetInterviewStats(ctx)
+	if err != nil {
+		stats = map[string]any{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"prompts": prompts,
+		"stats":   stats,
+	})
+}
+
+// handleRunGapInterview handles POST /v1/system/gap-interviews/run
+// Manually triggers the weekly gap interview process
+func (s *Server) handleRunGapInterview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.gapInterviewer == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "gap interviewer not available",
+		})
+		return
+	}
+
+	// Parse optional config overrides
+	var reqConfig struct {
+		MaxPrompts   int     `json:"max_prompts"`
+		MinPriority  float64 `json:"min_priority"`
+		MinOccurrences int   `json:"min_occurrences"`
+	}
+	if r.ContentLength > 0 {
+		if !readJSON(w, r, &reqConfig) {
+			return
+		}
+	}
+
+	// Build config
+	cfg := gaps.DefaultInterviewConfig()
+	if reqConfig.MaxPrompts > 0 {
+		cfg.MaxPromptsPerRun = reqConfig.MaxPrompts
+	}
+	if reqConfig.MinPriority > 0 {
+		cfg.MinPriority = reqConfig.MinPriority
+	}
+	if reqConfig.MinOccurrences > 0 {
+		cfg.MinOccurrenceCount = reqConfig.MinOccurrences
+	}
+
+	ctx := r.Context()
+
+	result, err := s.gapInterviewer.RunWeeklyInterview(ctx, cfg)
+	if err != nil {
+		writeInternalError(w, err, "run gap interview")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// handleAnswerGapInterview handles POST /v1/system/gap-interviews/{id}/answer
+// Marks a prompt as answered
+func (s *Server) handleAnswerGapInterview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.gapInterviewer == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "gap interviewer not available",
+		})
+		return
+	}
+
+	// Extract prompt ID from path
+	promptID := extractInterviewID(r.URL.Path, "/answer")
+	if promptID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid prompt_id in path"})
+		return
+	}
+
+	var req struct {
+		ObservationNodeID string `json:"observation_node_id"`
+	}
+	if r.ContentLength > 0 {
+		if !readJSON(w, r, &req) {
+			return
+		}
+	}
+
+	ctx := r.Context()
+
+	if err := s.gapInterviewer.AnswerPrompt(ctx, promptID, req.ObservationNodeID); err != nil {
+		writeInternalError(w, err, "answer gap interview")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"prompt_id": promptID,
+		"status":    "answered",
+	})
+}
+
+// handleSkipGapInterview handles POST /v1/system/gap-interviews/{id}/skip
+// Marks a prompt as skipped
+func (s *Server) handleSkipGapInterview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.gapInterviewer == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "gap interviewer not available",
+		})
+		return
+	}
+
+	// Extract prompt ID from path
+	promptID := extractInterviewID(r.URL.Path, "/skip")
+	if promptID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid prompt_id in path"})
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+
+	ctx := r.Context()
+
+	if err := s.gapInterviewer.SkipPrompt(ctx, promptID, req.Reason); err != nil {
+		writeInternalError(w, err, "skip gap interview")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"prompt_id": promptID,
+		"status":    "skipped",
+	})
+}
+
+// handleGapInterviewStats handles GET /v1/system/gap-interviews/stats
+// Returns interview statistics
+func (s *Server) handleGapInterviewStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.gapInterviewer == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "gap interviewer not available",
+		})
+		return
+	}
+
+	ctx := r.Context()
+
+	stats, err := s.gapInterviewer.GetInterviewStats(ctx)
+	if err != nil {
+		writeInternalError(w, err, "get interview stats")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats)
+}
+
+// handleGapInterviewOperation routes interview requests to appropriate handler
+func (s *Server) handleGapInterviewOperation(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+
+	switch {
+	case strings.HasSuffix(path, "/run"):
+		s.handleRunGapInterview(w, r)
+	case strings.HasSuffix(path, "/stats"):
+		s.handleGapInterviewStats(w, r)
+	case strings.HasSuffix(path, "/answer"):
+		s.handleAnswerGapInterview(w, r)
+	case strings.HasSuffix(path, "/skip"):
+		s.handleSkipGapInterview(w, r)
+	default:
+		// List all pending prompts
+		s.handleGapInterviews(w, r)
+	}
+}
+
+// Helper to extract interview prompt ID from path
+func extractInterviewID(path, suffix string) string {
+	// Path format: /v1/system/gap-interviews/{id}/suffix
+	path = strings.TrimSuffix(path, suffix)
+	path = strings.TrimPrefix(path, "/v1/system/gap-interviews/")
+	return path
+}

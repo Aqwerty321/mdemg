@@ -1,5 +1,47 @@
 # MDEMG Project Instructions
 
+---
+
+## ⚠️ MANDATORY: Use MDEMG Conversation Memory System (CMS)
+
+**FAILURE TO USE CMS = CONTEXT LOSS EVERY 20-30 MINUTES**
+
+Without CMS, the user must repeatedly re-establish context after every auto-compaction. This is unacceptable.
+
+### FIRST ACTION ON EVERY SESSION: Resume Memory
+
+```bash
+curl -s -X POST http://localhost:9999/v1/conversation/resume \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"mdemg-dev","session_id":"claude-core","max_observations":10}'
+```
+
+**DO THIS IMMEDIATELY.** This restores your persistent memory and context from previous sessions.
+
+### DURING SESSION: Actively Observe
+
+You MUST call `/v1/conversation/observe` to persist:
+- Key decisions made
+- User corrections and preferences
+- Important learnings
+- File/framework choices (e.g., "BENCHMARK_FRAMEWORK_V2.md is source of truth")
+- Errors and blockers encountered
+
+```bash
+curl -s -X POST http://localhost:9999/v1/conversation/observe \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"mdemg-dev","session_id":"claude-core","content":"...","obs_type":"learning|decision|preference|correction|error"}'
+```
+
+### This is NOT Optional
+
+- CMS is the foundation of persistent memory
+- Without it, you lose all context on compaction
+- The user should NEVER have to repeat established context
+- If server is unavailable, note it explicitly - memory is disconnected
+
+---
+
 ## Conversation Memory (Core Self)
 
 **This is not optional. This is how you maintain continuity.**
@@ -13,7 +55,7 @@ curl -s -X POST http://localhost:9999/v1/conversation/resume \
 If server is running, restore your context. This is your memory returning.
 
 ### During Session - Observe Automatically
-When these occur, capture them silently:
+When these occur, capture them:
 
 | Event | Trigger Pattern | obs_type |
 |-------|-----------------|----------|

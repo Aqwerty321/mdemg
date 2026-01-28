@@ -1,0 +1,872 @@
+{
+  "metadata": {
+    "codebase": "megatron-lm",
+    "total_questions": 142,
+    "contains_answers": false,
+    "version": "1.0",
+    "created_date": "2026-01-28",
+    "categories": {
+      "architecture_structure": 25,
+      "service_relationships": 27,
+      "data_flow_integration": 25,
+      "cross_cutting_concerns": 20,
+      "business_logic_constraints": 20,
+      "calibration": 15,
+      "negative_control": 10
+    }
+  },
+  "questions": [
+    {
+      "id": 1,
+      "category": "architecture_structure",
+      "question": "What is the primary base class that all Megatron models inherit from, and where is it defined?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 2,
+      "category": "architecture_structure",
+      "question": "How does Megatron-LM organize the separation between the legacy code and the new Megatron-Core architecture?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 3,
+      "category": "architecture_structure",
+      "question": "What is the purpose of the TransformerConfig dataclass and what parent class does it extend?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 4,
+      "category": "architecture_structure",
+      "question": "What are the main subdirectories under megatron/core and what is each responsible for?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 5,
+      "category": "architecture_structure",
+      "question": "How is the GPTModel class structured in terms of its main components?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 6,
+      "category": "architecture_structure",
+      "question": "What is the purpose of the ModuleSpec class and how is it used in Megatron-Core?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 7,
+      "category": "architecture_structure",
+      "question": "How does Megatron-LM implement layer normalization and what variants are supported?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 8,
+      "category": "architecture_structure",
+      "question": "What is the role of the TransformerBlock class and how does it relate to TransformerLayer?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 9,
+      "category": "architecture_structure",
+      "question": "How does Megatron-Core implement attention mechanisms and what backends are supported?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 10,
+      "category": "architecture_structure",
+      "question": "What is the structure of the Mixture-of-Experts (MoE) implementation in Megatron-Core?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 11,
+      "category": "architecture_structure",
+      "question": "How is the inference system organized in Megatron-Core?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 12,
+      "category": "architecture_structure",
+      "question": "What is the purpose of ProcessGroupCollection and how does it manage distributed groups?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 13,
+      "category": "architecture_structure",
+      "question": "How does Megatron-LM implement multi-token prediction (MTP)?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 14,
+      "category": "architecture_structure",
+      "question": "What state space models (SSM) are supported in Megatron-LM and where is the implementation?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 15,
+      "category": "architecture_structure",
+      "question": "How are model embeddings structured in Megatron-Core?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 16,
+      "category": "architecture_structure",
+      "question": "What is the Float16Module wrapper and when is it used?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 17,
+      "category": "architecture_structure",
+      "question": "How does the pipeline parallel layer layout system work in Megatron-LM?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 18,
+      "category": "architecture_structure",
+      "question": "What is the structure of the CUDA graphs implementation in Megatron-Core?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 19,
+      "category": "architecture_structure",
+      "question": "How does Megatron-LM organize multimodal model support?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 20,
+      "category": "architecture_structure",
+      "question": "What is the role of the LanguageModule base class?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 21,
+      "category": "architecture_structure",
+      "question": "How is quantization support structured in Megatron-Core?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 22,
+      "category": "architecture_structure",
+      "question": "What models are available in the megatron/core/models directory?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 23,
+      "category": "architecture_structure",
+      "question": "How does the tokenizer system integrate with Megatron datasets?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 24,
+      "category": "architecture_structure",
+      "question": "What is the structure of the extensions system in Megatron-Core?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 25,
+      "category": "architecture_structure",
+      "question": "How is the resharding functionality implemented for checkpoint conversion?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 26,
+      "category": "service_relationships",
+      "question": "How do tensor parallel layers communicate gradients during the backward pass?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 27,
+      "category": "service_relationships",
+      "question": "How does the DistributedDataParallel wrapper interact with the optimizer?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 28,
+      "category": "service_relationships",
+      "question": "How does pipeline parallelism coordinate forward and backward passes across stages?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 29,
+      "category": "service_relationships",
+      "question": "How do MoE routers and token dispatchers work together?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 30,
+      "category": "service_relationships",
+      "question": "How does the distributed checkpointing system coordinate saves across ranks?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 31,
+      "category": "service_relationships",
+      "question": "How does sequence parallelism interact with tensor parallelism?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 32,
+      "category": "service_relationships",
+      "question": "How does the context parallel implementation distribute attention computation?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 33,
+      "category": "service_relationships",
+      "question": "How does the optimizer parameter scheduler interact with the optimizer?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 34,
+      "category": "service_relationships",
+      "question": "How do model chunks interact in virtual pipeline parallelism?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 35,
+      "category": "service_relationships",
+      "question": "How does the rerun state machine interact with training to handle failures?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 36,
+      "category": "service_relationships",
+      "question": "How do attention and MLP sublayers communicate within a TransformerLayer?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 37,
+      "category": "service_relationships",
+      "question": "How does the DistributedOptimizer manage parameter sharding across DP ranks?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 38,
+      "category": "service_relationships",
+      "question": "How does the indexed dataset system provide data to the training loop?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 39,
+      "category": "service_relationships",
+      "question": "How do FP8 scaling factors propagate through the model in mixed precision training?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 40,
+      "category": "service_relationships",
+      "question": "How does the parallel_state module track and provide access to process groups?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 41,
+      "category": "service_relationships",
+      "question": "How does gradient accumulation fusion work with tensor parallel layers?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 42,
+      "category": "service_relationships",
+      "question": "How do shared experts interact with routed experts in MoE layers?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 43,
+      "category": "service_relationships",
+      "question": "How does the FSDP integration work in Megatron-Core?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 44,
+      "category": "service_relationships",
+      "question": "How does the P2P communicator handle tensor exchange in pipeline parallelism?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 45,
+      "category": "service_relationships",
+      "question": "How does the checkpoint conversion system transform between formats?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 46,
+      "category": "service_relationships",
+      "question": "How does hybrid context parallelism balance workload across CP ranks?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 47,
+      "category": "service_relationships",
+      "question": "How do auxiliary losses flow from MoE routers to the training loop?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 48,
+      "category": "service_relationships",
+      "question": "How does the timer system track training performance?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 49,
+      "category": "service_relationships",
+      "question": "How does model initialization coordinate across tensor parallel ranks?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 50,
+      "category": "service_relationships",
+      "question": "How does the CPU offloading system manage memory during training?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 51,
+      "category": "service_relationships",
+      "question": "How does the energy monitor track training energy consumption?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 52,
+      "category": "service_relationships",
+      "question": "How does the global memory buffer optimize communication in tensor parallelism?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 53,
+      "category": "data_flow_integration",
+      "question": "How does data flow from raw text files to model inputs during pretraining?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 54,
+      "category": "data_flow_integration",
+      "question": "How are tensors sharded across tensor parallel ranks for linear layers?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 55,
+      "category": "data_flow_integration",
+      "question": "How does the attention mechanism handle KV caching during inference?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 56,
+      "category": "data_flow_integration",
+      "question": "How does data move between pipeline stages during forward and backward passes?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 57,
+      "category": "data_flow_integration",
+      "question": "How are gradients accumulated and reduced in distributed training?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 58,
+      "category": "data_flow_integration",
+      "question": "How does the rotary position embedding get applied to queries and keys?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 59,
+      "category": "data_flow_integration",
+      "question": "How does token routing work in MoE layers from input to expert outputs?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 60,
+      "category": "data_flow_integration",
+      "question": "How does activation checkpointing reduce memory during training?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 61,
+      "category": "data_flow_integration",
+      "question": "How does the blended dataset system combine multiple data sources?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 62,
+      "category": "data_flow_integration",
+      "question": "How do sequence parallel regions manage tensor shapes during forward passes?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 63,
+      "category": "data_flow_integration",
+      "question": "How does the packed sequence format handle variable-length sequences?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 64,
+      "category": "data_flow_integration",
+      "question": "How does the loss function compute and reduce losses across ranks?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 65,
+      "category": "data_flow_integration",
+      "question": "How does the QKV projection handle multi-head attention in Megatron?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 66,
+      "category": "data_flow_integration",
+      "question": "How does the optimizer update model parameters with distributed optimizer?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 67,
+      "category": "data_flow_integration",
+      "question": "How does the model handle embedding weight tying between input and output layers?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 68,
+      "category": "data_flow_integration",
+      "question": "How does the Mamba SSM layer process sequential data?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 69,
+      "category": "data_flow_integration",
+      "question": "How does async tensor save work for overlapping checkpointing with training?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 70,
+      "category": "data_flow_integration",
+      "question": "How does the unified memory system manage KV cache for inference?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 71,
+      "category": "data_flow_integration",
+      "question": "How does the dataclass configuration flow from arguments to model initialization?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 72,
+      "category": "data_flow_integration",
+      "question": "How does tensor parallel communication overlap with computation?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 73,
+      "category": "data_flow_integration",
+      "question": "How does the model handle different attention mask types?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 74,
+      "category": "data_flow_integration",
+      "question": "How does the multi-latent attention (MLA) mechanism work in Megatron?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 75,
+      "category": "data_flow_integration",
+      "question": "How does fine-grained activation offloading manage memory during training?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 76,
+      "category": "data_flow_integration",
+      "question": "How does the GLU (Gated Linear Unit) variant work in the MLP?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 77,
+      "category": "data_flow_integration",
+      "question": "How does the SFT (Supervised Fine-Tuning) dataset differ from pretraining?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 78,
+      "category": "cross_cutting_concerns",
+      "question": "How does Megatron-LM handle logging across distributed ranks?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 79,
+      "category": "cross_cutting_concerns",
+      "question": "How does the codebase handle configuration validation and constraints?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 80,
+      "category": "cross_cutting_concerns",
+      "question": "How does Megatron-LM handle NaN and Inf detection during training?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 81,
+      "category": "cross_cutting_concerns",
+      "question": "How does error handling work in the distributed checkpointing system?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 82,
+      "category": "cross_cutting_concerns",
+      "question": "How does the codebase manage optional dependencies like Transformer Engine and APEX?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 83,
+      "category": "cross_cutting_concerns",
+      "question": "How does the straggler detection system identify slow ranks?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 84,
+      "category": "cross_cutting_concerns",
+      "question": "How does Megatron-LM handle deterministic training for reproducibility?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 85,
+      "category": "cross_cutting_concerns",
+      "question": "How does the NCCL allocator improve communication performance?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 86,
+      "category": "cross_cutting_concerns",
+      "question": "How does the config logger help with experiment tracking?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 87,
+      "category": "cross_cutting_concerns",
+      "question": "How does Megatron-LM integrate with fault tolerance systems?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 88,
+      "category": "cross_cutting_concerns",
+      "question": "How does the experimental API decorator work for unstable features?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 89,
+      "category": "cross_cutting_concerns",
+      "question": "How does the timeout management system work for distributed operations?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 90,
+      "category": "cross_cutting_concerns",
+      "question": "How does the codebase handle deprecation warnings?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 91,
+      "category": "cross_cutting_concerns",
+      "question": "How does the theoretical memory usage calculator work?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 92,
+      "category": "cross_cutting_concerns",
+      "question": "How does NVTX profiling integration work in Megatron?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 93,
+      "category": "cross_cutting_concerns",
+      "question": "How does the signal handler manage distributed job termination?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 94,
+      "category": "cross_cutting_concerns",
+      "question": "How does the Multi-Storage Client (MSC) support different storage backends?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 95,
+      "category": "cross_cutting_concerns",
+      "question": "How does the safe globals system handle torch.load security?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 96,
+      "category": "cross_cutting_concerns",
+      "question": "How are JIT fusion options configured for performance?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 97,
+      "category": "cross_cutting_concerns",
+      "question": "How does the progress logging system track training state?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 98,
+      "category": "business_logic_constraints",
+      "question": "What are the constraints on tensor parallel size relative to attention heads?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 99,
+      "category": "business_logic_constraints",
+      "question": "What rules govern pipeline parallel stage assignment for layers?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 100,
+      "category": "business_logic_constraints",
+      "question": "What are the requirements for enabling sequence parallelism?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 101,
+      "category": "business_logic_constraints",
+      "question": "How does the optimizer handle decoupled learning rate for embeddings?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 102,
+      "category": "business_logic_constraints",
+      "question": "What constraints exist on MoE expert and token dispatcher configurations?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 103,
+      "category": "business_logic_constraints",
+      "question": "How does the checkpoint validation ensure model compatibility?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 104,
+      "category": "business_logic_constraints",
+      "question": "What are the rules for virtual pipeline model parallel size?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 105,
+      "category": "business_logic_constraints",
+      "question": "How does the loss scaling behavior differ for FP16 vs BF16 training?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 106,
+      "category": "business_logic_constraints",
+      "question": "What are the requirements for deferred embedding wgrad compute?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 107,
+      "category": "business_logic_constraints",
+      "question": "How does the batch P2P communication constraint work?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 108,
+      "category": "business_logic_constraints",
+      "question": "What constraints apply to the FFN hidden size configuration?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 109,
+      "category": "business_logic_constraints",
+      "question": "How does num_microbatches_calculator determine microbatch count?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 110,
+      "category": "business_logic_constraints",
+      "question": "What are the constraints on context parallel with attention?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 111,
+      "category": "business_logic_constraints",
+      "question": "How does weight decay handling differ for bias and normalization parameters?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 112,
+      "category": "business_logic_constraints",
+      "question": "What validation rules apply to window attention configuration?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 113,
+      "category": "business_logic_constraints",
+      "question": "How does the optimizer handle multiple distributed optimizer instances?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 114,
+      "category": "business_logic_constraints",
+      "question": "What constraints apply to FP8 training configuration?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 115,
+      "category": "business_logic_constraints",
+      "question": "How does the indexed dataset determine optimal dtype for tokens?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 116,
+      "category": "business_logic_constraints",
+      "question": "What rules govern the persistent layer norm kernel selection?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 117,
+      "category": "business_logic_constraints",
+      "question": "How does the training loop handle spiky loss detection?",
+      "difficulty": "hard"
+    },
+    {
+      "id": 118,
+      "category": "calibration",
+      "question": "What is the name of the main configuration dataclass for transformer models?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 119,
+      "category": "calibration",
+      "question": "What is the default value of tensor_model_parallel_size in ModelParallelConfig?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 120,
+      "category": "calibration",
+      "question": "What function returns the appropriate forward-backward function based on pipeline parallelism configuration?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 121,
+      "category": "calibration",
+      "question": "What is the name of the base module class that all Megatron models extend?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 122,
+      "category": "calibration",
+      "question": "What is the header bytes sequence that starts an IndexedDataset index file?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 123,
+      "category": "calibration",
+      "question": "What is the default activation function in TransformerConfig?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 124,
+      "category": "calibration",
+      "question": "What is the name of the router class used for top-k expert selection in MoE?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 125,
+      "category": "calibration",
+      "question": "What is the default normalization type in TransformerConfig?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 126,
+      "category": "calibration",
+      "question": "What module provides the parallel_state alias 'mpu' for backward compatibility?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 127,
+      "category": "calibration",
+      "question": "What is the default layernorm epsilon value in TransformerConfig?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 128,
+      "category": "calibration",
+      "question": "What class handles rotary position embeddings in Megatron-Core?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 129,
+      "category": "calibration",
+      "question": "What is the name of the GPT dataset configuration class?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 130,
+      "category": "calibration",
+      "question": "What is the default hidden_dropout value in TransformerConfig?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 131,
+      "category": "calibration",
+      "question": "What is the name of the distributed data parallel wrapper class in megatron.core.distributed?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 132,
+      "category": "calibration",
+      "question": "What is the default rotary_base value for position embeddings?",
+      "difficulty": "easy"
+    },
+    {
+      "id": 133,
+      "category": "negative_control",
+      "question": "Does Megatron-LM support automatic mixed precision (AMP) with torch.cuda.amp.autocast directly in the training loop?",
+      "difficulty": "medium"
+    },
+    {
+      "id": 134,
+      "category": "negative_control",
+      "question": "Does Megatron-LM include a built-in Kubernetes operator for distributed training orchestration?",
+      "difficulty": "medium"
+    },
+    {
+      "id": 135,
+      "category": "negative_control",
+      "question": "Does the codebase support training on AMD GPUs via ROCm?",
+      "difficulty": "medium"
+    },
+    {
+      "id": 136,
+      "category": "negative_control",
+      "question": "Does Megatron-LM support automatic hyperparameter tuning or neural architecture search?",
+      "difficulty": "medium"
+    },
+    {
+      "id": 137,
+      "category": "negative_control",
+      "question": "Does Megatron-LM include a native ONNX export functionality?",
+      "difficulty": "medium"
+    },
+    {
+      "id": 138,
+      "category": "negative_control",
+      "question": "Does the GPTDataset support on-the-fly tokenization of raw text during training?",
+      "difficulty": "medium"
+    },
+    {
+      "id": 139,
+      "category": "negative_control",
+      "question": "Does Megatron-LM support training with sparse attention patterns like BigBird or Longformer natively?",
+      "difficulty": "medium"
+    },
+    {
+      "id": 140,
+      "category": "negative_control",
+      "question": "Does Megatron-LM support dynamic batching where sequences of similar lengths are grouped automatically?",
+      "difficulty": "medium"
+    },
+    {
+      "id": 141,
+      "category": "negative_control",
+      "question": "Does Megatron-LM include a built-in dataset versioning or lineage tracking system?",
+      "difficulty": "medium"
+    },
+    {
+      "id": 142,
+      "category": "negative_control",
+      "question": "Does Megatron-LM support training with gradient compression techniques like PowerSGD or error feedback?",
+      "difficulty": "medium"
+    }
+  ]
+}

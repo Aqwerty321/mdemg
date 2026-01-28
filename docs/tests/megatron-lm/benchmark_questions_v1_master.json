@@ -1,0 +1,1156 @@
+{
+  "metadata": {
+    "codebase": "megatron-lm",
+    "total_questions": 142,
+    "contains_answers": true,
+    "version": "1.0",
+    "created_date": "2026-01-28",
+    "categories": {
+      "architecture_structure": 25,
+      "service_relationships": 27,
+      "data_flow_integration": 25,
+      "cross_cutting_concerns": 20,
+      "business_logic_constraints": 20,
+      "calibration": 15,
+      "negative_control": 10
+    }
+  },
+  "questions": [
+    {
+      "id": 1,
+      "category": "architecture_structure",
+      "question": "What is the primary base class that all Megatron models inherit from, and where is it defined?",
+      "expected_answer": "MegatronModule is the primary base class for all Megatron models. It is defined in megatron/core/transformer/module.py and extends torch.nn.Module with support for pipelining and distributed checkpointing via sharded_state_dict methods.",
+      "file_line_refs": ["megatron/core/transformer/module.py:29"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 2,
+      "category": "architecture_structure",
+      "question": "How does Megatron-LM organize the separation between the legacy code and the new Megatron-Core architecture?",
+      "expected_answer": "Megatron-LM separates code into two main directories under megatron/: 'core' contains the modern Megatron-Core library with modular components, while 'legacy' contains older implementations. The 'training' directory contains training utilities that bridge both. Core is the recommended path for new development.",
+      "file_line_refs": ["megatron/core/__init__.py:1-53", "megatron/legacy/", "megatron/training/"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 3,
+      "category": "architecture_structure",
+      "question": "What is the purpose of the TransformerConfig dataclass and what parent class does it extend?",
+      "expected_answer": "TransformerConfig is the main configuration dataclass for Megatron transformers. It extends ModelParallelConfig, inheriting all model parallelism settings (tensor, pipeline, sequence, context, expert parallel sizes). It contains model architecture parameters like num_layers, hidden_size, num_attention_heads, and training configurations.",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py:34-39", "megatron/core/model_parallel_config.py:10-11"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 4,
+      "category": "architecture_structure",
+      "question": "What are the main subdirectories under megatron/core and what is each responsible for?",
+      "expected_answer": "Key subdirectories: 'transformer' (attention, MLP, transformer blocks), 'models' (GPT, T5, vision, multimodal models), 'tensor_parallel' (TP layers and mappings), 'pipeline_parallel' (PP schedules and communication), 'distributed' (DDP, FSDP), 'optimizer' (distributed optimizer), 'datasets' (GPT, BERT, T5 datasets), 'dist_checkpointing' (sharded checkpointing), 'ssm' (Mamba/state-space models), 'inference' (inference engines).",
+      "file_line_refs": ["megatron/core/"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 5,
+      "category": "architecture_structure",
+      "question": "How is the GPTModel class structured in terms of its main components?",
+      "expected_answer": "GPTModel (in megatron/core/models/gpt/gpt_model.py) extends LanguageModule and contains: LanguageModelEmbedding for token+position embeddings (when pre_process=True), TransformerBlock for the main transformer layers with rotary embeddings, and an output layer for logits (when post_process=True). It supports various position embedding types including learned_absolute, rope, mrope, yarn, and none.",
+      "file_line_refs": ["megatron/core/models/gpt/gpt_model.py:45-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 6,
+      "category": "architecture_structure",
+      "question": "What is the purpose of the ModuleSpec class and how is it used in Megatron-Core?",
+      "expected_answer": "ModuleSpec (in megatron/core/transformer/spec_utils.py) is used to specify module configurations in a declarative way. It allows defining which implementation classes to use for transformer components (attention, MLP, etc.) and their submodules. The build_module function uses ModuleSpec to instantiate the actual modules, enabling flexible model architecture customization.",
+      "file_line_refs": ["megatron/core/transformer/spec_utils.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 7,
+      "category": "architecture_structure",
+      "question": "How does Megatron-LM implement layer normalization and what variants are supported?",
+      "expected_answer": "Megatron-LM supports LayerNorm and RMSNorm via the 'normalization' config parameter. FusedLayerNorm in megatron/core/fusions/fused_layer_norm.py uses APEX for fast CUDA kernels. It supports persistent kernels for specific hidden sizes (1024-65536 in steps). With Transformer Engine installed, TENorm is used instead. The zero_centered_gamma option centers gamma around 0 for numerical stability.",
+      "file_line_refs": ["megatron/core/fusions/fused_layer_norm.py:30-99", "megatron/core/transformer/transformer_config.py:189-193"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 8,
+      "category": "architecture_structure",
+      "question": "What is the role of the TransformerBlock class and how does it relate to TransformerLayer?",
+      "expected_answer": "TransformerBlock (megatron/core/transformer/transformer_block.py) is a container that holds multiple TransformerLayer instances. It manages the stack of transformer layers, handles layer numbering/offsets for pipeline parallelism, and coordinates the forward pass through all layers. TransformerLayer (transformer_layer.py) implements a single transformer layer with attention and MLP sublayers.",
+      "file_line_refs": ["megatron/core/transformer/transformer_block.py:1-150", "megatron/core/transformer/transformer_layer.py:1-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 9,
+      "category": "architecture_structure",
+      "question": "How does Megatron-Core implement attention mechanisms and what backends are supported?",
+      "expected_answer": "Attention is implemented in megatron/core/transformer/attention.py. It supports multiple backends via AttnBackend enum: 'auto' lets Transformer Engine choose, 'local' uses PyTorch implementation in mcore. Flash Attention 2 and 3 are supported through TE. The attention module handles QKV projections via linear_qkv, rotary embeddings, and core attention via dot_product_attention.py or TE's fused attention.",
+      "file_line_refs": ["megatron/core/transformer/attention.py:1-150", "megatron/core/transformer/transformer_config.py:102-106"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 10,
+      "category": "architecture_structure",
+      "question": "What is the structure of the Mixture-of-Experts (MoE) implementation in Megatron-Core?",
+      "expected_answer": "MoE is in megatron/core/transformer/moe/. MoELayer (moe_layer.py) is the main class extending BaseMoELayer. It contains a Router (TopKRouter by default in router.py) for token routing, expert networks (experts.py), optional shared experts, and a TokenDispatcher for distributing tokens. The dispatcher supports AlltoAll and AllGather strategies. MoESubmodules dataclass specifies component specs.",
+      "file_line_refs": ["megatron/core/transformer/moe/moe_layer.py:69-150", "megatron/core/transformer/moe/router.py:28-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 11,
+      "category": "architecture_structure",
+      "question": "How is the inference system organized in Megatron-Core?",
+      "expected_answer": "Inference is in megatron/core/inference/. Key components: InferenceRequest for request management, Scheduler for request scheduling, inference engines (static/dynamic) in engines/, text_generation_controllers for sampling strategies, model_inference_wrappers for model wrapping, contexts/ for inference context management (KV cache, etc.). The system supports both static and dynamic batching.",
+      "file_line_refs": ["megatron/core/inference/"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 12,
+      "category": "architecture_structure",
+      "question": "What is the purpose of ProcessGroupCollection and how does it manage distributed groups?",
+      "expected_answer": "ProcessGroupCollection (megatron/core/process_groups_config.py) is a unified container for all distributed process groups. It holds groups for tensor parallel (tp), data parallel (dp), pipeline parallel (pp), context parallel (cp), expert parallel (ep), and various combinations (tp_cp, dp_cp, etc.). It provides setup methods for DDP and optimizer that extract the needed groups from the collection.",
+      "file_line_refs": ["megatron/core/process_groups_config.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 13,
+      "category": "architecture_structure",
+      "question": "How does Megatron-LM implement multi-token prediction (MTP)?",
+      "expected_answer": "Multi-token prediction is implemented in megatron/core/transformer/multi_token_prediction.py. It adds MTP layers after the main transformer to predict multiple future tokens. MTPLossAutoScaler handles loss scaling, MTPLossLoggingHelper manages metrics. The config has mtp_num_layers and mtp_loss_scaling_factor. MTP can be placed in separate virtual pipeline stages via mtp_standalone config.",
+      "file_line_refs": ["megatron/core/transformer/multi_token_prediction.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 14,
+      "category": "architecture_structure",
+      "question": "What state space models (SSM) are supported in Megatron-LM and where is the implementation?",
+      "expected_answer": "SSM/Mamba models are in megatron/core/ssm/. MambaMixer (mamba_mixer.py) implements the selective state space layer using mamba_ssm ops. MambaBlock (mamba_block.py) wraps the mixer. MambaLayer provides the full layer. mamba_hybrid_layer_allocation.py handles hybrid attention+mamba architectures. Context parallelism for Mamba is in mamba_context_parallel.py. Also supports GatedDeltaNet.",
+      "file_line_refs": ["megatron/core/ssm/mamba_mixer.py:1-100", "megatron/core/ssm/mamba_block.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 15,
+      "category": "architecture_structure",
+      "question": "How are model embeddings structured in Megatron-Core?",
+      "expected_answer": "Embeddings are in megatron/core/models/common/embeddings/. LanguageModelEmbedding combines token embeddings (via VocabParallelEmbedding) with optional position embeddings. Rotary embeddings (RotaryEmbedding, YarnRotaryEmbedding, MultimodalRotaryEmbedding) are separate modules in rotary_pos_embedding.py. rope_utils.py has apply_rotary_pos_emb functions. Token embeddings are sharded across tensor parallel ranks.",
+      "file_line_refs": ["megatron/core/models/common/embeddings/language_model_embedding.py", "megatron/core/models/common/embeddings/rotary_pos_embedding.py:36-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 16,
+      "category": "architecture_structure",
+      "question": "What is the Float16Module wrapper and when is it used?",
+      "expected_answer": "Float16Module (in megatron/core/transformer/module.py) wraps models to handle mixed precision training. It converts inputs to fp16/bf16 as needed and manages the model parameters in the specified precision. It's used when config.fp16 or config.bf16 is True to ensure consistent dtype handling throughout forward passes.",
+      "file_line_refs": ["megatron/core/transformer/module.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 17,
+      "category": "architecture_structure",
+      "question": "How does the pipeline parallel layer layout system work in Megatron-LM?",
+      "expected_answer": "Pipeline layout is configured via pipeline_model_parallel_layout in TransformerConfig. It accepts a string like 'Et*3|(tt|)*29,m|L' or a list or PipelineParallelLayerLayout object. 'E' = embedding, 't' = decoder layer, 'L' = loss, 'm' = MTP. Stages are split by '|'. The layout is parsed in pipeline_parallel_layer_layout.py and determines which layers go on which PP rank.",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py:62-86", "megatron/core/transformer/pipeline_parallel_layer_layout.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 18,
+      "category": "architecture_structure",
+      "question": "What is the structure of the CUDA graphs implementation in Megatron-Core?",
+      "expected_answer": "CUDA graphs are in megatron/core/transformer/cuda_graphs.py. TECudaGraphHelper manages TransformerEngine CUDA graph capture. CudaGraphScope enum defines scopes (full_model, transformer_block, etc.). GraphableMegatronModule extends MegatronModule with graph capture support. The system captures forward passes to reduce kernel launch overhead during training/inference.",
+      "file_line_refs": ["megatron/core/transformer/cuda_graphs.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 19,
+      "category": "architecture_structure",
+      "question": "How does Megatron-LM organize multimodal model support?",
+      "expected_answer": "Multimodal support is in megatron/core/models/multimodal/ and examples/multimodal/. Core has base multimodal model classes. The examples directory has full implementations for vision-language models (VLM) including CLIP/SigLIP vision encoders, LLaVA-style architectures, image processing utilities, and evaluation scripts. examples/mimo/ adds audio-visual support.",
+      "file_line_refs": ["megatron/core/models/multimodal/", "examples/multimodal/model.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 20,
+      "category": "architecture_structure",
+      "question": "What is the role of the LanguageModule base class?",
+      "expected_answer": "LanguageModule (in megatron/core/models/common/language_module/language_module.py) is the base class for language models like GPTModel. It provides common functionality for language model embeddings, output projections, and shared embedding weight handling. It manages the compute_logits method and loss computation infrastructure.",
+      "file_line_refs": ["megatron/core/models/common/language_module/language_module.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 21,
+      "category": "architecture_structure",
+      "question": "How is quantization support structured in Megatron-Core?",
+      "expected_answer": "Quantization is in megatron/core/quantization/. RecipeConfig specifies quantization configurations. FP8 support is in fp8_utils.py with is_float8tensor checks, FP8_TENSOR_CLASS handling for TE compatibility. FP4 support is in fp4_utils.py. Post-training quantization uses NVIDIA ModelOpt integration in megatron/post_training/ and megatron/core/post_training/modelopt/.",
+      "file_line_refs": ["megatron/core/quantization/", "megatron/core/fp8_utils.py:1-106"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 22,
+      "category": "architecture_structure",
+      "question": "What models are available in the megatron/core/models directory?",
+      "expected_answer": "Models in megatron/core/models/: 'gpt' (GPTModel for decoder-only LLMs), 'T5' (encoder-decoder T5), 'mamba' (state-space models), 'vision' (ViT-style models), 'multimodal' (VLM base), 'mimo' (multi-input multi-output for audio-visual), 'common' (shared components like embeddings). Each has its own model class extending appropriate base modules.",
+      "file_line_refs": ["megatron/core/models/"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 23,
+      "category": "architecture_structure",
+      "question": "How does the tokenizer system integrate with Megatron datasets?",
+      "expected_answer": "Tokenizers are in megatron/core/tokenizers/ and megatron/training/tokenizer/. MegatronTokenizerBase is the base class. Tokenizers are configured via GPTDatasetConfig.tokenizer. The build_tokenizer function (in megatron/core/tokenizers/text/utils/) creates appropriate tokenizer instances. Datasets use tokenizer.vocab_size for determining optimal dtype for indices (uint16 vs int32).",
+      "file_line_refs": ["megatron/core/tokenizers/", "megatron/core/datasets/megatron_tokenizer.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 24,
+      "category": "architecture_structure",
+      "question": "What is the structure of the extensions system in Megatron-Core?",
+      "expected_answer": "Extensions are in megatron/core/extensions/. The main extension is for Transformer Engine integration, providing TELinear, TEColumnParallelLinear, TERowParallelLinear, TENorm classes that wrap TE modules. These are used when TE is available for optimized kernels. The extension pattern allows optional dependencies without breaking core functionality.",
+      "file_line_refs": ["megatron/core/extensions/"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 25,
+      "category": "architecture_structure",
+      "question": "How is the resharding functionality implemented for checkpoint conversion?",
+      "expected_answer": "Resharding is in megatron/core/resharding/. It handles converting checkpoints between different parallelism configurations (e.g., changing TP/PP sizes). Works with dist_checkpointing to load sharded tensors and redistribute them according to new parallelism settings. Used when scaling models up/down or changing cluster configurations.",
+      "file_line_refs": ["megatron/core/resharding/"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 26,
+      "category": "service_relationships",
+      "question": "How do tensor parallel layers communicate gradients during the backward pass?",
+      "expected_answer": "Tensor parallel layers use reduce_from_tensor_model_parallel_region during backward to all-reduce gradients across TP ranks. For ColumnParallelLinear, the backward all-reduces the input gradient. For RowParallelLinear, it reduces the output gradient. With sequence parallelism, reduce_scatter_to_sequence_parallel_region is used instead. These mappings are in megatron/core/tensor_parallel/mappings.py.",
+      "file_line_refs": ["megatron/core/tensor_parallel/mappings.py:22-111"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 27,
+      "category": "service_relationships",
+      "question": "How does the DistributedDataParallel wrapper interact with the optimizer?",
+      "expected_answer": "DDP (megatron/core/distributed/distributed_data_parallel.py) stores gradients in contiguous ParamAndGradBuffers. It groups parameters into buckets for overlapped all-reduce. The optimizer (especially DistributedOptimizer) operates on these buffers, with each rank owning a shard of parameters. DDP's overlap_grad_reduce enables overlapping gradient communication with backward computation.",
+      "file_line_refs": ["megatron/core/distributed/distributed_data_parallel.py:22-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 28,
+      "category": "service_relationships",
+      "question": "How does pipeline parallelism coordinate forward and backward passes across stages?",
+      "expected_answer": "Pipeline schedules in megatron/core/pipeline_parallel/schedules.py coordinate execution. get_forward_backward_func returns the appropriate function based on PP/VP sizes. P2P communication (p2p_communication.py) handles tensor exchange. 1F1B schedule interleaves forward/backward. With virtual PP, forward_backward_pipelining_with_interleaving manages multiple model chunks per rank.",
+      "file_line_refs": ["megatron/core/pipeline_parallel/schedules.py:45-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 29,
+      "category": "service_relationships",
+      "question": "How do MoE routers and token dispatchers work together?",
+      "expected_answer": "The Router (router.py) computes routing logits via gating() and selects top-k experts via routing(). It outputs (probs, routing_map). The TokenDispatcher (token_dispatcher.py) takes this routing info and handles the actual token redistribution. MoEAlltoAllTokenDispatcher uses all-to-all for EP, MoEAllGatherTokenDispatcher gathers all tokens. The MoELayer orchestrates both components.",
+      "file_line_refs": ["megatron/core/transformer/moe/router.py:79-150", "megatron/core/transformer/moe/token_dispatcher.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 30,
+      "category": "service_relationships",
+      "question": "How does the distributed checkpointing system coordinate saves across ranks?",
+      "expected_answer": "dist_checkpointing uses ShardedTensor to describe each rank's tensor slice. During save, each rank writes its local data with metadata about global shape/offset. serialization.py coordinates the save strategy (torch.save or zarr). FullyParallelSaveStrategyWrapper distributes I/O across ranks. All ranks must call save together due to metadata synchronization requirements.",
+      "file_line_refs": ["megatron/core/dist_checkpointing/serialization.py", "megatron/core/dist_checkpointing/mapping.py:52-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 31,
+      "category": "service_relationships",
+      "question": "How does sequence parallelism interact with tensor parallelism?",
+      "expected_answer": "Sequence parallelism splits activations along the sequence dimension across TP ranks. It's enabled via config.sequence_parallel=True (requires TP>1). LayerNorm and dropout run on sequence-sharded activations. Before TP linear layers, gather_from_sequence_parallel_region collects the full sequence. After TP operations, reduce_scatter_to_sequence_parallel_region reshards. This reduces activation memory.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:39-43", "megatron/core/tensor_parallel/mappings.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 32,
+      "category": "service_relationships",
+      "question": "How does the context parallel implementation distribute attention computation?",
+      "expected_answer": "Context parallelism splits the input sequence across CP ranks (config.context_parallel_size). For attention, each CP rank computes attention on its sequence chunk but needs KV from all chunks. Ring attention or all-gather patterns exchange KV tensors. get_batch_on_this_cp_rank slices input. RotaryEmbedding.cp_group manages position embeddings across CP ranks.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:45-46", "megatron/core/models/common/embeddings/rotary_pos_embedding.py:86-90"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 33,
+      "category": "service_relationships",
+      "question": "How does the optimizer parameter scheduler interact with the optimizer?",
+      "expected_answer": "OptimizerParamScheduler (megatron/core/optimizer_param_scheduler.py) computes learning rate and other hyperparameters based on iteration. It implements warmup, decay schedules (linear, cosine). The scheduler is called each step to update optimizer.param_groups[*]['lr']. It tracks num_iters, supports restarts, and handles WSD (warmup-stable-decay) schedules.",
+      "file_line_refs": ["megatron/core/optimizer_param_scheduler.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 34,
+      "category": "service_relationships",
+      "question": "How do model chunks interact in virtual pipeline parallelism?",
+      "expected_answer": "Virtual PP splits a model into multiple chunks on each PP rank. Each chunk is a separate model instance with different layers. Forward passes alternate between chunks in a round-robin or depth-first order (configurable via microbatch_group_size_per_vp_stage). P2P communication sends activations between chunks across PP stages. ChainedOptimizer handles optimization across model chunks.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:31-37"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 35,
+      "category": "service_relationships",
+      "question": "How does the rerun state machine interact with training to handle failures?",
+      "expected_answer": "RerunStateMachine (megatron/core/rerun_state_machine.py) tracks training state for fault tolerance. It validates results (NaN/Inf checks), manages RerunDataIterator for deterministic data replay, and handles RerunMode (normal, detect, rerun). When validation fails, it can rerun the step with different RNG. The machine coordinates with checkpointing for recovery.",
+      "file_line_refs": ["megatron/core/rerun_state_machine.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 36,
+      "category": "service_relationships",
+      "question": "How do attention and MLP sublayers communicate within a TransformerLayer?",
+      "expected_answer": "TransformerLayer follows a standard architecture: input -> LayerNorm -> SelfAttention -> residual -> LayerNorm -> MLP -> residual. The self_attention and mlp are defined by ModuleSpec. Pre-norm (default) or post-norm is configurable. apply_residual_connection_post_layernorm controls residual ordering. Hidden states flow sequentially with residual connections adding the original input.",
+      "file_line_refs": ["megatron/core/transformer/transformer_layer.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 37,
+      "category": "service_relationships",
+      "question": "How does the DistributedOptimizer manage parameter sharding across DP ranks?",
+      "expected_answer": "DistributedOptimizer (megatron/core/optimizer/distrib_optimizer.py) shards optimizer state and model parameters across DP ranks. Each rank owns a subset of parameters (like ZeRO Stage 3). It uses param_and_grad_buffer for efficient gradient handling. all-gather reconstructs full parameters when needed, reduce-scatter distributes gradients. This reduces memory per-GPU.",
+      "file_line_refs": ["megatron/core/optimizer/distrib_optimizer.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 38,
+      "category": "service_relationships",
+      "question": "How does the indexed dataset system provide data to the training loop?",
+      "expected_answer": "IndexedDataset (megatron/core/datasets/indexed_dataset.py) memory-maps preprocessed .bin and .idx files. GPTDataset builds on it, creating document_index, sample_index, shuffle_index for efficient sampling. BlendedMegatronDatasetBuilder creates train/valid/test splits. build_pretraining_data_loader wraps datasets in DataLoader with DistributedSampler for multi-GPU training.",
+      "file_line_refs": ["megatron/core/datasets/indexed_dataset.py:1-120", "megatron/core/datasets/gpt_dataset.py:104-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 39,
+      "category": "service_relationships",
+      "question": "How do FP8 scaling factors propagate through the model in mixed precision training?",
+      "expected_answer": "FP8 training uses delayed scaling with amax history. TE tracks amax (max absolute value) across forward/backward passes. get_fp8_context (fp8_utils.py) manages the FP8 context. Each microbatch, is_first_microbatch triggers amax updates. correct_amax_history_if_needed synchronizes history across DP ranks. The scaling factors are stored in FP8 tensor metadata.",
+      "file_line_refs": ["megatron/core/fp8_utils.py:1-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 40,
+      "category": "service_relationships",
+      "question": "How does the parallel_state module track and provide access to process groups?",
+      "expected_answer": "parallel_state (megatron/core/parallel_state.py) maintains global state for all process groups via module-level variables like _TENSOR_MODEL_PARALLEL_GROUP, _PIPELINE_MODEL_PARALLEL_GROUP, etc. initialize_model_parallel() creates these groups based on TP/PP/DP/CP/EP sizes. Getter functions (get_tensor_model_parallel_group, etc.) provide access. Each group type has associated rank/world_size getters.",
+      "file_line_refs": ["megatron/core/parallel_state.py:28-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 41,
+      "category": "service_relationships",
+      "question": "How does gradient accumulation fusion work with tensor parallel layers?",
+      "expected_answer": "Gradient accumulation fusion fuses weight gradient computation with GEMM operations. It requires the fused_weight_gradient_mlp_cuda APEX extension. When config.gradient_accumulation_fusion=True, weight gradients are accumulated directly in the GEMM kernel instead of separate accumulation. prepare_input_tensors_for_wgrad_compute manages the input tensors needed for fused wgrad.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:162-168", "megatron/core/tensor_parallel/layers.py:44-48"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 42,
+      "category": "service_relationships",
+      "question": "How do shared experts interact with routed experts in MoE layers?",
+      "expected_answer": "MoE layers can have both routed experts and shared experts (config.moe_shared_expert_intermediate_size). Shared experts process all tokens without routing. In forward pass, shared expert output is computed and added to routed expert output. moe_shared_expert_overlap enables overlapping shared expert computation with routing. SharedExpert implementation is in shared_experts.py.",
+      "file_line_refs": ["megatron/core/transformer/moe/moe_layer.py:105-106", "megatron/core/transformer/moe/shared_experts.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 43,
+      "category": "service_relationships",
+      "question": "How does the FSDP integration work in Megatron-Core?",
+      "expected_answer": "FSDP support is in megatron/core/distributed/fsdp/. TorchFullyShardedDataParallel wraps PyTorch FSDP2. megatron_FSDP (mcore_fsdp_adapter.py) provides Megatron-specific FSDP. DistributedDataParallelConfig has use_megatron_fsdp flag. FSDP shards parameters across DP ranks like DistributedOptimizer but at a more granular level. fsdp_dtensor_checkpoint.py handles checkpointing with DTensor.",
+      "file_line_refs": ["megatron/core/distributed/fsdp/"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 44,
+      "category": "service_relationships",
+      "question": "How does the P2P communicator handle tensor exchange in pipeline parallelism?",
+      "expected_answer": "P2PCommunicator (megatron/core/pipeline_parallel/p2p_communication.py) manages send/recv operations between PP stages. It supports batched communication (batch_p2p_comm) using batch_isend_irecv for efficiency. ring_exchange_p2p provides an alternative kernel. recv_forward/send_forward handle forward pass tensors, recv_backward/send_backward handle gradients. Variable sequence lengths require size communication.",
+      "file_line_refs": ["megatron/core/pipeline_parallel/p2p_communication.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 45,
+      "category": "service_relationships",
+      "question": "How does the checkpoint conversion system transform between formats?",
+      "expected_answer": "Checkpoint conversion is in tools/checkpoint/. convert.py orchestrates conversion between formats. Loaders (loader_llama_mistral.py, loader_core.py, loader_legacy.py) read source checkpoints. Savers (saver_core.py, saver_legacy.py, saver_hf_llava.py) write target formats. Schema files (schema_core.py, schema_hf.py) define parameter name mappings between formats.",
+      "file_line_refs": ["tools/checkpoint/convert.py", "tools/checkpoint/loader_llama_mistral.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 46,
+      "category": "service_relationships",
+      "question": "How does hybrid context parallelism balance workload across CP ranks?",
+      "expected_answer": "Hybrid CP (config.hybrid_context_parallel) handles variable-length sequences by redistributing samples across CP*DP ranks based on length. max_seqlen_per_dp_cp_rank specifies the max sequence length per rank. hybrid_cp_schedule.py computes the schedule. get_batch_on_this_hybrid_cp_rank splits batches appropriately. This balances compute when sequence lengths vary significantly.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:56-70", "megatron/core/pipeline_parallel/hybrid_cp_schedule.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 47,
+      "category": "service_relationships",
+      "question": "How do auxiliary losses flow from MoE routers to the training loop?",
+      "expected_answer": "MoE auxiliary losses (load balancing, z-loss) are computed in router.py via save_to_aux_losses_tracker. MoEAuxLossAutoScaler (moe_utils.py) manages loss scaling. track_moe_metrics aggregates losses across layers. The losses are added to the main loss in the training loop. clear_aux_losses_tracker resets between iterations. Losses are averaged across DP/TP ranks via all-reduce.",
+      "file_line_refs": ["megatron/core/transformer/moe/router.py", "megatron/core/transformer/moe/moe_utils.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 48,
+      "category": "service_relationships",
+      "question": "How does the timer system track training performance?",
+      "expected_answer": "Timers (megatron/core/timers.py) provides hierarchical timing. Timer objects measure elapsed time with start/stop. Timers collection manages multiple named timers. ModelParallelConfig.timers can be set to enable timing. The training loop uses timers for iteration time, forward, backward, optimizer steps. log_timers_to_tensorboard writes metrics. barrier_with_L1_time controls synchronization.",
+      "file_line_refs": ["megatron/core/timers.py", "megatron/core/model_parallel_config.py:109-110"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 49,
+      "category": "service_relationships",
+      "question": "How does model initialization coordinate across tensor parallel ranks?",
+      "expected_answer": "Weight initialization uses get_cuda_rng_tracker (tensor_parallel/random.py) to ensure consistent random states across TP ranks. _initialize_affine_weight_gpu forks the RNG tracker before init. For expert weights, a separate RNG tracker (get_expert_parallel_rng_tracker_name) ensures experts get different initializations. use_cpu_initialization can initialize on CPU then distribute.",
+      "file_line_refs": ["megatron/core/tensor_parallel/layers.py:134-146", "megatron/core/tensor_parallel/random.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 50,
+      "category": "service_relationships",
+      "question": "How does the CPU offloading system manage memory during training?",
+      "expected_answer": "CPU offloading is configured via config.cpu_offloading. When True, activations are asynchronously offloaded to CPU memory during forward pass and reloaded during backward (cpu_offloading_activations). cpu_offloading_weights can offload model weights. cpu_offloading_num_layers specifies which layers to offload. _cpu_offloading_context manages the context. double_buffering overlaps transfers.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:354-375"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 51,
+      "category": "service_relationships",
+      "question": "How does the energy monitor track training energy consumption?",
+      "expected_answer": "EnergyMonitor (megatron/core/energy_monitor.py) tracks GPU power consumption using NVML. It records energy during training steps, aggregates across ranks, and can report joules/tokens metrics. The monitor starts/stops measurement around training iterations and accounts for multi-GPU setups.",
+      "file_line_refs": ["megatron/core/energy_monitor.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 52,
+      "category": "service_relationships",
+      "question": "How does the global memory buffer optimize communication in tensor parallelism?",
+      "expected_answer": "GlobalMemoryBuffer (megatron/core/utils.py, accessed via parallel_state.get_global_memory_buffer) pre-allocates memory for collective operations to avoid repeated allocations. get_tensor returns a view into the preallocated buffer. It's used in tensor_parallel/mappings.py for gather operations with use_global_buffer=True flag, reducing allocation overhead during all-gather operations.",
+      "file_line_refs": ["megatron/core/parallel_state.py:140-141", "megatron/core/tensor_parallel/mappings.py:138-139"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 53,
+      "category": "data_flow_integration",
+      "question": "How does data flow from raw text files to model inputs during pretraining?",
+      "expected_answer": "Data flow: 1) preprocess_data.py tokenizes raw text into .bin/.idx files (IndexedDataset format). 2) GPTDataset loads these files, builds document/sample/shuffle indices. 3) BlendedMegatronDatasetBuilder creates train/valid/test splits with blending weights. 4) DataLoader batches samples. 5) get_batch_on_this_tp_rank/cp_rank distributes to appropriate ranks. 6) Model receives tokens, labels, loss_mask, position_ids.",
+      "file_line_refs": ["tools/preprocess_data.py", "megatron/core/datasets/gpt_dataset.py", "pretrain_gpt.py:65-97"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 54,
+      "category": "data_flow_integration",
+      "question": "How are tensors sharded across tensor parallel ranks for linear layers?",
+      "expected_answer": "ColumnParallelLinear splits the weight matrix along the output dimension (columns) - each TP rank has weight of shape [hidden, hidden_per_tp]. RowParallelLinear splits along input dimension (rows). During forward, ColumnParallel does local GEMM then all-gather output. RowParallel all-gathers input (or uses scatter), does local GEMM, then reduces output. These are in tensor_parallel/layers.py.",
+      "file_line_refs": ["megatron/core/tensor_parallel/layers.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 55,
+      "category": "data_flow_integration",
+      "question": "How does the attention mechanism handle KV caching during inference?",
+      "expected_answer": "During inference, BaseInferenceContext (megatron/core/inference/contexts/) manages KV cache. On first forward, K and V are computed and cached. On subsequent forwards, only new tokens' KV are computed and concatenated to cache. flash_attn_with_kvcache efficiently handles this. DynamicInferenceContext supports variable-length sequences. The cache is stored per-layer and grows with sequence length.",
+      "file_line_refs": ["megatron/core/inference/contexts/", "megatron/core/transformer/attention.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 56,
+      "category": "data_flow_integration",
+      "question": "How does data move between pipeline stages during forward and backward passes?",
+      "expected_answer": "In forward: Stage N computes activations and sends to stage N+1 via P2P send_forward. First stage gets data from data loader. In backward: Stage N receives gradients from N+1 via recv_backward, computes local gradients, sends input gradients to N-1 via send_backward. Last stage computes loss gradient. The p2p_communication.py handles the actual tensor transfers with isend/irecv.",
+      "file_line_refs": ["megatron/core/pipeline_parallel/p2p_communication.py", "megatron/core/pipeline_parallel/schedules.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 57,
+      "category": "data_flow_integration",
+      "question": "How are gradients accumulated and reduced in distributed training?",
+      "expected_answer": "Gradients flow: 1) Backward pass computes per-microbatch gradients. 2) DistributedDataParallel accumulates into main_grad buffer. 3) After all microbatches, finalize_model_grads triggers all-reduce across DP ranks (or reduce-scatter for distributed optimizer). 4) For MoE expert params, separate expert_dp groups handle reduction. 5) Optimizer reads from grad buffer.",
+      "file_line_refs": ["megatron/core/distributed/distributed_data_parallel.py", "megatron/core/distributed/__init__.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 58,
+      "category": "data_flow_integration",
+      "question": "How does the rotary position embedding get applied to queries and keys?",
+      "expected_answer": "RotaryEmbedding computes freqs from position indices and inv_freq. apply_rotary_pos_emb (rope_utils.py) takes Q, K tensors and cos/sin embeddings. It splits Q/K into halves, rotates using rotate_half (negating and swapping), then combines: out = x * cos + rotate_half(x) * sin. For interleaved format, pairs of consecutive elements are rotated together.",
+      "file_line_refs": ["megatron/core/models/common/embeddings/rotary_pos_embedding.py:36-150", "megatron/core/models/common/embeddings/rope_utils.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 59,
+      "category": "data_flow_integration",
+      "question": "How does token routing work in MoE layers from input to expert outputs?",
+      "expected_answer": "Flow: 1) Router computes logits = input @ gate_weight. 2) Top-k selection gets (probs, routing_map). 3) TokenDispatcher permutes tokens based on routing_map. 4) Each expert processes its assigned tokens. 5) Dispatcher unpermutes outputs back to original order. 6) probs weight the expert outputs. For EP, all-to-all moves tokens between ranks. Output shape matches input shape.",
+      "file_line_refs": ["megatron/core/transformer/moe/moe_layer.py", "megatron/core/transformer/moe/token_dispatcher.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 60,
+      "category": "data_flow_integration",
+      "question": "How does activation checkpointing reduce memory during training?",
+      "expected_answer": "Activation checkpointing (recomputation) saves memory by not storing all intermediate activations. config.recompute_granularity controls level: 'full' recomputes entire layer, 'selective' only attention. During forward, only inputs are saved. During backward, forward is re-run to recompute activations. num_microbatches_with_partial_activation_checkpoints allows mixed strategies per microbatch.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:151-157"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 61,
+      "category": "data_flow_integration",
+      "question": "How does the blended dataset system combine multiple data sources?",
+      "expected_answer": "BlendedDataset (megatron/core/datasets/blended_dataset.py) combines multiple datasets with specified weights. BlendedMegatronDatasetBuilder builds indexed datasets for each path, then BlendedMegatronDatasetConfig specifies blend weights and per-split ratios. During sampling, a weighted random selection picks which dataset to sample from, enabling training on diverse data mixtures.",
+      "file_line_refs": ["megatron/core/datasets/blended_dataset.py", "megatron/core/datasets/blended_megatron_dataset_builder.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 62,
+      "category": "data_flow_integration",
+      "question": "How do sequence parallel regions manage tensor shapes during forward passes?",
+      "expected_answer": "With sequence parallelism, tensors have shape [seq_len/TP, batch, hidden] instead of [seq_len, batch, hidden]. Before ColumnParallelLinear, gather_from_sequence_parallel_region collects full sequence. After RowParallelLinear, reduce_scatter_to_sequence_parallel_region reshards. LayerNorm and dropout operate on sharded tensors. This reduces activation memory proportional to TP size.",
+      "file_line_refs": ["megatron/core/tensor_parallel/mappings.py:35-54"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 63,
+      "category": "data_flow_integration",
+      "question": "How does the packed sequence format handle variable-length sequences?",
+      "expected_answer": "PackedSeqParams (megatron/core/packed_seq_params.py) contains cu_seqlens (cumulative sequence lengths), max_seqlen, and cu_seqlens_padded for variable-length sequences packed into one tensor. Attention uses flash_attn_varlen_func with these params to handle the packing. This enables efficient batching of different-length sequences without padding waste.",
+      "file_line_refs": ["megatron/core/packed_seq_params.py", "pretrain_gpt.py:80-95"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 64,
+      "category": "data_flow_integration",
+      "question": "How does the loss function compute and reduce losses across ranks?",
+      "expected_answer": "In pretrain_gpt.py loss_func: 1) output_tensor contains per-token losses. 2) loss_mask zeros out padded/special tokens. 3) torch.sum(losses * loss_mask) gets raw loss. 4) num_tokens counts valid tokens. 5) Loss is reduced across DP ranks via all-reduce (in training.py). 6) MoE aux losses are added from aux_losses_tracker. Report dict tracks metrics for logging.",
+      "file_line_refs": ["pretrain_gpt.py:104-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 65,
+      "category": "data_flow_integration",
+      "question": "How does the QKV projection handle multi-head attention in Megatron?",
+      "expected_answer": "linear_qkv projects input to Q, K, V. With GQA (num_query_groups), Q has more heads than K/V. Output shape is [seq, batch, (num_q_heads + 2*num_kv_heads) * head_dim]. The tensor is split and reshaped to [seq, batch, num_heads, head_dim] format. With TP, each rank handles a subset of heads. Fused QKV avoids 3 separate linear layers.",
+      "file_line_refs": ["megatron/core/transformer/attention.py:120-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 66,
+      "category": "data_flow_integration",
+      "question": "How does the optimizer update model parameters with distributed optimizer?",
+      "expected_answer": "With DistributedOptimizer: 1) Each rank owns a shard of parameters. 2) Gradients are reduce-scattered so each rank has grads for its shard. 3) Optimizer.step() updates local parameter shard. 4) Parameters are all-gathered back to full model. 5) For FP16, main params in FP32 are updated, then cast to FP16. This is handled by MixedPrecisionOptimizer base class.",
+      "file_line_refs": ["megatron/core/optimizer/distrib_optimizer.py", "megatron/core/optimizer/__init__.py:267-475"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 67,
+      "category": "data_flow_integration",
+      "question": "How does the model handle embedding weight tying between input and output layers?",
+      "expected_answer": "When share_embeddings_and_output_weights=True in GPTModel, the embedding weight is shared with the output layer. tie_word_embeddings_state_dict (multi_token_prediction.py) handles this for checkpointing. During forward, the same weight matrix is used for input embeddings (lookup) and output projection (linear). This reduces parameters but requires matching vocab dimensions.",
+      "file_line_refs": ["megatron/core/models/gpt/gpt_model.py:98", "megatron/core/transformer/multi_token_prediction.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 68,
+      "category": "data_flow_integration",
+      "question": "How does the Mamba SSM layer process sequential data?",
+      "expected_answer": "MambaMixer (mamba_mixer.py) implements selective state space: 1) Input goes through in_proj (expand to inner_dim). 2) causal_conv1d_fn applies 1D convolution. 3) SSM computes dt (discretization), A, B, C matrices. 4) mamba_chunk_scan_combined performs the state space scan. 5) Output projection returns to hidden_size. State is maintained for inference. CP support via MambaContextParallel.",
+      "file_line_refs": ["megatron/core/ssm/mamba_mixer.py:1-100"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 69,
+      "category": "data_flow_integration",
+      "question": "How does async tensor save work for overlapping checkpointing with training?",
+      "expected_answer": "schedule_async_save (megatron/training/async_utils.py) queues checkpoint saves to a background thread. Tensors are first copied to CPU asynchronously. The background thread writes to storage without blocking training. is_empty_async_queue checks completion. This allows training to continue while previous checkpoint writes complete, reducing checkpoint overhead.",
+      "file_line_refs": ["megatron/training/async_utils.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 70,
+      "category": "data_flow_integration",
+      "question": "How does the unified memory system manage KV cache for inference?",
+      "expected_answer": "unified_memory.py in megatron/core/inference/ manages KV cache allocation. It pre-allocates a memory pool that's shared across requests. KV cache tensors are views into this pool. For dynamic inference, cache grows as sequences extend. Memory is reclaimed when sequences complete. This avoids repeated allocations and enables efficient memory reuse.",
+      "file_line_refs": ["megatron/core/inference/unified_memory.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 71,
+      "category": "data_flow_integration",
+      "question": "How does the dataclass configuration flow from arguments to model initialization?",
+      "expected_answer": "Flow: 1) arguments.py parses CLI args into Namespace. 2) core_transformer_config_from_args converts args to TransformerConfig dataclass. 3) Config passes to model constructors. 4) Modules access config attributes directly. 5) __post_init__ validates constraints (e.g., sequence_parallel requires TP>1). This provides type-safe configuration throughout the codebase.",
+      "file_line_refs": ["megatron/training/arguments.py", "megatron/core/transformer/transformer_config.py:34-200"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 72,
+      "category": "data_flow_integration",
+      "question": "How does tensor parallel communication overlap with computation?",
+      "expected_answer": "tp_comm_overlap=True enables overlapping TP communication with compute. For AllGather->GEMM, the GEMM is split and pipelined with AG. tp_comm_overlap_ag/rs control specific operations. For ReduceScatter, GEMM output is RS'd while next layer computes. TELinear handles the implementation with split/atomic variants. This hides communication latency behind computation.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:177-231"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 73,
+      "category": "data_flow_integration",
+      "question": "How does the model handle different attention mask types?",
+      "expected_answer": "AttnMaskType enum (transformer/enums.py) defines: causal (lower triangular), padding (mask padded tokens), causal_bottom_right, no_mask. GPTDatasetConfig.create_attention_mask controls generation. Masks flow from dataset to model. For packed sequences, cu_seqlens defines boundaries. Flash attention kernels use mask type directly; fused attention handles masking internally.",
+      "file_line_refs": ["megatron/core/transformer/enums.py", "megatron/core/datasets/gpt_dataset.py:37-39"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 74,
+      "category": "data_flow_integration",
+      "question": "How does the multi-latent attention (MLA) mechanism work in Megatron?",
+      "expected_answer": "MLA (multi_latent_attention.py) compresses KV into lower-dimensional latent space for memory efficiency. It uses learned projections to compress K/V to latent dimensions, then expands during attention. This reduces KV cache size. MLATransformerConfig has MLA-specific settings. The implementation supports both training and inference with compressed cache.",
+      "file_line_refs": ["megatron/core/transformer/multi_latent_attention.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 75,
+      "category": "data_flow_integration",
+      "question": "How does fine-grained activation offloading manage memory during training?",
+      "expected_answer": "fine_grained_activation_offload.py implements FineGrainedActivationOffloadingInterface. Instead of offloading entire layers, it selectively offloads specific activation tensors (attention outputs, intermediate states) to CPU. This is more granular than cpu_offloading and can target specific memory bottlenecks while minimizing transfer overhead.",
+      "file_line_refs": ["megatron/core/pipeline_parallel/fine_grained_activation_offload.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 76,
+      "category": "data_flow_integration",
+      "question": "How does the GLU (Gated Linear Unit) variant work in the MLP?",
+      "expected_answer": "When config.gated_linear_unit=True, MLP uses a gated structure. linear_fc1 outputs 2x the intermediate size. The output is split: gate and value. Result = activation(gate) * (value + glu_linear_offset). Supported activations include SwiGLU (swish), GeGLU (gelu). This provides better expressiveness than standard MLP with similar compute.",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py:154-166", "megatron/core/transformer/mlp.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 77,
+      "category": "data_flow_integration",
+      "question": "How does the SFT (Supervised Fine-Tuning) dataset differ from pretraining?",
+      "expected_answer": "SFTDataset (megatron/training/datasets/sft_dataset.py) handles instruction/response format for fine-tuning. Unlike pretraining's continuous text, SFT has distinct input/output portions. Loss is computed only on response tokens via loss_mask. The dataset handles conversation templates, system prompts, and turn markers specific to instruction tuning.",
+      "file_line_refs": ["megatron/training/datasets/sft_dataset.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 78,
+      "category": "cross_cutting_concerns",
+      "question": "How does Megatron-LM handle logging across distributed ranks?",
+      "expected_answer": "log_single_rank (megatron/core/utils.py via _rank_utils.py) ensures logs only appear on specified rank (usually 0). CustomHandler (training/log_handler.py) filters MCore logs. print_rank_0 is the common pattern for user messages. TensorBoard logging via write_args_to_tensorboard. WandB integration in wandb_utils.py. OneLogger support in one_logger_utils.py for structured metrics.",
+      "file_line_refs": ["megatron/core/_rank_utils.py", "megatron/training/log_handler.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 79,
+      "category": "cross_cutting_concerns",
+      "question": "How does the codebase handle configuration validation and constraints?",
+      "expected_answer": "Configuration validation primarily happens in __post_init__ methods of dataclasses. TransformerConfig.__post_init__ validates parallelism combinations, ModelParallelConfig.__post_init__ checks TP/PP/SP constraints. check_checkpoint_args validates checkpoint compatibility. Assertions throughout enforce invariants. @dataclass fields use type hints for basic validation.",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py", "megatron/core/model_parallel_config.py:386-438"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 80,
+      "category": "cross_cutting_concerns",
+      "question": "How does Megatron-LM handle NaN and Inf detection during training?",
+      "expected_answer": "NaN/Inf detection is controlled by args.check_for_nan_in_loss_and_grad. In loss_func, rerun_state_machine.validate_result checks for NaN/Inf with torch.isnan/isinf. For gradients, DDP can track inf counts. DynamicGradScaler skips updates on inf gradients. The system can trigger reruns or fatal errors. check_for_spiky_loss detects sudden loss spikes (10x normal).",
+      "file_line_refs": ["pretrain_gpt.py:133-148"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 81,
+      "category": "cross_cutting_concerns",
+      "question": "How does error handling work in the distributed checkpointing system?",
+      "expected_answer": "dist_checkpointing uses CheckpointingException (core.py) for checkpoint-specific errors. ShardedTensor.validate_metadata_integrity checks tensor metadata consistency. During load, mismatched shapes can raise exceptions (allow_shape_mismatch=True to skip). Validation.py has functions to verify checkpoint integrity. All ranks must succeed; failures propagate via collective operations.",
+      "file_line_refs": ["megatron/core/dist_checkpointing/core.py", "megatron/core/dist_checkpointing/mapping.py:96-134"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 82,
+      "category": "cross_cutting_concerns",
+      "question": "How does the codebase manage optional dependencies like Transformer Engine and APEX?",
+      "expected_answer": "Optional dependencies use try/except import patterns with HAVE_* flags. E.g., HAVE_TE = True after successful transformer_engine import, else False. Code paths check these flags: if HAVE_TE: use TENorm else: use FusedLayerNorm. This allows running without TE/APEX but with reduced functionality. Similar patterns for flash_attn, mamba_ssm, einops.",
+      "file_line_refs": ["megatron/core/fp8_utils.py:23-86", "megatron/core/transformer/transformer_block.py:37-69"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 83,
+      "category": "cross_cutting_concerns",
+      "question": "How does the straggler detection system identify slow ranks?",
+      "expected_answer": "StragglerDetector (megatron/core/utils.py) tracks iteration times across ranks. It identifies ranks that consistently take longer than others. README_STRAGGLER.md documents the system. stimer = StragglerDetector() creates instance. report_straggler_times logs timing info. This helps debug performance issues in distributed training due to hardware variance or load imbalance.",
+      "file_line_refs": ["megatron/core/utils.py", "megatron/core/README_STRAGGLER.md"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 84,
+      "category": "cross_cutting_concerns",
+      "question": "How does Megatron-LM handle deterministic training for reproducibility?",
+      "expected_answer": "config.deterministic_mode=True enables deterministic ops (may be slower). RNG state is tracked per TP rank via get_cuda_rng_tracker for reproducible initialization. Checkpoint saves RNG state (both global and per-rank). Data shuffling uses seeded indices. For MoE, expert_parallel_rng_tracker ensures experts get consistent random init. CUDA deterministic algorithms are enabled.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:141-143", "megatron/core/tensor_parallel/random.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 85,
+      "category": "cross_cutting_concerns",
+      "question": "How does the NCCL allocator improve communication performance?",
+      "expected_answer": "nccl_allocator.py provides a custom memory allocator for NCCL operations. It pre-allocates memory pools for collective operations, reducing allocation overhead during training. The allocator is configured via nccl_comm_cfgs with options like cga_cluster_size, max_ctas, min_ctas for tuning NCCL performance on different GPU architectures (e.g., Hopper).",
+      "file_line_refs": ["megatron/core/nccl_allocator.py", "megatron/core/parallel_state.py:152-184"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 86,
+      "category": "cross_cutting_concerns",
+      "question": "How does the config logger help with experiment tracking?",
+      "expected_answer": "config_logger.py provides has_config_logger_enabled() and log_config_to_disk(). When enabled, it serializes config dataclasses and local variables to disk for reproducibility. Modules call log_config_to_disk in __init__ to record their configuration. This creates a record of all configuration used in an experiment without manual tracking.",
+      "file_line_refs": ["megatron/core/config_logger.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 87,
+      "category": "cross_cutting_concerns",
+      "question": "How does Megatron-LM integrate with fault tolerance systems?",
+      "expected_answer": "ft_integration.py provides integration with NVIDIA Fault Tolerance library. nvidia_resiliency_ext provides CallWrapper for resilient function execution. inprocess_restart.py handles in-process restart after transient failures. Checkpointing saves all state needed for recovery. The rerun_state_machine enables replaying failed steps with different RNG.",
+      "file_line_refs": ["megatron/training/ft_integration.py", "megatron/training/inprocess_restart.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 88,
+      "category": "cross_cutting_concerns",
+      "question": "How does the experimental API decorator work for unstable features?",
+      "expected_answer": "experimental_fn decorator (megatron/core/utils.py) marks functions as experimental with a version tag. When ENABLE_EXPERIMENTAL is not set, calling raises ExperimentalNotEnabledError. The decorator also checks version lifetime (default 3 minor versions). internal_api decorator marks internal-only functions. This helps manage API stability expectations.",
+      "file_line_refs": ["megatron/core/utils.py:113-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 89,
+      "category": "cross_cutting_concerns",
+      "question": "How does the timeout management system work for distributed operations?",
+      "expected_answer": "update_pg_timeout (parallel_state.py) updates timeout for process groups. It synchronizes via barrier before changing timeout to prevent hangs. _global_process_group_list tracks all PGs for bulk updates. Long operations (checkpointing) may need extended timeouts. Default NCCL timeout can be insufficient for large model operations.",
+      "file_line_refs": ["megatron/core/parallel_state.py:187-200"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 90,
+      "category": "cross_cutting_concerns",
+      "question": "How does the codebase handle deprecation warnings?",
+      "expected_answer": "Deprecated features use warnings.warn with DeprecationWarning. Deprecated config fields document the deprecation (e.g., moe_extended_tp: 'Deprecated from MCore v0.10'). deprecate_inference_params decorator handles API changes. _logged_deprecations tracks already-logged warnings to avoid spam. The pattern allows gradual migration while maintaining backward compatibility.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:78-81", "megatron/core/utils.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 91,
+      "category": "cross_cutting_concerns",
+      "question": "How does the theoretical memory usage calculator work?",
+      "expected_answer": "report_theoretical_memory (megatron/training/theoretical_memory_usage.py) estimates memory usage based on model config. tools/report_theoretical_memory.py provides CLI access. It calculates parameter memory, activation memory (based on sequence length, batch size), optimizer state, and gradients. Helps plan distributed training configurations before running.",
+      "file_line_refs": ["megatron/training/theoretical_memory_usage.py", "tools/report_theoretical_memory.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 92,
+      "category": "cross_cutting_concerns",
+      "question": "How does NVTX profiling integration work in Megatron?",
+      "expected_answer": "nvtx_range_push/pop (megatron/core/utils.py) wrap NVTX ranges when available (HAVE_NVTX). These create named regions in Nsight Systems profiles. Key operations (forward, backward, optimizer) are annotated. null_decorator provides no-op when NVTX unavailable. This enables detailed performance analysis of training runs.",
+      "file_line_refs": ["megatron/core/utils.py:68-73"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 93,
+      "category": "cross_cutting_concerns",
+      "question": "How does the signal handler manage distributed job termination?",
+      "expected_answer": "dist_signal_handler.py provides signal handling for distributed training. It catches SIGTERM/SIGINT and coordinates graceful shutdown across all ranks. Ensures all ranks checkpoint before exit. Prevents orphaned processes. Integrates with SLURM/torchrun job management for clean termination.",
+      "file_line_refs": ["megatron/training/dist_signal_handler.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 94,
+      "category": "cross_cutting_concerns",
+      "question": "How does the Multi-Storage Client (MSC) support different storage backends?",
+      "expected_answer": "MultiStorageClientFeature (megatron/core/msc_utils.py) provides abstraction for different storage systems. It wraps operations like open, isfile, makedirs. Supports local filesystem, S3, and other cloud storage. object_storage_utils.py has S3-specific support. This enables seamless checkpoint storage across different backends without code changes.",
+      "file_line_refs": ["megatron/core/msc_utils.py", "megatron/core/datasets/object_storage_utils.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 95,
+      "category": "cross_cutting_concerns",
+      "question": "How does the safe globals system handle torch.load security?",
+      "expected_answer": "safe_globals.py uses register_safe_globals() for PyTorch 2.6+ to allow loading trusted objects in checkpoints. This addresses torch.load security concerns by explicitly listing safe classes/functions. Without this, loading checkpoints with custom objects would fail or require weights_only=False (security risk).",
+      "file_line_refs": ["megatron/core/safe_globals.py", "megatron/core/__init__.py:49-52"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 96,
+      "category": "cross_cutting_concerns",
+      "question": "How are JIT fusion options configured for performance?",
+      "expected_answer": "set_jit_fusion_options (megatron/training/initialize.py) configures PyTorch JIT for kernel fusion. It sets torch._C._jit_set_profiling_executor/mode, fusion strategies, and memory layouts. Different settings optimize for training vs inference. This improves performance by enabling more aggressive kernel fusion in the JIT compiler.",
+      "file_line_refs": ["megatron/training/initialize.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 97,
+      "category": "cross_cutting_concerns",
+      "question": "How does the progress logging system track training state?",
+      "expected_answer": "append_to_progress_log (megatron/training/utils.py) writes training progress to a file. It records iteration, learning rate, loss, elapsed time. This provides a simple text log for monitoring long training runs. Separate from TensorBoard/WandB, it ensures basic progress tracking even if external logging fails.",
+      "file_line_refs": ["megatron/training/utils.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 98,
+      "category": "business_logic_constraints",
+      "question": "What are the constraints on tensor parallel size relative to attention heads?",
+      "expected_answer": "Tensor parallel size must divide num_attention_heads evenly (so each TP rank gets whole heads). With GQA, TP must also divide num_query_groups. For MoE, num_moe_experts should be divisible by expert_model_parallel_size. These constraints ensure clean tensor sharding without padding. Violations cause assertion errors during model construction.",
+      "file_line_refs": ["megatron/core/transformer/attention.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 99,
+      "category": "business_logic_constraints",
+      "question": "What rules govern pipeline parallel stage assignment for layers?",
+      "expected_answer": "With even PP, num_layers must divide by pipeline_model_parallel_size. Uneven PP allows specifying num_layers_in_first/last_pipeline_stage. Virtual PP requires layers divisible by vp_size*pp_size. Embedding always on first stage (pre_process=True), loss on last (post_process=True). account_for_embedding/loss_in_pipeline_split treats them as regular layers for balancing.",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py:54-95"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 100,
+      "category": "business_logic_constraints",
+      "question": "What are the requirements for enabling sequence parallelism?",
+      "expected_answer": "Sequence parallelism requires: 1) tensor_model_parallel_size > 1. 2) sequence_parallel = True in config. 3) With expert parallelism, sequence_parallel should be True for correct gradient reduction. __post_init__ raises ValueError if sequence_parallel=True with TP<=1. This is because SP reduces across TP group.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:391-393"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 101,
+      "category": "business_logic_constraints",
+      "question": "How does the optimizer handle decoupled learning rate for embeddings?",
+      "expected_answer": "decoupled_lr in OptimizerConfig specifies separate LR for embedding/output layers. Parameters with is_embedding_or_output_parameter=True attribute get this LR. decoupled_min_lr sets minimum for this group. get_standard_config_overrides creates the override. This allows using different LR schedules for embeddings vs transformer layers, common in large model training.",
+      "file_line_refs": ["megatron/core/optimizer/__init__.py:70-104"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 102,
+      "category": "business_logic_constraints",
+      "question": "What constraints exist on MoE expert and token dispatcher configurations?",
+      "expected_answer": "num_moe_experts must be divisible by expert_model_parallel_size. moe_router_topk must be <= num_moe_experts. Token dispatcher selection: AlltoAll for EP>1 distributed case, AllGather when all experts on one rank. moe_token_dispatcher_type overrides auto selection. moe_aux_loss_coeff controls load balancing loss weight. Expert TP requires separate handling.",
+      "file_line_refs": ["megatron/core/transformer/moe/moe_layer.py:100-116"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 103,
+      "category": "business_logic_constraints",
+      "question": "How does the checkpoint validation ensure model compatibility?",
+      "expected_answer": "check_checkpoint_args (megatron/training/checkpointing.py) compares key arguments: num_layers, hidden_size, num_attention_heads must match exactly. max_position_embeddings and vocab settings are checked if using vocab_file. With dist_ckpt, some constraints relax (e.g., TP/PP can differ for resharding). Mismatches raise assertion errors.",
+      "file_line_refs": ["megatron/training/checkpointing.py:102-141"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 104,
+      "category": "business_logic_constraints",
+      "question": "What are the rules for virtual pipeline model parallel size?",
+      "expected_answer": "virtual_pipeline_model_parallel_size must be None or >= 1. When set, enables interleaved scheduling to reduce pipeline bubble. num_layers must be divisible by (vp_size * pp_size). Each VP stage gets num_layers/(vp_size*pp_size) layers. microbatch_group_size_per_vp_stage controls execution ordering (depth-first default: equals pp_size).",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:31-37", "megatron/core/model_parallel_config.py:333-346"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 105,
+      "category": "business_logic_constraints",
+      "question": "How does the loss scaling behavior differ for FP16 vs BF16 training?",
+      "expected_answer": "FP16 requires loss scaling due to limited dynamic range. DynamicGradScaler starts at initial_loss_scale, backs off on inf/nan, grows after growth_interval successful steps. BF16 has larger dynamic range, typically doesn't need scaling (grad_scaler=None). ConstantGradScaler uses fixed scale if loss_scale arg provided. Scale affects gradient magnitude during backward.",
+      "file_line_refs": ["megatron/core/optimizer/__init__.py:427-443"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 106,
+      "category": "business_logic_constraints",
+      "question": "What are the requirements for deferred embedding wgrad compute?",
+      "expected_answer": "defer_embedding_wgrad_compute requires: 1) pipeline_model_parallel_size > 1. 2) gradient_accumulation_fusion = True. When enabled, embedding weight gradients are delayed until pipeline flush to hide flush latency. wgrad_deferral_limit >= 0 controls how many microbatches to defer (0 = all). Invalid combinations raise ValueError in __post_init__.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:315-325", "megatron/core/model_parallel_config.py:407-420"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 107,
+      "category": "business_logic_constraints",
+      "question": "How does the batch P2P communication constraint work?",
+      "expected_answer": "batch_p2p_comm and overlap_p2p_comm are mutually exclusive. batch_p2p_comm=True uses batch_isend_irecv for efficiency. overlap_p2p_comm=True overlaps P2P with compute but requires individual send/recv. batch_p2p_sync adds synchronization for older PyTorch versions. overlap_p2p_comm_warmup_flush extends overlap to warmup/flush phases.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:290-331"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 108,
+      "category": "business_logic_constraints",
+      "question": "What constraints apply to the FFN hidden size configuration?",
+      "expected_answer": "ffn_hidden_size defaults to 4*hidden_size if not set. With gated_linear_unit, the projection is to ffn_hidden_size*2 (gate + value). ffn_hidden_size should typically be divisible by tensor_parallel_size for clean sharding. MoE layers use ffn_hidden_size for expert MLPs. moe_shared_expert_intermediate_size can differ for shared experts.",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py:119-121"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 109,
+      "category": "business_logic_constraints",
+      "question": "How does num_microbatches_calculator determine microbatch count?",
+      "expected_answer": "num_microbatches_calculator.py computes microbatches from global_batch_size / (dp_size * micro_batch_size). It handles rampup schedules where batch size increases. update_num_microbatches adjusts during training. The calculator ensures global batch divides evenly across DP ranks and microbatches. Checkpointing saves/restores the calculator state.",
+      "file_line_refs": ["megatron/core/num_microbatches_calculator.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 110,
+      "category": "business_logic_constraints",
+      "question": "What are the constraints on context parallel with attention?",
+      "expected_answer": "Context parallel (CP) requires: sequence_length divisible by context_parallel_size. Attention implementation must support CP (ring attention or similar). With hierarchical_context_parallel_sizes, the product must equal context_parallel_size. CP group communicates KV tensors. Position embeddings must account for per-rank sequence offset.",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:45-54"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 111,
+      "category": "business_logic_constraints",
+      "question": "How does weight decay handling differ for bias and normalization parameters?",
+      "expected_answer": "By default, weight decay is skipped for: 1) bias parameters (name ends with '.bias'), 2) parameters with shape length 1 (LayerNorm weights). get_standard_config_overrides creates ParamKey rules for wd_mult=0.0 on these. apply_wd_to_qk_layernorm=True is an exception that applies WD to QK layernorm params (Qwen3 style).",
+      "file_line_refs": ["megatron/core/optimizer/__init__.py:70-96"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 112,
+      "category": "business_logic_constraints",
+      "question": "What validation rules apply to window attention configuration?",
+      "expected_answer": "window_size is a tuple (left, right) for sliding window attention. -1 means infinite (full attention). window_attn_skip_freq controls mixing full attention layers: integer N means 1 full after N-1 SWA, or list pattern like [1,1,0,0] (1=SWA, 0=full). Helps models handle long contexts while maintaining global attention periodically.",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py:180-187"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 113,
+      "category": "business_logic_constraints",
+      "question": "How does the optimizer handle multiple distributed optimizer instances?",
+      "expected_answer": "num_distributed_optimizer_instances > 1 creates multiple optimizer instances across DP ranks. Each instance handles a subset of DP ranks. inter_dist_opt_group coordinates between instances. Gradients are all-reduced within instances. This is useful for very large DP sizes where single-instance communication is bottleneck.",
+      "file_line_refs": ["megatron/core/distributed/distributed_data_parallel.py:88-89"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 114,
+      "category": "business_logic_constraints",
+      "question": "What constraints apply to FP8 training configuration?",
+      "expected_answer": "FP8 training (config.fp8) requires Transformer Engine. Fp8Recipe enum specifies recipe (delayed scaling, etc.). Current scaling vs delayed scaling have different amax handling. fp8_wgrad uses FP8 for weight gradients. fp8_amax_history_len and fp8_amax_compute_algo control scaling. MXFP8 has separate configuration path.",
+      "file_line_refs": ["megatron/core/enums.py", "megatron/core/fp8_utils.py"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 115,
+      "category": "business_logic_constraints",
+      "question": "How does the indexed dataset determine optimal dtype for tokens?",
+      "expected_answer": "DType.optimal_dtype checks vocab_size: if < 65500, uses uint16 (2 bytes per token), else int32 (4 bytes). GPTDatasetConfig.token_dtype_code stores the code (8 for uint16, 4 for int32). This optimization halves storage for typical vocab sizes. The dtype must match between preprocessing and training.",
+      "file_line_refs": ["megatron/core/datasets/indexed_dataset.py:107-119", "megatron/core/datasets/gpt_dataset.py:76-96"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 116,
+      "category": "business_logic_constraints",
+      "question": "What rules govern the persistent layer norm kernel selection?",
+      "expected_answer": "Persistent layer norm kernel (APEX FastLayerNormFN) only supports specific hidden_sizes: [1024, 1536, 2048, ..., 65536] in steps. FusedLayerNorm checks if hidden_size is in persist_ln_hidden_sizes and HAVE_PERSIST_LAYER_NORM. If not, falls back to FusedLayerNormAffineFunction. This affects performance but not correctness.",
+      "file_line_refs": ["megatron/core/fusions/fused_layer_norm.py:73-99"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 117,
+      "category": "business_logic_constraints",
+      "question": "How does the training loop handle spiky loss detection?",
+      "expected_answer": "check_for_spiky_loss compares current loss against max observed loss * SPIKY_LOSS_FACTOR (10x). If exceeded, it's flagged as spiky. The rerun_state_machine can trigger a rerun with different RNG. This catches training instabilities early. Spiky losses often indicate gradient explosion or data issues.",
+      "file_line_refs": ["pretrain_gpt.py:100-101", "pretrain_gpt.py:149-150"],
+      "difficulty": "hard"
+    },
+    {
+      "id": 118,
+      "category": "calibration",
+      "question": "What is the name of the main configuration dataclass for transformer models?",
+      "expected_answer": "TransformerConfig",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py:34"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 119,
+      "category": "calibration",
+      "question": "What is the default value of tensor_model_parallel_size in ModelParallelConfig?",
+      "expected_answer": "1",
+      "file_line_refs": ["megatron/core/model_parallel_config.py:20"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 120,
+      "category": "calibration",
+      "question": "What function returns the appropriate forward-backward function based on pipeline parallelism configuration?",
+      "expected_answer": "get_forward_backward_func",
+      "file_line_refs": ["megatron/core/pipeline_parallel/schedules.py:45"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 121,
+      "category": "calibration",
+      "question": "What is the name of the base module class that all Megatron models extend?",
+      "expected_answer": "MegatronModule",
+      "file_line_refs": ["megatron/core/transformer/module.py:29"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 122,
+      "category": "calibration",
+      "question": "What is the header bytes sequence that starts an IndexedDataset index file?",
+      "expected_answer": "MMIDIDX followed by two null bytes (b'MMIDIDX\\x00\\x00')",
+      "file_line_refs": ["megatron/core/datasets/indexed_dataset.py:47"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 123,
+      "category": "calibration",
+      "question": "What is the default activation function in TransformerConfig?",
+      "expected_answer": "F.gelu (torch.nn.functional.gelu)",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py:157"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 124,
+      "category": "calibration",
+      "question": "What is the name of the router class used for top-k expert selection in MoE?",
+      "expected_answer": "TopKRouter",
+      "file_line_refs": ["megatron/core/transformer/moe/router.py:131"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 125,
+      "category": "calibration",
+      "question": "What is the default normalization type in TransformerConfig?",
+      "expected_answer": "LayerNorm",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py:189"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 126,
+      "category": "calibration",
+      "question": "What module provides the parallel_state alias 'mpu' for backward compatibility?",
+      "expected_answer": "megatron/core/__init__.py defines mpu = parallel_state",
+      "file_line_refs": ["megatron/core/__init__.py:26"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 127,
+      "category": "calibration",
+      "question": "What is the default layernorm epsilon value in TransformerConfig?",
+      "expected_answer": "1e-5",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py:140"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 128,
+      "category": "calibration",
+      "question": "What class handles rotary position embeddings in Megatron-Core?",
+      "expected_answer": "RotaryEmbedding",
+      "file_line_refs": ["megatron/core/models/common/embeddings/rotary_pos_embedding.py:36"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 129,
+      "category": "calibration",
+      "question": "What is the name of the GPT dataset configuration class?",
+      "expected_answer": "GPTDatasetConfig",
+      "file_line_refs": ["megatron/core/datasets/gpt_dataset.py:25"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 130,
+      "category": "calibration",
+      "question": "What is the default hidden_dropout value in TransformerConfig?",
+      "expected_answer": "0.1",
+      "file_line_refs": ["megatron/core/transformer/transformer_config.py:127"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 131,
+      "category": "calibration",
+      "question": "What is the name of the distributed data parallel wrapper class in megatron.core.distributed?",
+      "expected_answer": "DistributedDataParallel",
+      "file_line_refs": ["megatron/core/distributed/distributed_data_parallel.py:22"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 132,
+      "category": "calibration",
+      "question": "What is the default rotary_base value for position embeddings?",
+      "expected_answer": "10000",
+      "file_line_refs": ["megatron/core/models/common/embeddings/rotary_pos_embedding.py:64"],
+      "difficulty": "easy"
+    },
+    {
+      "id": 133,
+      "category": "negative_control",
+      "question": "Does Megatron-LM support automatic mixed precision (AMP) with torch.cuda.amp.autocast directly in the training loop?",
+      "expected_answer": "No, Megatron-LM does not use torch.cuda.amp.autocast directly for mixed precision. Instead, it uses its own Float16Module wrapper and explicit dtype management through the config (fp16/bf16 flags). The enable_autocast config option exists but triggers manual autocast context management, not the standard PyTorch AMP pattern.",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": 134,
+      "category": "negative_control",
+      "question": "Does Megatron-LM include a built-in Kubernetes operator for distributed training orchestration?",
+      "expected_answer": "No, Megatron-LM does not include a Kubernetes operator. It relies on external launchers like torchrun, SLURM, or manual mpirun for distributed training orchestration. Users need to set up their own cluster management infrastructure.",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": 135,
+      "category": "negative_control",
+      "question": "Does the codebase support training on AMD GPUs via ROCm?",
+      "expected_answer": "The codebase is primarily designed for NVIDIA GPUs with CUDA. While PyTorch itself supports ROCm, Megatron-LM relies heavily on NVIDIA-specific libraries (APEX, Transformer Engine, NCCL, custom CUDA kernels) that are not available on ROCm. There is no explicit ROCm support in the codebase.",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": 136,
+      "category": "negative_control",
+      "question": "Does Megatron-LM support automatic hyperparameter tuning or neural architecture search?",
+      "expected_answer": "No, Megatron-LM does not include built-in hyperparameter tuning or NAS capabilities. It focuses on efficient distributed training of predefined architectures. Users must use external tools (Optuna, Ray Tune, etc.) for hyperparameter optimization.",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": 137,
+      "category": "negative_control",
+      "question": "Does Megatron-LM include a native ONNX export functionality?",
+      "expected_answer": "Megatron-LM does not include native ONNX export. The export path goes through TensorRT-LLM for inference optimization. Users would need to manually implement ONNX export using torch.onnx.export, which may not support all Megatron-specific operations.",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": 138,
+      "category": "negative_control",
+      "question": "Does the GPTDataset support on-the-fly tokenization of raw text during training?",
+      "expected_answer": "No, GPTDataset requires pre-tokenized data in indexed binary format (.bin/.idx files). Raw text must be preprocessed using tools/preprocess_data.py before training. This is by design for efficiency - on-the-fly tokenization would be a significant bottleneck for large-scale training.",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": 139,
+      "category": "negative_control",
+      "question": "Does Megatron-LM support training with sparse attention patterns like BigBird or Longformer natively?",
+      "expected_answer": "No, Megatron-LM does not include native implementations of sparse attention patterns like BigBird or Longformer. It supports sliding window attention (window_size config) and full attention, but not the specific sparse patterns from those papers. Custom implementations would be needed.",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": 140,
+      "category": "negative_control",
+      "question": "Does Megatron-LM support dynamic batching where sequences of similar lengths are grouped automatically?",
+      "expected_answer": "No, Megatron-LM does not include automatic dynamic batching with length-based grouping. Batch composition is determined by the sampler, not dynamically at runtime. Packed sequences and variable length support exist but require explicit handling, not automatic grouping.",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": 141,
+      "category": "negative_control",
+      "question": "Does Megatron-LM include a built-in dataset versioning or lineage tracking system?",
+      "expected_answer": "No, Megatron-LM does not include dataset versioning or lineage tracking. The indexed dataset format stores data and indices but no version metadata. Users need external tools (DVC, MLflow, etc.) to track dataset versions and training data lineage.",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": 142,
+      "category": "negative_control",
+      "question": "Does Megatron-LM support training with gradient compression techniques like PowerSGD or error feedback?",
+      "expected_answer": "No, Megatron-LM does not include native gradient compression algorithms like PowerSGD. Gradient communication uses standard all-reduce or reduce-scatter without compression. The distributed optimizer reduces communication volume through sharding, not compression.",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    }
+  ]
+}

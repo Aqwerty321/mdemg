@@ -1229,14 +1229,246 @@ This creates a feedback loop where MDEMG learns from its own benchmark performan
 
 ---
 
-## 12. Version History
+## 12. Answer Contamination Prevention (MANDATORY)
+
+**The benchmark agent MUST NEVER have access to expected answers.**
+
+| File Type | Contains Answers | Agent Access |
+|-----------|------------------|--------------|
+| `*_agent.json` | NO | ✅ YES - Give to agent |
+| `*_master.json` | YES | ❌ NEVER - Grading only |
+| `benchmark_questions_*.json` | YES | ❌ NEVER |
+| `benchmark_questions_*_agent.json` | NO | ✅ YES |
+
+**Critical Rules:**
+1. Agent receives ONLY the `*_agent.json` file (questions without answers)
+2. The `*_master.json` file is used ONLY by the grading script AFTER agent completes
+3. NEVER include answer keys in agent prompts
+4. NEVER let agent access the master question file
+5. Violation of these rules INVALIDATES the entire benchmark
+
+**File Separation:**
+```
+questions/
+├── benchmark_questions_v1_agent.json   # → Agent input (NO answers)
+└── benchmark_questions_v1_master.json  # → Grading script only (HAS answers)
+```
+
+---
+
+## 13. Detailed Answer Format Specification
+
+### JSONL Answer Format (MANDATORY)
+
+Each answer MUST be a single JSON line with these exact fields:
+
+```json
+{"id": 1, "question": "What is MAX_TAKE?", "answer": "MAX_TAKE is 1000, defined in pagination.constants.ts:42", "files_consulted": ["src/pagination/pagination.constants.ts"], "file_line_refs": ["pagination.constants.ts:42"], "mdemg_skill_used": "retrieve", "confidence": "HIGH"}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | number | YES | Question ID from test set |
+| `question` | string | YES | Full question text |
+| `answer` | string | YES | Agent's answer (must include value + file:line) |
+| `files_consulted` | array | YES | All files read/retrieved |
+| `file_line_refs` | array | YES | Specific file:line citations |
+| `mdemg_skill_used` | string | MDEMG only | "consult" or "retrieve" |
+| `confidence` | string | YES | "HIGH", "MEDIUM", or "LOW" |
+
+**Confidence Levels:**
+- **HIGH**: Found exact value in correct file with line number
+- **MEDIUM**: Found relevant file but value not confirmed
+- **LOW**: Could not locate or uncertain
+
+---
+
+## 14. MDEMG API Configuration
+
+### Skill vs API Access
+
+**CRITICAL:** Sub-agents spawned via Task tool CANNOT access `/mdemg` skills. Skills are defined in `.claude/commands/` but are NOT inherited by sub-agents.
+
+**SOLUTION:** Use direct curl API calls to the MDEMG server.
+
+### MDEMG Skill Usage Pattern
+
+| Question Type | MDEMG Method | Rationale |
+|---------------|--------------|-----------|
+| `symbol-lookup` | `/v1/memory/retrieve` | Direct symbol search |
+| `multi-file`, `cross-module`, `system-wide` | `/v1/memory/consult` | Complex questions need SME synthesis |
+
+### API Endpoints
+
+| Endpoint | Purpose | Example |
+|----------|---------|---------|
+| `GET /healthz` | Health check | `curl localhost:9999/healthz` |
+| `POST /v1/memory/consult` | Get SME advice | See below |
+| `POST /v1/memory/retrieve` | Search memories | See below |
+| `GET /v1/memory/stats` | Space statistics | `curl 'localhost:9999/v1/memory/stats?space_id=<id>'` |
+
+### API Call Examples
+
+```bash
+# Consult API - for complex questions
+curl -s 'http://localhost:9999/v1/memory/consult' \
+  -H 'content-type: application/json' \
+  -d '{"space_id":"<space_id>","context":"Answering benchmark question","question":"<question>"}'
+
+# Retrieve API - for symbol lookups
+curl -s 'http://localhost:9999/v1/memory/retrieve' \
+  -H 'content-type: application/json' \
+  -d '{"space_id":"<space_id>","query_text":"<symbol>","top_k":10}'
+```
+
+### Task Agent Configuration
+
+**Required `allowed_tools` for benchmarks:**
+
+| Tool | Purpose |
+|------|---------|
+| `Bash` | For curl API calls to MDEMG |
+| `Read` | Reading question files and source files |
+| `Write` | Writing JSONL output |
+| `Grep`, `Glob` | File searching |
+
+**NOTE:** Do NOT include `Skill(mdemg)` in `allowed_tools` - use curl API calls instead.
+
+---
+
+## 15. Advanced Metrics
+
+### 15.1 Codebase Metrics (Collected Once Per Repo)
+
+Capture BEFORE running benchmarks. Store in `codebase_profile.json`.
+
+| Metric | Field Name | How to Collect |
+|--------|------------|----------------|
+| Total Files | `total_files` | `find . -type f \| wc -l` (filtered) |
+| Total LOC | `total_loc` | `wc -l` on all source files |
+| File Types | `file_types` | Extension breakdown |
+| Module Count | `module_count` | Count top-level directories |
+| Repo Commit | `repo_commit` | `git rev-parse HEAD` |
+
+### 15.2 Learning & State Persistence Metrics
+
+These metrics capture MDEMG's fundamental advantage: **state persistence under context churn**.
+
+| Metric | Name | Definition | Why it matters |
+|--------|------|------------|----------------|
+| **CSC** | Compaction Survival Curve | `Score(k)` where `k` is compaction count | Baseline degrades; MDEMG stays flat |
+| **PCD** | Post-Compaction Delta | `Δ score` after compaction | Makes "forgetting" measurable |
+| **DP@K** | Decision Persistence at K | `%` of commitments remembered after K compactions | Long-context ≠ long-term memory |
+| **RRAC** | Repeat Rate after Compaction | `%` of turns repeating prior work | Detects "looping" failures |
+| **CCC** | Context Churn Cost | Tokens + tool calls to recover state | Efficiency penalty of working-memory-only |
+
+### 15.3 Isolation & Reliability Metrics
+
+| Metric | Name | Definition | Why it matters |
+|--------|------|------------|----------------|
+| **RAA** | Repo Attribution Accuracy | `%` correctly identifying source corpus | Proves graph partitions knowledge |
+| **CRCR** | Cross-Repo Contamination Rate | `%` citing wrong `space_id` | Multi-tenant safety |
+| **E-Acc** | Evidence Accuracy | `%` of citations that support claim | Punishes citation spam |
+| **WER** | Wrong Evidence Rate | `%` with hallucinated citations | RAG confidence trick failure mode |
+
+### 15.4 Skepticism Reduction Metrics (MANDATORY)
+
+These 4 metrics expose ways systems "cheat" or collapse in real-world usage:
+
+| Metric | Description |
+|--------|-------------|
+| **WER** (Wrong-Evidence Rate) | 1 - E-Acc |
+| **Cross-Space Confusion Rate** | % citing files from wrong repo |
+| **Bottom-Decile Score (p10)** | Worst 10% performance floor |
+| **Completion Rate** | Graded / Expected |
+
+### 15.5 Compaction Ladder Protocol
+
+Stress test for persistent memory:
+
+1. **Plant Commitments**: Give agent 10-15 questions establishing decisions
+2. **Forced Compaction**: Force compaction/restart every N questions
+3. **Trace Persistence**: Continue 50-100 questions depending on earlier decisions
+4. **Calculate Metrics**: Compare baseline (memory=off) vs MDEMG
+
+---
+
+## 16. Codebase Preparation
+
+### 16.1 Clone/Locate Repository
+
+```bash
+# Clone from URL
+git clone https://github.com/org/repo.git /path/to/repo
+
+# Or use existing path
+cd /path/to/existing/repo
+```
+
+### 16.2 Generate File List
+
+```bash
+find /path/to/repo -type f \
+  -name "*.ts" -o -name "*.py" -o -name "*.go" -o -name "*.java" \
+  -o -name "*.rs" -o -name "*.json" -o -name "*.yaml" \
+  | grep -v node_modules | grep -v .git \
+  | sort > file-list.txt
+```
+
+### 16.3 Analyze Structure
+
+```bash
+tree -d -L 3 /path/to/repo > structure.txt
+```
+
+---
+
+## 17. Question Development
+
+### 17.1 Question Categories
+
+Create questions across these categories:
+
+| Category | Description | Example |
+|----------|-------------|---------|
+| `architecture_structure` | Module organization | "Why is X marked @Global?" |
+| `service_relationships` | Dependencies | "What services does X inject?" |
+| `business_logic_constraints` | Domain rules | "What prevents overlapping X?" |
+| `data_flow_integration` | Request flows | "Trace the flow when X happens" |
+| `cross_cutting_concerns` | Auth, logging | "How does audit logging work?" |
+| `negative_control` | Features that DON'T exist | "Does X support Y?" (answer: No) |
+| `calibration` | Easy baseline questions | "What file defines X?" |
+
+### 17.2 Question Quality Requirements
+
+Questions MUST be:
+1. **Multi-file** - Require understanding 2+ files
+2. **Verifiable** - Have concrete, code-referenced answers
+3. **Non-trivial** - Cannot be answered from single function
+4. **Specific** - Avoid vague "How does X work?"
+
+### 17.3 Question Verification
+
+**CRITICAL:** ~30-35% of LLM-generated answers contain errors.
+
+Common errors:
+- Wrong method names
+- Overstated functionality
+- Incorrect enums/constants
+
+Always verify answers against actual code before using.
+
+---
+
+## 18. Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-01-27 | Initial BENCHMARK_AGENT_RULES.md |
 | 2.0 | 2026-01-27 | Complete framework rewrite based on lessons learned |
 | 2.1 | 2026-01-27 | Added standardized summary schema and post-test analysis |
+| 2.2 | 2026-01-28 | Merged content from BENCHMARKING_GUIDE.md (contamination prevention, advanced metrics, API config, question development) |
 
 ---
 
-*This framework supersedes BENCHMARK_AGENT_RULES.md for all future benchmark testing.*
+*This framework supersedes BENCHMARK_AGENT_RULES.md and BENCHMARKING_GUIDE.md for all future benchmark testing.*

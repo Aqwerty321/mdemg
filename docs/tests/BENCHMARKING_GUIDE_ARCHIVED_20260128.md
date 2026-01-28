@@ -1,8 +1,10 @@
 # MDEMG Benchmarking Guide
 
-**Version:** 2.5
-**Last Updated:** 2026-01-26
+**Version:** 2.6
+**Last Updated:** 2026-01-28
 **Purpose:** Step-by-step guide for setting up, running, and analyzing MDEMG vs Baseline retrieval tests on new codebases
+
+> **Note:** This guide incorporates learnings from BENCHMARK_FRAMEWORK_V2.md including real-time guardrails, defective agent detection, and the standardized summary schema.
 
 ---
 
@@ -27,15 +29,27 @@
 | `symbol-lookup` | `/mdemg retrieve "<symbol_name>"` | Direct symbol search, no interpretation needed |
 | `multi-file`, `cross-module`, `system-wide`, `disambiguation`, `computed_value`, `relationship` | `/mdemg consult "<question>"` | Complex questions need SME synthesis |
 
-### Grading Formula
+### Grading Formula (V3)
 
 ```
-score = 0.70 * value_score + 0.30 * keyword_score
+score = 0.70 * evidence_score + 0.15 * semantic_score + 0.15 * concept_score
 
 where:
-  value_score = 1.0 if expected value found in answer, else 0.0
-  keyword_score = |keywords_found| / |keywords_expected|
+  evidence_score = Score based on file:line citation quality
+                   - 1.0: Strong evidence (file:line refs present and valid)
+                   - 0.5: Weak evidence (file refs without line numbers)
+                   - 0.0: No evidence
+  semantic_score = Cosine similarity between answer and expected answer embeddings
+  concept_score  = Keyword/concept overlap with expected answer
 ```
+
+### Evidence Tier Definitions
+
+| Tier | Criteria | Score Weight |
+|------|----------|--------------|
+| **Strong** | Answer includes `file:line` references (e.g., `handler.py:42`) | Full evidence credit |
+| **Weak** | Answer references files without line numbers | 50% evidence credit |
+| **None** | No file references in answer | 0% evidence credit |
 
 ### Public Framing (The Elevator Pitch)
 - **Non-Technical**: "Baseline can be accurate until the next context update. MDEMG is accurate because it doesn’t forget the work."
@@ -235,6 +249,85 @@ Each answer MUST be a single JSON line with these exact fields:
 | `confidence` | string | YES | "HIGH", "MEDIUM", or "LOW" |
 
 **CRITICAL:** Agents MUST append one line per answer to the output file. Do NOT output JSON arrays or pretty-printed JSON.
+
+### Real-Time Guardrails (MANDATORY)
+
+Implement these guardrails to prevent run failures before they happen:
+
+#### Hard-Stop Rules
+
+| Condition | Action | Rationale |
+|-----------|--------|-----------|
+| **3 consecutive answers missing line numbers** | Auto-interrupt, inject correction | Prevents evidence degradation |
+| **No new output for 2 minutes** | Stop run, mark INVALID | Prevents context exhaustion stalls |
+| **Duplicate question ID detected** | Stop run, mark INVALID | Data integrity violation |
+| **JSON parse error in output** | Stop run, mark INVALID | Output corruption |
+| **Metadata dumping detected** | Stop run, mark INVALID | Defective agent behavior |
+
+#### Defective Agent Detection (Critical Lesson from Megatron-LM Benchmark)
+
+Agents may exhibit "metadata dumping" behavior where they output raw MDEMG retrieval metadata instead of synthesized answers. Detect and immediately stop runs when answers contain these patterns:
+
+| Pattern | Example | Action |
+|---------|---------|--------|
+| `Package: __init__` | Agent dumping element descriptions | STOP, mark INVALID |
+| `Module: ... Contains N functions` | Raw MDEMG module metadata | STOP, mark INVALID |
+| `Related to: authentication, error-handling` | Raw concern tags | STOP, mark INVALID |
+| 10+ refs/question average | Dumping all retrieval results | Flag for investigation |
+| Avg answer length > 150 chars with low semantic score | Nonsense padding | Flag for investigation |
+
+**Detection Script:**
+```python
+def detect_metadata_dumping(answer_text):
+    """Detect if answer contains raw MDEMG metadata instead of synthesized response."""
+    patterns = [
+        r'Package:\s*__init__',
+        r'Module:.*Contains \d+ functions',
+        r'Related to:\s*\w+,\s*\w+',
+        r'Python module:',
+        r'File:\s+.*\.py\s*\nImports:',
+    ]
+    for pattern in patterns:
+        if re.search(pattern, answer_text):
+            return True
+    return False
+```
+
+### Run Validity Criteria
+
+A run is **VALID** if:
+- [ ] 100% questions answered
+- [ ] No duplicate IDs
+- [ ] No disqualification events (WebSearch, out-of-repo access)
+- [ ] No agent restarts mid-run
+- [ ] Output passes validation
+- [ ] No metadata dumping detected
+
+A run is **PARTIAL** if:
+- Questions answered < 100% but > 90%
+- No disqualification events
+
+A run is **INVALID** if:
+- Disqualification event occurred
+- Agent was restarted mid-run
+- Duplicate IDs found
+- < 90% questions answered
+- Metadata dumping detected
+
+### Standardized Summary Schema
+
+All benchmarks MUST produce a structured summary following the schema defined in `/docs/tests/blueseer/BENCHMARK_FRAMEWORK_V2.md` section 10. Key required fields:
+
+```json
+{
+  "$schema": "benchmark_summary_v2",
+  "metadata": { "benchmark_id": "...", "date": "...", "framework_version": "2.0" },
+  "environment": { "mdemg_version": "...", "target_repo": {...} },
+  "runs": [{ "run_id": "...", "status": "valid|partial|invalid", "grading": {...} }],
+  "aggregate": { "baseline": {...}, "mdemg": {...}, "comparison": {...} },
+  "findings": { "excluded_runs": [...], "key_insights": [...] }
+}
+```
 
 ---
 

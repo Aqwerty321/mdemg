@@ -156,3 +156,61 @@ A persistent memory system for LLMs providing:
 - Benchmark tests in `docs/tests/whk-wms/`
 - Run V11 test: `python3 docs/tests/whk-wms/run_mdemg_test_v11_alltracks.py`
 - Question file: `test_questions_v4_selected.json` (100 questions, seed 42)
+
+---
+
+## Enforced Protocols (Hook-Backed)
+
+These protocols are mechanically enforced by hooks in `.claude/hooks/`.
+The hooks run automatically — they are not optional.
+
+### Session Start Protocol
+The `session-start.sh` hook automatically calls `/v1/conversation/resume` on every session.
+```
+ON SESSION START:
+1. SessionStart hook runs automatically → CMS context injected
+2. Acknowledge restored context: "Resuming with: [key items]"
+3. If no CMS context appeared: warn user "CMS unavailable — memory disconnected"
+4. Before ANY action: review preferences and active tasks from CMS
+```
+
+### Decision Protocol
+```
+BEFORE ANY DECISION:
+1. Is this a reversible or irreversible action?
+2. If IRREVERSIBLE: ask user explicitly. NEVER proceed without confirmation.
+3. If reversible: check CMS for relevant preferences (prompt-context hook injects these)
+4. Observe the decision after it's made
+```
+
+### Destructive Action Blocklist
+The `pre-bash-check.py` hook automatically blocks these. If you hit a block,
+you MUST ask the user for explicit confirmation before retrying.
+```
+BLOCKED WITHOUT EXPLICIT USER CONFIRMATION:
+- reset-db, clear-space, DELETE nodes
+- rm -rf, rm -fr
+- git reset --hard, git push --force, git clean -f, git branch -D
+- DROP TABLE, TRUNCATE, DELETE FROM, DETACH DELETE
+- Any MATCH (n) DETACH DELETE n pattern
+```
+
+### Communication Protocol
+```
+BEFORE EVERY ACTION:
+1. State what you are about to do
+2. State why
+3. If it modifies data: get confirmation
+4. All long-running commands: run in foreground (user must see output)
+```
+
+### Automatic Observation Capture
+The `post-tool-observe.py` hook automatically captures:
+- Edits to CLAUDE.md or settings → `decision` observation
+- Bash errors → `error` observation
+- Successful builds/tests → `progress` observation
+You should still manually observe important decisions and user corrections.
+
+### Pre-Compaction Safety
+The `pre-compact.sh` hook saves a context snapshot to CMS before every compaction.
+This ensures critical state survives context window boundaries.

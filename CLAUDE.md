@@ -43,6 +43,26 @@ This space contains Claude's conversation memory. It is **protected from deletio
 - reset-db command skips this space entirely
 - This protection is hardcoded - do not circumvent it
 
+### Monitoring Learning Health
+Check the learning phase and score distribution periodically:
+```bash
+curl -s "http://localhost:9999/v1/memory/distribution?space_id=mdemg-dev" | jq '{phase: .stats.phase, edges: .stats.edge_count, alerts: .stats.alerts}'
+```
+
+**Learning Phases:** cold(0) → learning(1-10k) → warm(10k-50k) → saturated(50k+)
+
+If phase reaches `saturated`, consider running learning edge pruning.
+
+### Learning Freeze (For Stable Scoring)
+Freeze learning when stable, predictable scoring is needed:
+```bash
+# Freeze
+curl -s -X POST http://localhost:9999/v1/learning/freeze -H "Content-Type: application/json" -d '{"space_id":"mdemg-dev","reason":"stable scoring","frozen_by":"claude"}'
+
+# Unfreeze
+curl -s -X POST http://localhost:9999/v1/learning/unfreeze -H "Content-Type: application/json" -d '{"space_id":"mdemg-dev"}'
+```
+
 ---
 
 ## Orchestration Protocol

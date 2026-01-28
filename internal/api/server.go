@@ -246,10 +246,14 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/ape/trigger", s.handleAPETrigger)
 	mux.HandleFunc("/v1/learning/prune", s.handleLearningPrune)
 	mux.HandleFunc("/v1/learning/stats", s.handleLearningStats)
+	mux.HandleFunc("/v1/learning/freeze", s.handleLearningFreeze)
+	mux.HandleFunc("/v1/learning/unfreeze", s.handleLearningUnfreeze)
+	mux.HandleFunc("/v1/learning/freeze/status", s.handleLearningFreezeStatus)
 	mux.HandleFunc("/v1/memory/consult", s.handleConsult)
 	mux.HandleFunc("/v1/memory/suggest", s.handleSuggest)
 	mux.HandleFunc("/v1/memory/cache/stats", s.handleCacheStats)
 	mux.HandleFunc("/v1/memory/query/metrics", s.handleQueryMetrics)
+	mux.HandleFunc("/v1/memory/distribution", s.handleDistributionStats)
 	mux.HandleFunc("/v1/memory/symbols", s.handleSymbolSearch)
 
 	// Ingestion job management endpoints

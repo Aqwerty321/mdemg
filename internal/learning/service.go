@@ -3,6 +3,8 @@ package learning
 import (
 	"context"
 	"sort"
+	"sync"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
@@ -12,10 +14,123 @@ import (
 type Service struct {
 	cfg    config.Config
 	driver neo4j.DriverWithContext
+
+	// Freeze state tracking (per space)
+	freezeMu     sync.RWMutex
+	frozenSpaces map[string]FreezeState
+}
+
+// FreezeState tracks the frozen state of a space
+type FreezeState struct {
+	Frozen    bool      `json:"frozen"`
+	Reason    string    `json:"reason,omitempty"`
+	FrozenAt  time.Time `json:"frozen_at,omitempty"`
+	FrozenBy  string    `json:"frozen_by,omitempty"`
+	EdgeCount int64     `json:"edge_count_at_freeze,omitempty"`
 }
 
 func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
-	return &Service{cfg: cfg, driver: driver}
+	return &Service{
+		cfg:          cfg,
+		driver:       driver,
+		frozenSpaces: make(map[string]FreezeState),
+	}
+}
+
+// FreezeLearning stops all learning edge creation/updates for a space.
+// Existing edges are preserved but no new edges are created and weights are not updated.
+// Use this for production deployments where stable scoring is required.
+func (s *Service) FreezeLearning(ctx context.Context, spaceID, reason, frozenBy string) (FreezeState, error) {
+	s.freezeMu.Lock()
+	defer s.freezeMu.Unlock()
+
+	// Get current edge count for record-keeping (optional - don't fail if DB unavailable)
+	var edgeCount int64 = -1
+	if s.driver != nil {
+		count, err := s.getEdgeCountUnlocked(ctx, spaceID)
+		if err == nil {
+			edgeCount = count
+		}
+	}
+
+	state := FreezeState{
+		Frozen:    true,
+		Reason:    reason,
+		FrozenAt:  time.Now(),
+		FrozenBy:  frozenBy,
+		EdgeCount: edgeCount,
+	}
+	s.frozenSpaces[spaceID] = state
+	return state, nil
+}
+
+// UnfreezeLearning resumes learning edge creation/updates for a space.
+func (s *Service) UnfreezeLearning(spaceID string) FreezeState {
+	s.freezeMu.Lock()
+	defer s.freezeMu.Unlock()
+
+	delete(s.frozenSpaces, spaceID)
+	return FreezeState{Frozen: false}
+}
+
+// IsFrozen checks if learning is frozen for a space.
+func (s *Service) IsFrozen(spaceID string) bool {
+	s.freezeMu.RLock()
+	defer s.freezeMu.RUnlock()
+
+	state, exists := s.frozenSpaces[spaceID]
+	return exists && state.Frozen
+}
+
+// GetFreezeState returns the freeze state for a space.
+func (s *Service) GetFreezeState(spaceID string) FreezeState {
+	s.freezeMu.RLock()
+	defer s.freezeMu.RUnlock()
+
+	state, exists := s.frozenSpaces[spaceID]
+	if !exists {
+		return FreezeState{Frozen: false}
+	}
+	return state
+}
+
+// GetAllFreezeStates returns freeze states for all tracked spaces.
+func (s *Service) GetAllFreezeStates() map[string]FreezeState {
+	s.freezeMu.RLock()
+	defer s.freezeMu.RUnlock()
+
+	result := make(map[string]FreezeState)
+	for k, v := range s.frozenSpaces {
+		result[k] = v
+	}
+	return result
+}
+
+// getEdgeCountUnlocked queries the edge count (caller must hold lock)
+func (s *Service) getEdgeCountUnlocked(ctx context.Context, spaceID string) (int64, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `MATCH ()-[r:CO_ACTIVATED_WITH {space_id: $spaceId}]->()
+RETURN count(r) AS edge_count`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			count, _ := res.Record().Get("edge_count")
+			if c, ok := count.(int64); ok {
+				return c, nil
+			}
+		}
+		return int64(0), res.Err()
+	})
+	if err != nil {
+		return 0, err
+	}
+	return result.(int64), nil
 }
 
 type pair struct {
@@ -28,9 +143,15 @@ type pair struct {
 // ApplyCoactivation performs bounded, regularized learning updates.
 // DB writes are intentionally limited to small deltas.
 // Supports both code nodes and conversation_observation nodes with surprise-based weighting.
+// Returns immediately if learning is frozen for the space.
 func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp models.RetrieveResponse) error {
 	if spaceID == "" || len(resp.Results) < 2 {
 		return nil
+	}
+
+	// Check if learning is frozen for this space
+	if s.IsFrozen(spaceID) {
+		return nil // Silently skip - learning is frozen
 	}
 
 	// Filter nodes by activation threshold (configurable, default 0.20)
@@ -184,9 +305,15 @@ RETURN count(*) AS updated;`
 // - Temporal proximity (closer in time = stronger edge)
 // - Surprise scores (high surprise observations get stronger connections)
 // This enables session-based learning where related observations reinforce each other.
+// Returns immediately if learning is frozen for the space.
 func (s *Service) CoactivateSession(ctx context.Context, spaceID, sessionID string) error {
 	if spaceID == "" || sessionID == "" {
 		return nil
+	}
+
+	// Check if learning is frozen for this space
+	if s.IsFrozen(spaceID) {
+		return nil // Silently skip - learning is frozen
 	}
 
 	// Get Hebbian learning parameters

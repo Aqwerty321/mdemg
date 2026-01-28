@@ -148,6 +148,22 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 		s.gapDetector.RecordQueryResult(req.SpaceID, req.QueryText, avgScore, len(resp.Results))
 	}
 
+	// Record score distribution for learning phase monitoring
+	if len(resp.Results) > 0 {
+		scores := make([]float64, len(resp.Results))
+		for i, r := range resp.Results {
+			scores[i] = r.Score
+		}
+		dist := retrieval.ComputeDistribution(scores)
+		alerts := retrieval.GetDistributionMonitor().RecordDistribution(req.SpaceID, dist)
+		if len(alerts) > 0 {
+			if resp.Debug == nil {
+				resp.Debug = make(map[string]any)
+			}
+			resp.Debug["distribution_alerts"] = alerts
+		}
+	}
+
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -1701,7 +1717,105 @@ func (s *Server) handleLearningStats(w http.ResponseWriter, r *http.Request) {
 	stats["prune_threshold"] = s.cfg.LearningPruneThreshold
 	stats["max_edges_per_node"] = s.cfg.LearningMaxEdgesPerNode
 
+	// Include freeze state
+	freezeState := s.learner.GetFreezeState(spaceID)
+	stats["freeze_state"] = freezeState
+
 	writeJSON(w, http.StatusOK, stats)
+}
+
+// handleLearningFreeze handles POST /v1/learning/freeze
+// Freezes learning edge creation/updates for a space.
+// When frozen, no new CO_ACTIVATED_WITH edges are created and existing edges are not updated.
+// Use this for production deployments requiring stable scoring.
+func (s *Server) handleLearningFreeze(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		SpaceID  string `json:"space_id"`
+		Reason   string `json:"reason"`
+		FrozenBy string `json:"frozen_by"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if req.SpaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required"})
+		return
+	}
+
+	state, err := s.learner.FreezeLearning(r.Context(), req.SpaceID, req.Reason, req.FrozenBy)
+	if err != nil {
+		writeInternalError(w, err, "learning freeze")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"space_id": req.SpaceID,
+		"status":   "frozen",
+		"state":    state,
+		"message":  "Learning has been frozen for this space. No new edges will be created.",
+	})
+}
+
+// handleLearningUnfreeze handles POST /v1/learning/unfreeze
+// Resumes learning edge creation/updates for a space.
+func (s *Server) handleLearningUnfreeze(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		SpaceID string `json:"space_id"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if req.SpaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required"})
+		return
+	}
+
+	state := s.learner.UnfreezeLearning(req.SpaceID)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"space_id": req.SpaceID,
+		"status":   "unfrozen",
+		"state":    state,
+		"message":  "Learning has been resumed for this space.",
+	})
+}
+
+// handleLearningFreezeStatus handles GET /v1/learning/freeze/status
+// Returns freeze status for all spaces or a specific space.
+func (s *Server) handleLearningFreezeStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	spaceID := r.URL.Query().Get("space_id")
+
+	if spaceID != "" {
+		// Return status for specific space
+		state := s.learner.GetFreezeState(spaceID)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"space_id": spaceID,
+			"state":    state,
+		})
+		return
+	}
+
+	// Return status for all spaces
+	states := s.learner.GetAllFreezeStates()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"frozen_spaces": states,
+		"count":         len(states),
+	})
 }
 
 // handleCacheStats handles GET /v1/memory/cache/stats
@@ -2176,4 +2290,94 @@ func (s *Server) handlePoolMetrics(w http.ResponseWriter, r *http.Request) {
 			"num_gc":          memStats.NumGC,
 		},
 	})
+}
+
+// handleDistributionStats handles GET /v1/memory/distribution
+// Returns score distribution statistics for monitoring learning phases.
+// Query params:
+//   - space_id (required): Memory space to get stats for
+//   - history_limit: Number of historical distributions to include (default 10, max 100)
+func (s *Server) handleDistributionStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	query := r.URL.Query()
+	spaceID := query.Get("space_id")
+	if spaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query parameter is required"})
+		return
+	}
+
+	// Parse history limit
+	historyLimit := 10
+	if limitStr := query.Get("history_limit"); limitStr != "" {
+		if _, err := fmt.Sscanf(limitStr, "%d", &historyLimit); err != nil || historyLimit < 1 {
+			historyLimit = 10
+		}
+		if historyLimit > 100 {
+			historyLimit = 100
+		}
+	}
+
+	monitor := retrieval.GetDistributionMonitor()
+
+	// Fetch edge count from Neo4j to update learning phase
+	edgeCount, err := s.fetchLearningEdgeCount(r.Context(), spaceID)
+	if err != nil {
+		log.Printf("WARN: failed to fetch edge count for distribution stats: %v", err)
+	} else {
+		monitor.UpdateEdgeCount(spaceID, edgeCount)
+	}
+
+	// Get comprehensive stats
+	stats := monitor.GetStats(spaceID)
+
+	// Add phase thresholds for context
+	stats.PhaseThresholds = map[string]int64{
+		"learning":  retrieval.PhaseThresholds.Learning,
+		"warm":      retrieval.PhaseThresholds.Warm,
+		"saturated": retrieval.PhaseThresholds.Saturated,
+	}
+
+	// Add history if requested
+	history := monitor.GetHistory(spaceID, historyLimit)
+	if len(history) > 0 {
+		resp := map[string]any{
+			"stats":   stats,
+			"history": history,
+		}
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats)
+}
+
+// fetchLearningEdgeCount queries Neo4j for the count of CO_ACTIVATED_WITH edges in a space
+func (s *Server) fetchLearningEdgeCount(ctx context.Context, spaceID string) (int64, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	cypher := `MATCH ()-[r:CO_ACTIVATED_WITH {space_id: $spaceId}]->()
+RETURN count(r) AS edge_count`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			count, _ := res.Record().Get("edge_count")
+			if c, ok := count.(int64); ok {
+				return c, nil
+			}
+		}
+		return int64(0), res.Err()
+	})
+	if err != nil {
+		return 0, err
+	}
+	return result.(int64), nil
 }

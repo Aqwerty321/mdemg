@@ -104,19 +104,31 @@ jobs:
 
       - name: Start MDEMG server
         run: |
+          # Find an available port in range 8090-8199
+          for port in $(seq 8090 8199); do
+            if ! nc -z localhost $port 2>/dev/null; then
+              echo "Found available port: $port"
+              echo "MDEMG_PORT=$port" >> $GITHUB_ENV
+              break
+            fi
+          done
+
           export NEO4J_URI=bolt://localhost:7687
           export NEO4J_USER=neo4j
           export NEO4J_PASS=testpassword
-          export LISTEN_ADDR=:8082
+          export LISTEN_ADDR=:$port
           export EMBEDDING_PROVIDER=
           export REQUIRED_SCHEMA_VERSION=10
           ./bin/mdemg &
+
           # Wait for server to be ready
-          timeout 30s bash -c 'until curl -s http://localhost:8082/healthz > /dev/null 2>&1; do sleep 1; done'
-          echo "MDEMG server is ready"
+          timeout 30s bash -c "until curl -s http://localhost:$port/healthz > /dev/null 2>&1; do sleep 1; done"
+          echo "MDEMG server is ready on port $port"
 
       - name: Run Integration Tests
         run: go test -v -tags=integration ./tests/integration/...
+        env:
+          TEST_MDEMG_ENDPOINT: http://localhost:${{ env.MDEMG_PORT }}
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

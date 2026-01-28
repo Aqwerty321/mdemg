@@ -23,13 +23,23 @@ type Service struct {
 	embedder         Embedder
 	surpriseDetector *SurpriseDetector
 	learningService  LearningService
+	vectorIndexName  string
 }
 
 // NewService creates a new conversation service
 func NewService(driver neo4j.DriverWithContext, embedder Embedder) *Service {
+	return NewServiceWithConfig(driver, embedder, "memNodeEmbedding")
+}
+
+// NewServiceWithConfig creates a new conversation service with configurable index name
+func NewServiceWithConfig(driver neo4j.DriverWithContext, embedder Embedder, vectorIndexName string) *Service {
 	var surpriseDet *SurpriseDetector
 	if embedder != nil {
 		surpriseDet = NewSurpriseDetector(embedder, driver)
+	}
+
+	if vectorIndexName == "" {
+		vectorIndexName = "memNodeEmbedding"
 	}
 
 	return &Service{
@@ -37,6 +47,7 @@ func NewService(driver neo4j.DriverWithContext, embedder Embedder) *Service {
 		embedder:         embedder,
 		surpriseDetector: surpriseDet,
 		learningService:  nil, // Set via SetLearningService to avoid circular dependency
+		vectorIndexName:  vectorIndexName,
 	}
 }
 
@@ -736,8 +747,8 @@ func (s *Service) findSimilarObservations(ctx context.Context, spaceID string, e
 	defer sess.Close(ctx)
 
 	// Use vector similarity search on conversation_observation nodes
-	cypher := `
-CALL db.index.vector.queryNodes('mdemg_vector_index', $topK * 2, $embedding)
+	cypher := fmt.Sprintf(`
+CALL db.index.vector.queryNodes('%s', $topK * 2, $embedding)
 YIELD node, score
 WHERE node.space_id = $spaceId
   AND node.role_type = 'conversation_observation'
@@ -747,7 +758,7 @@ RETURN node.node_id AS nodeId, node.content AS content, node.summary AS summary,
        node.obs_type AS obsType, node.surprise_score AS surpriseScore,
        node.session_id AS sessionId, score
 ORDER BY score DESC
-LIMIT $topK`
+LIMIT $topK`, s.vectorIndexName)
 
 	params := map[string]any{
 		"spaceId":   spaceID,
@@ -796,8 +807,8 @@ func (s *Service) findSimilarThemes(ctx context.Context, spaceID string, embeddi
 	defer sess.Close(ctx)
 
 	// Use vector similarity search on conversation_theme nodes
-	cypher := `
-CALL db.index.vector.queryNodes('mdemg_vector_index', $topK * 2, $embedding)
+	cypher := fmt.Sprintf(`
+CALL db.index.vector.queryNodes('%s', $topK * 2, $embedding)
 YIELD node, score
 WHERE node.space_id = $spaceId
   AND node.role_type = 'conversation_theme'
@@ -807,7 +818,7 @@ RETURN node.node_id AS nodeId, node.name AS name, node.summary AS summary,
        node.member_count AS memberCount, node.dominant_obs_type AS dominantObsType,
        node.avg_surprise_score AS avgSurpriseScore, score
 ORDER BY score DESC
-LIMIT $topK`
+LIMIT $topK`, s.vectorIndexName)
 
 	params := map[string]any{
 		"spaceId":   spaceID,
@@ -853,8 +864,8 @@ func (s *Service) findSimilarConcepts(ctx context.Context, spaceID string, embed
 	defer sess.Close(ctx)
 
 	// Use vector similarity search on emergent_concept nodes
-	cypher := `
-CALL db.index.vector.queryNodes('mdemg_vector_index', $topK * 2, $embedding)
+	cypher := fmt.Sprintf(`
+CALL db.index.vector.queryNodes('%s', $topK * 2, $embedding)
 YIELD node, score
 WHERE node.space_id = $spaceId
   AND node.role_type = 'emergent_concept'
@@ -864,7 +875,7 @@ RETURN node.node_id AS nodeId, node.name AS name, node.summary AS summary,
        node.layer AS layer, node.keywords AS keywords,
        node.session_count AS sessionCount, score
 ORDER BY score DESC
-LIMIT $topK`
+LIMIT $topK`, s.vectorIndexName)
 
 	params := map[string]any{
 		"spaceId":   spaceID,

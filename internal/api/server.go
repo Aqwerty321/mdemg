@@ -127,8 +127,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	// Initialize conversation service (Phase 1: Observation Capture with Surprise Detection)
 	var convSvc *conversation.Service
 	if emb != nil {
-		convSvc = conversation.NewService(driver, emb)
-		log.Printf("Conversation service initialized")
+		convSvc = conversation.NewServiceWithConfig(driver, emb, cfg.VectorIndexName)
+		log.Printf("Conversation service initialized (vector index: %s)", cfg.VectorIndexName)
 	} else {
 		log.Printf("Conversation service disabled (requires embedder)")
 	}

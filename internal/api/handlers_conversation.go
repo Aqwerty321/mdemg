@@ -46,6 +46,7 @@ func (s *Server) handleObserve(w http.ResponseWriter, r *http.Request) {
 		Metadata:   req.Metadata,
 		UserID:     req.UserID,
 		Visibility: req.Visibility,
+		RefersTo:   req.RefersTo,
 	}
 
 	resp, err := s.conversationSvc.Observe(r.Context(), internalReq)
@@ -100,6 +101,7 @@ func (s *Server) handleCorrect(w http.ResponseWriter, r *http.Request) {
 		Context:    req.Context,
 		UserID:     req.UserID,
 		Visibility: req.Visibility,
+		RefersTo:   req.RefersTo,
 	}
 
 	resp, err := s.conversationSvc.Correct(r.Context(), internalReq)

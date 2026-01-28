@@ -69,6 +69,9 @@ type ObserveRequest struct {
 	// Identity & Visibility (CMS v2)
 	UserID     string `json:"user_id,omitempty"`
 	Visibility string `json:"visibility,omitempty"` // private|team|global
+
+	// Cross-module linking (CMS v2)
+	RefersTo []string `json:"refers_to,omitempty"` // Node/symbol IDs this observation references
 }
 
 // ObserveResponse is the response from capturing an observation
@@ -91,6 +94,9 @@ type CorrectRequest struct {
 	// Identity & Visibility (CMS v2)
 	UserID     string `json:"user_id,omitempty"`
 	Visibility string `json:"visibility,omitempty"` // private|team|global
+
+	// Cross-module linking (CMS v2)
+	RefersTo []string `json:"refers_to,omitempty"` // Node/symbol IDs this correction references
 }
 
 // Observe captures a conversation observation
@@ -189,6 +195,17 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 	log.Printf("Created conversation observation %s (node=%s, type=%s, surprise=%.2f)",
 		obsID, nodeID, obsType, surpriseScore)
 
+	// Create REFERS_TO edges for cross-module linking
+	if len(req.RefersTo) > 0 {
+		edgesCreated, err := s.createRefersToEdges(ctx, req.SpaceID, nodeID, req.RefersTo)
+		if err != nil {
+			// Log but don't fail - references are an enhancement
+			log.Printf("WARNING: failed to create REFERS_TO edges: %v", err)
+		} else if edgesCreated > 0 {
+			log.Printf("Created %d REFERS_TO edges from observation %s", edgesCreated, nodeID)
+		}
+	}
+
 	// Trigger session-based coactivation if learning service is available
 	// This creates CO_ACTIVATED_WITH edges between observations in the same session
 	if s.learningService != nil && req.SessionID != "" {
@@ -235,6 +252,7 @@ func (s *Service) Correct(ctx context.Context, req CorrectRequest) (*ObserveResp
 		},
 		UserID:     req.UserID,
 		Visibility: req.Visibility,
+		RefersTo:   req.RefersTo,
 	}
 
 	resp, err := s.Observe(ctx, obsReq)

@@ -65,8 +65,6 @@ func (p *XMLParser) IsTestFile(path string) bool {
 }
 
 func (p *XMLParser) ParseFile(root, path string, extractSymbols bool) ([]CodeElement, error) {
-	var elements []CodeElement
-
 	content, err := ReadFileContent(path)
 	if err != nil {
 		return nil, err

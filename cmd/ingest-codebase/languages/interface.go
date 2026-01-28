@@ -84,7 +84,7 @@ func GetParserForFile(path string) (LanguageParser, bool) {
 // AllParsers returns all registered parsers
 func AllParsers() []LanguageParser {
 	parsers := make([]LanguageParser, 0, len(registry))
-	for _, p := range parsers {
+	for _, p := range registry {
 		parsers = append(parsers, p)
 	}
 	return parsers

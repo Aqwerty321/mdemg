@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"mdemg/cmd/ingest-codebase/languages"
 	"mdemg/internal/summarize"
 )
 
@@ -58,6 +59,9 @@ var (
 	llmSummaryModel    = flag.String("llm-summary-model", "gpt-4o-mini", "Model for LLM summaries")
 	llmSummaryBatch    = flag.Int("llm-summary-batch", 10, "Files per LLM API call for summaries")
 	llmSummaryProvider = flag.String("llm-summary-provider", "openai", "LLM provider for summaries (openai/ollama)")
+
+	// Info flags
+	listLanguages = flag.Bool("list-languages", false, "List supported languages and exit")
 )
 
 // Global summarize service (nil if disabled)
@@ -332,6 +336,23 @@ func archiveDeletedNodes(client *http.Client, endpoint, spaceID string, deletedP
 
 func main() {
 	flag.Parse()
+
+	// Handle --list-languages flag
+	if *listLanguages {
+		fmt.Println("Supported Languages:")
+		fmt.Println()
+		fmt.Printf("%-20s %-15s %s\n", "LANGUAGE", "PARSER", "EXTENSIONS")
+		fmt.Printf("%-20s %-15s %s\n", "--------", "------", "----------")
+		for _, parser := range languages.AllParsers() {
+			fmt.Printf("%-20s %-15s %s\n",
+				parser.Name(),
+				parser.Name()+"_parser.go",
+				strings.Join(parser.Extensions(), ", "))
+		}
+		fmt.Println()
+		fmt.Printf("Total: %d languages\n", len(languages.AllParsers()))
+		os.Exit(0)
+	}
 
 	// Load .env file for dynamic configuration
 	if err := godotenv.Load(); err != nil {

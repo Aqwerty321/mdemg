@@ -49,8 +49,10 @@ func (p *PythonParser) ParseFile(root, path string, extractSymbols bool) ([]Code
 	moduleName := strings.TrimSuffix(fileName, ".py")
 
 	// Find classes, functions, and imports
-	classes := FindAllMatches(content, `class\s+(\w+)`)
-	functions := FindAllMatches(content, `def\s+(\w+)\s*\(`)
+	// Use (?m)^ to match at line start, require colon or parenthesis after name
+	// This avoids matching "class that" in docstrings like "A dummy class that..."
+	classes := FindAllMatches(content, `(?m)^\s*class\s+(\w+)\s*[:\(]`)
+	functions := FindAllMatches(content, `(?m)^\s*def\s+(\w+)\s*\(`)
 	imports := FindAllMatches(content, `^(?:from\s+[\w.]+\s+)?import\s+([\w.]+)`)
 
 	// Build content for embedding
@@ -114,13 +116,15 @@ func (p *PythonParser) ParseFile(root, path string, extractSymbols bool) ([]Code
 		Symbols:  symbols,
 	})
 
-	// Add classes as separate elements
+	// Add classes as separate elements with enhanced content for better retrieval
 	for _, cls := range uniqueStrings(classes) {
+		// Try to extract class definition and docstring for better embedding
+		classContent := extractClassContent(content, cls, moduleName)
 		elements = append(elements, CodeElement{
 			Name:     cls,
 			Kind:     "class",
 			Path:     fmt.Sprintf("/%s#%s", relPath, cls),
-			Content:  fmt.Sprintf("Python class '%s' in module %s", cls, moduleName),
+			Content:  classContent,
 			Package:  moduleName,
 			FilePath: relPath,
 			Tags:     append([]string{"python", "class"}, concerns...),
@@ -224,4 +228,82 @@ func formatPythonReturn(returnType string) string {
 		return ""
 	}
 	return " -> " + returnType
+}
+
+// extractClassContent extracts a class definition with docstring for better embedding.
+// Returns enhanced content that includes class signature, docstring, and key attributes.
+func extractClassContent(content, className, moduleName string) string {
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("Python class %s in module %s\n", className, moduleName))
+
+	// Find class definition
+	classPattern := regexp.MustCompile(fmt.Sprintf(`(?m)^class\s+%s\s*(?:\(([^)]*)\))?\s*:`, regexp.QuoteMeta(className)))
+	match := classPattern.FindStringSubmatchIndex(content)
+	if match == nil {
+		return result.String()
+	}
+
+	// Extract base classes if present
+	if match[2] != -1 && match[3] != -1 {
+		bases := content[match[2]:match[3]]
+		if bases != "" {
+			result.WriteString(fmt.Sprintf("Inherits from: %s\n", bases))
+		}
+	}
+
+	// Find class body start
+	classStart := match[0]
+	lines := strings.Split(content[classStart:], "\n")
+
+	// Extract docstring if present (first string after class:)
+	docLines := []string{}
+	inDocstring := false
+	docstringDelim := ""
+	for i := 1; i < len(lines) && i < 30; i++ {
+		line := strings.TrimSpace(lines[i])
+		if !inDocstring {
+			if strings.HasPrefix(line, `"""`) || strings.HasPrefix(line, `'''`) {
+				inDocstring = true
+				docstringDelim = line[:3]
+				docLine := strings.TrimPrefix(line, docstringDelim)
+				if strings.HasSuffix(docLine, docstringDelim) {
+					// Single-line docstring
+					docLines = append(docLines, strings.TrimSuffix(docLine, docstringDelim))
+					break
+				}
+				docLines = append(docLines, docLine)
+			} else if line != "" && !strings.HasPrefix(line, "#") {
+				// Not a docstring, move on
+				break
+			}
+		} else {
+			if strings.HasSuffix(line, docstringDelim) {
+				docLines = append(docLines, strings.TrimSuffix(line, docstringDelim))
+				break
+			}
+			docLines = append(docLines, line)
+		}
+	}
+
+	if len(docLines) > 0 {
+		docstring := strings.Join(docLines, " ")
+		if len(docstring) > 500 {
+			docstring = docstring[:500] + "..."
+		}
+		result.WriteString(fmt.Sprintf("Description: %s\n", docstring))
+	}
+
+	// Extract class attributes (lines with : type annotation)
+	attrPattern := regexp.MustCompile(`^\s{4}(\w+)\s*:\s*(.+?)(?:\s*=.*)?$`)
+	attrs := []string{}
+	for i := 1; i < len(lines) && i < 50 && len(attrs) < 10; i++ {
+		if attrMatch := attrPattern.FindStringSubmatch(lines[i]); attrMatch != nil {
+			attrs = append(attrs, fmt.Sprintf("%s: %s", attrMatch[1], attrMatch[2]))
+		}
+	}
+	if len(attrs) > 0 {
+		result.WriteString(fmt.Sprintf("Key attributes: %s\n", strings.Join(attrs, ", ")))
+	}
+
+	return result.String()
 }

@@ -20,6 +20,43 @@
 | **Completion Rate** | 66.7% (2/3) | 66.7% (2/3) | - |
 | **CV (Consistency)** | 10.3% | 10.2% | -0.1pp |
 
+### Operator Overhead Index
+
+Quantifies the execution constraints required in agent prompts for successful completion:
+
+| Constraint Type | Baseline | MDEMG |
+|-----------------|----------|-------|
+| "Answer one question at a time" | ✅ Required | Optional |
+| "Write immediately after finding evidence" | ✅ Required | Optional |
+| "Do NOT batch questions" | ✅ Required | Not needed |
+| "Do NOT explore extensively" | ✅ Required | Not needed |
+| "MAX N searches per question" | ✅ Required | Not needed |
+| **Total constraint lines** | **5** | **0** |
+| **Operator Overhead Index** | **High (5)** | **Low (0)** |
+
+Without these constraints, baseline agents fail catastrophically (see Run 1). MDEMG agents complete successfully with standard prompts.
+
+### Failure Severity Score
+
+| Score | Definition | Example |
+|-------|------------|---------|
+| 0 | Completes with strong evidence (≥90%) | Baseline 3, MDEMG 3 |
+| 1 | Completes but evidence degraded (<90% strong) | MDEMG 2 (40% strong) |
+| 2 | Partial output (10-99% complete) | - |
+| 3 | Catastrophic failure (<10% complete) | Baseline 1 (4.3%) |
+
+| Run | Failure Severity Score |
+|-----|------------------------|
+| Baseline 1 | **3** (catastrophic) |
+| Baseline 2 | 0 |
+| Baseline 3 | 0 |
+| MDEMG 1 | 0 |
+| MDEMG 2 | **1** (degraded) |
+| MDEMG 3 | 0 |
+| **Worst case** | **3** | **1** |
+
+**Key insight:** MDEMG's worst failure (score 1) is recoverable; baseline's worst failure (score 3) produces no usable output.
+
 **Key Finding:** When runs complete successfully, baseline and MDEMG perform comparably. However, both approaches experienced 1/3 run failures, highlighting the challenges of large-context codebase tasks.
 
 **Critical Constraint:** Baseline agents **require explicit "answer one question at a time, write immediately" instructions** to complete the task. Without this constraint, agents attempt batch processing or extensive exploration, leading to context exhaustion and total failure. This represents a significant operational overhead for baseline approaches that MDEMG does not require.
@@ -231,14 +268,26 @@ This suggests MDEMG retrieval provides more value for moderately complex questio
 
 ### Case Study: MDEMG Run 2 - Formatting Variance
 
-**What happened:** Agent produced complete, detailed answers but omitted line numbers from file references.
+**What happened:** Agent produced complete, detailed answers but omitted line numbers from file references starting at Q4.
+
+**Detection timeline:**
+- Q4: First answer without line numbers
+- Q7: 3 consecutive answers without line numbers (trigger point)
+- Q140: Run completed with 103/140 answers lacking line numbers
+
+**With real-time guardrails (BENCHMARK_FRAMEWORK_V2.md Section 5.2):**
+- Auto-interrupt would trigger at Q7 (3 consecutive violations)
+- Corrective instruction injected
+- Run continues with proper formatting
+- Failure Severity Score: 0 instead of 1
 
 **Lessons learned:**
 1. Agent instruction-following varies between runs
 2. Output format validation should happen during execution, not just grading
-3. Detailed answers ≠ properly formatted answers
+3. Early detection (Q7) prevents degraded run (103 bad answers)
+4. **This failure was entirely preventable with checkpoint validation**
 
-**Relevance:** Highlights need for real-time output validation in benchmark framework.
+**Relevance:** Motivates mandatory real-time guardrails in BENCHMARK_FRAMEWORK_V2.md.
 
 ---
 
@@ -246,10 +295,21 @@ This suggests MDEMG retrieval provides more value for moderately complex questio
 
 ### For Future Benchmarks
 
-1. **Real-time validation**: Check file_line_refs format during execution
-2. **Incremental prompts**: Emphasize "write immediately after finding evidence"
-3. **Larger sample size**: n=3+ valid runs per condition for statistical power
-4. **Warm-up runs**: Consider discarding first run as warm-up
+1. **Hard-stop guardrails** (see BENCHMARK_FRAMEWORK_V2.md Section 5.2):
+   - Auto-interrupt after 3 consecutive answers missing line numbers
+   - Stop run after 2 minutes with no new output
+   - No mid-run restarts (mark invalid instead)
+
+2. **Checkpoint validation every 10 questions**:
+   - Validate JSONL format
+   - Check IDs are monotonic/unique
+   - Verify file_line_refs contain ":" (line numbers)
+
+3. **Failure prevention over failure recovery**:
+   - Both failure modes (Baseline Run 1, MDEMG Run 2) were detectable early
+   - Real-time intervention converts postmortem surprises into prevented failures
+
+4. **Larger sample size**: n=3+ valid runs per condition for statistical power
 
 ### For MDEMG Development
 

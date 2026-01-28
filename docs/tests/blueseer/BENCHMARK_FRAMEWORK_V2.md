@@ -267,7 +267,81 @@ if __name__ == "__main__":
     sys.exit(0 if validate(sys.argv[1]) else 1)
 ```
 
-### 5.2 Monitoring During Execution
+### 5.2 Real-Time Guardrails (MANDATORY)
+
+Implement these guardrails to prevent run failures before they happen:
+
+#### Checkpoint Validation (Every 10 Questions)
+
+After every 10 answers written, automatically validate:
+
+```python
+def checkpoint_validate(filepath, last_check_count):
+    """Run after every 10 new answers."""
+    with open(filepath) as f:
+        lines = f.readlines()
+
+    new_answers = lines[last_check_count:]
+    issues = []
+
+    for line in new_answers:
+        obj = json.loads(line)
+        refs = obj.get('file_line_refs', [])
+
+        # Check for missing line numbers
+        if refs and not any(':' in ref for ref in refs):
+            issues.append(f"Q{obj['id']}: Missing line numbers in refs")
+
+    return issues
+```
+
+#### Hard-Stop Rules
+
+| Condition | Action | Rationale |
+|-----------|--------|-----------|
+| **3 consecutive answers missing line numbers** | Auto-interrupt, inject correction | Prevents evidence degradation (MDEMG Run 2 failure mode) |
+| **No new output for 2 minutes** | Stop run, mark INVALID | Prevents context exhaustion (Baseline Run 1 failure mode) |
+| **Duplicate question ID detected** | Stop run, mark INVALID | Data integrity violation |
+| **JSON parse error** | Stop run, mark INVALID | Output corruption |
+
+#### Corrective Intervention Script
+
+When line number issues detected:
+
+```python
+def inject_correction(agent_id, last_question_id):
+    """Interrupt agent and inject correction instruction."""
+    correction = f"""
+STOP. Format violation detected.
+
+Your last answers are missing line numbers in file_line_refs.
+WRONG: ["ordData.java", "invData.java"]
+RIGHT: ["ordData.java:123", "invData.java:456"]
+
+Re-answer question {last_question_id} with proper file:line references.
+Then continue with the next question.
+"""
+    # Implementation depends on agent framework
+    return correction
+```
+
+#### Stall Detection
+
+```python
+import time
+from pathlib import Path
+
+def monitor_for_stall(filepath, timeout_seconds=120):
+    """Return True if file hasn't been modified in timeout_seconds."""
+    if not Path(filepath).exists():
+        return False
+
+    mtime = Path(filepath).stat().st_mtime
+    age = time.time() - mtime
+    return age > timeout_seconds
+```
+
+### 5.3 Monitoring During Execution
 
 Every 30 seconds during agent execution:
 
@@ -278,8 +352,19 @@ wc -l /tmp/answers_{type}_run{N}.jsonl
 # Check last ID written
 tail -1 /tmp/answers_{type}_run{N}.jsonl | jq .id
 
+# Check for line number issues in last 5 answers
+tail -5 /tmp/answers_{type}_run{N}.jsonl | python3 -c "
+import sys, json
+for line in sys.stdin:
+    obj = json.loads(line)
+    refs = obj.get('file_line_refs', [])
+    has_lines = any(':' in r for r in refs)
+    status = '✓' if has_lines else '✗ MISSING LINE NUMBERS'
+    print(f'Q{obj[\"id\"]}: {status}')
+"
+
 # Detect stalls (no progress for 2+ minutes)
-# If stalled: investigate, do NOT restart
+# If stalled: STOP RUN, mark INVALID (no restarts mid-run)
 ```
 
 ---

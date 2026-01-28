@@ -1171,12 +1171,23 @@ func generateSummary(elem CodeElement) string {
 	if len(elem.Symbols) > 0 {
 		constCount := 0
 		funcCount := 0
+		var classNames []string
 		for _, s := range elem.Symbols {
 			switch s.Type {
 			case "const", "enum_value":
 				constCount++
 			case "function":
 				funcCount++
+			case "class":
+				classNames = append(classNames, s.Name)
+			}
+		}
+		// Include class names in summary (critical for re-ranking)
+		if len(classNames) > 0 {
+			if len(classNames) > 3 {
+				summary.WriteString(fmt.Sprintf(". Defines classes: %s, and %d more", strings.Join(classNames[:3], ", "), len(classNames)-3))
+			} else {
+				summary.WriteString(fmt.Sprintf(". Defines classes: %s", strings.Join(classNames, ", ")))
 			}
 		}
 		if constCount > 0 || funcCount > 0 {

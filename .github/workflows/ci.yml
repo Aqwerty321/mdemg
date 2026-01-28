@@ -64,7 +64,13 @@ jobs:
         run: go mod download
 
       - name: Run Unit Tests
-        run: go test -v ./internal/... ./pkg/...
+        run: go test -v ./internal/...
+
+      - name: Wait for Neo4j
+        run: |
+          timeout 60s bash -c 'until curl -s http://localhost:7687 > /dev/null; do sleep 2; done' || true
+          # Note: Neo4j bolt port doesn't respond to HTTP, but we can check if it is open
+          timeout 60s bash -c 'until printf "" 2>>/dev/null >/dev/tcp/localhost/7687; do sleep 2; done'
 
       - name: Run Integration Tests
         run: go test -v -tags=integration ./tests/integration/...

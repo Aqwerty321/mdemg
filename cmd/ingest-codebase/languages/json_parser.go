@@ -19,11 +19,14 @@ func (p *JSONParser) Name() string {
 }
 
 func (p *JSONParser) Extensions() []string {
-	return []string{".json"}
+	return []string{".json", ".jsonl", ".ndjson"}
 }
 
 func (p *JSONParser) CanParse(path string) bool {
-	return strings.HasSuffix(strings.ToLower(path), ".json")
+	pathLower := strings.ToLower(path)
+	return strings.HasSuffix(pathLower, ".json") ||
+		strings.HasSuffix(pathLower, ".jsonl") ||
+		strings.HasSuffix(pathLower, ".ndjson")
 }
 
 func (p *JSONParser) IsTestFile(path string) bool {
@@ -45,32 +48,64 @@ func (p *JSONParser) ParseFile(root, path string, extractSymbols bool) ([]CodeEl
 
 	relPath, _ := filepath.Rel(root, path)
 	fileName := filepath.Base(path)
+	pathLower := strings.ToLower(path)
 
-	// Try to parse JSON to extract structure info
-	var jsonData interface{}
-	jsonErr := json.Unmarshal([]byte(content), &jsonData)
+	// Check if this is a JSONL (JSON Lines) file
+	isJSONL := strings.HasSuffix(pathLower, ".jsonl") || strings.HasSuffix(pathLower, ".ndjson")
 
 	// Build content for embedding
 	var contentBuilder strings.Builder
-	contentBuilder.WriteString(fmt.Sprintf("JSON file: %s\n", fileName))
 
 	// Detect file type based on filename
 	jsonKind := p.detectJsonKind(fileName)
-	contentBuilder.WriteString(fmt.Sprintf("Type: %s\n", jsonKind))
 
-	// Extract structure info if valid JSON
-	if jsonErr == nil {
-		keys := p.extractTopLevelKeys(jsonData)
-		if len(keys) > 0 {
-			if len(keys) > 20 {
-				keys = keys[:20]
-				contentBuilder.WriteString(fmt.Sprintf("Top-level keys: %s (and more)\n", strings.Join(keys, ", ")))
-			} else {
-				contentBuilder.WriteString(fmt.Sprintf("Top-level keys: %s\n", strings.Join(keys, ", ")))
+	var jsonData interface{}
+	var jsonErr error
+
+	if isJSONL {
+		// Handle JSONL: each line is a separate JSON object
+		contentBuilder.WriteString(fmt.Sprintf("JSONL file: %s\n", fileName))
+		contentBuilder.WriteString(fmt.Sprintf("Type: %s\n", jsonKind))
+
+		lines := strings.Split(strings.TrimSpace(content), "\n")
+		contentBuilder.WriteString(fmt.Sprintf("Records: %d\n", len(lines)))
+
+		// Parse first non-empty line to get structure
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
 			}
+			jsonErr = json.Unmarshal([]byte(line), &jsonData)
+			if jsonErr == nil {
+				keys := p.extractTopLevelKeys(jsonData)
+				if len(keys) > 0 {
+					contentBuilder.WriteString(fmt.Sprintf("Record fields: %s\n", strings.Join(keys, ", ")))
+				}
+			}
+			break
 		}
 	} else {
-		contentBuilder.WriteString("Warning: Invalid JSON\n")
+		// Handle regular JSON
+		contentBuilder.WriteString(fmt.Sprintf("JSON file: %s\n", fileName))
+		contentBuilder.WriteString(fmt.Sprintf("Type: %s\n", jsonKind))
+
+		jsonErr = json.Unmarshal([]byte(content), &jsonData)
+
+		// Extract structure info if valid JSON
+		if jsonErr == nil {
+			keys := p.extractTopLevelKeys(jsonData)
+			if len(keys) > 0 {
+				if len(keys) > 20 {
+					keys = keys[:20]
+					contentBuilder.WriteString(fmt.Sprintf("Top-level keys: %s (and more)\n", strings.Join(keys, ", ")))
+				} else {
+					contentBuilder.WriteString(fmt.Sprintf("Top-level keys: %s\n", strings.Join(keys, ", ")))
+				}
+			}
+		} else {
+			contentBuilder.WriteString("Warning: Invalid JSON\n")
+		}
 	}
 
 	// Include actual content (truncated)
@@ -105,6 +140,20 @@ func (p *JSONParser) ParseFile(root, path string, extractSymbols bool) ([]CodeEl
 
 func (p *JSONParser) detectJsonKind(fileName string) string {
 	fileNameLower := strings.ToLower(fileName)
+
+	// Check for JSONL/NDJSON first
+	if strings.HasSuffix(fileNameLower, ".jsonl") || strings.HasSuffix(fileNameLower, ".ndjson") {
+		if strings.Contains(fileNameLower, "log") {
+			return "json-log"
+		}
+		if strings.Contains(fileNameLower, "event") {
+			return "json-events"
+		}
+		if strings.Contains(fileNameLower, "answer") || strings.Contains(fileNameLower, "result") {
+			return "json-results"
+		}
+		return "json-lines"
+	}
 
 	switch {
 	case fileNameLower == "package.json":

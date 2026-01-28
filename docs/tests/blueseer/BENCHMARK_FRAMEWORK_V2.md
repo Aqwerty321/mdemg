@@ -1,7 +1,7 @@
 # MDEMG Benchmark Framework V2
 
-**Version:** 2.0
-**Status:** Draft
+**Version:** 2.3
+**Status:** Active
 **Created:** 2026-01-27
 **Based on:** Lessons learned from Blueseer benchmark session
 
@@ -152,6 +152,67 @@ Read {QUESTION_FILE} and answer questions 1-{QUESTION_COUNT} sequentially.
 
 ## 4. Execution Protocol
 
+### 4.0 CRITICAL EXECUTION RULES (MANDATORY - READ FIRST)
+
+**These rules exist because every benchmark failure has been an execution issue, NOT an MDEMG quality issue.**
+
+#### NEVER DO (Violations INVALIDATE entire benchmark session):
+
+| Rule | Violation | Consequence |
+|------|-----------|-------------|
+| **NEVER run multiple agents writing to same file** | Two agents both writing to `answers_mdemg_run1.jsonl` | Duplicate IDs, corrupted data |
+| **NEVER run MDEMG runs in parallel** | Launching Run 2 before Run 1 completes | Learning edge contamination, file corruption |
+| **NEVER start a run without clearing the output file** | Appending to existing file | Duplicate answers, invalid grading |
+| **NEVER let agent access master question file** | Agent sees expected answers | Contaminated benchmark, useless results |
+| **NEVER restart an agent mid-run** | Agent crashes at Q75, restart and continue | Context inconsistency, data loss |
+
+#### ALWAYS DO (Pre-run checklist - MANDATORY):
+
+```bash
+# 1. VERIFY no other benchmark agents running
+pgrep -f "benchmark" && echo "STOP: Agent already running"
+
+# 2. CLEAR output file (or verify empty)
+rm -f /path/to/answers_run_N.jsonl
+touch /path/to/answers_run_N.jsonl
+
+# 3. VERIFY file is empty
+[[ $(wc -l < /path/to/answers_run_N.jsonl) -eq 0 ]] || echo "STOP: File not empty"
+
+# 4. WAIT for previous MDEMG run to complete before starting next
+# (For MDEMG runs only - learning edges must accumulate)
+```
+
+#### ONE AGENT AT A TIME (MDEMG)
+
+```
+WRONG:
+  Launch MDEMG Run 1 (background)
+  Launch MDEMG Run 2 (background)  ← VIOLATION: Run 1 not complete
+  Launch MDEMG Run 3 (background)  ← VIOLATION: Run 2 not complete
+
+CORRECT:
+  Launch MDEMG Run 1 → WAIT for completion → Grade
+  Launch MDEMG Run 2 → WAIT for completion → Grade
+  Launch MDEMG Run 3 → WAIT for completion → Grade
+```
+
+#### UNIQUE OUTPUT FILES (MANDATORY)
+
+Each run MUST have a unique output file path:
+```
+answers_baseline_run1.jsonl  ← Unique
+answers_baseline_run2.jsonl  ← Unique
+answers_baseline_run3.jsonl  ← Unique
+answers_mdemg_run1.jsonl     ← Unique
+answers_mdemg_run2.jsonl     ← Unique
+answers_mdemg_run3.jsonl     ← Unique
+```
+
+**NEVER** reuse a file path within the same benchmark session.
+
+---
+
 ### 4.1 Run Sequence
 
 **Baseline Runs** (can be parallel - no learning edge dependency):
@@ -163,10 +224,12 @@ Baseline Run 3 → /tmp/answers_baseline_run3.jsonl
 
 **MDEMG Runs** (MUST be sequential - learning edges accumulate):
 ```
-MDEMG Run 1 (cold) → /tmp/answers_mdemg_run1.jsonl → Record edges
-MDEMG Run 2 (warm) → /tmp/answers_mdemg_run2.jsonl → Record edges
-MDEMG Run 3 (warm) → /tmp/answers_mdemg_run3.jsonl → Record edges
+MDEMG Run 1 (cold) → /tmp/answers_mdemg_run1.jsonl → WAIT → Grade → Record edges
+MDEMG Run 2 (warm) → /tmp/answers_mdemg_run2.jsonl → WAIT → Grade → Record edges
+MDEMG Run 3 (warm) → /tmp/answers_mdemg_run3.jsonl → WAIT → Grade → Record edges
 ```
+
+**NOTE:** For MDEMG runs, WAIT means the orchestrator MUST NOT launch the next run until the previous run is FULLY COMPLETE (142/142 answers, no errors).
 
 ### 4.2 Per-Run Execution
 
@@ -187,13 +250,42 @@ echo "Learning edges: $EDGES_BEFORE -> $EDGES_AFTER (+$(($EDGES_AFTER - $EDGES_B
 
 ### 4.3 Disqualification Triggers
 
-| Event | Action |
-|-------|--------|
-| WebSearch/WebFetch call | STOP immediately, disqualify run |
-| File access outside repo | STOP immediately, disqualify run |
-| Duplicate question IDs | Flag for investigation, may invalidate |
-| Missing questions (gaps) | Flag as incomplete |
-| Agent restart required | Discard run, start fresh |
+| Event | Action | Detection |
+|-------|--------|-----------|
+| WebSearch/WebFetch call | STOP immediately, disqualify run | Agent logs |
+| File access outside repo | STOP immediately, disqualify run | Agent logs |
+| Duplicate question IDs | STOP immediately, disqualify run | `grep -c '"id": 1' file` > 1 |
+| Missing questions (gaps) | Flag as incomplete | Unique IDs < expected |
+| Agent restart required | Discard run, start fresh | Manual observation |
+| **Metadata dumping** | STOP immediately, disqualify run | See below |
+| **Multiple agents same file** | STOP ALL, disqualify session | Process monitoring |
+
+#### Metadata Dumping Detection (CRITICAL)
+
+**Definition:** Agent copies raw MDEMG retrieval metadata as answers instead of synthesizing proper responses.
+
+**Symptoms:**
+- Answers contain `"Package:"`, `"Module:"`, `"Related to:"`
+- References per question > 5 (typical: 1-3)
+- Answers look like internal data structures, not natural language
+
+**Detection Script:**
+```bash
+# Check for metadata patterns in answers
+BAD_PATTERNS=$(grep -cE '"Package:|"Module:|"Related to:' answers.jsonl)
+if [ "$BAD_PATTERNS" -gt 0 ]; then
+    echo "STOP: Metadata dumping detected ($BAD_PATTERNS occurrences)"
+    # Disqualify run
+fi
+
+# Check references per question
+AVG_REFS=$(jq -r '.file_line_refs | length' answers.jsonl | awk '{sum+=$1} END {print sum/NR}')
+if (( $(echo "$AVG_REFS > 5" | bc -l) )); then
+    echo "WARNING: High ref count ($AVG_REFS avg) - check for metadata dumping"
+fi
+```
+
+**Action on Detection:** STOP run immediately, mark as INVALID, investigate agent prompt.
 
 ---
 
@@ -1468,6 +1560,7 @@ Always verify answers against actual code before using.
 | 2.0 | 2026-01-27 | Complete framework rewrite based on lessons learned |
 | 2.1 | 2026-01-27 | Added standardized summary schema and post-test analysis |
 | 2.2 | 2026-01-28 | Merged content from BENCHMARKING_GUIDE.md (contamination prevention, advanced metrics, API config, question development) |
+| 2.3 | 2026-01-28 | Added Section 4.0 CRITICAL EXECUTION RULES - explicit NEVER/ALWAYS rules to prevent parallel agent corruption, metadata dumping detection, duplicate ID detection |
 
 ---
 

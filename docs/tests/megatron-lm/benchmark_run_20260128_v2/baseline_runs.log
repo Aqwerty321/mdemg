@@ -1,0 +1,101 @@
+[11:28:19] === Baseline Run 1/3 starting (142 questions) ===
+[11:28:35]   Progress: 5/142 | Hits: 1 (20%) | 0.3 q/s
+[11:28:52]   Progress: 11/142 | Hits: 1 (9%) | 0.3 q/s
+[11:29:10]   Progress: 17/142 | Hits: 1 (6%) | 0.3 q/s
+[11:29:26]   Progress: 23/142 | Hits: 1 (4%) | 0.3 q/s
+[11:29:42]   Progress: 28/142 | Hits: 2 (7%) | 0.3 q/s
+[11:30:00]   Progress: 32/142 | Hits: 2 (6%) | 0.3 q/s
+[11:30:17]   Progress: 37/142 | Hits: 2 (5%) | 0.3 q/s
+[11:30:35]   Progress: 42/142 | Hits: 2 (5%) | 0.3 q/s
+[11:30:50]   Progress: 46/142 | Hits: 2 (4%) | 0.3 q/s
+[11:31:06]   Progress: 52/142 | Hits: 2 (4%) | 0.3 q/s
+[11:31:25]   Progress: 56/142 | Hits: 2 (4%) | 0.3 q/s
+[11:31:40]   Progress: 60/142 | Hits: 2 (3%) | 0.3 q/s
+[11:31:59]   Progress: 65/142 | Hits: 2 (3%) | 0.3 q/s
+[11:32:14]   Progress: 70/142 | Hits: 2 (3%) | 0.3 q/s
+[11:32:32]   Progress: 74/142 | Hits: 2 (3%) | 0.3 q/s
+[11:32:49]   Progress: 77/142 | Hits: 2 (3%) | 0.3 q/s
+[11:33:06]   Progress: 82/142 | Hits: 2 (2%) | 0.3 q/s
+[11:33:22]   Progress: 87/142 | Hits: 2 (2%) | 0.3 q/s
+[11:33:39]   Progress: 91/142 | Hits: 2 (2%) | 0.3 q/s
+[11:33:56]   Progress: 97/142 | Hits: 2 (2%) | 0.3 q/s
+[11:34:17]   Progress: 102/142 | Hits: 2 (2%) | 0.3 q/s
+[11:34:32]   Progress: 106/142 | Hits: 2 (2%) | 0.3 q/s
+[11:34:49]   Progress: 110/142 | Hits: 2 (2%) | 0.3 q/s
+[11:35:08]   Progress: 115/142 | Hits: 2 (2%) | 0.3 q/s
+[11:35:23]   Progress: 124/142 | Hits: 2 (2%) | 0.3 q/s
+[11:35:40]   Progress: 136/142 | Hits: 2 (1%) | 0.3 q/s
+[11:35:49] === Baseline Run 1 Complete: 2/142 (1.4%) in 450.9s ===
+
+[11:35:49] Waiting 5s before next run...
+[11:35:55] === Baseline Run 2/3 starting (142 questions) ===
+[11:36:11]   Progress: 5/142 | Hits: 1 (20%) | 0.3 q/s
+[11:36:27]   Progress: 10/142 | Hits: 1 (10%) | 0.3 q/s
+[11:36:45]   Progress: 16/142 | Hits: 1 (6%) | 0.3 q/s
+[11:37:01]   Progress: 21/142 | Hits: 1 (5%) | 0.3 q/s
+[11:37:20]   Progress: 27/142 | Hits: 2 (7%) | 0.3 q/s
+[11:37:37]   Progress: 31/142 | Hits: 2 (6%) | 0.3 q/s
+[11:37:53]   Progress: 35/142 | Hits: 2 (6%) | 0.3 q/s
+[11:38:09]   Progress: 39/142 | Hits: 2 (5%) | 0.3 q/s
+[11:38:26]   Progress: 43/142 | Hits: 2 (5%) | 0.3 q/s
+[11:38:44]   Progress: 48/142 | Hits: 2 (4%) | 0.3 q/s
+[11:39:05]   Progress: 53/142 | Hits: 2 (4%) | 0.3 q/s
+[11:39:22]   Progress: 57/142 | Hits: 2 (4%) | 0.3 q/s
+[11:39:39]   Progress: 62/142 | Hits: 2 (3%) | 0.3 q/s
+[11:39:54]   Progress: 66/142 | Hits: 2 (3%) | 0.3 q/s
+[11:40:12]   Progress: 71/142 | Hits: 2 (3%) | 0.3 q/s
+[11:40:32]   Progress: 76/142 | Hits: 2 (3%) | 0.3 q/s
+[11:40:48]   Progress: 81/142 | Hits: 2 (2%) | 0.3 q/s
+[11:41:04]   Progress: 86/142 | Hits: 2 (2%) | 0.3 q/s
+[11:41:22]   Progress: 90/142 | Hits: 2 (2%) | 0.3 q/s
+[11:41:37]   Progress: 94/142 | Hits: 2 (2%) | 0.3 q/s
+[11:41:52]   Progress: 99/142 | Hits: 2 (2%) | 0.3 q/s
+[11:42:08]   Progress: 102/142 | Hits: 2 (2%) | 0.3 q/s
+[11:42:24]   Progress: 106/142 | Hits: 2 (2%) | 0.3 q/s
+[11:42:43]   Progress: 110/142 | Hits: 2 (2%) | 0.3 q/s
+[11:43:00]   Progress: 114/142 | Hits: 2 (2%) | 0.3 q/s
+[11:43:15]   Progress: 120/142 | Hits: 3 (2%) | 0.3 q/s
+[11:43:30]   Progress: 132/142 | Hits: 3 (2%) | 0.3 q/s
+[11:43:45]   Progress: 142/142 | Hits: 3 (2%) | 0.3 q/s
+[11:43:45] === Baseline Run 2 Complete: 3/142 (2.1%) in 470.6s ===
+
+[11:43:45] Waiting 5s before next run...
+[11:43:50] === Baseline Run 3/3 starting (142 questions) ===
+[11:44:07]   Progress: 6/142 | Hits: 1 (17%) | 0.3 q/s
+[11:44:24]   Progress: 11/142 | Hits: 1 (9%) | 0.3 q/s
+[11:44:43]   Progress: 17/142 | Hits: 1 (6%) | 0.3 q/s
+[11:45:01]   Progress: 23/142 | Hits: 1 (4%) | 0.3 q/s
+[11:45:18]   Progress: 28/142 | Hits: 1 (4%) | 0.3 q/s
+[11:45:34]   Progress: 33/142 | Hits: 1 (3%) | 0.3 q/s
+[11:45:50]   Progress: 37/142 | Hits: 1 (3%) | 0.3 q/s
+[11:46:05]   Progress: 42/142 | Hits: 1 (2%) | 0.3 q/s
+[11:46:23]   Progress: 47/142 | Hits: 1 (2%) | 0.3 q/s
+[11:46:44]   Progress: 53/142 | Hits: 1 (2%) | 0.3 q/s
+[11:47:00]   Progress: 58/142 | Hits: 1 (2%) | 0.3 q/s
+[11:47:17]   Progress: 63/142 | Hits: 1 (2%) | 0.3 q/s
+[11:47:33]   Progress: 68/142 | Hits: 1 (1%) | 0.3 q/s
+[11:47:50]   Progress: 73/142 | Hits: 1 (1%) | 0.3 q/s
+[11:48:05]   Progress: 77/142 | Hits: 1 (1%) | 0.3 q/s
+[11:48:22]   Progress: 83/142 | Hits: 1 (1%) | 0.3 q/s
+[11:48:38]   Progress: 88/142 | Hits: 1 (1%) | 0.3 q/s
+[11:48:56]   Progress: 93/142 | Hits: 1 (1%) | 0.3 q/s
+[11:49:14]   Progress: 99/142 | Hits: 1 (1%) | 0.3 q/s
+[11:49:31]   Progress: 105/142 | Hits: 1 (1%) | 0.3 q/s
+[11:49:48]   Progress: 111/142 | Hits: 1 (1%) | 0.3 q/s
+[11:50:05]   Progress: 117/142 | Hits: 1 (1%) | 0.3 q/s
+[11:50:21]   Progress: 129/142 | Hits: 1 (1%) | 0.3 q/s
+[11:50:36]   Progress: 139/142 | Hits: 1 (1%) | 0.3 q/s
+[11:50:40] === Baseline Run 3 Complete: 1/142 (0.7%) in 410.3s ===
+
+[11:50:40] ==================================================
+[11:50:40] BASELINE FINAL SUMMARY
+[11:50:40] ==================================================
+[11:50:40] Run 1: 1.4% hit rate (450.9s)
+[11:50:40] Run 2: 2.1% hit rate (470.6s)
+[11:50:40] Run 3: 0.7% hit rate (410.3s)
+[11:50:40] Average: 1.4%
+[11:50:40] 
+[11:50:40] COMPARISON:
+[11:50:40]   MDEMG Average:    24.6%
+[11:50:40]   Baseline Average: 1.4%
+[11:50:40]   Delta:            +23.2%

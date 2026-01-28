@@ -46,6 +46,7 @@ var (
 	includeTS      = flag.Bool("include-ts", true, "Include TypeScript/JavaScript files (*.ts, *.tsx, *.js, *.jsx)")
 	includePy      = flag.Bool("include-py", true, "Include Python files (*.py)")
 	includeJava    = flag.Bool("include-java", true, "Include Java files (*.java)")
+	includeRust    = flag.Bool("include-rust", true, "Include Rust files (*.rs)")
 	limitElements  = flag.Int("limit", 0, "Limit number of elements to ingest (0 = no limit)")
 	extractSymbols = flag.Bool("extract-symbols", true, "Extract code symbols (constants, functions, classes) for evidence-locked retrieval")
 	incremental    = flag.Bool("incremental", false, "Only ingest files changed since last commit (uses git diff)")
@@ -649,6 +650,18 @@ func walkCodebase(root string, excludeSet map[string]bool) ([]CodeElement, error
 			return nil
 		}
 
+		// Process Rust files
+		if *includeRust && strings.HasSuffix(path, ".rs") {
+			if !*includeTests && (strings.HasSuffix(path, "_test.rs") ||
+				strings.Contains(path, "/tests/") ||
+				strings.Contains(path, "/test/")) {
+				return nil
+			}
+			rustElements := parseRustFile(root, path)
+			elements = append(elements, rustElements...)
+			return nil
+		}
+
 		// Process JSON/YAML config files
 		if strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
 			if isConfigFile(path) {
@@ -1135,6 +1148,267 @@ func parseJavaFile(root, path string) []CodeElement {
 	}
 
 	return elements
+}
+
+// parseRustFile parses a Rust file and returns code elements
+func parseRustFile(root, path string) []CodeElement {
+	var elements []CodeElement
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+
+	relPath, _ := filepath.Rel(root, path)
+	fileName := filepath.Base(path)
+	contentStr := string(content)
+
+	// Extract module name from path (crate/module structure)
+	moduleName := strings.TrimSuffix(fileName, ".rs")
+	if moduleName == "mod" || moduleName == "lib" || moduleName == "main" {
+		// Use parent directory as module name
+		dir := filepath.Dir(relPath)
+		if dir != "." {
+			parts := strings.Split(dir, string(filepath.Separator))
+			if len(parts) > 0 {
+				moduleName = parts[len(parts)-1]
+			}
+		}
+	}
+
+	// Find structs, enums, traits, and functions
+	structs := findAllMatches(contentStr, `(?:pub\s+)?struct\s+(\w+)`)
+	enums := findAllMatches(contentStr, `(?:pub\s+)?enum\s+(\w+)`)
+	traits := findAllMatches(contentStr, `(?:pub\s+)?trait\s+(\w+)`)
+	functions := findAllMatches(contentStr, `(?:pub\s+)?(?:async\s+)?fn\s+(\w+)`)
+	macros := findAllMatches(contentStr, `macro_rules!\s+(\w+)`)
+
+	// Find use statements (imports)
+	uses := findAllMatches(contentStr, `^\s*use\s+([\w:]+)`)
+
+	// Build content - include actual code for embedding quality
+	var contentBuilder strings.Builder
+	contentBuilder.WriteString(fmt.Sprintf("Rust file: %s\n", fileName))
+	contentBuilder.WriteString(fmt.Sprintf("Module: %s\n", moduleName))
+
+	if len(structs) > 0 {
+		contentBuilder.WriteString(fmt.Sprintf("Structs: %s\n", strings.Join(uniqueStrings(structs), ", ")))
+	}
+	if len(enums) > 0 {
+		contentBuilder.WriteString(fmt.Sprintf("Enums: %s\n", strings.Join(uniqueStrings(enums), ", ")))
+	}
+	if len(traits) > 0 {
+		contentBuilder.WriteString(fmt.Sprintf("Traits: %s\n", strings.Join(uniqueStrings(traits), ", ")))
+	}
+	if len(functions) > 0 {
+		fnList := uniqueStrings(functions)
+		if len(fnList) > 15 {
+			fnList = fnList[:15]
+			contentBuilder.WriteString(fmt.Sprintf("Functions: %s (and more)\n", strings.Join(fnList, ", ")))
+		} else {
+			contentBuilder.WriteString(fmt.Sprintf("Functions: %s\n", strings.Join(fnList, ", ")))
+		}
+	}
+	if len(macros) > 0 {
+		contentBuilder.WriteString(fmt.Sprintf("Macros: %s\n", strings.Join(uniqueStrings(macros), ", ")))
+	}
+	contentBuilder.WriteString(fmt.Sprintf("Imports: %d\n", len(uses)))
+
+	// Include actual code content for better embeddings (truncate if too long)
+	codeContent := contentStr
+	maxCodeLen := 4000
+	if len(codeContent) > maxCodeLen {
+		codeContent = codeContent[:maxCodeLen] + "\n... [truncated]"
+	}
+	contentBuilder.WriteString("\n--- Code ---\n")
+	contentBuilder.WriteString(codeContent)
+
+	// Detect cross-cutting concerns
+	concerns := detectConcerns(relPath, contentStr)
+	tags := []string{"rust", "module"}
+	tags = append(tags, concerns...)
+
+	// Determine file kind based on content
+	rustKind := "rust-module"
+	if fileName == "lib.rs" {
+		rustKind = "rust-lib"
+		tags = append(tags, "library")
+	} else if fileName == "main.rs" {
+		rustKind = "rust-main"
+		tags = append(tags, "executable")
+	} else if fileName == "mod.rs" {
+		rustKind = "rust-mod"
+		tags = append(tags, "submodule")
+	}
+
+	// Extract code symbols
+	extractedSymbols := extractSymbolsFromRust(contentStr, relPath)
+
+	// Add file-level element with symbols
+	elements = append(elements, CodeElement{
+		Name:     fileName,
+		Kind:     rustKind,
+		Path:     "/" + relPath,
+		Content:  contentBuilder.String(),
+		Package:  moduleName,
+		FilePath: relPath,
+		Tags:     tags,
+		Concerns: concerns,
+		Symbols:  extractedSymbols,
+	})
+
+	// Add structs as separate elements
+	for _, st := range uniqueStrings(structs) {
+		elements = append(elements, CodeElement{
+			Name:     st,
+			Kind:     "struct",
+			Path:     fmt.Sprintf("/%s#%s", relPath, st),
+			Content:  fmt.Sprintf("Rust struct '%s' in module %s (file: %s)", st, moduleName, fileName),
+			Package:  moduleName,
+			FilePath: relPath,
+			Tags:     append([]string{"rust", "struct"}, concerns...),
+			Concerns: concerns,
+		})
+	}
+
+	// Add traits as separate elements
+	for _, tr := range uniqueStrings(traits) {
+		elements = append(elements, CodeElement{
+			Name:     tr,
+			Kind:     "trait",
+			Path:     fmt.Sprintf("/%s#%s", relPath, tr),
+			Content:  fmt.Sprintf("Rust trait '%s' in module %s (file: %s)", tr, moduleName, fileName),
+			Package:  moduleName,
+			FilePath: relPath,
+			Tags:     append([]string{"rust", "trait"}, concerns...),
+			Concerns: concerns,
+		})
+	}
+
+	return elements
+}
+
+// extractSymbolsFromRust extracts constants, functions, and types from Rust files
+func extractSymbolsFromRust(content, filePath string) []IngestSymbol {
+	if !*extractSymbols {
+		return nil
+	}
+
+	var symbols []IngestSymbol
+	lines := strings.Split(content, "\n")
+
+	// Patterns for Rust symbols
+	// Pattern: const NAME: Type = value;
+	constPattern := regexp.MustCompile(`^\s*(?:pub\s+)?const\s+([A-Z][A-Z0-9_]*)\s*:\s*([^=]+)\s*=\s*(.+?);`)
+	// Pattern: static NAME: Type = value;
+	staticPattern := regexp.MustCompile(`^\s*(?:pub\s+)?static\s+(?:mut\s+)?([A-Z][A-Z0-9_]*)\s*:\s*([^=]+)\s*=`)
+	// Pattern: pub fn name(...) -> Type
+	fnPattern := regexp.MustCompile(`^\s*(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)(?:\s*->\s*([^\{]+))?`)
+	// Pattern: struct Name
+	structPattern := regexp.MustCompile(`^\s*(?:pub\s+)?struct\s+(\w+)`)
+	// Pattern: enum Name
+	enumPattern := regexp.MustCompile(`^\s*(?:pub\s+)?enum\s+(\w+)`)
+	// Pattern: trait Name
+	traitPattern := regexp.MustCompile(`^\s*(?:pub\s+)?trait\s+(\w+)`)
+
+	for i, line := range lines {
+		lineNum := i + 1
+		isPublic := strings.Contains(line, "pub ")
+
+		// Check for constants
+		if matches := constPattern.FindStringSubmatch(line); matches != nil {
+			valueStr := strings.TrimSpace(matches[3])
+			if len(valueStr) > 100 {
+				valueStr = valueStr[:100] + "..."
+			}
+			symbols = append(symbols, IngestSymbol{
+				Name:           matches[1],
+				Type:           "const",
+				TypeAnnotation: strings.TrimSpace(matches[2]),
+				Value:          valueStr,
+				LineNumber:     lineNum,
+				Exported:       isPublic,
+				Language:       "rust",
+			})
+			continue
+		}
+
+		// Check for statics
+		if matches := staticPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, IngestSymbol{
+				Name:           matches[1],
+				Type:           "static",
+				TypeAnnotation: strings.TrimSpace(matches[2]),
+				LineNumber:     lineNum,
+				Exported:       isPublic,
+				Language:       "rust",
+			})
+			continue
+		}
+
+		// Check for functions
+		if matches := fnPattern.FindStringSubmatch(line); matches != nil {
+			fnName := matches[1]
+			params := strings.TrimSpace(matches[2])
+			returnType := ""
+			if len(matches) > 3 {
+				returnType = strings.TrimSpace(matches[3])
+			}
+			signature := fmt.Sprintf("fn %s(%s)", fnName, params)
+			if returnType != "" {
+				signature += " -> " + returnType
+			}
+			if len(signature) > 150 {
+				signature = signature[:150] + "..."
+			}
+			symbols = append(symbols, IngestSymbol{
+				Name:       fnName,
+				Type:       "function",
+				Signature:  signature,
+				LineNumber: lineNum,
+				Exported:   isPublic,
+				Language:   "rust",
+			})
+			continue
+		}
+
+		// Check for structs
+		if matches := structPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, IngestSymbol{
+				Name:       matches[1],
+				Type:       "struct",
+				LineNumber: lineNum,
+				Exported:   isPublic,
+				Language:   "rust",
+			})
+			continue
+		}
+
+		// Check for enums
+		if matches := enumPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, IngestSymbol{
+				Name:       matches[1],
+				Type:       "enum",
+				LineNumber: lineNum,
+				Exported:   isPublic,
+				Language:   "rust",
+			})
+			continue
+		}
+
+		// Check for traits
+		if matches := traitPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, IngestSymbol{
+				Name:       matches[1],
+				Type:       "trait",
+				LineNumber: lineNum,
+				Exported:   isPublic,
+				Language:   "rust",
+			})
+		}
+	}
+
+	return symbols
 }
 
 // extractSymbolsFromJava extracts constants, fields, and methods from Java files

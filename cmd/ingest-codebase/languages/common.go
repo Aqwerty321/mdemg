@@ -105,10 +105,13 @@ func CleanValue(value string) string {
 		value = strings.TrimSpace(value[:idx])
 	}
 	// Remove quotes from string values but preserve the unquoted value
-	if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
-		(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) ||
-		(strings.HasPrefix(value, "`") && strings.HasSuffix(value, "`")) {
-		value = value[1 : len(value)-1]
+	// Must be at least 2 chars to have matching quotes
+	if len(value) >= 2 {
+		if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
+			(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) ||
+			(strings.HasPrefix(value, "`") && strings.HasSuffix(value, "`")) {
+			value = value[1 : len(value)-1]
+		}
 	}
 	return value
 }

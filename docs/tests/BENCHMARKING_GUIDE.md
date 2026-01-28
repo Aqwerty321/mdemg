@@ -473,13 +473,14 @@ This section captures the fundamental advantage of MDEMG: **state persistence un
 | **CCC** | Context Churn Cost | Tokens + tool calls needed to recover state after reset | Shows the efficiency penalty of "working-memory-only" agents. |
 | **SoWI** | State-of-Work Integrity | Rubric-based coherence score (objective, constraints, next step) | Measures the coherence of the agent's narrative. |
 
-**Isolation & Reliability Metrics:**
+**Isolation & Reliability Metrics (Multi-Corpus Validation):**
 
 | Metric | Name | Definition | Why it matters |
 |--------|------|------------|----------------|
 | **RAA** | Repo Attribution Accuracy | `%` of answers correctly identifying the source corpus | Proves the graph correctly partitions knowledge. |
 | **CRCR** | Cross-Repo Contamination Rate | `%` of answers citing nodes from the wrong `space_id` | Proves zero mix-ups in multi-tenant environments. |
 | **E-Acc** | Evidence Accuracy | `%` of cited `file:line` refs that actually support the claim | Credibility killer; punishes "citation spam". |
+| **WER** | Wrong Evidence Rate | `%` of answers with "hallucinated" or irrelevant citations | Measures the "confidence trick" failure mode of standard RAG. |
 
 ### Compaction Defined
 A **Compaction Event** is any time the agent's working context is truncated or replaced (e.g., `auto-compact`, summarization, session restart). 

@@ -4,8 +4,9 @@ package languages
 
 // CodeElement represents a parsed code element (function, class, struct, etc.)
 type CodeElement struct {
+	// Existing fields (v1 - preserved for backward compatibility)
 	Name     string
-	Kind     string   // "function", "class", "struct", "interface", "enum", "trait", "module"
+	Kind     string   // Code construct: "function", "class", "struct", "interface", "enum", "trait", "module", "kernel"
 	Path     string   // Relative path to file
 	Content  string   // Source code content
 	Summary  string   // Brief summary from docstrings/comments
@@ -14,12 +15,19 @@ type CodeElement struct {
 	Tags     []string // Language, file type, etc.
 	Concerns []string // Cross-cutting concerns detected
 	Symbols  []Symbol // Extracted code symbols
+
+	// New fields (v2 - evidence and stability)
+	ElementKind string // Ingestion unit type: "file", "symbol", "section", "keypath_fact", "unit", "snippet", "migration", "kernel", "other"
+	StartLine   int    // First line of element in source file (1-indexed, 0 = not set)
+	EndLine     int    // Last line of element in source file (1-indexed, 0 = not set)
+	StableID    string // Deterministic ID: hash(space_id + path + element_kind + qualname + start_line + end_line)
+	Signature   string // Human-readable signature (e.g., "func ParseFile(root, path string) ([]CodeElement, error)")
 }
 
 // Symbol represents an extracted code symbol (constant, function signature, etc.)
 type Symbol struct {
 	Name           string `json:"name"`
-	Type           string `json:"type"` // "constant", "function", "class", "interface", "variable"
+	Type           string `json:"type"` // "constant", "function", "class", "interface", "variable", "struct", "enum", "method", "macro", "kernel", "device_function", "typedef"
 	Value          string `json:"value,omitempty"`
 	RawValue       string `json:"raw_value,omitempty"`
 	LineNumber     int    `json:"line_number"`
@@ -55,6 +63,36 @@ type ParserConfig struct {
 	ExtractSymbols bool     // Whether to extract detailed symbols
 	IncludeTests   bool     // Whether to include test files
 	ExcludeDirs    []string // Directories to exclude
+}
+
+// BuildContext holds cross-file build metadata gathered during ingestion.
+// This is populated by BuildContextParser implementations and used by
+// ContextAwareParser implementations to enhance parsing with build info.
+type BuildContext struct {
+	CompilerFlags map[string][]string // path pattern → flags (e.g., "*.cu" → ["-arch=sm_80"])
+	IncludePaths  []string            // Global include paths from build system
+	Defines       map[string]string   // Preprocessor defines (e.g., "CUDA_VERSION" → "11.0")
+	BuildSystem   string              // Detected build system: "cmake", "make", "bazel", "cargo", etc.
+	SourceRoot    string              // Root path for resolving includes
+}
+
+// BuildContextParser extracts build context from build configuration files.
+// Examples: CMakeLists.txt, Makefile, Cargo.toml, pyproject.toml
+type BuildContextParser interface {
+	// CanParseBuildFile returns true if this parser can extract build context from the file
+	CanParseBuildFile(path string) bool
+
+	// ParseBuildFile extracts build context from a build configuration file
+	ParseBuildFile(root, path string) (*BuildContext, error)
+}
+
+// ContextAwareParser extends LanguageParser with build context support.
+// Parsers that benefit from build metadata (like CUDA, C/C++) can implement this.
+type ContextAwareParser interface {
+	LanguageParser
+
+	// ParseFileWithContext parses a source file with additional build context
+	ParseFileWithContext(root, path string, extractSymbols bool, ctx *BuildContext) ([]CodeElement, error)
 }
 
 // registry holds all registered language parsers

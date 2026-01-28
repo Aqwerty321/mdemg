@@ -141,3 +141,57 @@ func HasExtension(path string, extensions []string) bool {
 	}
 	return false
 }
+
+// UniqueStrings returns a slice with duplicate strings removed, preserving order.
+func UniqueStrings(input []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, s := range input {
+		if !seen[s] {
+			seen[s] = true
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+// uniqueStrings is an alias for UniqueStrings (for package-internal use).
+func uniqueStrings(input []string) []string {
+	return UniqueStrings(input)
+}
+
+// DeriveElementKind maps a Kind (code construct) to an ElementKind (ingestion unit type).
+// Kind represents what the code IS (function, class, struct, etc.)
+// ElementKind represents how it's INGESTED (symbol, unit, section, etc.)
+//
+// Mapping:
+//   - function, class, struct, interface, enum, trait, method, macro, typedef → "symbol"
+//   - module → "unit"
+//   - config → "keypath_fact"
+//   - doc, markdown → "section"
+//   - kernel, device_function → "kernel"
+//   - migration → "migration"
+//   - file → "file"
+//   - everything else → "other"
+func DeriveElementKind(kind string) string {
+	switch strings.ToLower(kind) {
+	case "function", "class", "struct", "interface", "enum", "trait", "method", "macro", "typedef", "constant", "variable":
+		return "symbol"
+	case "module", "package", "namespace":
+		return "unit"
+	case "config", "env", "settings":
+		return "keypath_fact"
+	case "doc", "markdown", "readme", "documentation":
+		return "section"
+	case "kernel", "device_function":
+		return "kernel"
+	case "migration", "schema":
+		return "migration"
+	case "file":
+		return "file"
+	case "snippet":
+		return "snippet"
+	default:
+		return "other"
+	}
+}

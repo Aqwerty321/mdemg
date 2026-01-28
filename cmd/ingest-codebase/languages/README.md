@@ -13,9 +13,11 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 | Java | `java_parser.go` | `.java` |
 | C++ | `cpp_parser.go` | `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.h` (C++ headers) |
 | C | `c_parser.go` | `.c`, `.h` (C headers) |
+| CUDA | `cuda_parser.go` | `.cu`, `.cuh` |
 | SQL | `sql_parser.go` | `.sql` |
 | JSON | `json_parser.go` | `.json` |
 | Markdown | `markdown_parser.go` | `.md`, `.markdown` |
+| XML | `xml_parser.go` | `.xml`, `.xsd`, `.xsl`, etc. |
 
 ## Adding a New Language
 
@@ -217,8 +219,9 @@ Represents a parsed code unit (file, class, function, etc.):
 
 ```go
 type CodeElement struct {
+    // v1 fields (original)
     Name     string    // Element name (class name, function name, etc.)
-    Kind     string    // Type: "class", "function", "struct", "module", etc.
+    Kind     string    // Code construct: "class", "function", "struct", "module", "kernel", etc.
     Path     string    // Virtual path for linking (e.g., "/src/main.go#Handler")
     Content  string    // Text content for embedding generation
     Summary  string    // Brief summary (from docstrings)
@@ -227,8 +230,27 @@ type CodeElement struct {
     Tags     []string  // Labels: language, kind, concerns
     Concerns []string  // Cross-cutting concerns detected
     Symbols  []Symbol  // Extracted code symbols
+
+    // v2 fields (evidence and stability)
+    ElementKind string // Ingestion unit type: "file", "symbol", "section", "keypath_fact", "unit", "snippet", "migration", "kernel", "other"
+    StartLine   int    // First line of element in source file (1-indexed, 0 = not set)
+    EndLine     int    // Last line of element in source file
+    StableID    string // Deterministic ID for evidence tracking
+    Signature   string // Human-readable signature
 }
 ```
+
+### Kind vs ElementKind
+
+| Kind (code construct) | ElementKind (ingestion unit) | Notes |
+|-----------------------|------------------------------|-------|
+| function | symbol | Standard code symbol |
+| class | symbol | Standard code symbol |
+| struct | symbol | Standard code symbol |
+| kernel | kernel | CUDA GPU kernel |
+| module | unit | Represents a compilation unit |
+| config | keypath_fact | Config file key-value |
+| doc | section | Documentation section |
 
 ### Symbol
 
@@ -237,7 +259,7 @@ Represents an extracted code symbol (constant, function signature, etc.):
 ```go
 type Symbol struct {
     Name           string // Symbol name
-    Type           string // "constant", "function", "class", "variable"
+    Type           string // "constant", "function", "class", "variable", "struct", "enum", "method", "macro", "kernel", "device_function", "typedef"
     Value          string // Value for constants
     RawValue       string // Original value string
     LineNumber     int    // Line number in source
@@ -248,6 +270,22 @@ type Symbol struct {
     Parent         string // Parent class/struct
     TypeAnnotation string // Type annotation
     Language       string // Source language
+}
+```
+
+### CUDA-Specific Symbol Types
+
+The CUDA parser extracts these specialized symbol types:
+- `kernel` - CUDA `__global__` kernel functions
+- `device_function` - CUDA `__device__` functions (GPU-only)
+
+Example:
+```go
+Symbol{
+    Name: "matmul_kernel",
+    Type: "kernel",
+    Signature: "__global__ void matmul_kernel(float* A, float* B, float* C, int N)",
+    Language: "cuda",
 }
 ```
 

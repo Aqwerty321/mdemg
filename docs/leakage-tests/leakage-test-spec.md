@@ -122,6 +122,8 @@ Per run, log:
 
 - space_id_in_request (verbatim)
 - space_id_requested
+- space_id_transformed (true|false)
+- space_id_transform_reason (alias|default|trim|invalid)
 - top_k
 - cross_space_hits
 - LR@k
@@ -134,12 +136,12 @@ Per run, log:
 
 Standardized Report Table (example header):
 
-| run_id | space_id_in_request | space_id_requested | top_k | cross_space_hits | LR@k | CSR | BCR | URER | space_id_resolved_distribution | repo_commit_A | repo_commit_B | notes |
-|:------|:--------------------|:------------------|:-----|:-----------------|:----|:----|:----|:-----|:------------------------------|:-------------|:-------------|:------|
+| run_id | space_id_in_request | space_id_requested | space_id_transformed | space_id_transform_reason | top_k | cross_space_hits | LR@k | CSR | BCR | URER | space_id_resolved_distribution | repo_commit_A | repo_commit_B | notes |
+|:------|:--------------------|:------------------|:---------------------|:--------------------------|:-----|:-----------------|:----|:----|:----|:-----|:------------------------------|:-------------|:-------------|:------|
 
 Standardized Report Table (example row):
 
-| 2026-01-22T183012Z | A | A | 10 | 0 | 0.000 | 0.000 | 0.000 | 0.000 | A:120,B:0,unknown:0 | 3f9c2a1 | 9b4d11e | baseline run |
+| 2026-01-22T183012Z | A | A | false | - | 10 | 0 | 0.000 | 0.000 | 0.000 | 0.000 | A:120,B:0,unknown:0 | 3f9c2a1 | 9b4d11e | baseline run |
 
 ## Acceptance Criteria
 

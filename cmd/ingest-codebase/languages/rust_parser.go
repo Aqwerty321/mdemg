@@ -213,19 +213,6 @@ func (p *RustParser) extractSymbols(content string) []Symbol {
 	return symbols
 }
 
-// uniqueStrings returns a deduplicated slice of strings
-func uniqueStrings(input []string) []string {
-	seen := make(map[string]bool)
-	var result []string
-	for _, s := range input {
-		if !seen[s] {
-			seen[s] = true
-			result = append(result, s)
-		}
-	}
-	return result
-}
-
 // formatReturn formats a return type for display
 func formatReturn(returnType string) string {
 	if returnType == "" {

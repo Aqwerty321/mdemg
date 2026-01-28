@@ -1,0 +1,1340 @@
+{
+  "aggregate": {
+    "total_questions": 142,
+    "mean": 0.273,
+    "std": 0.087,
+    "semantic_mean": 0.361,
+    "concept_mean": 0.285,
+    "median": 0.256,
+    "min": 0.058,
+    "max": 0.607,
+    "high_score_rate": 0.028,
+    "by_difficulty": {
+      "easy": {
+        "count": 15,
+        "mean": 0.206,
+        "std": 0.059
+      },
+      "medium": {
+        "count": 10,
+        "mean": 0.305,
+        "std": 0.069
+      },
+      "hard": {
+        "count": 117,
+        "mean": 0.279,
+        "std": 0.088
+      }
+    },
+    "by_category": {
+      "cross_cutting_concerns": {
+        "count": 20,
+        "mean": 0.296
+      },
+      "data_flow_integration": {
+        "count": 25,
+        "mean": 0.244
+      },
+      "business_logic_constraints": {
+        "count": 20,
+        "mean": 0.248
+      },
+      "calibration": {
+        "count": 15,
+        "mean": 0.206
+      },
+      "negative_control": {
+        "count": 10,
+        "mean": 0.305
+      },
+      "service_relationships": {
+        "count": 27,
+        "mean": 0.27
+      },
+      "architecture_structure": {
+        "count": 25,
+        "mean": 0.336
+      }
+    }
+  },
+  "per_question": [
+    {
+      "id": 1,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.738,
+      "concept_score": 0.455,
+      "evidence_score": 0.0,
+      "score": 0.505
+    },
+    {
+      "id": 2,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.565,
+      "concept_score": 0.412,
+      "evidence_score": 0.0,
+      "score": 0.406
+    },
+    {
+      "id": 3,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.5,
+      "concept_score": 0.5,
+      "evidence_score": 0.0,
+      "score": 0.4
+    },
+    {
+      "id": 4,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.476,
+      "concept_score": 0.429,
+      "evidence_score": 0.0,
+      "score": 0.367
+    },
+    {
+      "id": 5,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.341,
+      "concept_score": 0.316,
+      "evidence_score": 0.0,
+      "score": 0.265
+    },
+    {
+      "id": 6,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.633,
+      "concept_score": 0.647,
+      "evidence_score": 0.0,
+      "score": 0.511
+    },
+    {
+      "id": 7,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.441,
+      "concept_score": 0.412,
+      "evidence_score": 0.0,
+      "score": 0.344
+    },
+    {
+      "id": 8,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.513,
+      "concept_score": 0.318,
+      "evidence_score": 0.0,
+      "score": 0.352
+    },
+    {
+      "id": 9,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.338,
+      "concept_score": 0.368,
+      "evidence_score": 0.0,
+      "score": 0.28
+    },
+    {
+      "id": 10,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.535,
+      "concept_score": 0.48,
+      "evidence_score": 0.0,
+      "score": 0.412
+    },
+    {
+      "id": 11,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.525,
+      "concept_score": 0.318,
+      "evidence_score": 0.0,
+      "score": 0.358
+    },
+    {
+      "id": 12,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.496,
+      "concept_score": 0.529,
+      "evidence_score": 0.0,
+      "score": 0.407
+    },
+    {
+      "id": 13,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.406,
+      "concept_score": 0.222,
+      "evidence_score": 0.0,
+      "score": 0.27
+    },
+    {
+      "id": 14,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.559,
+      "concept_score": 0.474,
+      "evidence_score": 0.0,
+      "score": 0.421
+    },
+    {
+      "id": 15,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.411,
+      "concept_score": 0.111,
+      "evidence_score": 0.0,
+      "score": 0.239
+    },
+    {
+      "id": 16,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.301,
+      "concept_score": 0.25,
+      "evidence_score": 0.0,
+      "score": 0.225
+    },
+    {
+      "id": 17,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.362,
+      "concept_score": 0.32,
+      "evidence_score": 0.0,
+      "score": 0.277
+    },
+    {
+      "id": 18,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.387,
+      "concept_score": 0.316,
+      "evidence_score": 0.0,
+      "score": 0.288
+    },
+    {
+      "id": 19,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.56,
+      "concept_score": 0.308,
+      "evidence_score": 0.0,
+      "score": 0.372
+    },
+    {
+      "id": 20,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.293,
+      "concept_score": 0.152,
+      "evidence_score": 0.0,
+      "score": 0.192
+    },
+    {
+      "id": 21,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.335,
+      "concept_score": 0.231,
+      "evidence_score": 0.0,
+      "score": 0.237
+    },
+    {
+      "id": 22,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.373,
+      "concept_score": 0.294,
+      "evidence_score": 0.0,
+      "score": 0.275
+    },
+    {
+      "id": 23,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.611,
+      "concept_score": 0.407,
+      "evidence_score": 0.0,
+      "score": 0.428
+    },
+    {
+      "id": 24,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.477,
+      "concept_score": 0.263,
+      "evidence_score": 0.0,
+      "score": 0.317
+    },
+    {
+      "id": 25,
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "semantic_score": 0.367,
+      "concept_score": 0.227,
+      "evidence_score": 0.0,
+      "score": 0.252
+    },
+    {
+      "id": 26,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.461,
+      "concept_score": 0.263,
+      "evidence_score": 0.0,
+      "score": 0.309
+    },
+    {
+      "id": 27,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.547,
+      "concept_score": 0.444,
+      "evidence_score": 1.0,
+      "score": 0.607
+    },
+    {
+      "id": 28,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.541,
+      "concept_score": 0.381,
+      "evidence_score": 0.0,
+      "score": 0.385
+    },
+    {
+      "id": 29,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.501,
+      "concept_score": 0.458,
+      "evidence_score": 0.0,
+      "score": 0.388
+    },
+    {
+      "id": 30,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.328,
+      "concept_score": 0.286,
+      "evidence_score": 0.0,
+      "score": 0.25
+    },
+    {
+      "id": 31,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.335,
+      "concept_score": 0.129,
+      "evidence_score": 0.0,
+      "score": 0.206
+    },
+    {
+      "id": 32,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.461,
+      "concept_score": 0.56,
+      "evidence_score": 0.0,
+      "score": 0.398
+    },
+    {
+      "id": 33,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.487,
+      "concept_score": 0.333,
+      "evidence_score": 0.0,
+      "score": 0.343
+    },
+    {
+      "id": 34,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.423,
+      "concept_score": 0.267,
+      "evidence_score": 0.0,
+      "score": 0.292
+    },
+    {
+      "id": 35,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.419,
+      "concept_score": 0.323,
+      "evidence_score": 0.0,
+      "score": 0.306
+    },
+    {
+      "id": 36,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.287,
+      "concept_score": 0.143,
+      "evidence_score": 0.0,
+      "score": 0.186
+    },
+    {
+      "id": 37,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.342,
+      "concept_score": 0.25,
+      "evidence_score": 0.0,
+      "score": 0.246
+    },
+    {
+      "id": 38,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.22,
+      "concept_score": 0.188,
+      "evidence_score": 0.0,
+      "score": 0.166
+    },
+    {
+      "id": 39,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.279,
+      "concept_score": 0.286,
+      "evidence_score": 0.0,
+      "score": 0.225
+    },
+    {
+      "id": 40,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.363,
+      "concept_score": 0.172,
+      "evidence_score": 0.0,
+      "score": 0.233
+    },
+    {
+      "id": 41,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.323,
+      "concept_score": 0.208,
+      "evidence_score": 0.0,
+      "score": 0.224
+    },
+    {
+      "id": 42,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.251,
+      "concept_score": 0.25,
+      "evidence_score": 0.0,
+      "score": 0.201
+    },
+    {
+      "id": 43,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.295,
+      "concept_score": 0.312,
+      "evidence_score": 0.0,
+      "score": 0.241
+    },
+    {
+      "id": 44,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.331,
+      "concept_score": 0.227,
+      "evidence_score": 0.0,
+      "score": 0.234
+    },
+    {
+      "id": 45,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.234,
+      "concept_score": 0.143,
+      "evidence_score": 0.0,
+      "score": 0.16
+    },
+    {
+      "id": 46,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.247,
+      "concept_score": 0.231,
+      "evidence_score": 0.0,
+      "score": 0.193
+    },
+    {
+      "id": 47,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.351,
+      "concept_score": 0.185,
+      "evidence_score": 0.0,
+      "score": 0.231
+    },
+    {
+      "id": 48,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.29,
+      "concept_score": 0.281,
+      "evidence_score": 0.0,
+      "score": 0.23
+    },
+    {
+      "id": 49,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.342,
+      "concept_score": 0.167,
+      "evidence_score": 0.0,
+      "score": 0.221
+    },
+    {
+      "id": 50,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.3,
+      "concept_score": 0.135,
+      "evidence_score": 0.0,
+      "score": 0.191
+    },
+    {
+      "id": 51,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.479,
+      "concept_score": 0.261,
+      "evidence_score": 0.0,
+      "score": 0.318
+    },
+    {
+      "id": 52,
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "semantic_score": 0.462,
+      "concept_score": 0.286,
+      "evidence_score": 0.0,
+      "score": 0.317
+    },
+    {
+      "id": 53,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.347,
+      "concept_score": 0.478,
+      "evidence_score": 0.0,
+      "score": 0.317
+    },
+    {
+      "id": 54,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.254,
+      "concept_score": 0.273,
+      "evidence_score": 0.0,
+      "score": 0.209
+    },
+    {
+      "id": 55,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.351,
+      "concept_score": 0.229,
+      "evidence_score": 0.0,
+      "score": 0.244
+    },
+    {
+      "id": 56,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.328,
+      "concept_score": 0.148,
+      "evidence_score": 0.0,
+      "score": 0.209
+    },
+    {
+      "id": 57,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.3,
+      "concept_score": 0.086,
+      "evidence_score": 0.0,
+      "score": 0.176
+    },
+    {
+      "id": 58,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.285,
+      "concept_score": 0.167,
+      "evidence_score": 0.0,
+      "score": 0.192
+    },
+    {
+      "id": 59,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.333,
+      "concept_score": 0.185,
+      "evidence_score": 0.0,
+      "score": 0.222
+    },
+    {
+      "id": 60,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.432,
+      "concept_score": 0.25,
+      "evidence_score": 0.0,
+      "score": 0.291
+    },
+    {
+      "id": 61,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.495,
+      "concept_score": 0.212,
+      "evidence_score": 0.0,
+      "score": 0.311
+    },
+    {
+      "id": 62,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.392,
+      "concept_score": 0.192,
+      "evidence_score": 0.0,
+      "score": 0.254
+    },
+    {
+      "id": 63,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.397,
+      "concept_score": 0.194,
+      "evidence_score": 0.0,
+      "score": 0.256
+    },
+    {
+      "id": 64,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.246,
+      "concept_score": 0.235,
+      "evidence_score": 0.0,
+      "score": 0.194
+    },
+    {
+      "id": 65,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.308,
+      "concept_score": 0.156,
+      "evidence_score": 0.0,
+      "score": 0.201
+    },
+    {
+      "id": 66,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.378,
+      "concept_score": 0.111,
+      "evidence_score": 0.0,
+      "score": 0.222
+    },
+    {
+      "id": 67,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.359,
+      "concept_score": 0.179,
+      "evidence_score": 0.0,
+      "score": 0.233
+    },
+    {
+      "id": 68,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.527,
+      "concept_score": 0.364,
+      "evidence_score": 0.0,
+      "score": 0.373
+    },
+    {
+      "id": 69,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.31,
+      "concept_score": 0.3,
+      "evidence_score": 0.0,
+      "score": 0.245
+    },
+    {
+      "id": 70,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.394,
+      "concept_score": 0.161,
+      "evidence_score": 0.0,
+      "score": 0.245
+    },
+    {
+      "id": 71,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.321,
+      "concept_score": 0.2,
+      "evidence_score": 0.0,
+      "score": 0.22
+    },
+    {
+      "id": 72,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.344,
+      "concept_score": 0.219,
+      "evidence_score": 0.0,
+      "score": 0.238
+    },
+    {
+      "id": 73,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.333,
+      "concept_score": 0.269,
+      "evidence_score": 0.0,
+      "score": 0.247
+    },
+    {
+      "id": 74,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.385,
+      "concept_score": 0.217,
+      "evidence_score": 0.0,
+      "score": 0.258
+    },
+    {
+      "id": 75,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.44,
+      "concept_score": 0.214,
+      "evidence_score": 0.0,
+      "score": 0.284
+    },
+    {
+      "id": 76,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.388,
+      "concept_score": 0.207,
+      "evidence_score": 0.0,
+      "score": 0.256
+    },
+    {
+      "id": 77,
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "semantic_score": 0.284,
+      "concept_score": 0.167,
+      "evidence_score": 0.0,
+      "score": 0.192
+    },
+    {
+      "id": 78,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.513,
+      "concept_score": 0.667,
+      "evidence_score": 0.0,
+      "score": 0.457
+    },
+    {
+      "id": 79,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.408,
+      "concept_score": 0.444,
+      "evidence_score": 0.0,
+      "score": 0.337
+    },
+    {
+      "id": 80,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.343,
+      "concept_score": 0.077,
+      "evidence_score": 0.0,
+      "score": 0.195
+    },
+    {
+      "id": 81,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.361,
+      "concept_score": 0.136,
+      "evidence_score": 0.0,
+      "score": 0.222
+    },
+    {
+      "id": 82,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.404,
+      "concept_score": 0.095,
+      "evidence_score": 0.0,
+      "score": 0.231
+    },
+    {
+      "id": 83,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.387,
+      "concept_score": 0.2,
+      "evidence_score": 1.0,
+      "score": 0.454
+    },
+    {
+      "id": 84,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.357,
+      "concept_score": 0.353,
+      "evidence_score": 0.0,
+      "score": 0.285
+    },
+    {
+      "id": 85,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.248,
+      "concept_score": 0.158,
+      "evidence_score": 0.0,
+      "score": 0.172
+    },
+    {
+      "id": 86,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.359,
+      "concept_score": 0.353,
+      "evidence_score": 0.0,
+      "score": 0.286
+    },
+    {
+      "id": 87,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.328,
+      "concept_score": 0.238,
+      "evidence_score": 0.0,
+      "score": 0.235
+    },
+    {
+      "id": 88,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.434,
+      "concept_score": 0.125,
+      "evidence_score": 0.0,
+      "score": 0.254
+    },
+    {
+      "id": 89,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.407,
+      "concept_score": 0.174,
+      "evidence_score": 0.0,
+      "score": 0.256
+    },
+    {
+      "id": 90,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.294,
+      "concept_score": 0.118,
+      "evidence_score": 1.0,
+      "score": 0.382
+    },
+    {
+      "id": 91,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.458,
+      "concept_score": 0.136,
+      "evidence_score": 0.0,
+      "score": 0.27
+    },
+    {
+      "id": 92,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.499,
+      "concept_score": 0.158,
+      "evidence_score": 0.0,
+      "score": 0.297
+    },
+    {
+      "id": 93,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.429,
+      "concept_score": 0.091,
+      "evidence_score": 0.0,
+      "score": 0.242
+    },
+    {
+      "id": 94,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.417,
+      "concept_score": 0.2,
+      "evidence_score": 0.0,
+      "score": 0.268
+    },
+    {
+      "id": 95,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.438,
+      "concept_score": 0.222,
+      "evidence_score": 0.0,
+      "score": 0.286
+    },
+    {
+      "id": 96,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.452,
+      "concept_score": 0.2,
+      "evidence_score": 0.0,
+      "score": 0.286
+    },
+    {
+      "id": 97,
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "semantic_score": 0.516,
+      "concept_score": 0.13,
+      "evidence_score": 1.0,
+      "score": 0.497
+    },
+    {
+      "id": 98,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.334,
+      "concept_score": 0.5,
+      "evidence_score": 0.0,
+      "score": 0.317
+    },
+    {
+      "id": 99,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.435,
+      "concept_score": 0.273,
+      "evidence_score": 0.0,
+      "score": 0.299
+    },
+    {
+      "id": 100,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.412,
+      "concept_score": 1.0,
+      "evidence_score": 0.0,
+      "score": 0.506
+    },
+    {
+      "id": 101,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.363,
+      "concept_score": 0.167,
+      "evidence_score": 0.0,
+      "score": 0.231
+    },
+    {
+      "id": 102,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.49,
+      "concept_score": 0.182,
+      "evidence_score": 0.0,
+      "score": 0.299
+    },
+    {
+      "id": 103,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.313,
+      "concept_score": 0.091,
+      "evidence_score": 0.0,
+      "score": 0.184
+    },
+    {
+      "id": 104,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.193,
+      "concept_score": 0.083,
+      "evidence_score": 0.0,
+      "score": 0.122
+    },
+    {
+      "id": 105,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.448,
+      "concept_score": 0.133,
+      "evidence_score": 0.0,
+      "score": 0.264
+    },
+    {
+      "id": 106,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.324,
+      "concept_score": 0.2,
+      "evidence_score": 0.0,
+      "score": 0.222
+    },
+    {
+      "id": 107,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.334,
+      "concept_score": 0.4,
+      "evidence_score": 0.0,
+      "score": 0.287
+    },
+    {
+      "id": 108,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.427,
+      "concept_score": 0.222,
+      "evidence_score": 0.0,
+      "score": 0.28
+    },
+    {
+      "id": 109,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.338,
+      "concept_score": 0.125,
+      "evidence_score": 0.0,
+      "score": 0.206
+    },
+    {
+      "id": 110,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.31,
+      "concept_score": 0.2,
+      "evidence_score": 0.0,
+      "score": 0.215
+    },
+    {
+      "id": 111,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.204,
+      "concept_score": 0.222,
+      "evidence_score": 0.0,
+      "score": 0.168
+    },
+    {
+      "id": 112,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.254,
+      "concept_score": 0.333,
+      "evidence_score": 0.0,
+      "score": 0.227
+    },
+    {
+      "id": 113,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.334,
+      "concept_score": 0.375,
+      "evidence_score": 0.0,
+      "score": 0.28
+    },
+    {
+      "id": 114,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.187,
+      "concept_score": 0.111,
+      "evidence_score": 0.0,
+      "score": 0.127
+    },
+    {
+      "id": 115,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.189,
+      "concept_score": 0.182,
+      "evidence_score": 0.0,
+      "score": 0.149
+    },
+    {
+      "id": 116,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.394,
+      "concept_score": 0.25,
+      "evidence_score": 0.0,
+      "score": 0.272
+    },
+    {
+      "id": 117,
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "semantic_score": 0.4,
+      "concept_score": 0.375,
+      "evidence_score": 0.0,
+      "score": 0.313
+    },
+    {
+      "id": 118,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.135,
+      "concept_score": 0.5,
+      "evidence_score": 0.0,
+      "score": 0.218
+    },
+    {
+      "id": 119,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.116,
+      "concept_score": 0.0,
+      "evidence_score": 0.0,
+      "score": 0.058
+    },
+    {
+      "id": 120,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.144,
+      "concept_score": 0.5,
+      "evidence_score": 0.0,
+      "score": 0.222
+    },
+    {
+      "id": 121,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.105,
+      "concept_score": 0.333,
+      "evidence_score": 0.0,
+      "score": 0.153
+    },
+    {
+      "id": 122,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.142,
+      "concept_score": 0.5,
+      "evidence_score": 0.0,
+      "score": 0.221
+    },
+    {
+      "id": 123,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.103,
+      "concept_score": 0.5,
+      "evidence_score": 0.0,
+      "score": 0.202
+    },
+    {
+      "id": 124,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.101,
+      "concept_score": 0.5,
+      "evidence_score": 0.0,
+      "score": 0.201
+    },
+    {
+      "id": 125,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.134,
+      "concept_score": 0.5,
+      "evidence_score": 0.0,
+      "score": 0.217
+    },
+    {
+      "id": 126,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.17,
+      "concept_score": 0.5,
+      "evidence_score": 0.0,
+      "score": 0.235
+    },
+    {
+      "id": 127,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.16,
+      "concept_score": 0.5,
+      "evidence_score": 0.0,
+      "score": 0.23
+    },
+    {
+      "id": 128,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.127,
+      "concept_score": 0.333,
+      "evidence_score": 0.0,
+      "score": 0.163
+    },
+    {
+      "id": 129,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.14,
+      "concept_score": 0.5,
+      "evidence_score": 0.0,
+      "score": 0.22
+    },
+    {
+      "id": 130,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.129,
+      "concept_score": 0.0,
+      "evidence_score": 1.0,
+      "score": 0.264
+    },
+    {
+      "id": 131,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.058,
+      "concept_score": 1.0,
+      "evidence_score": 0.0,
+      "score": 0.329
+    },
+    {
+      "id": 132,
+      "category": "calibration",
+      "difficulty": "easy",
+      "semantic_score": 0.126,
+      "concept_score": 0.333,
+      "evidence_score": 0.0,
+      "score": 0.163
+    },
+    {
+      "id": 133,
+      "category": "negative_control",
+      "difficulty": "medium",
+      "semantic_score": 0.447,
+      "concept_score": 0.286,
+      "evidence_score": 0.0,
+      "score": 0.309
+    },
+    {
+      "id": 134,
+      "category": "negative_control",
+      "difficulty": "medium",
+      "semantic_score": 0.594,
+      "concept_score": 0.462,
+      "evidence_score": 0.0,
+      "score": 0.435
+    },
+    {
+      "id": 135,
+      "category": "negative_control",
+      "difficulty": "medium",
+      "semantic_score": 0.386,
+      "concept_score": 0.231,
+      "evidence_score": 0.0,
+      "score": 0.262
+    },
+    {
+      "id": 136,
+      "category": "negative_control",
+      "difficulty": "medium",
+      "semantic_score": 0.427,
+      "concept_score": 0.167,
+      "evidence_score": 0.0,
+      "score": 0.264
+    },
+    {
+      "id": 137,
+      "category": "negative_control",
+      "difficulty": "medium",
+      "semantic_score": 0.355,
+      "concept_score": 0.333,
+      "evidence_score": 0.0,
+      "score": 0.277
+    },
+    {
+      "id": 138,
+      "category": "negative_control",
+      "difficulty": "medium",
+      "semantic_score": 0.305,
+      "concept_score": 0.143,
+      "evidence_score": 0.0,
+      "score": 0.195
+    },
+    {
+      "id": 139,
+      "category": "negative_control",
+      "difficulty": "medium",
+      "semantic_score": 0.328,
+      "concept_score": 0.333,
+      "evidence_score": 0.0,
+      "score": 0.264
+    },
+    {
+      "id": 140,
+      "category": "negative_control",
+      "difficulty": "medium",
+      "semantic_score": 0.57,
+      "concept_score": 0.273,
+      "evidence_score": 0.0,
+      "score": 0.367
+    },
+    {
+      "id": 141,
+      "category": "negative_control",
+      "difficulty": "medium",
+      "semantic_score": 0.431,
+      "concept_score": 0.3,
+      "evidence_score": 0.0,
+      "score": 0.305
+    },
+    {
+      "id": 142,
+      "category": "negative_control",
+      "difficulty": "medium",
+      "semantic_score": 0.469,
+      "concept_score": 0.444,
+      "evidence_score": 0.0,
+      "score": 0.368
+    }
+  ]
+}

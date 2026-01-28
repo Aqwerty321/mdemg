@@ -59,6 +59,12 @@ var (
 
 	// Info flags
 	listLanguages = flag.Bool("list-languages", false, "List supported languages and exit")
+
+	// Phase 2.5: Performance guards for large repos
+	maxFileSize       = flag.Int("max-file-size", 1048576, "Max file size in bytes to process (default: 1MB)")
+	maxElementsPerFile = flag.Int("max-elements-per-file", 500, "Max elements to extract per file (default: 500)")
+	maxSymbolsPerFile  = flag.Int("max-symbols-per-file", 1000, "Max symbols to extract per file (default: 1000)")
+	preset             = flag.String("preset", "", "Exclusion preset: default, ml_cuda, web_monorepo")
 )
 
 // Global summarize service (nil if disabled)
@@ -107,6 +113,52 @@ type CodeElement struct {
 	Tags     []string
 	Concerns []string       // Cross-cutting concerns detected in this element
 	Symbols  []IngestSymbol // Extracted code symbols (constants, functions, etc.)
+}
+
+// Phase 2.5: Exclusion presets for different repo types
+type exclusionPreset struct {
+	excludeDirs     []string
+	excludePatterns []string
+	maxFileSize     int
+}
+
+var presets = map[string]exclusionPreset{
+	"default": {
+		excludeDirs: []string{
+			".git", "node_modules", "vendor", "__pycache__",
+			".venv", "venv", "build", "dist", "target",
+		},
+		excludePatterns: []string{
+			"*.min.js", "*.bundle.js", "*.pyc",
+		},
+		maxFileSize: 1048576, // 1MB
+	},
+	"ml_cuda": {
+		excludeDirs: []string{
+			".git", "node_modules", "vendor", "__pycache__",
+			".venv", "venv", "build", "dist", "target",
+			"third_party", "data", "datasets", "checkpoints",
+			"logs", "wandb", "outputs", ".cache",
+		},
+		excludePatterns: []string{
+			"*.min.js", "*.bundle.js", "*.pyc",
+			"*.pt", "*.pth", "*.onnx", "*.bin",
+			"*.safetensors", "*.npy", "*.npz",
+		},
+		maxFileSize: 524288, // 512KB
+	},
+	"web_monorepo": {
+		excludeDirs: []string{
+			".git", "node_modules", "vendor", "__pycache__",
+			".venv", "venv", "build", "dist", "target",
+			".next", ".nuxt", ".output", "coverage", "storybook-static",
+		},
+		excludePatterns: []string{
+			"*.min.js", "*.bundle.js", "*.pyc",
+			"*.chunk.js", "*.map",
+		},
+		maxFileSize: 1048576, // 1MB
+	},
 }
 
 // Cross-cutting concern patterns for detection
@@ -331,6 +383,25 @@ func archiveDeletedNodes(client *http.Client, endpoint, spaceID string, deletedP
 	return archived, nil
 }
 
+// getExcludeDirList returns a sorted list of excluded directories
+func getExcludeDirList(excludeSet map[string]bool) []string {
+	var dirs []string
+	for dir := range excludeSet {
+		dirs = append(dirs, dir)
+	}
+	return dirs
+}
+
+// matchesExcludePattern checks if a filename matches any exclusion pattern
+func matchesExcludePattern(filename string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if matched, _ := filepath.Match(pattern, filename); matched {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	flag.Parse()
 
@@ -375,7 +446,25 @@ func main() {
 		log.Fatal("--path is required")
 	}
 
+	// Phase 2.5: Apply preset if specified
 	excludeSet := make(map[string]bool)
+	var excludePatterns []string
+	if *preset != "" {
+		if p, ok := presets[*preset]; ok {
+			for _, dir := range p.excludeDirs {
+				excludeSet[dir] = true
+			}
+			excludePatterns = p.excludePatterns
+			// Apply preset max file size if no CLI override
+			if *maxFileSize == 1048576 { // default value
+				*maxFileSize = p.maxFileSize
+			}
+			log.Printf("Applied preset: %s", *preset)
+		} else {
+			log.Fatalf("Unknown preset: %s (available: default, ml_cuda, web_monorepo)", *preset)
+		}
+	}
+	// Merge CLI excludeDirs with preset
 	for _, dir := range strings.Split(*excludeDirs, ",") {
 		excludeSet[strings.TrimSpace(dir)] = true
 	}
@@ -385,7 +474,12 @@ func main() {
 	log.Printf("Space ID: %s", *spaceID)
 	log.Printf("Endpoint: %s", *mdemgEndpoint)
 	log.Printf("Batch size: %d, Workers: %d, Timeout: %ds", *batchSize, *workers, *timeout)
-	log.Printf("Excluded dirs: %s", *excludeDirs)
+	log.Printf("Excluded dirs: %v", getExcludeDirList(excludeSet))
+	if len(excludePatterns) > 0 {
+		log.Printf("Excluded patterns: %v", excludePatterns)
+	}
+	log.Printf("Max file size: %d bytes", *maxFileSize)
+	log.Printf("Max elements/file: %d, Max symbols/file: %d", *maxElementsPerFile, *maxSymbolsPerFile)
 	log.Printf("Symbol extraction: %v", *extractSymbols)
 	log.Printf("Incremental mode: %v", *incremental)
 	log.Printf("LLM summaries: %v", *llmSummary)
@@ -450,7 +544,7 @@ func main() {
 	}
 
 	// Collect all code elements
-	elements, err := walkCodebase(*codebasePath, excludeSet)
+	elements, err := walkCodebase(*codebasePath, excludeSet, excludePatterns)
 	if err != nil {
 		log.Fatalf("Failed to walk codebase: %v", err)
 	}
@@ -638,7 +732,7 @@ func getEnabledLanguages() map[string]bool {
 	}
 }
 
-func walkCodebase(root string, excludeSet map[string]bool) ([]CodeElement, error) {
+func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []string) ([]CodeElement, error) {
 	var elements []CodeElement
 	enabledLangs := getEnabledLanguages()
 
@@ -653,6 +747,22 @@ func walkCodebase(root string, excludeSet map[string]bool) ([]CodeElement, error
 					log.Printf("Skipping excluded directory: %s", path)
 				}
 				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Phase 2.5: File size early exit
+		if *maxFileSize > 0 && info.Size() > int64(*maxFileSize) {
+			if *verbose {
+				log.Printf("Skipping oversized file (%d bytes > %d max): %s", info.Size(), *maxFileSize, path)
+			}
+			return nil
+		}
+
+		// Phase 2.5: Exclude files matching patterns
+		if matchesExcludePattern(info.Name(), excludePatterns) {
+			if *verbose {
+				log.Printf("Skipping file matching exclude pattern: %s", path)
 			}
 			return nil
 		}
@@ -686,9 +796,25 @@ func walkCodebase(root string, excludeSet map[string]bool) ([]CodeElement, error
 				return nil
 			}
 
-			// Convert and append elements
+			// Phase 2.5: Apply per-file element cap
+			if *maxElementsPerFile > 0 && len(langElements) > *maxElementsPerFile {
+				if *verbose {
+					log.Printf("Capping elements for %s: %d → %d", path, len(langElements), *maxElementsPerFile)
+				}
+				langElements = langElements[:*maxElementsPerFile]
+			}
+
+			// Convert and append elements with symbol caps
 			for _, elem := range langElements {
-				elements = append(elements, convertLanguageElement(elem))
+				converted := convertLanguageElement(elem)
+				// Phase 2.5: Apply per-file symbol cap
+				if *maxSymbolsPerFile > 0 && len(converted.Symbols) > *maxSymbolsPerFile {
+					if *verbose {
+						log.Printf("Capping symbols for %s: %d → %d", path, len(converted.Symbols), *maxSymbolsPerFile)
+					}
+					converted.Symbols = converted.Symbols[:*maxSymbolsPerFile]
+				}
+				elements = append(elements, converted)
 			}
 			return nil
 		}

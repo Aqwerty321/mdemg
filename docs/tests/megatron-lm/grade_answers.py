@@ -124,8 +124,22 @@ def get_expected_answer(question: Dict) -> str:
 
 def get_requires_files(question: Dict) -> List[str]:
     """Get required files from question, handling schema variations."""
-    return (question.get('requires_files') or
-            question.get('required_files') or [])
+    # Try multiple field names for compatibility
+    files = (question.get('requires_files') or
+             question.get('required_files') or
+             question.get('file_line_refs') or [])
+
+    # Extract file paths from file_line_refs format (may include :line or :line-line)
+    result = []
+    for f in files:
+        # Strip line numbers if present (e.g., "file.py:123" -> "file.py")
+        if ':' in str(f):
+            # Handle ranges like "file.py:34-39" and single lines "file.py:123"
+            file_part = str(f).split(':')[0]
+            result.append(file_part)
+        else:
+            result.append(str(f))
+    return result
 
 
 def extract_file_citations(answer_text: str) -> List[Dict]:
@@ -141,6 +155,25 @@ def extract_file_citations(answer_text: str) -> List[Dict]:
     return citations
 
 
+def parse_file_line_ref(ref: str) -> Tuple[str, Optional[int], Optional[int]]:
+    """Parse a file_line_ref like 'file.py:123' or 'file.py:34-39' into (file, start, end)."""
+    if ':' not in ref:
+        return (ref, None, None)
+    parts = ref.split(':')
+    file_path = parts[0]
+    line_part = parts[1] if len(parts) > 1 else ''
+    if '-' in line_part:
+        try:
+            start, end = line_part.split('-')
+            return (file_path, int(start), int(end))
+        except ValueError:
+            return (file_path, None, None)
+    elif line_part.isdigit():
+        line_num = int(line_part)
+        return (file_path, line_num, line_num)
+    return (file_path, None, None)
+
+
 def validate_evidence(answer: Dict, question: Dict) -> Dict:
     """Validate evidence citations in answer against question's expected evidence."""
     answer_text = answer.get('answer', '')
@@ -148,6 +181,8 @@ def validate_evidence(answer: Dict, question: Dict) -> Dict:
     files_consulted = answer.get('files_consulted', [])
 
     expected_files = get_requires_files(question)
+    # Parse file_line_refs from question for line-level comparison
+    expected_refs = question.get('file_line_refs', [])
     expected_evidence = question.get('evidence', [])
 
     # Extract citations from answer text
@@ -164,14 +199,67 @@ def validate_evidence(answer: Dict, question: Dict) -> Dict:
 
     for expected_file in expected_files:
         expected_basename = Path(expected_file).name.lower()
+        # Also handle directory refs like "megatron/core/"
+        expected_path = expected_file.lower().rstrip('/')
         for cited in all_cited:
-            if expected_basename in cited:
+            cited_lower = cited.lower()
+            if expected_basename in cited_lower or expected_path in cited_lower:
                 correct_file_cited = True
                 break
+        if correct_file_cited:
+            break
 
     # Check evidence accuracy (do cited lines match expected?)
     evidence_accurate = False
-    if expected_evidence and text_citations:
+
+    # First try using file_line_refs from question (preferred)
+    if expected_refs:
+        for expected_ref in expected_refs:
+            exp_file, exp_start, exp_end = parse_file_line_ref(str(expected_ref))
+            exp_basename = Path(exp_file).name.lower()
+
+            # Check against cited_files from answer
+            for cited_ref in cited_files:
+                cited_file, cited_start, cited_end = parse_file_line_ref(str(cited_ref))
+                cited_basename = Path(cited_file).name.lower()
+
+                if exp_basename == cited_basename or exp_file.lower() in str(cited_ref).lower():
+                    # File matches, check line numbers if both have them
+                    if exp_start is not None and cited_start is not None:
+                        # Allow tolerance of 10 lines
+                        if exp_end is None:
+                            exp_end = exp_start
+                        if cited_end is None:
+                            cited_end = cited_start
+                        # Check if cited line falls within expected range (with tolerance)
+                        if (exp_start - 10 <= cited_start <= exp_end + 10 or
+                            exp_start - 10 <= cited_end <= exp_end + 10):
+                            evidence_accurate = True
+                            break
+                    elif exp_start is None:
+                        # No line number in expected, file match is enough
+                        evidence_accurate = True
+                        break
+            if evidence_accurate:
+                break
+
+            # Also check text_citations
+            for tc in text_citations:
+                if exp_basename in tc['file'].lower():
+                    if exp_start is not None:
+                        if exp_end is None:
+                            exp_end = exp_start
+                        if exp_start - 10 <= tc['line'] <= exp_end + 10:
+                            evidence_accurate = True
+                            break
+                    else:
+                        evidence_accurate = True
+                        break
+            if evidence_accurate:
+                break
+
+    # Fallback to old evidence format if file_line_refs didn't match
+    if not evidence_accurate and expected_evidence and text_citations:
         for tc in text_citations:
             for ee in expected_evidence:
                 ee_file = ee.get('file', '')

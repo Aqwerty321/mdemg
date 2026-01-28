@@ -11,6 +11,8 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Retrieval & Search](#retrieval--search)
 - [Consolidation](#consolidation)
 - [Learning System](#learning-system)
+- [Conversation Memory](#conversation-memory)
+- [Capability Gaps](#capability-gaps)
 - [Plugins & Modules](#plugins--modules)
 - [System & Monitoring](#system--monitoring)
 
@@ -372,6 +374,336 @@ Prune decayed and excess learning edges.
   "decayed_deleted": 45,
   "excess_deleted": 12,
   "total_deleted": 57
+}
+```
+
+---
+
+## Conversation Memory
+
+Endpoints for the Conversation Memory System (CMS) - capturing, recalling, and managing conversational knowledge.
+
+### POST /v1/conversation/observe
+
+Capture a significant observation with auto-surprise scoring.
+
+**Request Body**:
+```json
+{
+  "space_id": "my-project",
+  "session_id": "session-abc123",
+  "content": "User prefers TypeScript over JavaScript",
+  "obs_type": "preference",
+  "tags": ["coding-style"],
+  "metadata": {"context": "discussion about language choice"},
+  "user_id": "alice",
+  "visibility": "team",
+  "refers_to": ["sym-validateInput-xyz"]
+}
+```
+
+**Fields**:
+- `obs_type`: `decision`, `learning`, `preference`, `error`, `task`, `correction`
+- `visibility`: `private` (owner only), `team` (space members), `global` (everyone, default)
+- `refers_to`: Array of node IDs to create REFERS_TO edges
+
+**Response**:
+```json
+{
+  "obs_id": "obs-abc123",
+  "node_id": "mem-xyz789",
+  "surprise_score": 0.65,
+  "surprise_factors": {
+    "term_novelty": 0.7,
+    "correction_score": 0.0,
+    "embedding_novelty": 0.6
+  },
+  "summary": "User preference for TypeScript"
+}
+```
+
+### POST /v1/conversation/correct
+
+Capture an explicit user correction (high surprise, persistent).
+
+**Request Body**:
+```json
+{
+  "space_id": "my-project",
+  "session_id": "session-abc123",
+  "incorrect": "The ORM is Hibernate",
+  "correct": "The ORM is BlueSeerData, a custom framework",
+  "context": "User corrected my assumption about the database layer",
+  "user_id": "alice",
+  "visibility": "global"
+}
+```
+
+**Response**: Same as `/observe` with higher surprise score (baseline 0.5).
+
+### POST /v1/conversation/resume
+
+Restore context after context compaction.
+
+**Request Body**:
+```json
+{
+  "space_id": "my-project",
+  "session_id": "session-abc123",
+  "include_tasks": true,
+  "include_decisions": true,
+  "include_learnings": true,
+  "max_observations": 20,
+  "requesting_user_id": "alice"
+}
+```
+
+**Response**:
+```json
+{
+  "space_id": "my-project",
+  "session_id": "session-abc123",
+  "observations": [
+    {
+      "node_id": "mem-obs1",
+      "obs_type": "decision",
+      "content": "Using plugin architecture",
+      "summary": "Architecture decision",
+      "surprise_score": 0.5,
+      "created_at": "2026-01-27T10:00:00Z"
+    }
+  ],
+  "themes": [...],
+  "emergent_concepts": [...],
+  "jiminy": {
+    "rationale": "Restoring 15 observations from session...",
+    "confidence": 0.72,
+    "score_breakdown": {
+      "observation_coverage": 0.85,
+      "theme_relevance": 0.65,
+      "recency_boost": 0.70
+    },
+    "highlights": ["Decision: Using plugin architecture"]
+  },
+  "summary": "Resuming with 15 observations..."
+}
+```
+
+### POST /v1/conversation/recall
+
+Retrieve relevant conversation knowledge via semantic query.
+
+**Request Body**:
+```json
+{
+  "space_id": "my-project",
+  "query": "What do I know about user preferences?",
+  "top_k": 10,
+  "include_themes": true,
+  "include_concepts": true,
+  "requesting_user_id": "alice"
+}
+```
+
+**Response**:
+```json
+{
+  "space_id": "my-project",
+  "query": "What do I know about user preferences?",
+  "results": [
+    {
+      "type": "emergent_concept",
+      "node_id": "concept-123",
+      "content": "User prefers modular architecture",
+      "score": 0.85,
+      "layer": 2
+    }
+  ]
+}
+```
+
+### POST /v1/conversation/consolidate
+
+Trigger consolidation to form themes and emergent concepts.
+
+**Request Body**:
+```json
+{
+  "space_id": "my-project"
+}
+```
+
+**Response**:
+```json
+{
+  "space_id": "my-project",
+  "themes_created": 3,
+  "concepts_created": 1,
+  "duration_ms": 1250
+}
+```
+
+### GET /v1/conversation/volatile/stats
+
+Get statistics about volatile (ungraduated) observations.
+
+**Query Parameters**:
+- `space_id` (required)
+
+**Response**:
+```json
+{
+  "space_id": "my-project",
+  "volatile_count": 15,
+  "permanent_count": 42,
+  "avg_volatile_stability": 0.35,
+  "min_volatile_stability": 0.10,
+  "max_volatile_stability": 0.72
+}
+```
+
+### POST /v1/conversation/graduate
+
+Manually trigger graduation processing for the Context Cooler.
+
+**Request Body**:
+```json
+{
+  "space_id": "my-project"
+}
+```
+
+**Response**:
+```json
+{
+  "space_id": "my-project",
+  "timestamp": "2026-01-27T12:00:00Z",
+  "graduated": 3,
+  "tombstoned": 1,
+  "remaining_volatile": 11,
+  "decay_applied": 5
+}
+```
+
+---
+
+## Capability Gaps
+
+Endpoints for capability gap detection and interview prompts.
+
+### GET /v1/system/capability-gaps
+
+List all capability gaps.
+
+**Query Parameters**:
+- `status`: `open`, `addressed`, `dismissed`
+- `type`: `data_source`, `reasoning`, `query_pattern`
+- `space_id`: Filter by space
+
+**Response**:
+```json
+{
+  "data": {
+    "gaps": [
+      {
+        "id": "gap-abc123",
+        "type": "data_source",
+        "description": "Content references Slack but no integration exists",
+        "evidence": ["slack"],
+        "suggested_plugin": {
+          "type": "INGESTION",
+          "name": "slack-ingestion",
+          "description": "Ingest Slack messages and channels"
+        },
+        "priority": 0.85,
+        "status": "open",
+        "occurrence_count": 15
+      }
+    ],
+    "summary": {
+      "total": 5,
+      "by_type": {"data_source": 3, "reasoning": 2},
+      "high_priority": 2
+    }
+  }
+}
+```
+
+### GET /v1/system/gap-interviews
+
+Get pending interview prompts.
+
+**Query Parameters**:
+- `space_id` (optional)
+
+**Response**:
+```json
+{
+  "prompts": [
+    {
+      "id": "interview-abc123",
+      "gap_id": "gap-xyz789",
+      "gap_type": "data_source",
+      "question": "How should MDEMG integrate with Slack?",
+      "context": "This gap has been detected 15 times.",
+      "suggestions": ["Create slack-ingestion plugin", "Configure webhook"],
+      "priority": 0.85,
+      "status": "pending"
+    }
+  ],
+  "stats": {
+    "total": 10,
+    "pending": 5,
+    "answered": 4,
+    "skipped": 1
+  }
+}
+```
+
+### POST /v1/system/gap-interviews/run
+
+Manually trigger the weekly gap interview process.
+
+**Request Body** (optional):
+```json
+{
+  "max_prompts": 10,
+  "min_priority": 0.3,
+  "min_occurrences": 3
+}
+```
+
+**Response**:
+```json
+{
+  "total_gaps_analyzed": 8,
+  "prompts_generated": 5,
+  "high_priority_count": 2,
+  "gaps_by_type": {"data_source": 3, "reasoning": 2},
+  "processed_at": "2026-01-27T12:00:00Z",
+  "next_scheduled_at": "2026-02-03T12:00:00Z"
+}
+```
+
+### POST /v1/system/gap-interviews/{id}/answer
+
+Mark an interview prompt as answered.
+
+**Request Body**:
+```json
+{
+  "observation_node_id": "obs-abc123"
+}
+```
+
+### POST /v1/system/gap-interviews/{id}/skip
+
+Skip an interview prompt.
+
+**Request Body**:
+```json
+{
+  "reason": "Not relevant to this project"
 }
 ```
 

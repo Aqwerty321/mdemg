@@ -3,11 +3,19 @@ package retrieval
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
+
+// debugTraceEnabled enables detailed tracing for specific search terms
+var debugTraceEnabled = false
+
+// debugTraceTerm is the term to trace through the pipeline
+var debugTraceTerm = "transformerconfig"
 
 // BM25Result represents a result from full-text BM25 search
 type BM25Result struct {
@@ -115,6 +123,17 @@ LIMIT $topK`
 			return nil, err
 		}
 
+		// Debug: trace target term through BM25 results
+		if debugTraceEnabled {
+			for i, r := range results {
+				if strings.Contains(strings.ToLower(r.Name), debugTraceTerm) ||
+					strings.Contains(strings.ToLower(r.Path), debugTraceTerm) {
+					log.Printf("[DEBUG BM25] Found '%s' at rank %d: NodeID=%s, Name=%s, Path=%s, Score=%.2f",
+						debugTraceTerm, i+1, r.NodeID, r.Name, r.Path, r.Score)
+				}
+			}
+		}
+
 		return results, nil
 	})
 
@@ -161,6 +180,10 @@ const RRFConstant = 60
 // - Different score scales between retrievers
 // - Documents appearing in only one retriever's results
 func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, vectorWeight, bm25Weight float64) []FusedCandidate {
+	// Debug: log input counts
+	if debugTraceEnabled {
+		log.Printf("[DEBUG RRF] Input: %d vector results, %d BM25 results", len(vectorResults), len(bm25Results))
+	}
 	// Build maps for quick lookup and score accumulation
 	candidateMap := make(map[string]*FusedCandidate)
 
@@ -224,6 +247,18 @@ func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, v
 		return fused[i].RRFScore > fused[j].RRFScore
 	})
 
+	// Debug: trace target term through fused results
+	if debugTraceEnabled {
+		for i, f := range fused {
+			if strings.Contains(strings.ToLower(f.Name), debugTraceTerm) ||
+				strings.Contains(strings.ToLower(f.Path), debugTraceTerm) {
+				log.Printf("[DEBUG RRF] Fused '%s' at rank %d: NodeID=%s, Name=%s, RRF=%.4f, VectorRank=%d, BM25Rank=%d",
+					debugTraceTerm, i+1, f.NodeID, f.Name, f.RRFScore, f.VectorRank, f.BM25Rank)
+			}
+		}
+		log.Printf("[DEBUG RRF] Output: %d total fused candidates", len(fused))
+	}
+
 	return fused
 }
 
@@ -236,6 +271,10 @@ func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, v
 func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 	if len(fused) == 0 {
 		return []Candidate{}
+	}
+
+	if debugTraceEnabled {
+		log.Printf("[DEBUG ConvertFused] Converting %d fused candidates", len(fused))
 	}
 
 	// Find max RRF for normalization of BM25-only candidates
@@ -252,11 +291,16 @@ func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 		score := f.VectorSim
 
 		// For candidates that came ONLY from BM25 (no vector match),
-		// estimate a score based on their RRF rank position
+		// estimate a score based on their BM25 rank position
+		// Top BM25 results are exact keyword matches - highly valuable!
 		if f.VectorSim == 0 && f.BM25Score > 0 {
-			// BM25-only candidates get score based on RRF position
-			// Top RRF gets ~0.65, decays from there
-			score = 0.4 + 0.25*(f.RRFScore/maxRRF)
+			// BM25 rank 1 gets 0.95, rank 5 gets ~0.75, rank 20 gets ~0.55
+			// This ensures top keyword matches compete with vector results
+			rankBoost := 0.95 - 0.02*float64(f.BM25Rank-1)
+			if rankBoost < 0.4 {
+				rankBoost = 0.4
+			}
+			score = rankBoost
 		}
 
 		// Small boost for candidates that appear in BOTH retrievers
@@ -277,6 +321,15 @@ func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 			VectorSim:  score,
 			Layer:      f.Layer,
 			Tags:       f.Tags,
+		}
+
+		// Debug: trace target term through converted candidates
+		if debugTraceEnabled {
+			if strings.Contains(strings.ToLower(f.Name), debugTraceTerm) ||
+				strings.Contains(strings.ToLower(f.Path), debugTraceTerm) {
+				log.Printf("[DEBUG ConvertFused] '%s' at position %d: NodeID=%s, Name=%s, VectorSim=%.4f (was BM25Rank=%d)",
+					debugTraceTerm, i, f.NodeID, f.Name, score, f.BM25Rank)
+			}
 		}
 	}
 	return cands

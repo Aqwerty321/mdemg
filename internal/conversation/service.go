@@ -113,12 +113,17 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 
 	// Validate observation type value
 	validTypes := map[ObservationType]bool{
-		ObsTypeDecision:   true,
-		ObsTypeCorrection: true,
-		ObsTypeLearning:   true,
-		ObsTypePreference: true,
-		ObsTypeError:      true,
-		ObsTypeTask:       true,
+		ObsTypeDecision:      true,
+		ObsTypeCorrection:    true,
+		ObsTypeLearning:      true,
+		ObsTypePreference:    true,
+		ObsTypeError:         true,
+		ObsTypeTask:          true,
+		ObsTypeTechnicalNote: true,
+		ObsTypeInsight:       true,
+		ObsTypeContext:       true,
+		ObsTypeProgress:      true,
+		ObsTypeBlocker:       true,
 	}
 	if !validTypes[obsType] {
 		return nil, fmt.Errorf("invalid observation type: %s", req.ObsType)

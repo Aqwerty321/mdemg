@@ -271,7 +271,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		}
 	} else {
 		results = ScoreAndRank(cands, act, edges, initialTopK, s.cfg, req.QueryText)
-	}
+	}, len(results))
 
 	// 5) Reasoning Module Processing (if available and query text provided)
 	var reasoningModuleID string

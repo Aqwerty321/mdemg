@@ -1,6 +1,7 @@
 package retrieval
 
 import (
+	"log"
 	"math"
 	"regexp"
 	"sort"
@@ -10,6 +11,12 @@ import (
 	"mdemg/internal/config"
 	"mdemg/internal/models"
 )
+
+// scoringDebugEnabled enables detailed tracing in scoring
+var scoringDebugEnabled = false
+
+// scoringDebugTerm is the term to trace through scoring
+var scoringDebugTerm = "transformerconfig"
 
 // pathPatterns matches common path patterns in query text
 // Captures paths like "lib/graphql", "frontend/src", "services/auth", etc.
@@ -151,6 +158,78 @@ func comparisonMatchScore(name, summary string, tags []string, comparisonTargets
 	return 0.1 + 0.1*matchRatio
 }
 
+// isCodeQuery returns true if the query appears to be asking about code elements
+// rather than documentation or configuration.
+func isCodeQuery(query string) bool {
+	if query == "" {
+		return false
+	}
+	queryLower := strings.ToLower(query)
+
+	// Code-related keywords that suggest the user wants code, not config
+	// Use word boundaries via space, start-of-string, or end-of-string
+	codeKeywords := []string{
+		" class", "class ",  // "X class" or "class X"
+		" function", "function ",
+		" method", "method ",
+		" struct", "struct ",
+		" interface", "interface ",
+		" def ", "def ",
+		"implement", "defined", "definition",
+		"where is", "how does", "what does",
+		" code", "code ",
+		" source", "source ",
+	}
+
+	for _, kw := range codeKeywords {
+		if strings.Contains(queryLower, kw) {
+			return true
+		}
+	}
+
+	// Also check for words at query boundaries
+	boundaryKeywords := []string{"class", "function", "method", "struct", "interface", "code", "source"}
+	for _, kw := range boundaryKeywords {
+		// Match at end of query: "X class"
+		if strings.HasSuffix(queryLower, kw) {
+			return true
+		}
+		// Match at start of query: "class X"
+		if strings.HasPrefix(queryLower, kw+" ") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// codeTypeBoost returns a multiplier for the score based on code vs config files.
+// For code queries: code files get 1.0, config/doc get penalty (< 1.0)
+// For non-code queries: all get 1.0 (no change)
+func codeTypeBoost(tags []string, isCodeQuery bool) float64 {
+	if !isCodeQuery {
+		return 1.0 // No adjustment for non-code queries
+	}
+
+	// Code file tags get no penalty
+	codeTags := []string{"python", "go", "rust", "java", "typescript", "javascript", "c", "cpp", "csharp", "ruby", "php", "scala", "kotlin", "swift"}
+	for _, ct := range codeTags {
+		if hasTag(tags, ct) {
+			return 1.0
+		}
+	}
+
+	// Config and documentation get penalized for code queries
+	if hasTag(tags, "config") || hasTag(tags, "configuration") {
+		return 0.5 // 50% penalty
+	}
+	if hasTag(tags, "documentation") || hasTag(tags, "markdown") {
+		return 0.7 // 30% penalty
+	}
+
+	return 1.0
+}
+
 // pathMatchScore returns a boost score (0.0-1.0) based on how well a node path matches query hints
 func pathMatchScore(nodePath string, hints []string) float64 {
 	if len(hints) == 0 || nodePath == "" {
@@ -237,6 +316,9 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 	// Extract comparison targets for comparison-style queries
 	comparisonTargets := extractComparisonTargets(queryText)
 
+	// Detect if this is a code-focused query (for code type boost)
+	codeQueryDetected := isCodeQuery(queryText)
+
 	// Redundancy: simple path-prefix clustering
 	prefixCount := map[string]int{}
 	prefixOf := func(path string) string {
@@ -256,6 +338,11 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 
 	items := make([]ScoredCandidate, 0, len(cands))
 	now := time.Now()
+
+	if scoringDebugEnabled {
+		log.Printf("[DEBUG Scoring] Processing %d candidates, query='%s', codeQueryDetected=%v", len(cands), queryText, codeQueryDetected)
+	}
+
 	for _, c := range cands {
 		a := act[c.NodeID]
 		ageDays := now.Sub(c.UpdatedAt).Hours() / 24.0
@@ -272,7 +359,11 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 		if c.Layer == 0 {
 			h = math.Log(1.0 + float64(deg[c.NodeID]))
 		}
-		d := float64(prefixCount[prefixOf(c.Path)]-1) // 0 if unique
+		d := float64(prefixCount[prefixOf(c.Path)] - 1) // 0 if unique
+		// Cap the redundancy factor to avoid excessive penalties for files in large directories
+		if d > 3 {
+			d = 3 // Max penalty is 3 * kappa (0.36 at default kappa=0.12)
+		}
 
 		// Path boost: reward nodes whose paths match patterns mentioned in query
 		pbRaw := pathMatchScore(c.Path, pathHints)
@@ -292,12 +383,23 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 
 		s := vecComponent + actComponent + recComponent + confComponent + pb + cb - hubPenComponent - redPenComponent
 
-		// Apply config boost for configuration nodes
+		// Apply code type boost/penalty
+		// For code queries: config/doc files get penalized, code files unchanged
+		// For non-code queries: apply the configBoost to config files
+		codeTypeMult := codeTypeBoost(c.Tags, codeQueryDetected)
 		configBoostEffect := 0.0
-		if hasTag(c.Tags, "config") {
+		if codeQueryDetected {
+			// For code queries, apply the penalty/boost from codeTypeBoost
 			originalScore := s
-			s *= configBoost
-			configBoostEffect = s - originalScore
+			s *= codeTypeMult
+			configBoostEffect = s - originalScore // Will be negative for config files
+		} else {
+			// For non-code queries, use the existing configBoost logic
+			if hasTag(c.Tags, "config") {
+				originalScore := s
+				s *= configBoost
+				configBoostEffect = s - originalScore
+			}
 		}
 
 		breakdown := ScoreBreakdown{
@@ -315,6 +417,19 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			FinalScore:        s,
 		}
 
+		// Debug: trace target term through scoring
+		if scoringDebugEnabled {
+			if strings.Contains(strings.ToLower(c.Name), scoringDebugTerm) ||
+				strings.Contains(strings.ToLower(c.Path), scoringDebugTerm) {
+				log.Printf("[DEBUG Scoring] '%s': NodeID=%s, Name=%s", scoringDebugTerm, c.NodeID, c.Name)
+				log.Printf("[DEBUG Scoring]   Components: vec=%.4f, act=%.4f, rec=%.4f, conf=%.4f, pathBoost=%.4f, compBoost=%.4f",
+					vecComponent, actComponent, recComponent, confComponent, pb, cb)
+				log.Printf("[DEBUG Scoring]   Penalties: hub=%.4f (degree=%d), redundancy=%.4f (prefixCount=%d)",
+					hubPenComponent, deg[c.NodeID], redPenComponent, prefixCount[prefixOf(c.Path)])
+				log.Printf("[DEBUG Scoring]   Final: %.4f, codeTypeMult=%.2f", s, codeTypeMult)
+			}
+		}
+
 		items = append(items, ScoredCandidate{
 			RetrieveResult: models.RetrieveResult{
 				NodeID:     c.NodeID,
@@ -330,8 +445,44 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 	}
 
 	sort.Slice(items, func(i, j int) bool { return items[i].Score > items[j].Score })
+
+	// Debug: check if target term is in top results before truncation
+	if scoringDebugEnabled {
+		found := false
+		rank := -1
+		for i, item := range items {
+			if strings.Contains(strings.ToLower(item.Name), scoringDebugTerm) ||
+				strings.Contains(strings.ToLower(item.Path), scoringDebugTerm) {
+				found = true
+				rank = i + 1
+				log.Printf("[DEBUG Scoring] '%s' ranked #%d of %d (before truncation to topK=%d): Score=%.4f, Name=%s",
+					scoringDebugTerm, rank, len(items), topK, item.Score, item.Name)
+				break
+			}
+		}
+		if !found {
+			log.Printf("[DEBUG Scoring] '%s' NOT FOUND in %d scored items", scoringDebugTerm, len(items))
+		}
+	}
+
 	if len(items) > topK {
 		items = items[:topK]
+	}
+
+	// Debug: check if target term survived truncation
+	if scoringDebugEnabled {
+		found := false
+		for i, item := range items {
+			if strings.Contains(strings.ToLower(item.Name), scoringDebugTerm) ||
+				strings.Contains(strings.ToLower(item.Path), scoringDebugTerm) {
+				found = true
+				log.Printf("[DEBUG Scoring] '%s' SURVIVED truncation at rank #%d", scoringDebugTerm, i+1)
+				break
+			}
+		}
+		if !found {
+			log.Printf("[DEBUG Scoring] '%s' DID NOT survive truncation to topK=%d", scoringDebugTerm, topK)
+		}
 	}
 
 	// Apply percentile-based normalized confidence

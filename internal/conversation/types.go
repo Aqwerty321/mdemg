@@ -6,12 +6,17 @@ import "time"
 type ObservationType string
 
 const (
-	ObsTypeDecision   ObservationType = "decision"
-	ObsTypeCorrection ObservationType = "correction"
-	ObsTypeLearning   ObservationType = "learning"
-	ObsTypePreference ObservationType = "preference"
-	ObsTypeError      ObservationType = "error"
-	ObsTypeTask       ObservationType = "task"
+	ObsTypeDecision      ObservationType = "decision"
+	ObsTypeCorrection    ObservationType = "correction"
+	ObsTypeLearning      ObservationType = "learning"
+	ObsTypePreference    ObservationType = "preference"
+	ObsTypeError         ObservationType = "error"
+	ObsTypeTask          ObservationType = "task"
+	ObsTypeTechnicalNote ObservationType = "technical_note" // Technical documentation/notes
+	ObsTypeInsight       ObservationType = "insight"        // Insights and discoveries
+	ObsTypeContext       ObservationType = "context"        // Context/background information
+	ObsTypeProgress      ObservationType = "progress"       // Progress updates
+	ObsTypeBlocker       ObservationType = "blocker"        // Blockers/issues encountered
 )
 
 // Visibility levels for multi-tenant memory access

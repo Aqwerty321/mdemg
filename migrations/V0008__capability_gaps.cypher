@@ -21,6 +21,15 @@ FOR (g:CapabilityGap) ON (g.priority);
 CREATE INDEX capability_gap_status_priority IF NOT EXISTS
 FOR (g:CapabilityGap) ON (g.status, g.priority);
 
+// Record migration
+MERGE (m:Migration {version: 8})
+ON CREATE SET m.name='V0008__capability_gaps',
+              m.applied_at=datetime(),
+              m.checksum=null;
+
 // Update schema version
-MATCH (s:SchemaMeta {key: 'version'})
-SET s.value = 8;
+MATCH (s:SchemaMeta {key:'schema'})
+WITH s
+WHERE coalesce(s.current_version, 0) < 8
+SET s.current_version = 8,
+    s.updated_at = datetime();

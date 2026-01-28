@@ -21,3 +21,16 @@ FOR (p:InterviewPrompt) ON (p.space_id);
 // Composite index for common query pattern (pending prompts by priority)
 CREATE INDEX interview_prompt_status_priority IF NOT EXISTS
 FOR (p:InterviewPrompt) ON (p.status, p.priority);
+
+// Record migration
+MERGE (m:Migration {version: 10})
+ON CREATE SET m.name='V0010__interview_prompts',
+              m.applied_at=datetime(),
+              m.checksum=null;
+
+// Update schema version
+MATCH (s:SchemaMeta {key:'schema'})
+WITH s
+WHERE coalesce(s.current_version, 0) < 10
+SET s.current_version = 10,
+    s.updated_at = datetime();

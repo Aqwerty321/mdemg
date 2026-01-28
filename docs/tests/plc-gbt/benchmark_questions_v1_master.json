@@ -1,0 +1,1172 @@
+{
+  "metadata": {
+    "codebase": "plc-gbt",
+    "version": "v1",
+    "question_count": 115
+  },
+  "questions": [
+    {
+      "id": 1,
+      "category": "control_loop_architecture",
+      "question": "What are the four PID controller types defined in the plc-gbt system?",
+      "expected_answer": "ladder_logic_standard_pid, ladder_logic_advanced_pid, function_block_standard_pide, function_block_advanced_pide",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/types/control-loop.types.ts:28"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 2,
+      "category": "control_loop_architecture",
+      "question": "What is the maximum character length allowed for a tag_name in the plc-gbt system, and what regex pattern must it match?",
+      "expected_answer": "Maximum 40 characters, must match pattern ^[A-Za-z][A-Za-z0-9_]*$ (start with letter, contain only alphanumeric and underscores)",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/schemas/control-loop.schemas.ts:53"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 3,
+      "category": "control_loop_architecture",
+      "question": "In cascade control configuration, what are the four communication_method enum values that define how master-slave loops communicate?",
+      "expected_answer": "direct_write, message_instruction, produced_tag, ethernet_ip",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/cascade/function-block-standard-pide-cascade.json:120"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 4,
+      "category": "control_loop_architecture",
+      "question": "What is the default value and valid range for the overshoot_limit parameter in master loop tuning configuration?",
+      "expected_answer": "Default: 10.0%, Range: 0.0 to 50.0%",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/cascade/function-block-standard-pide-cascade.json:183"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 5,
+      "category": "control_loop_architecture",
+      "question": "What is the default response_ratio for slave loop tuning, and what are its minimum and maximum allowed values?",
+      "expected_answer": "Default: 0.2, Minimum: 0.1, Maximum: 1.0",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/cascade/function-block-standard-pide-cascade.json:246"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 6,
+      "category": "control_loop_architecture",
+      "question": "What are the three scaling_type enum values available for setpoint scaling between master and slave loops?",
+      "expected_answer": "linear, square_root, custom",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/cascade/function-block-standard-pide-cascade.json:146"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 7,
+      "category": "control_loop_architecture",
+      "question": "What are the six control modes defined in the ControlMode type?",
+      "expected_answer": "Manual, Automatic, Cascade, Override, Program, Ratio",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/types/control-loop.types.ts:34"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 8,
+      "category": "control_loop_architecture",
+      "question": "What is the valid range for response_time_target in master loop tuning parameters?",
+      "expected_answer": "Minimum: 1.0 seconds, Maximum: 3600.0 seconds",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/cascade/function-block-standard-pide-cascade.json:177"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 9,
+      "category": "control_loop_architecture",
+      "question": "What is the default stability_margin value for slave loop tuning, and what are its minimum and maximum constraints?",
+      "expected_answer": "Default: 2.0, Minimum: 1.0, Maximum: 5.0",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/cascade/function-block-standard-pide-cascade.json:253"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 10,
+      "category": "control_loop_architecture",
+      "question": "What are the valid values for cascade_fault_action that define slave loop behavior when cascade communication fails?",
+      "expected_answer": "manual_mode, local_setpoint, safe_state (default: local_setpoint)",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/cascade/function-block-standard-pide-cascade.json:281"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 11,
+      "category": "data_models_schema",
+      "question": "What are the possible values for ProcessVariable quality in the plc-gbt control-loop.types.ts file?",
+      "expected_answer": "'good', 'bad', 'uncertain'",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/types/control-loop.types.ts:49"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 12,
+      "category": "data_models_schema",
+      "question": "What is the regex pattern used for ProcessVariable tag_name validation in plc-gbt schemas?",
+      "expected_answer": "^[A-Za-z][A-Za-z0-9_]*$",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/types/control-loop.types.ts:44"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 13,
+      "category": "data_models_schema",
+      "question": "List all InstanceStatus enum values in plc-gbt in the order they appear in the code.",
+      "expected_answer": "DRAFT, CONFIGURED, VALIDATED, DEPLOYED, ACTIVE, INACTIVE, ERROR, ARCHIVED",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:84"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 14,
+      "category": "data_models_schema",
+      "question": "What are the four ValidationLevel values in plc-gbt and what does each level validate?",
+      "expected_answer": "BASIC (schema compliance only), STANDARD (schema + basic logic validation), ADVANCED (standard + simulation testing), PRODUCTION (advanced + PLC connectivity validation)",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:105"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 15,
+      "category": "data_models_schema",
+      "question": "In the CascadeConfiguration interface, what are the two possible values for cascade_type and what additional fields are used for each type?",
+      "expected_answer": "cascade_type can be 'master' or 'slave'. Master loops use slave_loop_ids (array), slave loops use master_loop_id (string). Both share is_cascade and cascade_ratio fields.",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/types/control-loop.types.ts:181"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 16,
+      "category": "data_models_schema",
+      "question": "What JSON Schema draft version is used in plc-gbt control loop schemas?",
+      "expected_answer": "JSON Schema 2020-12 (https://json-schema.org/draft/2020-12/schema)",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/feedforward/ladder-logic-standard-pid-feedforward.json:2"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 17,
+      "category": "data_models_schema",
+      "question": "What are the three priority levels for WorkflowMetadata in plc-gbt?",
+      "expected_answer": "'low', 'medium', 'high'",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/types/workflow-management.types.ts:49"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 18,
+      "category": "data_models_schema",
+      "question": "What are the four schema organization directories under plc-gbt-stack/schemas/control-loops/subtypes/?",
+      "expected_answer": "cascade, combined_ff_cascade, feedforward, multi_formula_weighted_ff",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 19,
+      "category": "data_models_schema",
+      "question": "In plc-gbt, what keyword is used in JSON schemas to reference base schemas for inheritance?",
+      "expected_answer": "$ref",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/feedforward/ladder-logic-standard-pid-feedforward.json:9"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 20,
+      "category": "data_models_schema",
+      "question": "What are all seven InstanceType enum values in plc-gbt?",
+      "expected_answer": "BASIC_PID, CASCADE_PID, FEEDFORWARD_PID, MULTI_LOOP, ADAPTIVE_PID, MPC, CUSTOM",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:95"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 21,
+      "category": "api_services",
+      "question": "What is the default timeout value (in seconds) for the CommandRequest model's timeout field in the CLI-to-API Bridge?",
+      "expected_answer": "30.0 seconds",
+      "file_line_refs": [
+        "plc-gbt-stack/api/cli_api_bridge.py:131"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 22,
+      "category": "api_services",
+      "question": "What are the five fields defined in the APIResponse Pydantic model in cli_api_bridge.py?",
+      "expected_answer": "success, message, data, command_executed, execution_time, and timestamp",
+      "file_line_refs": [
+        "plc-gbt-stack/api/cli_api_bridge.py:118"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 23,
+      "category": "api_services",
+      "question": "What is the default chunk_size (in bytes) used by the FileStorageService for file operations?",
+      "expected_answer": "8192 bytes",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/file_storage_service.py:42"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 24,
+      "category": "api_services",
+      "question": "What is the default fine-tuned OpenAI model ID used by the OpenAIService when no OPENAI_MODEL environment variable is set?",
+      "expected_answer": "ft:gpt-4o-mini-2024-07-18:whiskey-house:plc-gbt:CMx89NDT",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/openai_service.py:18"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 25,
+      "category": "api_services",
+      "question": "What hashing algorithm does the FileStorageService use to calculate file checksums?",
+      "expected_answer": "SHA-256",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/file_storage_service.py:65"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 26,
+      "category": "api_services",
+      "question": "What is the CLI version constant (CLI_VERSION) defined in the plc_control_loop_cli.py file?",
+      "expected_answer": "1.0.0",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/plc_control_loop_cli.py:58"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 27,
+      "category": "api_services",
+      "question": "In the CLIConfiguration dataclass, what is the default value for session_timeout and what unit is it measured in?",
+      "expected_answer": "3600 (1 hour in seconds)",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/plc_control_loop_cli.py:91"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 28,
+      "category": "api_services",
+      "question": "What are the four ExecutionStatus enum values defined in cli_api_bridge.py?",
+      "expected_answer": "SUCCESS, ERROR, TIMEOUT, UNAUTHORIZED",
+      "file_line_refs": [
+        "plc-gbt-stack/api/cli_api_bridge.py:101"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 29,
+      "category": "api_services",
+      "question": "What temperature value does the OpenAIService use when calling the chat completion API for truth-seeking responses?",
+      "expected_answer": "0.2",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/openai_service.py:147"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 30,
+      "category": "api_services",
+      "question": "What is the maximum number of command results stored in the CLIExecutor's command_history before older entries are trimmed?",
+      "expected_answer": "1000",
+      "file_line_refs": [
+        "plc-gbt-stack/api/cli_api_bridge.py:157"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 31,
+      "category": "configuration_infrastructure",
+      "question": "What is the full model ID for the fine-tuned OpenAI model used in plc-gbt?",
+      "expected_answer": "ft:gpt-4o-mini-2024-07-18:whiskey-house:plc-gbt:CMx89NDT",
+      "file_line_refs": [
+        "plc-gbt-stack/.env.example:7"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 32,
+      "category": "configuration_infrastructure",
+      "question": "What is the OpenAI Seed value configured for deterministic responses in plc-gbt?",
+      "expected_answer": "1",
+      "file_line_refs": [
+        "plc-gbt-stack/.env.example:10"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 33,
+      "category": "configuration_infrastructure",
+      "question": "What is the default port for the backend API in plc-gbt?",
+      "expected_answer": "8000",
+      "file_line_refs": [
+        "plc-gbt-stack/.env.example:14"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 34,
+      "category": "configuration_infrastructure",
+      "question": "What is the full path to the CLI configuration file location?",
+      "expected_answer": "~/.plc-control-loop/.plc-cl-config",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/config_manager.py:278",
+        "plc-gbt-stack/cli/plc_control_loop_cli.py:58"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 35,
+      "category": "configuration_infrastructure",
+      "question": "What is the default session timeout value in seconds for the CLI?",
+      "expected_answer": "3600",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/config_manager.py:148"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 36,
+      "category": "configuration_infrastructure",
+      "question": "What is the default cache TTL (time-to-live) in seconds for the CLI?",
+      "expected_answer": "300",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/config_manager.py:184"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 37,
+      "category": "configuration_infrastructure",
+      "question": "What port does the mTLS proxy expose in the docker-compose configuration?",
+      "expected_answer": "8443",
+      "file_line_refs": [
+        "plc-gbt-stack/docker-compose.yml:36"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 38,
+      "category": "configuration_infrastructure",
+      "question": "What is the default FILE_STORAGE_ROOT path configured in the CLI API bridge?",
+      "expected_answer": "/Users/reh3376/repos/plc-gbt/file-storage",
+      "file_line_refs": [
+        "plc-gbt-stack/api/cli_api_bridge.py:66"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 39,
+      "category": "configuration_infrastructure",
+      "question": "What is the default request timeout in seconds for the CLIExecutor class?",
+      "expected_answer": "30.0",
+      "file_line_refs": [
+        "plc-gbt-stack/api/cli_api_bridge.py:131"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 40,
+      "category": "configuration_infrastructure",
+      "question": "Which PostgreSQL database name is used for N8N workflows according to docker-compose.yml?",
+      "expected_answer": "plc_gbt",
+      "file_line_refs": [
+        "plc-gbt-stack/docker-compose.yml:201"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 41,
+      "category": "business_logic_workflows",
+      "question": "What PLC connection mode is enforced by default in plc-gbt for safety reasons?",
+      "expected_answer": "READ_ONLY",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:114"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 42,
+      "category": "business_logic_workflows",
+      "question": "What are the four communication methods supported for cascade master-slave loop coordination?",
+      "expected_answer": "direct_write, message_instruction, produced_tag, ethernet_ip",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/cascade/function-block-standard-pide-cascade.json:120"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 43,
+      "category": "business_logic_workflows",
+      "question": "What is the correct lifecycle state progression from DRAFT to DEPLOYED?",
+      "expected_answer": "DRAFT \u2192 CONFIGURED \u2192 VALIDATED \u2192 DEPLOYED",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:84"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 44,
+      "category": "business_logic_workflows",
+      "question": "What validation level includes simulation testing but not PLC connectivity validation?",
+      "expected_answer": "ADVANCED",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:105"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 45,
+      "category": "business_logic_workflows",
+      "question": "What database column is used to implement soft delete functionality in the file storage service?",
+      "expected_answer": "deleted_at",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/file_storage_service.py:94"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 46,
+      "category": "business_logic_workflows",
+      "question": "In the OpenAI service system prompt, what are the three critical behavior requirements listed (keywords only)?",
+      "expected_answer": "TRUTH-SEEKING, CONCISE, HONEST",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/openai_service.py:97"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 47,
+      "category": "business_logic_workflows",
+      "question": "What is the temperature parameter value used in the OpenAI chat completion for truth-seeking deterministic responses?",
+      "expected_answer": "0.2",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/openai_service.py:147"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 48,
+      "category": "business_logic_workflows",
+      "question": "What is the default instance status when creating a new control loop instance via the wizard?",
+      "expected_answer": "CONFIGURED",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:635"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 49,
+      "category": "business_logic_workflows",
+      "question": "What are the four PID parameters that MUST be present for BASIC_PID instance type to pass STANDARD validation level?",
+      "expected_answer": "kp, ki, kd, setpoint",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:313"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 50,
+      "category": "business_logic_workflows",
+      "question": "What permission level is required to delete an instance in the CLI?",
+      "expected_answer": "ADMIN",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:1235"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 51,
+      "category": "ui_ux",
+      "question": "What is the name of the Zustand store used for managing layout state in the plc-gbt UI, and what is its localStorage persistence key?",
+      "expected_answer": "The store is named 'useLayoutStore' and its localStorage persistence key is 'plc-gbt-layout-storage'",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/stores/layout-store.ts:179",
+        "plc-gbt-stack/ui/nextjs/src/lib/stores/layout-store.ts:412"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 52,
+      "category": "ui_ux",
+      "question": "What are the seven possible values for the ToolType type in the layout store?",
+      "expected_answer": "explorer, search, analytics, workflows, control-loops, settings, plc-git",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/stores/layout-store.ts:7"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 53,
+      "category": "ui_ux",
+      "question": "What two Google fonts are loaded in the root layout of the plc-gbt Next.js application?",
+      "expected_answer": "Inter (--font-inter) and JetBrains_Mono (--font-jetbrains-mono)",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/app/layout.tsx:3"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 54,
+      "category": "ui_ux",
+      "question": "In the Providers component, what is the default staleTime configured for React Query queries, and what is the gcTime (garbage collection time)?",
+      "expected_answer": "staleTime is 5 minutes (5 * 60 * 1000 = 300000ms) and gcTime is 10 minutes (10 * 60 * 1000 = 600000ms)",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/components/providers/Providers.tsx:29"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 55,
+      "category": "ui_ux",
+      "question": "What toast notification library is used in the Providers component, and where is its default position configured?",
+      "expected_answer": "Sonner is used for toast notifications, positioned at 'bottom-right'",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/components/providers/Providers.tsx:49"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 56,
+      "category": "ui_ux",
+      "question": "In the ControlLoopGrid component, how many columns does the responsive grid display at different breakpoints (default, md, lg, xl)?",
+      "expected_answer": "1 column by default, 2 columns at md breakpoint, 3 columns at lg breakpoint, and 4 columns at xl breakpoint",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/components/control-loop/ControlLoopGrid.tsx:93"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 57,
+      "category": "ui_ux",
+      "question": "What four types of widgets are supported in the analytics store Dashboard interface?",
+      "expected_answer": "chart, metric, table, gauge",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/stores/analytics-store.ts:53"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 58,
+      "category": "ui_ux",
+      "question": "What drag-and-drop library is used for the IconStrip component's icon reordering functionality, and what two sensors are configured?",
+      "expected_answer": "@dnd-kit library is used with PointerSensor (8px activation constraint) and KeyboardSensor sensors",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/components/layout/LeftSidebar/IconStrip.tsx:18"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 59,
+      "category": "ui_ux",
+      "question": "What are the three layout presets available in the useLayoutStore's applyLayoutPreset action?",
+      "expected_answer": "minimal, development, debugging",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/stores/layout-store.ts:124"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 60,
+      "category": "ui_ux",
+      "question": "In the ControlLoopStats component, what are the three color thresholds for the avgPerformance value that determine whether it displays as green, yellow, or red?",
+      "expected_answer": "Performance >= 90% displays green (text-green-400), >= 70% displays yellow (text-yellow-400), and below 70% displays red (text-red-400)",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/components/control-loop/ControlLoopStats.tsx:42"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 61,
+      "category": "system_purpose",
+      "question": "What is the core purpose of plc-gbt and how does it provide a novel solution to process control and automation version control?",
+      "expected_answer": "plc-gbt enables GitHub-based version control for PLC programs by using a custom .ACD to .L5X conversion tool (acd-l5x-tool-lib) that converts proprietary and encrypted Rockwell .ACD files into XML-based .L5X format, making them diff-friendly and trackable in git repositories.",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 62,
+      "category": "system_purpose",
+      "question": "Why is .ACD to .L5X conversion essential for modern DevOps practices in industrial automation?",
+      "expected_answer": ".ACD files are proprietary binary archives that cannot be diffed or merged. .L5X is XML-based, enabling meaningful diffs, pull request reviews, merge conflict resolution, and CI/CD pipeline integration - bridging industrial automation with modern software development practices.",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md",
+        "plc-gbt-stack/docker-compose.yml"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 63,
+      "category": "system_architecture",
+      "question": "How does plc-gbt integrate AI assistance with traditional PLC programming workflows?",
+      "expected_answer": "plc-gbt uses a fine-tuned OpenAI model (gpt-4o-mini) with domain-specific system prompts emphasizing TRUTH-SEEKING, CONCISE, and HONEST responses. It ingests PLC program context into a Neo4j knowledge graph for RAG-based retrieval, enabling AI to understand control loop structures, tuning parameters, and provide contextual assistance.",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/openai_service.py:18",
+        "AI_ASSISTANT_RAG_SESSION_SUMMARY.md"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 64,
+      "category": "system_architecture",
+      "question": "What is the control loop classification system in plc-gbt and why does it distinguish between ladder logic and function block implementations?",
+      "expected_answer": "plc-gbt classifies PID controllers into four types: ladder_logic_standard_pid, ladder_logic_advanced_pid, function_block_standard_pide, function_block_advanced_pide. This distinction is necessary because ladder logic (older, rung-based) and function block (modern, object-oriented PIDE instruction) implementations have different tuning parameters, configuration options, and behaviors.",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/types/control-loop.types.ts:28",
+        "plc-gbt-stack/schemas/control-loops/subtypes/"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 65,
+      "category": "system_architecture",
+      "question": "How does the cascade control configuration in plc-gbt enable complex multi-loop control strategies?",
+      "expected_answer": "Cascade control connects master and slave loops where the master's output becomes the slave's setpoint. plc-gbt supports four communication methods (direct_write, message_instruction, produced_tag, ethernet_ip), configurable mode coordination (cascade_fault_action), and separate tuning parameters for master (overshoot_limit, response_time_target) and slave (response_ratio, stability_margin) loops.",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/cascade/function-block-standard-pide-cascade.json",
+        "plc-gbt-stack/ui/nextjs/src/lib/types/control-loop.types.ts:181"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 66,
+      "category": "safety_security",
+      "question": "What safety measures does plc-gbt implement to prevent accidental PLC modifications?",
+      "expected_answer": "plc-gbt enforces READ_ONLY connection mode by default for safety. Write operations require explicit ADMIN permission level, validated through the @requires_permission decorator. The CLI uses a session-based configuration with timeout (3600s default) and supports multiple validation levels (MINIMAL, BASIC, STANDARD, ADVANCED) including simulation testing before deployment.",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:114",
+        "plc-gbt-stack/cli/commands/instance.py:105"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 67,
+      "category": "integration",
+      "question": "How does plc-gbt's n8n integration enable workflow automation for industrial processes?",
+      "expected_answer": "plc-gbt integrates with n8n workflow automation to create event-driven workflows for PLC monitoring, alerting, and automated responses. The n8n-mcp module provides Model Context Protocol integration, while the n8n-framework enables visual workflow design connecting PLC events to notifications, data logging, and external system triggers.",
+      "file_line_refs": [
+        "plc-gbt-stack/n8n-mcp/",
+        "plc-gbt-stack/n8n-framework/"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 68,
+      "category": "data_architecture",
+      "question": "How does plc-gbt structure its JSON Schema definitions to support multiple PID controller configurations?",
+      "expected_answer": "plc-gbt organizes schemas in /schemas/control-loops/subtypes/ with four subdirectories: cascade, feedforward, combined_ff_cascade, and multi_formula_weighted_ff. Each subtype has variants for all four controller types (ladder standard/advanced, function block standard/advanced). Schemas use JSON Schema 2020-12 draft with $ref for composition and reuse.",
+      "file_line_refs": [
+        "plc-gbt-stack/schemas/control-loops/subtypes/",
+        "plc-gbt-stack/schemas/control-loops/subtypes/feedforward/ladder-logic-standard-pid-feedforward.json:2"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 69,
+      "category": "system_architecture",
+      "question": "What is the instance lifecycle in plc-gbt and how does it track PLC program states?",
+      "expected_answer": "Instances progress through states: CONFIGURED (initial) \u2192 RUNNING \u2192 PAUSED/STOPPED/ERROR. The InstanceStatus enum defines seven states, and transitions are controlled by the CLI with permission checks. Each instance has a unique ID, associated control loop type, validation level, and maintains a history of state changes for audit purposes.",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:84",
+        "plc-gbt-stack/cli/commands/instance.py:95"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 70,
+      "category": "ui_architecture",
+      "question": "How does the plc-gbt UI implement a flexible, user-customizable layout system?",
+      "expected_answer": "The UI uses Zustand for state management with localStorage persistence (key: plc-gbt-layout-storage). The useLayoutStore supports seven tool types, three layout presets (minimal, development, debugging), and drag-and-drop reordering via @dnd-kit. The ControlLoopGrid uses responsive Tailwind CSS grid classes for adaptive layouts.",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/stores/layout-store.ts:179",
+        "plc-gbt-stack/ui/nextjs/src/components/layout/LeftSidebar/IconStrip.tsx:18",
+        "plc-gbt-stack/ui/nextjs/src/components/control-loop/ControlLoopGrid.tsx:93"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 71,
+      "category": "data_architecture",
+      "question": "How does plc-gbt ensure data integrity for file storage operations?",
+      "expected_answer": "FileStorageService uses SHA-256 checksums (calculate_checksum method) to verify file integrity. It implements soft deletes via deleted_at column, chunked processing (8192 byte default chunk_size), and atomic operations. The API maintains command history (max 1000 results) for audit trails.",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/file_storage_service.py:65",
+        "plc-gbt-stack/api/cli_api_bridge.py:157"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 72,
+      "category": "integration",
+      "question": "What PLC controller families does plc-gbt support and what are their key capability differences?",
+      "expected_answer": "plc-gbt supports three Rockwell/Allen-Bradley controller families: ControlLogix (1000 programs, 250K tags, motion support, 128 I/O modules), CompactLogix (100 programs, 50K tags, limited motion), and Micro800 (10 programs, 1000 tags, no motion/safety). Each has different capacity limits affecting program structure and validation.",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md:52"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 73,
+      "category": "system_purpose",
+      "question": "How does plc-gbt bridge the gap between process control engineers and software developers?",
+      "expected_answer": "plc-gbt translates PLC concepts into software development paradigms: .ACD\u2192.L5X conversion enables git workflows, JSON Schemas standardize control loop definitions, the CLI provides familiar command-line interfaces, React/Next.js UI offers modern dashboards, and AI assistance explains PLC-specific concepts. This enables collaboration using shared tooling.",
+      "file_line_refs": [],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 74,
+      "category": "safety_security",
+      "question": "What validation levels does plc-gbt provide and when would you use each?",
+      "expected_answer": "Four ValidationLevels: MINIMAL (syntax only, for quick checks), BASIC (syntax + structure, for development), STANDARD (includes controller capability validation, for staging), ADVANCED (adds simulation testing, for production deployment). Higher levels catch more issues but take longer to execute.",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:105"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 75,
+      "category": "ui_architecture",
+      "question": "How does the plc-gbt analytics dashboard support real-time monitoring of control loops?",
+      "expected_answer": "The analytics-store supports four widget types (chart, metric, table, gauge) for visualizing control loop performance. ControlLoopStats displays health indicators with color-coded thresholds (green/yellow/red via Tailwind classes). React Query provides data fetching with configurable staleTime (5min) and cacheTime (10min) for efficient updates.",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/stores/analytics-store.ts:53",
+        "plc-gbt-stack/ui/nextjs/src/components/control-loop/ControlLoopStats.tsx:42",
+        "plc-gbt-stack/ui/nextjs/src/components/providers/Providers.tsx:29"
+      ],
+      "difficulty": "conceptual"
+    },
+    {
+      "id": 76,
+      "category": "ai_ml_integration",
+      "question": "What is the default OpenAI model used for fine-tuning in plc-gbt, and what base model is it derived from?",
+      "expected_answer": "ft:gpt-4o-mini-2024-07-18:whiskey-house:plc-gbt:CMx89NDT, derived from gpt-4o-mini-2024-07-18",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/openai_service.py:18",
+        "plc-gbt-stack/.env.example:7"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 77,
+      "category": "ai_ml_integration",
+      "question": "What are the three critical behavior keywords emphasized in the OpenAI service system prompt for truth-seeking responses?",
+      "expected_answer": "TRUTH-SEEKING, CONCISE, HONEST",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/openai_service.py:97"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 78,
+      "category": "ai_ml_integration",
+      "question": "What temperature value is used in the OpenAI chat completion API to ensure deterministic responses?",
+      "expected_answer": "0.2",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/openai_service.py:147"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 79,
+      "category": "ai_ml_integration",
+      "question": "What OpenAI seed value is configured in plc-gbt for reproducible responses?",
+      "expected_answer": "1 (OPENAI_SEED=1)",
+      "file_line_refs": [
+        "plc-gbt-stack/.env.example:10"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 80,
+      "category": "ai_ml_integration",
+      "question": "What is the purpose of the neural_tuning.py module in the plc-gbt AI integration?",
+      "expected_answer": "Provides neural network-based auto-tuning for PID controllers, using historical process data to optimize control parameters",
+      "file_line_refs": [
+        "plc-gbt-stack/analysis/tuning/ml_enhanced/neural_tuning.py"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 81,
+      "category": "ai_ml_integration",
+      "question": "What RAG (Retrieval-Augmented Generation) database is used to store PLC program context for AI assistance?",
+      "expected_answer": "Neo4j knowledge graph for storing and querying PLC program context, control loop structures, and tuning parameters",
+      "file_line_refs": [
+        "AI_ASSISTANT_RAG_SESSION_SUMMARY.md"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 82,
+      "category": "ai_ml_integration",
+      "question": "What is the trainer_callback.py module used for in the OpenAI fine-tuning workflow?",
+      "expected_answer": "Provides callback functions for monitoring and controlling the OpenAI fine-tuning job progress, including early stopping and metric logging",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": 83,
+      "category": "ai_ml_integration",
+      "question": "What environment variable stores the OpenAI API key for AI service authentication?",
+      "expected_answer": "OPENAI_API_KEY",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/openai_service.py:18"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 84,
+      "category": "ai_ml_integration",
+      "question": "What is the max_tokens parameter typically used in OpenAI completions for PLC assistance queries?",
+      "expected_answer": "1000-2000 tokens for detailed explanations, configurable per request",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/openai_service.py:147"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 85,
+      "category": "ai_ml_integration",
+      "question": "How does plc-gbt's AI assistant handle domain-specific PLC terminology in responses?",
+      "expected_answer": "Uses a fine-tuned model trained on PLC control loop data with domain-specific system prompts that enforce accurate industrial automation terminology",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/openai_service.py:97",
+        "AI_ASSISTANT_RAG_SESSION_SUMMARY.md"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 86,
+      "category": "security_authentication",
+      "question": "What connection mode is enforced by default in plc-gbt to prevent accidental PLC modifications?",
+      "expected_answer": "READ_ONLY mode",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:114"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 87,
+      "category": "security_authentication",
+      "question": "What port does the mTLS proxy expose in the docker-compose configuration for secure API access?",
+      "expected_answer": "8443",
+      "file_line_refs": [
+        "plc-gbt-stack/docker-compose.yml:36"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 88,
+      "category": "security_authentication",
+      "question": "What decorator is used in the CLI to enforce permission levels for protected operations?",
+      "expected_answer": "@requires_permission decorator with ADMIN, OPERATOR, or VIEWER permission levels",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:51"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 89,
+      "category": "security_authentication",
+      "question": "What permission level is required to delete a control loop instance?",
+      "expected_answer": "ADMIN",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:1235"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 90,
+      "category": "security_authentication",
+      "question": "What validation level includes simulation testing before deployment to verify safe operation?",
+      "expected_answer": "ADVANCED (includes standard + simulation testing)",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:105"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 91,
+      "category": "security_authentication",
+      "question": "What is the default session timeout value for the CLI security session?",
+      "expected_answer": "3600 seconds (1 hour)",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/config_manager.py:148"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 92,
+      "category": "security_authentication",
+      "question": "What are the four validation levels and their hierarchy from least to most strict?",
+      "expected_answer": "BASIC \u2192 STANDARD \u2192 ADVANCED \u2192 PRODUCTION (each level includes all validations from previous levels)",
+      "file_line_refs": [
+        "plc-gbt-stack/cli/commands/instance.py:105"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 93,
+      "category": "security_authentication",
+      "question": "What soft delete mechanism is used in the file storage service for audit compliance?",
+      "expected_answer": "deleted_at timestamp column (records are marked deleted rather than removed)",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/file_storage_service.py:94"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 94,
+      "category": "n8n_workflow",
+      "question": "What is the purpose of the n8n-mcp module in the plc-gbt stack?",
+      "expected_answer": "Provides Model Context Protocol integration for n8n, enabling AI-assisted workflow automation",
+      "file_line_refs": [
+        "plc-gbt-stack/n8n-mcp/"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 95,
+      "category": "n8n_workflow",
+      "question": "What PostgreSQL database name is used for N8N workflows in docker-compose?",
+      "expected_answer": "plc_gbt",
+      "file_line_refs": [
+        "plc-gbt-stack/docker-compose.yml:201"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 96,
+      "category": "n8n_workflow",
+      "question": "What is the relationship between n8n-framework and plc-gbt event handling?",
+      "expected_answer": "n8n-framework enables visual workflow design connecting PLC events to notifications, data logging, and external system triggers through event-driven architecture",
+      "file_line_refs": [
+        "plc-gbt-stack/n8n-framework/"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 97,
+      "category": "n8n_workflow",
+      "question": "What type of workflows can be automated using n8n in the plc-gbt stack?",
+      "expected_answer": "PLC monitoring, alerting, automated responses, data logging, and external system integration workflows",
+      "file_line_refs": [
+        "plc-gbt-stack/n8n-mcp/",
+        "plc-gbt-stack/n8n-framework/"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 98,
+      "category": "n8n_workflow",
+      "question": "What three workflow priority levels are defined in WorkflowMetadata?",
+      "expected_answer": "low, medium, high",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/types/workflow-management.types.ts:49"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 99,
+      "category": "n8n_workflow",
+      "question": "What is the purpose of the WorkflowState type in workflow management?",
+      "expected_answer": "Tracks workflow execution state including status (pending, running, completed, failed), start/end timestamps, and error information",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/lib/types/workflow-management.types.ts:29"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 100,
+      "category": "acd_l5x_conversion",
+      "question": "What is the core purpose of plc-gbt's ACD to L5X conversion capability?",
+      "expected_answer": "Enables GitHub-based version control for PLC programs by converting proprietary .ACD files to diff-friendly XML-based .L5X format",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 101,
+      "category": "acd_l5x_conversion",
+      "question": "Why are .ACD files unsuitable for traditional version control systems?",
+      "expected_answer": ".ACD files are proprietary binary archives that cannot be meaningfully diffed or merged, making code review and change tracking impossible",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 102,
+      "category": "acd_l5x_conversion",
+      "question": "What are the three Rockwell/Allen-Bradley controller families supported by plc-gbt?",
+      "expected_answer": "ControlLogix, CompactLogix, and Micro800",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md:52"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 103,
+      "category": "acd_l5x_conversion",
+      "question": "What are the capacity differences between ControlLogix and Micro800 controllers in terms of max programs and tags?",
+      "expected_answer": "ControlLogix: 1000 programs, 250K tags. Micro800: 10 programs, 1000 tags",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md:52"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 104,
+      "category": "acd_l5x_conversion",
+      "question": "What is the external library used for ACD to L5X conversion in plc-gbt?",
+      "expected_answer": "acd-l5x-tool-lib",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 105,
+      "category": "acd_l5x_conversion",
+      "question": "What file format is .L5X based on?",
+      "expected_answer": "XML (Extensible Markup Language)",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 106,
+      "category": "acd_l5x_conversion",
+      "question": "What DevOps capabilities are enabled by converting .ACD to .L5X format?",
+      "expected_answer": "Meaningful diffs, pull request reviews, merge conflict resolution, CI/CD pipeline integration, and branch-based development workflows",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md",
+        "plc-gbt-stack/docker-compose.yml"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 107,
+      "category": "acd_l5x_conversion",
+      "question": "Which controller family has the highest I/O module capacity?",
+      "expected_answer": "ControlLogix with 128 I/O modules (vs CompactLogix with limited, Micro800 with minimal)",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md:52"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 108,
+      "category": "acd_l5x_conversion",
+      "question": "Which controller family supports motion control capabilities?",
+      "expected_answer": "ControlLogix (full motion support) and CompactLogix (limited motion). Micro800 does not support motion control.",
+      "file_line_refs": [
+        "plc-gbt-stack/ACD_L5X_TOOL_LIB_INGESTION_SUMMARY.md:52"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 109,
+      "category": "acd_l5x_conversion",
+      "question": "How does plc-gbt bridge process control engineers and software developers?",
+      "expected_answer": "Translates PLC concepts into software paradigms: git workflows via .L5X conversion, JSON schemas for control loops, CLI interfaces, React/Next.js dashboards, and AI explanations",
+      "file_line_refs": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": 110,
+      "category": "database_persistence",
+      "question": "What hashing algorithm is used by FileStorageService for file integrity verification?",
+      "expected_answer": "SHA-256",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/file_storage_service.py:65"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "id": 111,
+      "category": "database_persistence",
+      "question": "What is the default chunk_size in bytes for file processing in FileStorageService?",
+      "expected_answer": "8192 bytes",
+      "file_line_refs": [
+        "plc-gbt-stack/api/services/file_storage_service.py:42"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 112,
+      "category": "database_persistence",
+      "question": "What is the maximum number of command results stored in CLIExecutor's command_history?",
+      "expected_answer": "1000",
+      "file_line_refs": [
+        "plc-gbt-stack/api/cli_api_bridge.py:157"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 113,
+      "category": "database_persistence",
+      "question": "What database is used for Neo4j knowledge graph storage in the RAG architecture?",
+      "expected_answer": "Neo4j graph database for storing PLC program context, control loop structures, and relationship data",
+      "file_line_refs": [
+        "AI_ASSISTANT_RAG_SESSION_SUMMARY.md"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": 114,
+      "category": "database_persistence",
+      "question": "What is the default FILE_STORAGE_ROOT path for the CLI API bridge file storage?",
+      "expected_answer": "/Users/reh3376/repos/plc-gbt/file-storage",
+      "file_line_refs": [
+        "plc-gbt-stack/api/cli_api_bridge.py:66"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": 115,
+      "category": "database_persistence",
+      "question": "What React Query cache settings are configured for data fetching in the UI?",
+      "expected_answer": "staleTime: 5 minutes (300000ms), gcTime: 10 minutes (600000ms)",
+      "file_line_refs": [
+        "plc-gbt-stack/ui/nextjs/src/components/providers/Providers.tsx:29"
+      ],
+      "difficulty": "medium"
+    }
+  ]
+}

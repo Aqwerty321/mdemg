@@ -45,6 +45,7 @@ var (
 	includeMd      = flag.Bool("include-md", true, "Include markdown files (*.md)")
 	includeTS      = flag.Bool("include-ts", true, "Include TypeScript/JavaScript files (*.ts, *.tsx, *.js, *.jsx)")
 	includePy      = flag.Bool("include-py", true, "Include Python files (*.py)")
+	includeJava    = flag.Bool("include-java", true, "Include Java files (*.java)")
 	limitElements  = flag.Int("limit", 0, "Limit number of elements to ingest (0 = no limit)")
 	extractSymbols = flag.Bool("extract-symbols", true, "Extract code symbols (constants, functions, classes) for evidence-locked retrieval")
 	incremental    = flag.Bool("incremental", false, "Only ingest files changed since last commit (uses git diff)")
@@ -635,6 +636,19 @@ func walkCodebase(root string, excludeSet map[string]bool) ([]CodeElement, error
 			return nil
 		}
 
+		// Process Java files
+		if *includeJava && strings.HasSuffix(path, ".java") {
+			if !*includeTests && (strings.HasSuffix(path, "Test.java") ||
+				strings.HasSuffix(path, "Tests.java") ||
+				strings.Contains(path, "/test/") ||
+				strings.Contains(path, "/tests/")) {
+				return nil
+			}
+			javaElements := parseJavaFile(root, path)
+			elements = append(elements, javaElements...)
+			return nil
+		}
+
 		// Process JSON/YAML config files
 		if strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
 			if isConfigFile(path) {
@@ -992,6 +1006,237 @@ func parsePythonFile(root, path string) []CodeElement {
 	}
 
 	return elements
+}
+
+// parseJavaFile parses a Java file and returns code elements
+func parseJavaFile(root, path string) []CodeElement {
+	var elements []CodeElement
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+
+	relPath, _ := filepath.Rel(root, path)
+	fileName := filepath.Base(path)
+	contentStr := string(content)
+
+	// Extract package name
+	packageName := ""
+	packageMatch := regexp.MustCompile(`^\s*package\s+([\w.]+)\s*;`).FindStringSubmatch(contentStr)
+	if packageMatch != nil {
+		packageName = packageMatch[1]
+	}
+
+	// Find classes and interfaces
+	classes := findAllMatches(contentStr, `(?:public\s+)?(?:abstract\s+)?(?:final\s+)?class\s+(\w+)`)
+	interfaces := findAllMatches(contentStr, `(?:public\s+)?interface\s+(\w+)`)
+	enums := findAllMatches(contentStr, `(?:public\s+)?enum\s+(\w+)`)
+
+	// Find methods
+	methods := findAllMatches(contentStr, `(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?(?:synchronized\s+)?(?:\w+(?:<[^>]+>)?)\s+(\w+)\s*\([^)]*\)\s*(?:throws\s+[\w,\s]+)?\s*\{`)
+
+	// Find imports
+	imports := findAllMatches(contentStr, `^\s*import\s+([\w.*]+)\s*;`)
+
+	// Build content - include actual code for embedding quality
+	var contentBuilder strings.Builder
+	contentBuilder.WriteString(fmt.Sprintf("Java file: %s\n", fileName))
+
+	if packageName != "" {
+		contentBuilder.WriteString(fmt.Sprintf("Package: %s\n", packageName))
+	}
+	if len(classes) > 0 {
+		contentBuilder.WriteString(fmt.Sprintf("Classes: %s\n", strings.Join(uniqueStrings(classes), ", ")))
+	}
+	if len(interfaces) > 0 {
+		contentBuilder.WriteString(fmt.Sprintf("Interfaces: %s\n", strings.Join(uniqueStrings(interfaces), ", ")))
+	}
+	if len(enums) > 0 {
+		contentBuilder.WriteString(fmt.Sprintf("Enums: %s\n", strings.Join(uniqueStrings(enums), ", ")))
+	}
+	if len(methods) > 0 {
+		methodList := uniqueStrings(methods)
+		if len(methodList) > 15 {
+			methodList = methodList[:15]
+			contentBuilder.WriteString(fmt.Sprintf("Methods: %s (and more)\n", strings.Join(methodList, ", ")))
+		} else {
+			contentBuilder.WriteString(fmt.Sprintf("Methods: %s\n", strings.Join(methodList, ", ")))
+		}
+	}
+	contentBuilder.WriteString(fmt.Sprintf("Imports: %d\n", len(imports)))
+
+	// Include actual code content for better embeddings (truncate if too long)
+	codeContent := contentStr
+	maxCodeLen := 4000
+	if len(codeContent) > maxCodeLen {
+		codeContent = codeContent[:maxCodeLen] + "\n... [truncated]"
+	}
+	contentBuilder.WriteString("\n--- Code ---\n")
+	contentBuilder.WriteString(codeContent)
+
+	// Detect cross-cutting concerns
+	concerns := detectConcerns(relPath, contentStr)
+	tags := []string{"java", "module"}
+	tags = append(tags, concerns...)
+
+	// Determine file kind based on content
+	javaKind := "java-class"
+	if len(interfaces) > 0 && len(classes) == 0 {
+		javaKind = "java-interface"
+		tags = append(tags, "interface")
+	} else if len(enums) > 0 && len(classes) == 0 {
+		javaKind = "java-enum"
+		tags = append(tags, "enum")
+	}
+
+	// Extract code symbols
+	extractedSymbols := extractSymbolsFromJava(contentStr, relPath)
+
+	// Add file-level element with symbols
+	elements = append(elements, CodeElement{
+		Name:     fileName,
+		Kind:     javaKind,
+		Path:     "/" + relPath,
+		Content:  contentBuilder.String(),
+		Package:  packageName,
+		FilePath: relPath,
+		Tags:     tags,
+		Concerns: concerns,
+		Symbols:  extractedSymbols,
+	})
+
+	// Add classes as separate elements
+	for _, class := range uniqueStrings(classes) {
+		elements = append(elements, CodeElement{
+			Name:     class,
+			Kind:     "class",
+			Path:     fmt.Sprintf("/%s#%s", relPath, class),
+			Content:  fmt.Sprintf("Java class '%s' in package %s (file: %s)", class, packageName, fileName),
+			Package:  packageName,
+			FilePath: relPath,
+			Tags:     append([]string{"java", "class"}, concerns...),
+			Concerns: concerns,
+		})
+	}
+
+	// Add interfaces as separate elements
+	for _, iface := range uniqueStrings(interfaces) {
+		elements = append(elements, CodeElement{
+			Name:     iface,
+			Kind:     "interface",
+			Path:     fmt.Sprintf("/%s#%s", relPath, iface),
+			Content:  fmt.Sprintf("Java interface '%s' in package %s (file: %s)", iface, packageName, fileName),
+			Package:  packageName,
+			FilePath: relPath,
+			Tags:     append([]string{"java", "interface"}, concerns...),
+			Concerns: concerns,
+		})
+	}
+
+	return elements
+}
+
+// extractSymbolsFromJava extracts constants, fields, and methods from Java files
+func extractSymbolsFromJava(content, filePath string) []IngestSymbol {
+	if !*extractSymbols {
+		return nil
+	}
+
+	var symbols []IngestSymbol
+	lines := strings.Split(content, "\n")
+
+	// Patterns for Java constants and fields
+	// Pattern: public static final TYPE NAME = value;
+	constPattern := regexp.MustCompile(`^\s*(?:public|private|protected)?\s*static\s+final\s+(\w+)\s+([A-Z][A-Z0-9_]*)\s*=\s*(.+?);`)
+	// Pattern: public static TYPE NAME = value;
+	staticFieldPattern := regexp.MustCompile(`^\s*(?:public|private|protected)?\s*static\s+(\w+)\s+([A-Z][A-Z0-9_]*)\s*=`)
+	// Pattern: method declarations
+	methodPattern := regexp.MustCompile(`^\s*(?:public|private|protected)\s+(?:static\s+)?(?:final\s+)?(?:synchronized\s+)?(\w+(?:<[^>]+>)?)\s+(\w+)\s*\(([^)]*)\)`)
+	// Pattern: enum values
+	enumValuePattern := regexp.MustCompile(`^\s*([A-Z][A-Z0-9_]*)\s*(?:\([^)]*\))?\s*[,;]`)
+
+	inEnum := false
+
+	for i, line := range lines {
+		lineNum := i + 1
+
+		// Check for enum declaration
+		if strings.Contains(line, "enum ") && strings.Contains(line, "{") {
+			inEnum = true
+			continue
+		}
+
+		// Check for enum end
+		if inEnum && strings.Contains(line, "}") {
+			inEnum = false
+			continue
+		}
+
+		// Extract enum values
+		if inEnum {
+			if matches := enumValuePattern.FindStringSubmatch(line); matches != nil {
+				symbols = append(symbols, IngestSymbol{
+					Name:       matches[1],
+					Type:       "enum_value",
+					LineNumber: lineNum,
+					Exported:   true,
+					Language:   "java",
+				})
+			}
+			continue
+		}
+
+		// Check for constants (public static final)
+		if matches := constPattern.FindStringSubmatch(line); matches != nil {
+			valueStr := strings.TrimSpace(matches[3])
+			if len(valueStr) > 100 {
+				valueStr = valueStr[:100] + "..."
+			}
+			symbols = append(symbols, IngestSymbol{
+				Name:       matches[2],
+				Type:       "const",
+				Value:      valueStr,
+				LineNumber: lineNum,
+				Exported:   strings.Contains(line, "public"),
+				Language:   "java",
+			})
+			continue
+		}
+
+		// Check for static fields
+		if matches := staticFieldPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, IngestSymbol{
+				Name:       matches[2],
+				Type:       "field",
+				LineNumber: lineNum,
+				Exported:   strings.Contains(line, "public"),
+				Language:   "java",
+			})
+			continue
+		}
+
+		// Check for methods
+		if matches := methodPattern.FindStringSubmatch(line); matches != nil {
+			returnType := matches[1]
+			methodName := matches[2]
+			params := matches[3]
+			signature := fmt.Sprintf("%s %s(%s)", returnType, methodName, params)
+			if len(signature) > 150 {
+				signature = signature[:150] + "..."
+			}
+			symbols = append(symbols, IngestSymbol{
+				Name:       methodName,
+				Type:       "method",
+				Signature:  signature,
+				LineNumber: lineNum,
+				Exported:   strings.Contains(line, "public"),
+				Language:   "java",
+			})
+		}
+	}
+
+	return symbols
 }
 
 // extractSymbolsFromTypeScript extracts constants and exports from TypeScript/JavaScript files

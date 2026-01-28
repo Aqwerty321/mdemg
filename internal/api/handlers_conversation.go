@@ -38,12 +38,14 @@ func (s *Server) handleObserve(w http.ResponseWriter, r *http.Request) {
 
 	// Convert to internal type
 	internalReq := conversation.ObserveRequest{
-		SpaceID:   req.SpaceID,
-		SessionID: req.SessionID,
-		Content:   req.Content,
-		ObsType:   req.ObsType,
-		Tags:      req.Tags,
-		Metadata:  req.Metadata,
+		SpaceID:    req.SpaceID,
+		SessionID:  req.SessionID,
+		Content:    req.Content,
+		ObsType:    req.ObsType,
+		Tags:       req.Tags,
+		Metadata:   req.Metadata,
+		UserID:     req.UserID,
+		Visibility: req.Visibility,
 	}
 
 	resp, err := s.conversationSvc.Observe(r.Context(), internalReq)
@@ -91,11 +93,13 @@ func (s *Server) handleCorrect(w http.ResponseWriter, r *http.Request) {
 
 	// Convert to internal type
 	internalReq := conversation.CorrectRequest{
-		SpaceID:   req.SpaceID,
-		SessionID: req.SessionID,
-		Incorrect: req.Incorrect,
-		Correct:   req.Correct,
-		Context:   req.Context,
+		SpaceID:    req.SpaceID,
+		SessionID:  req.SessionID,
+		Incorrect:  req.Incorrect,
+		Correct:    req.Correct,
+		Context:    req.Context,
+		UserID:     req.UserID,
+		Visibility: req.Visibility,
 	}
 
 	resp, err := s.conversationSvc.Correct(r.Context(), internalReq)
@@ -165,6 +169,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		Themes:           convertThemes(resp.Themes),
 		EmergentConcepts: convertConcepts(resp.EmergentConcepts),
 		Summary:          resp.Summary,
+		Jiminy:           convertJiminy(resp.Jiminy),
 		Debug:            resp.Debug,
 	}
 
@@ -290,6 +295,18 @@ func convertRecallResults(results []conversation.RecallResult) []models.RecallRe
 	return apiResults
 }
 
+func convertJiminy(j *conversation.JiminyRationale) *models.JiminyRationale {
+	if j == nil {
+		return nil
+	}
+	return &models.JiminyRationale{
+		Rationale:      j.Rationale,
+		Confidence:     j.Confidence,
+		ScoreBreakdown: j.ScoreBreakdown,
+		Highlights:     j.Highlights,
+	}
+}
+
 // handleConversationConsolidate runs conversation-specific consolidation
 // POST /v1/conversation/consolidate
 func (s *Server) handleConversationConsolidate(w http.ResponseWriter, r *http.Request) {
@@ -340,4 +357,79 @@ func (s *Server) handleConversationConsolidate(w http.ResponseWriter, r *http.Re
 		"concepts_created": conceptsCreated,
 		"duration_ms":      result.TotalDuration.Milliseconds(),
 	})
+}
+
+// handleVolatileStats returns statistics about volatile conversation observations
+// GET /v1/conversation/volatile/stats
+func (s *Server) handleVolatileStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.contextCooler == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "context cooler not available",
+		})
+		return
+	}
+
+	spaceID := r.URL.Query().Get("space_id")
+	if spaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query parameter is required"})
+		return
+	}
+
+	stats, err := s.contextCooler.GetVolatileStats(r.Context(), spaceID)
+	if err != nil {
+		writeInternalError(w, err, "volatile stats")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats)
+}
+
+// handleProcessGraduations manually triggers graduation processing
+// POST /v1/conversation/graduate
+func (s *Server) handleProcessGraduations(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.contextCooler == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "context cooler not available",
+		})
+		return
+	}
+
+	var req struct {
+		SpaceID string `json:"space_id"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+
+	if req.SpaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required"})
+		return
+	}
+
+	// Apply decay first
+	decayed, err := s.contextCooler.ApplyDecay(r.Context(), req.SpaceID)
+	if err != nil {
+		writeInternalError(w, err, "apply decay")
+		return
+	}
+
+	// Then process graduations
+	summary, err := s.contextCooler.ProcessGraduations(r.Context(), req.SpaceID)
+	if err != nil {
+		writeInternalError(w, err, "process graduations")
+		return
+	}
+
+	summary.DecayApplied = decayed
+	writeJSON(w, http.StatusOK, summary)
 }

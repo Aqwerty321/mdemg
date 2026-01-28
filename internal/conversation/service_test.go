@@ -397,3 +397,82 @@ func containsSubstringHelper(s, substr string) bool {
 	}
 	return false
 }
+
+func TestValidVisibility(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"private is valid", "private", true},
+		{"team is valid", "team", true},
+		{"global is valid", "global", true},
+		{"empty defaults to valid", "", true},
+		{"invalid value", "public", false},
+		{"case sensitive", "Private", false},
+		{"random string", "foobar", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ValidVisibility(tt.input)
+			if result != tt.expected {
+				t.Errorf("ValidVisibility(%q) = %v, want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestVisibilityConstants(t *testing.T) {
+	// Verify constant values are as expected
+	if VisibilityPrivate != "private" {
+		t.Errorf("VisibilityPrivate = %q, want %q", VisibilityPrivate, "private")
+	}
+	if VisibilityTeam != "team" {
+		t.Errorf("VisibilityTeam = %q, want %q", VisibilityTeam, "team")
+	}
+	if VisibilityGlobal != "global" {
+		t.Errorf("VisibilityGlobal = %q, want %q", VisibilityGlobal, "global")
+	}
+}
+
+func TestStabilityScoreConstants(t *testing.T) {
+	// Verify stability score constants
+	if DefaultStabilityScore != 0.1 {
+		t.Errorf("DefaultStabilityScore = %v, want %v", DefaultStabilityScore, 0.1)
+	}
+	if GraduationStabilityThreshold != 0.8 {
+		t.Errorf("GraduationStabilityThreshold = %v, want %v", GraduationStabilityThreshold, 0.8)
+	}
+	// Graduation threshold must be higher than default
+	if GraduationStabilityThreshold <= DefaultStabilityScore {
+		t.Errorf("GraduationStabilityThreshold (%v) must be > DefaultStabilityScore (%v)",
+			GraduationStabilityThreshold, DefaultStabilityScore)
+	}
+}
+
+func TestObservationIdentityFields(t *testing.T) {
+	// Test that Observation struct has the new identity fields
+	obs := Observation{
+		ObsID:          "test-obs",
+		SpaceID:        "test-space",
+		SessionID:      "test-session",
+		UserID:         "user-123",
+		Visibility:     VisibilityTeam,
+		Volatile:       true,
+		StabilityScore: 0.5,
+	}
+
+	if obs.UserID != "user-123" {
+		t.Errorf("UserID = %q, want %q", obs.UserID, "user-123")
+	}
+	if obs.Visibility != VisibilityTeam {
+		t.Errorf("Visibility = %q, want %q", obs.Visibility, VisibilityTeam)
+	}
+	if !obs.Volatile {
+		t.Error("Volatile should be true")
+	}
+	if obs.StabilityScore != 0.5 {
+		t.Errorf("StabilityScore = %v, want %v", obs.StabilityScore, 0.5)
+	}
+}

@@ -1,18 +1,19 @@
-# Private content (not for public repo)
+# Private and internal content (not for public repo)
 private/
+experiment/
+docs/internal/
 
 # Environment and secrets
 .env
-*.env
 .env.*
 !.env.example
 
-# API Keys - NEVER COMMIT
+# API Keys and Secrets - NEVER COMMIT
 **/secrets/
 *.key
 *.pem
 
-# Go binaries
+# Go binaries and compiled artifacts
 bin/
 /server
 /ingest-codebase
@@ -27,24 +28,34 @@ bin/
 *.so
 *.dylib
 
-# Go test and build
+# Go test and build artifacts
 *.test
 *.out
 coverage.html
 coverage.txt
 
-# IDE (keeping .vscode for shared settings)
-# .vscode/
+# IDE - Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# IDE - JetBrains
 .idea/
+
+# Editor temporary files
 *.swp
 *.swo
 *~
 
-# Claude config (user-specific)
+# AI Assistant configuration (user-specific)
 .claude/
 .claude_settings.json
+.cursor/
 
-# OS files
+# OS specific files
 .DS_Store
 .DS_Store?
 ._*
@@ -52,21 +63,16 @@ coverage.txt
 .Trashes
 Thumbs.db
 
-# Neo4j data (local dev)
+# Database data (local development)
 neo4j_data/
 neo4j_logs/
 data/
 
-# Cursor project files (user-specific)
-.cursor/
-
-# Temporary files
+# Temporary files and archives
 tmp/
 temp/
 *.tmp
 *.bak
-
-# Archives
 *.zip
 *.tar.gz
 *.rar
@@ -74,12 +80,3 @@ temp/
 # Logs
 *.log
 logs/
-
-# Compiled binaries (root level only)
-/server
-/ingest-codebase
-/decay
-/consolidate
-/prune
-/mdemg-server
-/mdemg-mcp

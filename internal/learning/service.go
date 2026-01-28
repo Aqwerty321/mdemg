@@ -11,6 +11,12 @@ import (
 	"mdemg/internal/models"
 )
 
+// StabilityReinforcer is called when nodes are co-activated to update stability scores
+// for conversation observations. This enables the Context Cooler graduation system.
+type StabilityReinforcer interface {
+	UpdateStabilityOnReinforcement(ctx context.Context, spaceID, nodeID string) error
+}
+
 type Service struct {
 	cfg    config.Config
 	driver neo4j.DriverWithContext
@@ -18,6 +24,9 @@ type Service struct {
 	// Freeze state tracking (per space)
 	freezeMu     sync.RWMutex
 	frozenSpaces map[string]FreezeState
+
+	// Optional: Context Cooler for stability reinforcement
+	stabilityReinforcer StabilityReinforcer
 }
 
 // FreezeState tracks the frozen state of a space
@@ -35,6 +44,12 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
 		driver:       driver,
 		frozenSpaces: make(map[string]FreezeState),
 	}
+}
+
+// SetStabilityReinforcer sets the callback for Context Cooler stability updates.
+// When nodes are co-activated, the reinforcer will be called for conversation observations.
+func (s *Service) SetStabilityReinforcer(reinforcer StabilityReinforcer) {
+	s.stabilityReinforcer = reinforcer
 }
 
 // FreezeLearning stops all learning edge creation/updates for a space.
@@ -297,7 +312,70 @@ RETURN count(*) AS updated;`
 		}
 		return nil, res.Err()
 	})
-	return err
+
+	if err != nil {
+		return err
+	}
+
+	// If stability reinforcer is set, update stability for conversation observations
+	if s.stabilityReinforcer != nil {
+		s.reinforceConversationObservations(ctx, spaceID, nodes)
+	}
+
+	return nil
+}
+
+// reinforceConversationObservations calls the stability reinforcer for any conversation observations
+// in the co-activated nodes. This supports the Context Cooler graduation system.
+func (s *Service) reinforceConversationObservations(ctx context.Context, spaceID string, nodes []models.RetrieveResult) {
+	if s.stabilityReinforcer == nil {
+		return
+	}
+
+	// Query which nodes are conversation observations and reinforce them
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	nodeIDs := make([]string, len(nodes))
+	for i, n := range nodes {
+		nodeIDs[i] = n.NodeID
+	}
+
+	// Find conversation observation nodes
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			UNWIND $nodeIds AS nodeId
+			MATCH (n:MemoryNode {space_id: $spaceId, node_id: nodeId})
+			WHERE n.role_type = 'conversation_observation'
+			RETURN n.node_id AS nodeId
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+			"nodeIds": nodeIDs,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		var obsNodeIDs []string
+		for res.Next(ctx) {
+			rec := res.Record()
+			if id, ok := rec.Get("nodeId"); ok && id != nil {
+				obsNodeIDs = append(obsNodeIDs, id.(string))
+			}
+		}
+		return obsNodeIDs, res.Err()
+	})
+
+	if err != nil {
+		return // Silently fail - stability reinforcement is best-effort
+	}
+
+	obsNodeIDs := result.([]string)
+	for _, nodeID := range obsNodeIDs {
+		// Best-effort reinforcement - don't fail the main operation
+		_ = s.stabilityReinforcer.UpdateStabilityOnReinforcement(ctx, spaceID, nodeID)
+	}
 }
 
 // CoactivateSession creates CO_ACTIVATED_WITH edges between all observations in a session.

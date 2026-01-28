@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"time"
 
@@ -64,6 +65,10 @@ type ObserveRequest struct {
 	ObsType   string         `json:"obs_type,omitempty"`
 	Tags      []string       `json:"tags,omitempty"`
 	Metadata  map[string]any `json:"metadata,omitempty"`
+
+	// Identity & Visibility (CMS v2)
+	UserID     string `json:"user_id,omitempty"`
+	Visibility string `json:"visibility,omitempty"` // private|team|global
 }
 
 // ObserveResponse is the response from capturing an observation
@@ -82,6 +87,10 @@ type CorrectRequest struct {
 	Incorrect string `json:"incorrect"`
 	Correct   string `json:"correct"`
 	Context   string `json:"context,omitempty"`
+
+	// Identity & Visibility (CMS v2)
+	UserID     string `json:"user_id,omitempty"`
+	Visibility string `json:"visibility,omitempty"` // private|team|global
 }
 
 // Observe captures a conversation observation
@@ -109,6 +118,11 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 		return nil, fmt.Errorf("invalid observation type: %s", req.ObsType)
 	}
 
+	// Validate visibility
+	if req.Visibility != "" && !ValidVisibility(req.Visibility) {
+		return nil, fmt.Errorf("invalid visibility: %s (must be private, team, or global)", req.Visibility)
+	}
+
 	// Generate embedding
 	var embedding []float32
 	var err error
@@ -121,17 +135,28 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 		}
 	}
 
+	// Determine visibility (default to private)
+	visibility := Visibility(req.Visibility)
+	if visibility == "" {
+		visibility = VisibilityPrivate
+	}
+
 	// Create observation object
+	// New observations start as volatile with low stability score
 	obs := Observation{
-		ObsID:     obsID,
-		SpaceID:   req.SpaceID,
-		SessionID: req.SessionID,
-		ObsType:   obsType,
-		Content:   req.Content,
-		Embedding: embedding,
-		Tags:      req.Tags,
-		Metadata:  req.Metadata,
-		CreatedAt: time.Now().UTC(),
+		ObsID:          obsID,
+		SpaceID:        req.SpaceID,
+		SessionID:      req.SessionID,
+		ObsType:        obsType,
+		Content:        req.Content,
+		Embedding:      embedding,
+		Tags:           req.Tags,
+		Metadata:       req.Metadata,
+		CreatedAt:      time.Now().UTC(),
+		UserID:         req.UserID,
+		Visibility:     visibility,
+		Volatile:       true, // New observations are volatile until reinforced
+		StabilityScore: DefaultStabilityScore,
 	}
 
 	// Generate summary (first 200 chars)
@@ -208,6 +233,8 @@ func (s *Service) Correct(ctx context.Context, req CorrectRequest) (*ObserveResp
 			"correct":   req.Correct,
 			"context":   req.Context,
 		},
+		UserID:     req.UserID,
+		Visibility: req.Visibility,
 	}
 
 	resp, err := s.Observe(ctx, obsReq)
@@ -248,24 +275,44 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 				surprise_score: $surpriseScore,
 				tags: $tags,
 				layer: 0,
+				user_id: $userId,
+				visibility: $visibility,
+				volatile: $volatile,
+				stability_score: $stabilityScore,
 				created_at: datetime($createdAt),
 				updated_at: datetime($createdAt)
 			})
 			RETURN n.node_id as nodeId
 		`
 
+		// Default visibility to private if not set
+		visibility := obs.Visibility
+		if visibility == "" {
+			visibility = VisibilityPrivate
+		}
+
+		// New observations start as volatile with low stability
+		stabilityScore := obs.StabilityScore
+		if stabilityScore == 0 {
+			stabilityScore = DefaultStabilityScore
+		}
+
 		params := map[string]any{
-			"nodeId":        nodeID,
-			"spaceId":       obs.SpaceID,
-			"obsId":         obs.ObsID,
-			"sessionId":     obs.SessionID,
-			"obsType":       string(obs.ObsType),
-			"content":       obs.Content,
-			"summary":       obs.Summary,
-			"embedding":     obs.Embedding,
-			"surpriseScore": obs.SurpriseScore,
-			"tags":          tags,
-			"createdAt":     obs.CreatedAt.Format(time.RFC3339),
+			"nodeId":         nodeID,
+			"spaceId":        obs.SpaceID,
+			"obsId":          obs.ObsID,
+			"sessionId":      obs.SessionID,
+			"obsType":        string(obs.ObsType),
+			"content":        obs.Content,
+			"summary":        obs.Summary,
+			"embedding":      obs.Embedding,
+			"surpriseScore":  obs.SurpriseScore,
+			"tags":           tags,
+			"userId":         obs.UserID,
+			"visibility":     string(visibility),
+			"volatile":       obs.Volatile,
+			"stabilityScore": stabilityScore,
+			"createdAt":      obs.CreatedAt.Format(time.RFC3339),
 		}
 
 		// Add metadata as properties if present
@@ -368,15 +415,25 @@ type ResumeRequest struct {
 	MaxObservations  int    `json:"max_observations,omitempty"`
 }
 
+// JiminyRationale explains WHY specific state was rehydrated during resume.
+// Named after Jiminy Cricket - the "conscience" that provides guidance.
+type JiminyRationale struct {
+	Rationale      string             `json:"rationale"`
+	Confidence     float64            `json:"confidence"`
+	ScoreBreakdown map[string]float64 `json:"score_breakdown"`
+	Highlights     []string           `json:"highlights"`
+}
+
 // ResumeResponse is the response from resuming context
 type ResumeResponse struct {
-	SpaceID          string                   `json:"space_id"`
-	SessionID        string                   `json:"session_id,omitempty"`
-	Observations     []ObservationResult      `json:"observations"`
-	Themes           []ThemeResult            `json:"themes"`
-	EmergentConcepts []EmergentConceptResult  `json:"emergent_concepts"`
-	Summary          string                   `json:"summary"`
-	Debug            map[string]any           `json:"debug,omitempty"`
+	SpaceID          string                  `json:"space_id"`
+	SessionID        string                  `json:"session_id,omitempty"`
+	Observations     []ObservationResult     `json:"observations"`
+	Themes           []ThemeResult           `json:"themes"`
+	EmergentConcepts []EmergentConceptResult `json:"emergent_concepts"`
+	Summary          string                  `json:"summary"`
+	Jiminy           *JiminyRationale        `json:"jiminy,omitempty"`
+	Debug            map[string]any          `json:"debug,omitempty"`
 }
 
 // ObservationResult represents an observation in resume/recall responses
@@ -491,6 +548,9 @@ func (s *Service) Resume(ctx context.Context, req ResumeRequest) (*ResumeRespons
 
 	// Step 4: Generate context summary
 	resp.Summary = s.generateResumeSummary(resp)
+
+	// Step 5: Generate Jiminy rationale (explains WHY this state was rehydrated)
+	resp.Jiminy = s.generateJiminyRationale(resp)
 
 	return resp, nil
 }
@@ -957,6 +1017,178 @@ func (s *Service) generateResumeSummary(resp *ResumeResponse) string {
 	}
 
 	return strings.Join(parts, ". ") + "."
+}
+
+// generateJiminyRationale creates the Jiminy explanation for why specific state was rehydrated.
+// It analyzes the returned observations, themes, and concepts to explain the rationale.
+func (s *Service) generateJiminyRationale(resp *ResumeResponse) *JiminyRationale {
+	// No content = no rationale needed
+	if len(resp.Observations) == 0 && len(resp.Themes) == 0 && len(resp.EmergentConcepts) == 0 {
+		return nil
+	}
+
+	// Calculate aggregate scores for the breakdown
+	var avgSurprise, maxSurprise float64
+	var recentCount int
+	highlights := []string{}
+
+	// Analyze observations
+	for _, obs := range resp.Observations {
+		if obs.SurpriseScore > maxSurprise {
+			maxSurprise = obs.SurpriseScore
+		}
+		avgSurprise += obs.SurpriseScore
+
+		// High surprise observations get highlighted
+		if obs.SurpriseScore >= 0.7 {
+			highlights = append(highlights, fmt.Sprintf("High-surprise %s: %s", obs.ObsType, truncate(obs.Summary, 60)))
+		}
+
+		// Recent observations (within last 24h would be ideal, but we just have all recent ones)
+		recentCount++
+	}
+
+	if len(resp.Observations) > 0 {
+		avgSurprise /= float64(len(resp.Observations))
+	}
+
+	// Analyze themes for additional highlights
+	for _, theme := range resp.Themes {
+		if theme.AvgSurpriseScore >= 0.6 {
+			highlights = append(highlights, fmt.Sprintf("Active theme: %s (%d members)", theme.Name, theme.MemberCount))
+		}
+	}
+
+	// Analyze emergent concepts
+	for _, concept := range resp.EmergentConcepts {
+		if concept.Layer >= 2 {
+			highlights = append(highlights, fmt.Sprintf("Emergent concept (L%d): %s", concept.Layer, concept.Name))
+		}
+	}
+
+	// Build rationale explanation
+	rationale := s.buildJiminyRationale(resp, maxSurprise, recentCount)
+
+	// Calculate confidence based on data quality
+	confidence := s.calculateJiminyConfidence(resp, maxSurprise)
+
+	// Build score breakdown
+	scoreBreakdown := map[string]float64{
+		"surprise_avg":     avgSurprise,
+		"surprise_max":     maxSurprise,
+		"recency":          math.Min(1.0, float64(recentCount)/10.0),
+		"theme_coverage":   math.Min(1.0, float64(len(resp.Themes))/3.0),
+		"concept_coverage": math.Min(1.0, float64(len(resp.EmergentConcepts))/2.0),
+	}
+
+	// Limit highlights to top 5
+	if len(highlights) > 5 {
+		highlights = highlights[:5]
+	}
+
+	return &JiminyRationale{
+		Rationale:      rationale,
+		Confidence:     confidence,
+		ScoreBreakdown: scoreBreakdown,
+		Highlights:     highlights,
+	}
+}
+
+// buildJiminyRationale creates the human-readable rationale text
+func (s *Service) buildJiminyRationale(resp *ResumeResponse, maxSurprise float64, recentCount int) string {
+	parts := []string{}
+
+	// Explain observation selection
+	if len(resp.Observations) > 0 {
+		if maxSurprise >= 0.7 {
+			parts = append(parts, fmt.Sprintf("Prioritized %d observations with high novelty (max surprise: %.0f%%)", len(resp.Observations), maxSurprise*100))
+		} else {
+			parts = append(parts, fmt.Sprintf("Restored %d recent observations to maintain context continuity", len(resp.Observations)))
+		}
+
+		// Check for specific observation types
+		typeCounts := make(map[string]int)
+		for _, obs := range resp.Observations {
+			typeCounts[obs.ObsType]++
+		}
+
+		if typeCounts["decision"] > 0 {
+			parts = append(parts, fmt.Sprintf("includes %d unresolved decisions", typeCounts["decision"]))
+		}
+		if typeCounts["task"] > 0 {
+			parts = append(parts, fmt.Sprintf("%d active tasks", typeCounts["task"]))
+		}
+		if typeCounts["correction"] > 0 {
+			parts = append(parts, fmt.Sprintf("%d corrections to remember", typeCounts["correction"]))
+		}
+	}
+
+	// Explain theme selection
+	if len(resp.Themes) > 0 {
+		parts = append(parts, fmt.Sprintf("Surfacing %d active themes for topic awareness", len(resp.Themes)))
+	}
+
+	// Explain emergent concepts
+	if len(resp.EmergentConcepts) > 0 {
+		parts = append(parts, fmt.Sprintf("Including %d emergent concepts representing accumulated learning", len(resp.EmergentConcepts)))
+	}
+
+	if len(parts) == 0 {
+		return "Resuming with available context."
+	}
+
+	// Join with appropriate punctuation
+	result := parts[0]
+	for i := 1; i < len(parts); i++ {
+		// Check if current part starts with lowercase (continuation)
+		if len(parts[i]) > 0 && parts[i][0] >= 'a' && parts[i][0] <= 'z' {
+			result += ", " + parts[i]
+		} else {
+			result += ". " + parts[i]
+		}
+	}
+
+	return result + "."
+}
+
+// calculateJiminyConfidence determines how confident we are in the rationale
+func (s *Service) calculateJiminyConfidence(resp *ResumeResponse, maxSurprise float64) float64 {
+	confidence := 0.5 // Base confidence
+
+	// More observations = higher confidence in context
+	if len(resp.Observations) >= 5 {
+		confidence += 0.15
+	} else if len(resp.Observations) >= 2 {
+		confidence += 0.1
+	}
+
+	// Themes provide thematic coverage confidence
+	if len(resp.Themes) >= 1 {
+		confidence += 0.1
+	}
+
+	// Emergent concepts show established understanding
+	if len(resp.EmergentConcepts) >= 1 {
+		confidence += 0.15
+	}
+
+	// High surprise content is more reliably novel
+	if maxSurprise >= 0.7 {
+		confidence += 0.1
+	}
+
+	return math.Min(0.99, confidence)
+}
+
+// truncate shortens a string to maxLen characters, adding "..." if needed
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return "..."
+	}
+	return s[:maxLen-3] + "..."
 }
 
 // sortAndLimitRecallResults sorts results by score and limits to topK

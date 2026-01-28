@@ -6,7 +6,7 @@
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceFolder}/mdemg_build/service/cmd/server",
+      "program": "${workspaceFolder}/cmd/server",
       "env": {
         "NEO4J_URI": "bolt://localhost:7687",
         "NEO4J_USER": "neo4j",
@@ -21,7 +21,7 @@
         "LEARNING_EDGE_CAP_PER_REQUEST": "200",
         "LISTEN_ADDR": ":8082"
       },
-      "cwd": "${workspaceFolder}/mdemg_build/service"
+      "cwd": "${workspaceFolder}"
     },
     {
       "name": "Debug Current Test",

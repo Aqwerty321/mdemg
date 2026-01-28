@@ -2,6 +2,24 @@ package domain
 
 import "time"
 
+// Visibility levels for multi-tenant memory access
+type Visibility string
+
+const (
+	VisibilityPrivate Visibility = "private" // Only visible to owner (user_id match)
+	VisibilityTeam    Visibility = "team"    // Visible to users in same space_id
+	VisibilityGlobal  Visibility = "global"  // Visible to all
+)
+
+// ValidVisibility checks if a visibility value is valid
+func ValidVisibility(v string) bool {
+	switch Visibility(v) {
+	case VisibilityPrivate, VisibilityTeam, VisibilityGlobal:
+		return true
+	}
+	return false
+}
+
 type MemoryNode struct {
 	SpaceID     string    `json:"space_id"`
 	NodeID      string    `json:"node_id"`
@@ -17,12 +35,17 @@ type MemoryNode struct {
 	Tags        []string  `json:"tags,omitempty"`
 	Embedding   []float64 `json:"embedding,omitempty"`
 
+	// Identity & Visibility (CMS v2)
+	UserID     string     `json:"user_id,omitempty"`     // Owner of the memory
+	Visibility Visibility `json:"visibility,omitempty"`  // private|team|global
+	Volatile   bool       `json:"volatile,omitempty"`    // True for unreinforced short-term thoughts
+
 	// Hidden layer support (V0005)
 	MessagePassEmbedding []float64  `json:"message_pass_embedding,omitempty"`
 	LastForwardPass      *time.Time `json:"last_forward_pass,omitempty"`
 	LastBackwardPass     *time.Time `json:"last_backward_pass,omitempty"`
 	AggregationCount     int        `json:"aggregation_count,omitempty"`
-	StabilityScore       float64    `json:"stability_score,omitempty"`
+	StabilityScore       float64    `json:"stability_score,omitempty"` // 0..1, managed by Context Cooler
 }
 
 type Observation struct {

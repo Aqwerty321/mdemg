@@ -38,8 +38,10 @@ type Server struct {
 	consultant      *consulting.Service
 	gapDetector     *gaps.GapDetector
 	conversationSvc *conversation.Service
+	contextCooler   *conversation.ContextCooler
 	hiddenSvc       *hidden.Service // alias for handleConversationConsolidate
 	stopConsolidate chan struct{}
+	stopCooler      chan struct{}
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -126,9 +128,16 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 	// Initialize conversation service (Phase 1: Observation Capture with Surprise Detection)
 	var convSvc *conversation.Service
+	var ctxCooler *conversation.ContextCooler
 	if emb != nil {
 		convSvc = conversation.NewServiceWithConfig(driver, emb, cfg.VectorIndexName)
 		log.Printf("Conversation service initialized (vector index: %s)", cfg.VectorIndexName)
+
+		// Initialize Context Cooler (Phase 3: Graduation logic for volatile observations)
+		ctxCooler = conversation.NewContextCooler(driver)
+		lea.SetStabilityReinforcer(ctxCooler)
+		log.Printf("Context Cooler initialized (graduation threshold: %.2f, decay rate: %.2f)",
+			conversation.GraduationStabilityThreshold, conversation.StabilityDecayRate)
 	} else {
 		log.Printf("Conversation service disabled (requires embedder)")
 	}
@@ -149,7 +158,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		}
 	}
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, hiddenSvc: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, conversationSvc: convSvc}
+	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, hiddenSvc: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, conversationSvc: convSvc, contextCooler: ctxCooler}
 }
 
 // Shutdown gracefully stops background services
@@ -158,6 +167,7 @@ func (s *Server) Shutdown() {
 		s.apeScheduler.Stop()
 	}
 	s.StopPeriodicConsolidation()
+	s.StopContextCoolerProcessing()
 }
 
 // StartPeriodicConsolidation starts a background goroutine that consolidates conversation memory
@@ -215,6 +225,61 @@ func (s *Server) StopPeriodicConsolidation() {
 	if s.stopConsolidate != nil {
 		close(s.stopConsolidate)
 		s.stopConsolidate = nil
+	}
+}
+
+// StartContextCoolerProcessing starts a background goroutine that processes
+// Context Cooler graduations and decay. Default interval is 10 minutes.
+func (s *Server) StartContextCoolerProcessing(spaceID string, interval time.Duration) {
+	if s.contextCooler == nil {
+		log.Println("Context Cooler processing disabled: cooler not available")
+		return
+	}
+	if interval <= 0 {
+		interval = 10 * time.Minute
+	}
+
+	s.stopCooler = make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		log.Printf("Context Cooler processing started (space=%s, interval=%v)", spaceID, interval)
+
+		for {
+			select {
+			case <-ticker.C:
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+
+				// Step 1: Apply decay to inactive volatile nodes
+				decayed, err := s.contextCooler.ApplyDecay(ctx, spaceID)
+				if err != nil {
+					log.Printf("Context Cooler decay error: %v", err)
+				}
+
+				// Step 2: Process graduations and tombstones
+				summary, err := s.contextCooler.ProcessGraduations(ctx, spaceID)
+				cancel()
+
+				if err != nil {
+					log.Printf("Context Cooler graduation error: %v", err)
+				} else if summary.Graduated > 0 || summary.Tombstoned > 0 || decayed > 0 {
+					log.Printf("Context Cooler: graduated=%d, tombstoned=%d, decayed=%d, remaining_volatile=%d",
+						summary.Graduated, summary.Tombstoned, decayed, summary.RemainingVolatile)
+				}
+			case <-s.stopCooler:
+				log.Println("Context Cooler processing stopped")
+				return
+			}
+		}
+	}()
+}
+
+// StopContextCoolerProcessing stops the background Context Cooler goroutine
+func (s *Server) StopContextCoolerProcessing() {
+	if s.stopCooler != nil {
+		close(s.stopCooler)
+		s.stopCooler = nil
 	}
 }
 
@@ -276,6 +341,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversation/resume", s.handleResume)
 	mux.HandleFunc("/v1/conversation/recall", s.handleRecall)
 	mux.HandleFunc("/v1/conversation/consolidate", s.handleConversationConsolidate)
+	mux.HandleFunc("/v1/conversation/volatile/stats", s.handleVolatileStats)
+	mux.HandleFunc("/v1/conversation/graduate", s.handleProcessGraduations)
 
 	// Wrap mux with middleware stack
 	// Order: compression (outermost) -> logging (innermost)

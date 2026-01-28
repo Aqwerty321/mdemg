@@ -14,6 +14,32 @@ const (
 	ObsTypeTask       ObservationType = "task"
 )
 
+// Visibility levels for multi-tenant memory access
+type Visibility string
+
+const (
+	VisibilityPrivate Visibility = "private" // Only visible to owner (user_id match)
+	VisibilityTeam    Visibility = "team"    // Visible to users in same space_id
+	VisibilityGlobal  Visibility = "global"  // Visible to all
+)
+
+// ValidVisibility checks if a visibility value is valid
+func ValidVisibility(v string) bool {
+	switch Visibility(v) {
+	case VisibilityPrivate, VisibilityTeam, VisibilityGlobal:
+		return true
+	case "": // Empty defaults to private
+		return true
+	}
+	return false
+}
+
+// DefaultStabilityScore is the initial stability for new volatile observations
+const DefaultStabilityScore = 0.1
+
+// GraduationStabilityThreshold is the stability score needed to graduate from volatile
+const GraduationStabilityThreshold = 0.8
+
 // Observation represents a significant conversational event
 type Observation struct {
 	ObsID         string
@@ -27,6 +53,12 @@ type Observation struct {
 	Tags          []string
 	Metadata      map[string]any
 	CreatedAt     time.Time
+
+	// Identity & Visibility (CMS v2)
+	UserID         string     // Owner of the observation
+	Visibility     Visibility // private|team|global (default: private)
+	Volatile       bool       // True for unreinforced short-term thoughts
+	StabilityScore float64    // 0..1, managed by Context Cooler
 }
 
 // SurpriseFactors breaks down the surprise score

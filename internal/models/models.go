@@ -488,6 +488,13 @@ type ObserveRequest struct {
 	ObsType   string         `json:"obs_type,omitempty"` // decision, learning, preference, etc.
 	Tags      []string       `json:"tags,omitempty"`
 	Metadata  map[string]any `json:"metadata,omitempty"`
+
+	// Identity & Visibility (CMS v2)
+	UserID     string `json:"user_id,omitempty"`                                                   // Owner of the observation
+	Visibility string `json:"visibility,omitempty" validate:"omitempty,oneof=private team global"` // Default: private
+
+	// Cross-module linking (CMS v2)
+	RefersTo []string `json:"refers_to,omitempty"` // Node/symbol IDs this observation references
 }
 
 // ObserveResponse - response from POST /v1/conversation/observe
@@ -507,6 +514,13 @@ type CorrectRequest struct {
 	Incorrect string `json:"incorrect" validate:"required,min=1"`
 	Correct   string `json:"correct" validate:"required,min=1"`
 	Context   string `json:"context,omitempty"`
+
+	// Identity & Visibility (CMS v2)
+	UserID     string `json:"user_id,omitempty"`                                                   // Owner of the correction
+	Visibility string `json:"visibility,omitempty" validate:"omitempty,oneof=private team global"` // Default: private
+
+	// Cross-module linking (CMS v2)
+	RefersTo []string `json:"refers_to,omitempty"` // Node/symbol IDs this correction references
 }
 
 // IngestTriggerRequest - request for POST /v1/memory/ingest/trigger
@@ -580,16 +594,26 @@ type ResumeRequest struct {
 	MaxObservations  int    `json:"max_observations,omitempty"`  // Max observations to return (default: 20)
 }
 
+// JiminyRationale explains WHY specific state was rehydrated during resume.
+// Named after Jiminy Cricket - the "conscience" that provides guidance.
+type JiminyRationale struct {
+	Rationale      string             `json:"rationale"`       // Human-readable explanation
+	Confidence     float64            `json:"confidence"`      // 0.0-1.0 confidence in rationale
+	ScoreBreakdown map[string]float64 `json:"score_breakdown"` // Factors: surprise, recency, reinforcement
+	Highlights     []string           `json:"highlights"`      // Key items to pay attention to
+}
+
 // ResumeResponse - response from POST /v1/conversation/resume
 // Provides context restoration after context compaction.
 type ResumeResponse struct {
-	SpaceID          string                  `json:"space_id"`
-	SessionID        string                  `json:"session_id,omitempty"`
-	Observations     []ConversationObsResult `json:"observations"`
+	SpaceID          string                    `json:"space_id"`
+	SessionID        string                    `json:"session_id,omitempty"`
+	Observations     []ConversationObsResult   `json:"observations"`
 	Themes           []ConversationThemeResult `json:"themes"`
-	EmergentConcepts []EmergentConceptResult `json:"emergent_concepts"`
-	Summary          string                  `json:"summary"` // Generated context summary
-	Debug            map[string]any          `json:"debug,omitempty"`
+	EmergentConcepts []EmergentConceptResult   `json:"emergent_concepts"`
+	Summary          string                    `json:"summary"`          // Generated context summary
+	Jiminy           *JiminyRationale          `json:"jiminy,omitempty"` // Explains why state was rehydrated
+	Debug            map[string]any            `json:"debug,omitempty"`
 }
 
 // ConversationObsResult represents a conversation observation in resume/recall responses

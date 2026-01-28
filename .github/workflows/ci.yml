@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  GO_VERSION: '1.21'
+  GO_VERSION: '1.24'
 
 jobs:
   build:
@@ -38,6 +38,18 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    services:
+      neo4j:
+        image: neo4j:5
+        env:
+          NEO4J_AUTH: neo4j/testpassword
+          NEO4J_PLUGINS: '["apoc"]'
+        ports:
+          - 7687:7687
+    env:
+      TEST_NEO4J_URI: bolt://localhost:7687
+      TEST_NEO4J_USER: neo4j
+      TEST_NEO4J_PASS: testpassword
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -51,8 +63,11 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Run tests
-        run: go test -v -race -coverprofile=coverage.out ./...
+      - name: Run Unit Tests
+        run: go test -v ./internal/... ./pkg/...
+
+      - name: Run Integration Tests
+        run: go test -v -tags=integration ./tests/integration/...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -63,7 +78,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    continue-on-error: true  # Don't block on existing lint issues
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -75,7 +90,7 @@ jobs:
           cache: true
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
           version: latest
           args: --timeout=5m

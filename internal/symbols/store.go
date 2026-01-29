@@ -23,6 +23,7 @@ func NewStore(driver neo4j.DriverWithContext) *Store {
 }
 
 // SymbolRecord represents a symbol ready for Neo4j storage.
+// Field names follow UPTS (Universal Parser Test Specification) v1.0.0
 type SymbolRecord struct {
 	SpaceID            string    `json:"space_id"`
 	SymbolID           string    `json:"symbol_id"`
@@ -32,8 +33,8 @@ type SymbolRecord struct {
 	RawValue           string    `json:"raw_value,omitempty"`
 	FilePath           string    `json:"file_path"`
 	ParentNodeID       string    `json:"parent_node_id,omitempty"` // Direct link to MemoryNode (avoids MATCH)
-	LineNumber         int       `json:"line_number"`
-	EndLine            int       `json:"end_line"`
+	Line               int       `json:"line"`                     // 1-indexed start line (UPTS standard)
+	LineEnd            int       `json:"line_end"`                 // End line for multi-line symbols
 	Column             int       `json:"column,omitempty"`
 	Exported           bool      `json:"exported"`
 	DocComment         string    `json:"doc_comment,omitempty"`
@@ -62,8 +63,8 @@ func ToRecord(spaceID string, sym Symbol) SymbolRecord {
 		Value:          sym.Value,
 		RawValue:       sym.RawValue,
 		FilePath:       sym.FilePath,
-		LineNumber:     sym.Line,    // UPTS: Line → LineNumber for storage
-		EndLine:        sym.LineEnd, // UPTS: LineEnd → EndLine for storage
+		Line:    sym.Line,    // UPTS standard: 1-indexed line
+		LineEnd: sym.LineEnd, // UPTS standard: end line
 		Column:         sym.Column,
 		Exported:       sym.Exported,
 		DocComment:     sym.DocComment,
@@ -163,8 +164,8 @@ func (s *Store) SaveSymbols(ctx context.Context, spaceID string, symbols []Symbo
 				"raw_value":           sym.RawValue,
 				"file_path":           sym.FilePath,
 				"parent_node_id":      sym.ParentNodeID,
-				"line_number":         sym.LineNumber,
-				"end_line":            sym.EndLine,
+				"line":                sym.Line,
+				"line_end":            sym.LineEnd,
 				"column":              sym.Column,
 				"exported":            sym.Exported,
 				"doc_comment":         sym.DocComment,
@@ -197,8 +198,8 @@ SET
   s.value = sym.value,
   s.raw_value = sym.raw_value,
   s.file_path = sym.file_path,
-  s.line_number = sym.line_number,
-  s.end_line = sym.end_line,
+  s.line = sym.line,
+  s.line_end = sym.line_end,
   s.column = sym.column,
   s.exported = sym.exported,
   s.doc_comment = sym.doc_comment,
@@ -334,7 +335,7 @@ func (s *Store) QueryByFile(ctx context.Context, spaceID, filePath string) ([]Sy
 		res, err := tx.Run(ctx, `
 MATCH (s:SymbolNode {space_id: $space_id, file_path: $file_path})
 RETURN s
-ORDER BY s.line_number
+ORDER BY s.line
 		`, params)
 		if err != nil {
 			return nil, err
@@ -466,7 +467,7 @@ func (s *Store) FindExactConstant(ctx context.Context, spaceID, name string) ([]
 MATCH (s:SymbolNode {space_id: $space_id, name: $name})
 WHERE s.symbol_type IN ['const', 'var', 'enum_value']
 RETURN s
-ORDER BY s.context_specificity DESC, s.exported DESC, s.line_number
+ORDER BY s.context_specificity DESC, s.exported DESC, s.line
 		`, params)
 		if err != nil {
 			return nil, err
@@ -529,7 +530,7 @@ WITH directSymbols + descendantSymbols + parentSymbols AS allSymbols
 UNWIND allSymbols AS s
 WITH s WHERE s IS NOT NULL
 RETURN s
-ORDER BY s.context_specificity DESC, s.line_number
+ORDER BY s.context_specificity DESC, s.line
 LIMIT $max_symbols
 		`, params)
 		if err != nil {
@@ -653,8 +654,8 @@ func nodeToSymbolRecord(n neo4j.Node) SymbolRecord {
 		Value:              getString(props, "value"),
 		RawValue:           getString(props, "raw_value"),
 		FilePath:           getString(props, "file_path"),
-		LineNumber:         getInt(props, "line_number"),
-		EndLine:            getInt(props, "end_line"),
+		Line:    getInt(props, "line"),    // UPTS standard
+		LineEnd: getInt(props, "line_end"), // UPTS standard
 		Column:             getInt(props, "column"),
 		Exported:           getBool(props, "exported"),
 		DocComment:         getString(props, "doc_comment"),

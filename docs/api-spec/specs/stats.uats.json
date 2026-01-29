@@ -1,0 +1,47 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Memory Stats",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "stats",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Memory Stats endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/stats",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.total_nodes",
+        "type": "integer"
+      },
+      {
+        "path": "$.total_edges",
+        "type": "integer"
+      }
+    ]
+  }
+}

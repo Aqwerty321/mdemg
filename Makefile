@@ -66,3 +66,52 @@ help:
 	@echo "  clean          - Remove build artifacts"
 	@echo "  dev-setup      - Install dependencies"
 	@echo "  run            - Run MDEMG server"
+# ============================================================
+# UATS API Testing Targets
+# Add to your existing Makefile
+# ============================================================
+
+.PHONY: test-api test-api-% test-smoke test-all uats-setup
+
+# Run all UATS API validation tests
+test-api:
+	@echo "Running UATS API validation (41 endpoints)..."
+	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
+		--spec-dir docs/api-spec/uats/specs/ \
+		--base-url http://localhost:8082 \
+		--report /tmp/api-report.json
+	@echo "Report saved to /tmp/api-report.json"
+
+# Validate single API endpoint
+# Usage: make test-api-health, test-api-retrieve, test-api-ingest
+test-api-%:
+	@echo "Validating $* API..."
+	python3 docs/api-spec/uats/runners/uats_runner.py validate \
+		--spec docs/api-spec/uats/specs/$*.uats.json \
+		--base-url http://localhost:8082
+
+# Smoke tests (health + readiness only)
+test-smoke:
+	@echo "Running smoke tests..."
+	python3 docs/api-spec/uats/runners/uats_runner.py validate \
+		--spec docs/api-spec/uats/specs/health.uats.json \
+		--base-url http://localhost:8082
+	python3 docs/api-spec/uats/runners/uats_runner.py validate \
+		--spec docs/api-spec/uats/specs/readiness.uats.json \
+		--base-url http://localhost:8082
+
+# Run all tests (parsers + API)
+test-all: test-parsers test-api
+	@echo "All tests complete (UPTS + UATS)"
+
+# Install UATS dependencies
+uats-setup:
+	pip install requests jsonpath-ng
+
+# Test with custom base URL
+# Usage: make test-api-remote BASE_URL=https://staging.example.com
+test-api-remote:
+	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
+		--spec-dir docs/api-spec/uats/specs/ \
+		--base-url $(BASE_URL) \
+		--report /tmp/api-report.json

@@ -1,0 +1,123 @@
+{
+  "uats_version": "1.0.0",
+
+  "api": {
+    "name": "Ingest Codebase Job Status",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "operation_id": "getIngestCodebaseJobStatus",
+    "tags": ["memory", "ingest", "codebase", "jobs", "read"]
+  },
+
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Get status and statistics for a running or completed ingest-codebase job",
+    "test_type": "contract",
+    "priority": "high"
+  },
+
+  "config": {
+    "timeout_ms": 5000,
+    "ignore_fields": ["$.stats.duration", "$.stats.rate"]
+  },
+
+  "variables": {
+    "job_id": "nonexistent-job-id"
+  },
+
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/ingest-codebase/{{job_id}}"
+  },
+
+  "expected": {
+    "status": [200, 404],
+    "body_assertions": [
+      {
+        "name": "job_id returned when found",
+        "path": "$.job_id",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "status value when found",
+        "path": "$.status",
+        "in": ["queued", "running", "completed", "failed", "cancelled"],
+        "optional": true
+      },
+      {
+        "name": "error when not found",
+        "path": "$.error",
+        "type": "string",
+        "optional": true
+      }
+    ]
+  },
+
+  "variants": [
+    {
+      "name": "job_found_completed",
+      "description": "Response structure when job is completed",
+      "skip": true,
+      "skip_reason": "Requires actual job_id from previous ingest",
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          { "path": "$.job_id", "type": "string" },
+          { "path": "$.status", "equals": "completed" },
+          { "path": "$.space_id", "type": "string" },
+          { "path": "$.path", "type": "string" },
+          { "path": "$.stats", "type": "object" },
+          { "path": "$.stats.files_found", "type": "integer" },
+          { "path": "$.stats.files_processed", "type": "integer" },
+          { "path": "$.stats.symbols_extracted", "type": "integer" },
+          { "path": "$.stats.errors", "type": "integer" }
+        ]
+      }
+    },
+    {
+      "name": "job_found_running",
+      "description": "Response structure when job is running",
+      "skip": true,
+      "skip_reason": "Requires active running job",
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          { "path": "$.job_id", "type": "string" },
+          { "path": "$.status", "equals": "running" },
+          { "path": "$.stats.files_processed", "type": "integer" },
+          { "path": "$.stats.rate", "type": "number", "optional": true }
+        ]
+      }
+    },
+    {
+      "name": "job_not_found",
+      "description": "Should return 404 for non-existent job",
+      "variables": {
+        "job_id": "definitely-not-a-real-job-id-12345"
+      },
+      "expected": {
+        "status": 404,
+        "body_assertions": [
+          { "path": "$.error", "contains": "not found" }
+        ]
+      }
+    },
+    {
+      "name": "empty_job_id",
+      "description": "Empty job_id should list all jobs",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/ingest-codebase"
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          { "path": "$.jobs", "type": "array" }
+        ]
+      }
+    }
+  ]
+}

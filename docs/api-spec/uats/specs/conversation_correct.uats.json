@@ -1,0 +1,44 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Record Correction",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "correct",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Record Correction endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/correct",
+    "body": {
+      "space_id": "{{test_space}}",
+      "session_id": "uats-session",
+      "original": "wrong info",
+      "correction": "correct info"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": []
+  }
+}

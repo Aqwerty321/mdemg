@@ -1,0 +1,46 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Freeze Learning",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "learning",
+      "freeze",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Freeze Learning endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/learning/freeze",
+    "body": {
+      "space_id": "{{test_space}}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.frozen",
+        "type": "boolean"
+      }
+    ]
+  }
+}

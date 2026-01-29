@@ -1,0 +1,47 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Symbol Search",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "symbols",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Symbol Search endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/symbols",
+    "body": {
+      "space_id": "{{test_space}}",
+      "query": "function"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.symbols",
+        "type": "array"
+      }
+    ]
+  }
+}

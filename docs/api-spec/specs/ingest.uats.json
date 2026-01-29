@@ -1,0 +1,82 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Ingest Memory",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "ingest",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Ingest Memory endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/ingest",
+    "body": {
+      "space_id": "{{test_space}}",
+      "timestamp": "2026-01-29T00:00:00Z",
+      "source": "uats-runner",
+      "content": "Test content for UATS validation"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": [
+      200,
+      201
+    ],
+    "body_assertions": [
+      {
+        "path": "$.node_id",
+        "type": "string"
+      },
+      {
+        "path": "$.space_id",
+        "equals": "{{test_space}}"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_content",
+      "request": {
+        "body": {
+          "space_id": "{{test_space}}",
+          "source": "test"
+        }
+      },
+      "expected": {
+        "status": 400
+      }
+    },
+    {
+      "name": "missing_source",
+      "request": {
+        "body": {
+          "space_id": "{{test_space}}",
+          "content": "test"
+        }
+      },
+      "expected": {
+        "status": 400
+      }
+    }
+  ]
+}

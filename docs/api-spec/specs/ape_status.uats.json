@@ -1,0 +1,40 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "APE Status",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "ape",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates APE Status endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/ape/status"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.running",
+        "type": "boolean"
+      }
+    ]
+  }
+}

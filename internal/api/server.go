@@ -404,6 +404,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversation/volatile/stats", s.handleVolatileStats)
 	mux.HandleFunc("/v1/conversation/graduate", s.handleProcessGraduations)
 
+	// Codebase ingestion endpoint
+	mux.HandleFunc("/v1/memory/ingest-codebase", s.handleIngestCodebaseRoute)
+	mux.HandleFunc("/v1/memory/ingest-codebase/", s.handleIngestCodebaseRoute)
+
 	// Wrap mux with middleware stack
 	// Order: compression (outermost) -> logging (innermost)
 	logCfg := LogConfig{

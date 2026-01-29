@@ -1,9 +1,10 @@
 package languages
 
 import (
-	"encoding/json"
+	"bufio"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -19,18 +20,20 @@ func (p *JSONParser) Name() string {
 }
 
 func (p *JSONParser) Extensions() []string {
-	return []string{".json", ".jsonl", ".ndjson"}
+	return []string{".json", ".jsonc", ".json5", ".jsonl", ".ndjson"}
 }
 
 func (p *JSONParser) CanParse(path string) bool {
 	pathLower := strings.ToLower(path)
-	return strings.HasSuffix(pathLower, ".json") ||
-		strings.HasSuffix(pathLower, ".jsonl") ||
-		strings.HasSuffix(pathLower, ".ndjson")
+	for _, ext := range p.Extensions() {
+		if strings.HasSuffix(pathLower, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *JSONParser) IsTestFile(path string) bool {
-	// JSON files are typically not test files, but check for test fixtures
 	pathLower := strings.ToLower(path)
 	return strings.Contains(pathLower, "/fixtures/") ||
 		strings.Contains(pathLower, "/testdata/") ||
@@ -51,62 +54,24 @@ func (p *JSONParser) ParseFile(root, path string, extractSymbols bool) ([]CodeEl
 	// Check if this is a JSONL (JSON Lines) file
 	isJSONL := strings.HasSuffix(pathLower, ".jsonl") || strings.HasSuffix(pathLower, ".ndjson")
 
-	// Build content for embedding
-	var contentBuilder strings.Builder
-
 	// Detect file type based on filename
 	jsonKind := p.detectJsonKind(fileName)
 
-	var jsonData interface{}
-	var jsonErr error
+	// Build content for embedding
+	var contentBuilder strings.Builder
+	contentBuilder.WriteString(fmt.Sprintf("JSON file: %s\n", fileName))
+	contentBuilder.WriteString(fmt.Sprintf("Type: %s\n", jsonKind))
 
-	if isJSONL {
-		// Handle JSONL: each line is a separate JSON object
-		contentBuilder.WriteString(fmt.Sprintf("JSONL file: %s\n", fileName))
-		contentBuilder.WriteString(fmt.Sprintf("Type: %s\n", jsonKind))
-
-		lines := strings.Split(strings.TrimSpace(content), "\n")
-		contentBuilder.WriteString(fmt.Sprintf("Records: %d\n", len(lines)))
-
-		// Parse first non-empty line to get structure
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-			jsonErr = json.Unmarshal([]byte(line), &jsonData)
-			if jsonErr == nil {
-				keys := p.extractTopLevelKeys(jsonData)
-				if len(keys) > 0 {
-					contentBuilder.WriteString(fmt.Sprintf("Record fields: %s\n", strings.Join(keys, ", ")))
-				}
-			}
-			break
-		}
-	} else {
-		// Handle regular JSON
-		contentBuilder.WriteString(fmt.Sprintf("JSON file: %s\n", fileName))
-		contentBuilder.WriteString(fmt.Sprintf("Type: %s\n", jsonKind))
-
-		jsonErr = json.Unmarshal([]byte(content), &jsonData)
-
-		// Extract structure info if valid JSON
-		if jsonErr == nil {
-			keys := p.extractTopLevelKeys(jsonData)
-			if len(keys) > 0 {
-				if len(keys) > 20 {
-					keys = keys[:20]
-					contentBuilder.WriteString(fmt.Sprintf("Top-level keys: %s (and more)\n", strings.Join(keys, ", ")))
-				} else {
-					contentBuilder.WriteString(fmt.Sprintf("Top-level keys: %s\n", strings.Join(keys, ", ")))
-				}
-			}
+	// Extract symbols with line numbers
+	var symbols []Symbol
+	if extractSymbols {
+		if isJSONL {
+			symbols = p.extractJSONLSymbols(content)
 		} else {
-			contentBuilder.WriteString("Warning: Invalid JSON\n")
+			symbols = p.extractSymbols(content)
 		}
 	}
 
-	// Include actual content (truncated)
 	contentBuilder.WriteString("\n--- Content ---\n")
 	contentBuilder.WriteString(TruncateContent(content, 4000))
 
@@ -115,22 +80,17 @@ func (p *JSONParser) ParseFile(root, path string, extractSymbols bool) ([]CodeEl
 	tags := []string{"json", "config", jsonKind}
 	tags = append(tags, concerns...)
 
-	// Extract symbols (key-value pairs for config files)
-	var symbols []Symbol
-	if extractSymbols && jsonErr == nil {
-		symbols = p.extractSymbols(jsonData, "")
-	}
-
 	element := CodeElement{
-		Name:     fileName,
-		Kind:     jsonKind,
-		Path:     "/" + relPath,
-		Content:  contentBuilder.String(),
-		Package:  "config",
-		FilePath: relPath,
-		Tags:     tags,
-		Concerns: concerns,
-		Symbols:  symbols,
+		Name:        fileName,
+		Kind:        jsonKind,
+		Path:        "/" + relPath,
+		Content:     contentBuilder.String(),
+		Package:     "config",
+		FilePath:    relPath,
+		Tags:        tags,
+		Concerns:    concerns,
+		Symbols:     symbols,
+		ElementKind: "file",
 	}
 
 	return []CodeElement{element}, nil
@@ -147,9 +107,6 @@ func (p *JSONParser) detectJsonKind(fileName string) string {
 		if strings.Contains(fileNameLower, "event") {
 			return "json-events"
 		}
-		if strings.Contains(fileNameLower, "answer") || strings.Contains(fileNameLower, "result") {
-			return "json-results"
-		}
 		return "json-lines"
 	}
 
@@ -160,8 +117,6 @@ func (p *JSONParser) detectJsonKind(fileName string) string {
 		return "typescript-config"
 	case fileNameLower == "composer.json":
 		return "composer-package"
-	case fileNameLower == "cargo.json":
-		return "cargo-config"
 	case strings.HasPrefix(fileNameLower, ".eslint"):
 		return "eslint-config"
 	case strings.HasPrefix(fileNameLower, ".prettier"):
@@ -177,73 +132,191 @@ func (p *JSONParser) detectJsonKind(fileName string) string {
 	}
 }
 
-func (p *JSONParser) extractTopLevelKeys(data interface{}) []string {
-	var keys []string
+// Regex patterns for JSON line-by-line parsing
+var (
+	// Match "key": at start of line (with optional whitespace)
+	jsonKeyRegex = regexp.MustCompile(`^\s*"([^"]+)"\s*:`)
+	// Match simple values: "key": "value" or "key": number or "key": true/false/null
+	jsonStringValueRegex = regexp.MustCompile(`^\s*"([^"]+)"\s*:\s*"([^"]*)"`)
+	jsonNumberValueRegex = regexp.MustCompile(`^\s*"([^"]+)"\s*:\s*(-?[\d.]+)`)
+	jsonBoolValueRegex   = regexp.MustCompile(`^\s*"([^"]+)"\s*:\s*(true|false|null)`)
+	// Match object start: "key": {
+	jsonObjectStartRegex = regexp.MustCompile(`^\s*"([^"]+)"\s*:\s*\{`)
+	// Match array start: "key": [
+	jsonArrayStartRegex = regexp.MustCompile(`^\s*"([^"]+)"\s*:\s*\[`)
+)
 
-	switch v := data.(type) {
-	case map[string]interface{}:
-		for k := range v {
-			keys = append(keys, k)
-		}
-	case []interface{}:
-		// For arrays, look at first element if it's an object
-		if len(v) > 0 {
-			if obj, ok := v[0].(map[string]interface{}); ok {
-				for k := range obj {
-					keys = append(keys, k)
+func (p *JSONParser) extractSymbols(content string) []Symbol {
+	var symbols []Symbol
+	var sectionStack []string
+	braceDepth := 0
+	bracketDepth := 0
+
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	lineNum := 0
+
+	for scanner.Scan() {
+		lineNum++
+		line := scanner.Text()
+
+		// Track brace depth for sections
+		openBraces := strings.Count(line, "{")
+		closeBraces := strings.Count(line, "}")
+		openBrackets := strings.Count(line, "[")
+		closeBrackets := strings.Count(line, "]")
+
+		// Pop sections when closing braces
+		for i := 0; i < closeBraces && len(sectionStack) > 0; i++ {
+			if braceDepth > 0 {
+				braceDepth--
+				if braceDepth < len(sectionStack) {
+					sectionStack = sectionStack[:braceDepth]
 				}
 			}
 		}
+
+		bracketDepth += openBrackets - closeBrackets
+		if bracketDepth < 0 {
+			bracketDepth = 0
+		}
+
+		// Get current parent
+		parent := ""
+		if len(sectionStack) > 0 {
+			parent = sectionStack[len(sectionStack)-1]
+		}
+
+		// Check for object start "key": {
+		if matches := jsonObjectStartRegex.FindStringSubmatch(line); matches != nil {
+			key := matches[1]
+			fullKey := key
+			if parent != "" {
+				fullKey = parent + "." + key
+			}
+
+			symbols = append(symbols, Symbol{
+				Name:     fullKey,
+				Type:     "section",
+				Line:     lineNum,
+				Parent:   parent,
+				Exported: true,
+				Language: "json",
+			})
+
+			sectionStack = append(sectionStack, fullKey)
+			braceDepth++
+			continue
+		}
+
+		// Check for array start "key": [
+		if matches := jsonArrayStartRegex.FindStringSubmatch(line); matches != nil {
+			key := matches[1]
+			fullKey := key
+			if parent != "" {
+				fullKey = parent + "." + key
+			}
+
+			symbols = append(symbols, Symbol{
+				Name:     fullKey,
+				Type:     "section",
+				Line:     lineNum,
+				Parent:   parent,
+				Exported: true,
+				Language: "json",
+			})
+			continue
+		}
+
+		// Check for string value
+		if matches := jsonStringValueRegex.FindStringSubmatch(line); matches != nil {
+			key := matches[1]
+			value := matches[2]
+			fullKey := key
+			if parent != "" {
+				fullKey = parent + "." + key
+			}
+
+			// Only include reasonably short values
+			if len(value) < 500 {
+				symbols = append(symbols, Symbol{
+					Name:     fullKey,
+					Type:     "constant",
+					Line:     lineNum,
+					Value:    value,
+					Parent:   parent,
+					Exported: true,
+					Language: "json",
+				})
+			}
+			continue
+		}
+
+		// Check for number value
+		if matches := jsonNumberValueRegex.FindStringSubmatch(line); matches != nil {
+			key := matches[1]
+			value := matches[2]
+			fullKey := key
+			if parent != "" {
+				fullKey = parent + "." + key
+			}
+
+			symbols = append(symbols, Symbol{
+				Name:     fullKey,
+				Type:     "constant",
+				Line:     lineNum,
+				Value:    value,
+				Parent:   parent,
+				Exported: true,
+				Language: "json",
+			})
+			continue
+		}
+
+		// Check for bool/null value
+		if matches := jsonBoolValueRegex.FindStringSubmatch(line); matches != nil {
+			key := matches[1]
+			value := matches[2]
+			fullKey := key
+			if parent != "" {
+				fullKey = parent + "." + key
+			}
+
+			symbols = append(symbols, Symbol{
+				Name:     fullKey,
+				Type:     "constant",
+				Line:     lineNum,
+				Value:    value,
+				Parent:   parent,
+				Exported: true,
+				Language: "json",
+			})
+			continue
+		}
+
+		// Update brace depth for opening braces (that weren't part of object start)
+		braceDepth += openBraces
 	}
 
-	return keys
+	return symbols
 }
 
-func (p *JSONParser) extractSymbols(data interface{}, prefix string) []Symbol {
+func (p *JSONParser) extractJSONLSymbols(content string) []Symbol {
 	var symbols []Symbol
 
-	switch v := data.(type) {
-	case map[string]interface{}:
-		for key, val := range v {
-			fullKey := key
-			if prefix != "" {
-				fullKey = prefix + "." + key
-			}
-
-			// Extract string/number/bool values as symbols
-			switch value := val.(type) {
-			case string:
-				if len(value) < 200 { // Only short values
-					symbols = append(symbols, Symbol{
-						Name:     fullKey,
-						Type:     "config-value",
-						Value:    value,
-						Exported: true,
-						Language: "json",
-					})
-				}
-			case float64:
+	// For JSONL, just extract keys from first line
+	lines := strings.Split(strings.TrimSpace(content), "\n")
+	if len(lines) > 0 {
+		firstLine := strings.TrimSpace(lines[0])
+		if firstLine != "" {
+			// Simple key extraction from first record
+			for _, match := range jsonKeyRegex.FindAllStringSubmatch(firstLine, -1) {
 				symbols = append(symbols, Symbol{
-					Name:     fullKey,
-					Type:     "config-value",
-					Value:    fmt.Sprintf("%v", value),
+					Name:     match[1],
+					Type:     "constant",
+					Line:     1,
 					Exported: true,
 					Language: "json",
 				})
-			case bool:
-				symbols = append(symbols, Symbol{
-					Name:     fullKey,
-					Type:     "config-value",
-					Value:    fmt.Sprintf("%v", value),
-					Exported: true,
-					Language: "json",
-				})
-			case map[string]interface{}:
-				// Recurse one level for nested configs (but not too deep)
-				if prefix == "" {
-					nested := p.extractSymbols(value, key)
-					symbols = append(symbols, nested...)
-				}
 			}
 		}
 	}

@@ -190,8 +190,8 @@ func main() {
 							Value:          sym.Value,
 							RawValue:       sym.RawValue,
 							FilePath:       relPath,
-							LineNumber:     sym.Line,    // UPTS: Line → LineNumber for storage
-							EndLine:        sym.LineEnd, // UPTS: LineEnd → EndLine for storage
+							Line:           sym.Line,    // UPTS standard
+							LineEnd:        sym.LineEnd, // UPTS standard
 							Exported:       sym.Exported,
 							DocComment:     sym.DocComment,
 							Signature:      sym.Signature,

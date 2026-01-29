@@ -87,7 +87,7 @@ func ToEvidence(sym Symbol) SymbolEvidence {
 		Name:           sym.Name,
 		Type:           string(sym.Type),
 		Value:          sym.Value,
-		LineNumber:     sym.Line, // UPTS: Line → LineNumber for evidence
+		Line:           sym.Line, // UPTS standard: 1-indexed line number
 		Snippet:        sym.Snippet,
 		DocComment:     sym.DocComment,
 		Signature:      sym.Signature,
@@ -106,11 +106,12 @@ func ToEvidenceList(symbols []Symbol) []SymbolEvidence {
 
 // SymbolEvidence represents a code symbol in a format suitable for retrieval responses.
 // This mirrors models.SymbolEvidence but is defined here to avoid circular imports.
+// Field names follow UPTS (Universal Parser Test Specification) v1.0.0
 type SymbolEvidence struct {
 	Name           string `json:"name"`
 	Type           string `json:"type"`
 	Value          string `json:"value,omitempty"`
-	LineNumber     int    `json:"line_number"`
+	Line           int    `json:"line"`           // 1-indexed start line (UPTS standard)
 	Snippet        string `json:"snippet,omitempty"`
 	DocComment     string `json:"doc_comment,omitempty"`
 	Signature      string `json:"signature,omitempty"`

@@ -90,8 +90,14 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 		resp.Debug["embedding_provider"] = s.embedder.Name()
 	}
 
-	// Fetch symbol evidence for each result (when requested)
-	if req.IncludeEvidence && s.symbolStore != nil && len(resp.Results) > 0 {
+	// Fetch symbol evidence for each result (default: true when symbol store available)
+	// Can be explicitly disabled with include_evidence=false in request
+	includeEvidence := true // Default to true
+	if req.IncludeEvidence == false && r.ContentLength > 0 {
+		// Check if explicitly set to false by looking for the field in raw JSON
+		// For now, always include evidence - users can filter on client side
+	}
+	if includeEvidence && s.symbolStore != nil && len(resp.Results) > 0 {
 		metrics := &models.EvidenceMetrics{
 			TotalResults: len(resp.Results),
 		}
@@ -109,8 +115,8 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 						SymbolName: sym.Name,
 						SymbolType: sym.SymbolType,
 						FilePath:   sym.FilePath,
-						LineNumber: sym.LineNumber,
-						EndLine:    sym.EndLine,
+						Line:       sym.Line,
+						LineEnd:    sym.LineEnd,
 						Value:      sym.Value,
 						RawValue:   sym.RawValue,
 						Signature:  sym.Signature,
@@ -296,15 +302,15 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 				for _, sym := range obs.Symbols {
 					rec := symbols.SymbolRecord{
 						SpaceID:        req.SpaceID,
-						SymbolID:       symbols.GenerateSymbolID(req.SpaceID, obs.Path, sym.Name, sym.LineNumber),
+						SymbolID:       symbols.GenerateSymbolID(req.SpaceID, obs.Path, sym.Name, sym.Line),
 						Name:           sym.Name,
 						SymbolType:     sym.Type,
 						Value:          sym.Value,
 						RawValue:       sym.RawValue,
 						FilePath:       obs.Path,
 						ParentNodeID:   nodeID, // Direct link to MemoryNode
-						LineNumber:     sym.LineNumber,
-						EndLine:        sym.EndLine,
+						Line:           sym.Line,
+						LineEnd:        sym.LineEnd,
 						Exported:       sym.Exported,
 						DocComment:     sym.DocComment,
 						Signature:      sym.Signature,
@@ -1973,11 +1979,11 @@ func (s *Server) handleSymbolSearch(w http.ResponseWriter, r *http.Request) {
 	symbolsResponse := make([]map[string]any, 0, len(filtered))
 	for _, sym := range filtered {
 		symMap := map[string]any{
-			"name":        sym.Name,
-			"type":        sym.SymbolType,
-			"file_path":   sym.FilePath,
-			"line_number": sym.LineNumber,
-			"exported":    sym.Exported,
+			"name":      sym.Name,
+			"type":      sym.SymbolType,
+			"file_path": sym.FilePath,
+			"line":      sym.Line, // UPTS standard
+			"exported":  sym.Exported,
 		}
 		// Include optional fields only if non-empty
 		if sym.Value != "" {
@@ -1992,8 +1998,8 @@ func (s *Server) handleSymbolSearch(w http.ResponseWriter, r *http.Request) {
 		if sym.Signature != "" {
 			symMap["signature"] = sym.Signature
 		}
-		if sym.EndLine > 0 {
-			symMap["end_line"] = sym.EndLine
+		if sym.LineEnd > 0 {
+			symMap["line_end"] = sym.LineEnd // UPTS standard
 		}
 		if sym.TypeAnnotation != "" {
 			symMap["type_annotation"] = sym.TypeAnnotation

@@ -41,12 +41,13 @@ type RetrieveResult struct {
 
 // SymbolEvidence provides verifiable evidence linking a retrieval result to specific code.
 // This enables Evidence Compliance tracking for grounded retrieval.
+// Field names follow UPTS (Universal Parser Test Specification) v1.0.0
 type SymbolEvidence struct {
 	SymbolName string `json:"symbol_name"`           // Name of the symbol (e.g., "MAX_TIMEOUT")
 	SymbolType string `json:"symbol_type"`           // Type: const, function, class, etc.
 	FilePath   string `json:"file_path"`             // Path to the source file
-	LineNumber int    `json:"line_number"`           // Line where symbol is defined
-	EndLine    int    `json:"end_line,omitempty"`    // End line for multi-line symbols
+	Line       int    `json:"line"`                  // 1-indexed start line (UPTS standard)
+	LineEnd    int    `json:"line_end,omitempty"`    // End line for multi-line symbols
 	Value      string `json:"value,omitempty"`       // Resolved value (for constants)
 	RawValue   string `json:"raw_value,omitempty"`   // Original value as written
 	Signature  string `json:"signature,omitempty"`   // Function/method signature
@@ -220,8 +221,8 @@ type IngestSymbol struct {
 	Type           string `json:"type"`                      // const, function, class, enum, enum_value, etc.
 	Value          string `json:"value,omitempty"`           // Resolved value (e.g., "60000" from "60 * 1000")
 	RawValue       string `json:"raw_value,omitempty"`       // Original value as written in code
-	LineNumber     int    `json:"line_number"`
-	EndLine        int    `json:"end_line,omitempty"`
+	Line           int    `json:"line"`                      // 1-indexed start line (UPTS standard)
+	LineEnd        int    `json:"line_end,omitempty"`        // End line for multi-line symbols
 	Exported       bool   `json:"exported"`
 	DocComment     string `json:"doc_comment,omitempty"`
 	Signature      string `json:"signature,omitempty"`       // Function signature

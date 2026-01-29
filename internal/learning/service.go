@@ -233,9 +233,16 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 
 	// Build pair updates (cap to config)
 	// Generate all O(n²) candidate pairs with their activation products
+	// VectorSim floor: only create edges between nodes with strong semantic match
+	const vectorSimFloor = 0.5
 	pairs := make([]pair, 0)
 	for i := 0; i < len(nodes); i++ {
 		for j := i + 1; j < len(nodes); j++ {
+			// Skip pairs where either node has weak vector similarity to the query.
+			// This prevents spurious edges between nodes that only matched via BM25.
+			if nodes[i].VectorSim < vectorSimFloor || nodes[j].VectorSim < vectorSimFloor {
+				continue
+			}
 			ps := pathPrefixSimilarity(nodes[i].Path, nodes[j].Path)
 			pairs = append(pairs, pair{src: nodes[i].NodeID, dst: nodes[j].NodeID, ai: nodes[i].Activation, aj: nodes[j].Activation, pathSim: ps})
 		}

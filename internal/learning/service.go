@@ -218,6 +218,11 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 		if r.Layer > 0 {
 			continue // Skip hidden/concept nodes
 		}
+		// Skip migration files - they co-activate with many unrelated code elements
+		// and become hubs that pollute activation spreading (64+ edges observed).
+		if isMigrationFile(r.Path) {
+			continue
+		}
 		if r.Activation >= minAct && !isStopWord(r.Name) {
 			nodes = append(nodes, r)
 		}
@@ -584,6 +589,16 @@ func isStopWord(name string) bool {
 		return true
 	}
 	return stopWords[n]
+}
+
+// isMigrationFile returns true if the path indicates a database migration file.
+// Migrations co-activate with many unrelated code elements and become hubs.
+func isMigrationFile(path string) bool {
+	p := strings.ToLower(path)
+	return strings.Contains(p, "/migrations/") ||
+		strings.Contains(p, "/migration/") ||
+		strings.HasSuffix(p, ".migration.ts") ||
+		strings.HasSuffix(p, ".migration.sql")
 }
 
 func clamp01(x float64) float64 {

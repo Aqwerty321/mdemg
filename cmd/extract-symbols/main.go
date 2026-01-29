@@ -268,8 +268,43 @@ func runJSONMode(filePath string) {
 
 	ctx := context.Background()
 	result, err := svc.ParseFile(ctx, filePath)
-	if err != nil {
-		log.Fatalf("Failed to parse file: %v", err)
+
+	// If tree-sitter fails or returns no symbols, try fallback parser
+	treeSitterFailed := err != nil || (result != nil && len(result.Symbols) == 0) || result == nil
+	if treeSitterFailed {
+		fallbackSymbols, handled, fallbackErr := TryFallbackParser(filePath)
+		if handled {
+			if fallbackErr != nil {
+				log.Fatalf("Fallback parser error: %v", fallbackErr)
+			}
+			// Use fallback symbols
+			output := UPTSOutput{
+				Symbols: make([]UPTSSymbol, 0, len(fallbackSymbols)),
+			}
+			for _, sym := range fallbackSymbols {
+				uptsSymbol := UPTSSymbol{
+					Name:       sym.Name,
+					Type:       normalizeType(sym.Type),
+					Line:       sym.Line,
+					Exported:   sym.Exported,
+					Parent:     sym.Parent,
+					Signature:  sym.Signature,
+					Value:      sym.Value,
+					DocComment: sym.DocComment,
+				}
+				output.Symbols = append(output.Symbols, uptsSymbol)
+			}
+			jsonBytes, jsonErr := json.MarshalIndent(output, "", "  ")
+			if jsonErr != nil {
+				log.Fatalf("Failed to marshal JSON: %v", jsonErr)
+			}
+			fmt.Println(string(jsonBytes))
+			return
+		}
+		// If fallback didn't handle it and tree-sitter had an error, fail
+		if err != nil {
+			log.Fatalf("Failed to parse file: %v", err)
+		}
 	}
 
 	output := UPTSOutput{

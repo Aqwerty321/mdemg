@@ -1,0 +1,186 @@
+{
+  "upts_version": "1.0.0",
+  "language": "cuda",
+  "variants": [
+    ".cu",
+    ".cuh"
+  ],
+  "metadata": {
+    "author": "auto-generated",
+    "created": "2026-01-29",
+    "description": "CUDA parser spec - generated from actual parser output"
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_parent": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/cuda_test_fixture.cu",
+    "sha256": "ea83b19afdd6d457c6db08e6c7fffc10253589a924b9e8b0346ae0f9df2c54b6"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 20,
+      "max": 35
+    },
+    "symbols": [
+      {
+        "name": "BLOCK_SIZE",
+        "type": "macro",
+        "line": 14,
+        "exported": true,
+        "value": "256"
+      },
+      {
+        "name": "MAX_THREADS",
+        "type": "macro",
+        "line": 15,
+        "exported": true,
+        "value": "1024"
+      },
+      {
+        "name": "WARP_SIZE",
+        "type": "macro",
+        "line": 16,
+        "exported": true,
+        "value": "32"
+      },
+      {
+        "name": "SHARED_MEM_SIZE",
+        "type": "macro",
+        "line": 17,
+        "exported": true,
+        "value": "49152"
+      },
+      {
+        "name": "NUM_STREAMS",
+        "type": "constant",
+        "line": 25,
+        "exported": true
+      },
+      {
+        "name": "BUFFER_SIZE",
+        "type": "constant",
+        "line": 26,
+        "exported": true
+      },
+      {
+        "name": "Vector3",
+        "type": "function",
+        "line": 37,
+        "exported": true
+      },
+      {
+        "name": "__align__",
+        "type": "struct",
+        "line": 37,
+        "exported": true
+      },
+      {
+        "name": "magnitude",
+        "type": "function",
+        "line": 40,
+        "exported": true
+      },
+      {
+        "name": "Particle",
+        "type": "struct",
+        "line": 46,
+        "exported": true
+      },
+      {
+        "name": "SimulationParams",
+        "type": "struct",
+        "line": 54,
+        "exported": true
+      },
+      {
+        "name": "val",
+        "type": "function",
+        "line": 63,
+        "exported": true
+      },
+      {
+        "name": "b",
+        "type": "function",
+        "line": 68,
+        "exported": true
+      },
+      {
+        "name": "params",
+        "type": "function",
+        "line": 76,
+        "exported": true
+      },
+      {
+        "name": "n",
+        "type": "function",
+        "line": 87,
+        "exported": true
+      },
+      {
+        "name": "K",
+        "type": "function",
+        "line": 96,
+        "exported": true
+      },
+      {
+        "name": "numIterations",
+        "type": "function",
+        "line": 112,
+        "exported": true
+      },
+      {
+        "name": "n",
+        "type": "function",
+        "line": 129,
+        "exported": true
+      },
+      {
+        "name": "n",
+        "type": "function",
+        "line": 151,
+        "exported": true
+      },
+      {
+        "name": "size",
+        "type": "function",
+        "line": 160,
+        "exported": true
+      },
+      {
+        "name": "ptr",
+        "type": "function",
+        "line": 164,
+        "exported": true
+      },
+      {
+        "name": "count",
+        "type": "function",
+        "line": 170,
+        "exported": true
+      },
+      {
+        "name": "count",
+        "type": "function",
+        "line": 175,
+        "exported": true
+      },
+      {
+        "name": "tensorCoreOperation",
+        "type": "function",
+        "line": 182,
+        "exported": true
+      },
+      {
+        "name": "asyncCopyOperation",
+        "type": "function",
+        "line": 188,
+        "exported": true
+      }
+    ]
+  }
+}

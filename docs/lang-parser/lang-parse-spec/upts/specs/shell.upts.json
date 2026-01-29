@@ -1,0 +1,207 @@
+{
+  "upts_version": "1.0.0",
+  "language": "shell",
+  "variants": [
+    ".sh",
+    ".bash",
+    ".zsh"
+  ],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Shell parser - bash/sh scripts, CI scripts, build scripts",
+    "parser_status": "planned",
+    "tags": [
+      "config",
+      "phase1",
+      "scripting"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_value": true,
+    "validate_parent": false
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/shell_test_fixture.sh",
+    "sha256": "0cd775d362c839e96d2beff3f8618c113b2fcc08e3e5287ed9b30e9c9cf07c52"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 15,
+      "max": 25
+    },
+    "symbols": [
+      {
+        "name": "APP_NAME",
+        "type": "constant",
+        "line": 8,
+        "exported": true,
+        "value": "mdemg-parser",
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "export",
+          "string"
+        ]
+      },
+      {
+        "name": "APP_VERSION",
+        "type": "constant",
+        "line": 9,
+        "exported": true,
+        "value": "1.0.0",
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "export",
+          "string"
+        ]
+      },
+      {
+        "name": "DEBUG",
+        "type": "constant",
+        "line": 10,
+        "exported": true,
+        "value": "true",
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "export",
+          "boolean"
+        ]
+      },
+      {
+        "name": "MAX_RETRIES",
+        "type": "constant",
+        "line": 12,
+        "exported": true,
+        "value": "3",
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "export",
+          "integer"
+        ]
+      },
+      {
+        "name": "CONFIG_FILE",
+        "type": "constant",
+        "line": 16,
+        "exported": false,
+        "value": "/etc/app/config.yaml",
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "readonly",
+          "path"
+        ]
+      },
+      {
+        "name": "DATA_DIR",
+        "type": "constant",
+        "line": 17,
+        "exported": false,
+        "value": "/var/lib/app",
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "readonly",
+          "path"
+        ]
+      },
+      {
+        "name": "log_info",
+        "type": "function",
+        "line": 23,
+        "pattern": "P2_FUNCTION",
+        "tags": [
+          "function"
+        ]
+      },
+      {
+        "name": "log_error",
+        "type": "function",
+        "line": 28,
+        "pattern": "P2_FUNCTION",
+        "tags": [
+          "function"
+        ]
+      },
+      {
+        "name": "check_dependencies",
+        "type": "function",
+        "line": 33,
+        "pattern": "P2_FUNCTION",
+        "tags": [
+          "function"
+        ]
+      },
+      {
+        "name": "setup_environment",
+        "type": "function",
+        "line": 41,
+        "pattern": "P2_FUNCTION",
+        "tags": [
+          "function"
+        ]
+      },
+      {
+        "name": "start_service",
+        "type": "function",
+        "line": 50,
+        "pattern": "P2_FUNCTION",
+        "tags": [
+          "function"
+        ]
+      },
+      {
+        "name": "stop_service",
+        "type": "function",
+        "line": 66,
+        "pattern": "P2_FUNCTION",
+        "tags": [
+          "function"
+        ]
+      },
+      {
+        "name": "health_check",
+        "type": "function",
+        "line": 80,
+        "pattern": "P2_FUNCTION",
+        "tags": [
+          "function"
+        ]
+      },
+      {
+        "name": "main",
+        "type": "function",
+        "line": 101,
+        "pattern": "P2_FUNCTION",
+        "tags": [
+          "function",
+          "entrypoint"
+        ]
+      }
+    ],
+    "excluded": [
+      {
+        "name": "config",
+        "reason": "local variable in function"
+      },
+      {
+        "name": "port",
+        "reason": "local variable in function"
+      },
+      {
+        "name": "pid",
+        "reason": "local variable in function"
+      },
+      {
+        "name": "command",
+        "reason": "local variable in function"
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P2_FUNCTION"
+  ]
+}

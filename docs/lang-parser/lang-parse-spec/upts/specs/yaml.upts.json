@@ -1,0 +1,271 @@
+{
+  "upts_version": "1.0.0",
+  "language": "yaml",
+  "variants": [
+    ".yml",
+    ".yaml"
+  ],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "YAML parser - config files, GHA, K8s, docker-compose",
+    "parser_status": "planned",
+    "tags": [
+      "config",
+      "phase1",
+      "critical"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_signature": false,
+    "validate_value": true,
+    "validate_parent": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/yaml_test_fixture.yaml",
+    "sha256": "9ced66e581079df25a0b52feb259b1e42374ed284aff22c07ceb29e7d8852c05"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 25,
+      "max": 40
+    },
+    "symbols": [
+      {
+        "name": "name",
+        "type": "constant",
+        "line": 7,
+        "value": "test-project",
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "top-level",
+          "string"
+        ]
+      },
+      {
+        "name": "version",
+        "type": "constant",
+        "line": 8,
+        "value": "1.0.0",
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "top-level",
+          "string"
+        ]
+      },
+      {
+        "name": "debug",
+        "type": "constant",
+        "line": 9,
+        "value": "true",
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "top-level",
+          "boolean"
+        ]
+      },
+      {
+        "name": "max_retries",
+        "type": "constant",
+        "line": 10,
+        "value": "3",
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "top-level",
+          "integer"
+        ]
+      },
+      {
+        "name": "database",
+        "type": "section",
+        "line": 14,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": [
+          "nested",
+          "mapping"
+        ]
+      },
+      {
+        "name": "database.host",
+        "type": "constant",
+        "line": 15,
+        "value": "localhost",
+        "parent": "database",
+        "tags": [
+          "nested",
+          "string"
+        ]
+      },
+      {
+        "name": "database.port",
+        "type": "constant",
+        "line": 16,
+        "value": "5432",
+        "parent": "database",
+        "tags": [
+          "nested",
+          "integer"
+        ]
+      },
+      {
+        "name": "defaults",
+        "type": "section",
+        "line": 22,
+        "tags": [
+          "anchor",
+          "mapping"
+        ],
+        "doc_comment": "anchor: defaults"
+      },
+      {
+        "name": "development",
+        "type": "section",
+        "line": 26,
+        "tags": [
+          "alias",
+          "mapping"
+        ],
+        "doc_comment": "merges: defaults"
+      },
+      {
+        "name": "production",
+        "type": "section",
+        "line": 31,
+        "tags": [
+          "alias",
+          "mapping"
+        ],
+        "doc_comment": "merges: defaults"
+      },
+      {
+        "name": "features",
+        "type": "section",
+        "line": 37,
+        "tags": [
+          "array",
+          "list"
+        ]
+      },
+      {
+        "name": "jobs",
+        "type": "section",
+        "line": 44,
+        "tags": [
+          "gha",
+          "mapping"
+        ]
+      },
+      {
+        "name": "jobs.build",
+        "type": "section",
+        "line": 45,
+        "parent": "jobs",
+        "tags": [
+          "gha",
+          "job"
+        ]
+      },
+      {
+        "name": "jobs.deploy",
+        "type": "section",
+        "line": 58,
+        "parent": "jobs",
+        "tags": [
+          "gha",
+          "job"
+        ]
+      },
+      {
+        "name": "apiVersion",
+        "type": "constant",
+        "line": 64,
+        "value": "v1",
+        "tags": [
+          "k8s",
+          "top-level"
+        ]
+      },
+      {
+        "name": "kind",
+        "type": "constant",
+        "line": 65,
+        "value": "ConfigMap",
+        "tags": [
+          "k8s",
+          "top-level"
+        ]
+      },
+      {
+        "name": "metadata",
+        "type": "section",
+        "line": 66,
+        "tags": [
+          "k8s",
+          "mapping"
+        ]
+      },
+      {
+        "name": "metadata.name",
+        "type": "constant",
+        "line": 67,
+        "value": "app-config",
+        "parent": "metadata",
+        "tags": [
+          "k8s",
+          "name"
+        ]
+      },
+      {
+        "name": "services",
+        "type": "section",
+        "line": 77,
+        "tags": [
+          "compose",
+          "mapping"
+        ]
+      },
+      {
+        "name": "services.web",
+        "type": "section",
+        "line": 78,
+        "parent": "services",
+        "tags": [
+          "compose",
+          "service"
+        ]
+      },
+      {
+        "name": "services.db",
+        "type": "section",
+        "line": 87,
+        "parent": "services",
+        "tags": [
+          "compose",
+          "service"
+        ]
+      }
+    ],
+    "excluded": [
+      {
+        "name": "steps",
+        "reason": "array items, not named symbols"
+      },
+      {
+        "name": "ports",
+        "reason": "array items"
+      },
+      {
+        "name": "volumes",
+        "reason": "array items"
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P3_CLASS_STRUCT"
+  ]
+}

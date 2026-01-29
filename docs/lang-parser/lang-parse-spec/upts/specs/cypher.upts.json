@@ -1,0 +1,167 @@
+{
+  "upts_version": "1.0.0",
+  "language": "cypher",
+  "variants": [
+    ".cypher",
+    ".cql"
+  ],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Cypher parser - Neo4j queries, MDEMG graph schema introspection",
+    "parser_status": "planned",
+    "tags": [
+      "phase3",
+      "data",
+      "strategic",
+      "mdemg"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/cypher_test_fixture.cypher",
+    "sha256": "496ddcb5ab3dccb69c2fe617e184a315db1b7e0640c083cf6eddfd564b8caf9c"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 12,
+      "max": 25
+    },
+    "symbols": [
+      {
+        "name": "User",
+        "type": "label",
+        "line": 7,
+        "tags": [
+          "node-label",
+          "constraint"
+        ]
+      },
+      {
+        "name": "Space",
+        "type": "label",
+        "line": 8,
+        "tags": [
+          "node-label",
+          "constraint"
+        ]
+      },
+      {
+        "name": "File",
+        "type": "label",
+        "line": 9,
+        "tags": [
+          "node-label",
+          "constraint",
+          "composite"
+        ]
+      },
+      {
+        "name": "Symbol",
+        "type": "label",
+        "line": 15,
+        "tags": [
+          "node-label",
+          "index"
+        ]
+      },
+      {
+        "name": "user_id",
+        "type": "constraint",
+        "line": 7,
+        "parent": "User",
+        "tags": [
+          "uniqueness"
+        ]
+      },
+      {
+        "name": "user_email",
+        "type": "index",
+        "line": 13,
+        "parent": "User",
+        "tags": [
+          "index"
+        ]
+      },
+      {
+        "name": "file_language",
+        "type": "index",
+        "line": 14,
+        "parent": "File",
+        "tags": [
+          "index"
+        ]
+      },
+      {
+        "name": "symbol_name",
+        "type": "index",
+        "line": 15,
+        "parent": "Symbol",
+        "tags": [
+          "index"
+        ]
+      },
+      {
+        "name": "OWNS",
+        "type": "relationship_type",
+        "line": 41,
+        "tags": [
+          "relationship"
+        ]
+      },
+      {
+        "name": "DEFINES_SYMBOL",
+        "type": "relationship_type",
+        "line": 45,
+        "tags": [
+          "relationship",
+          "mdemg"
+        ]
+      },
+      {
+        "name": "CONTAINS",
+        "type": "relationship_type",
+        "line": 61,
+        "tags": [
+          "relationship"
+        ]
+      },
+      {
+        "name": "CALLS",
+        "type": "relationship_type",
+        "line": 71,
+        "tags": [
+          "relationship",
+          "traversal"
+        ]
+      },
+      {
+        "name": "Chunk",
+        "type": "label",
+        "line": 82,
+        "tags": [
+          "node-label",
+          "mdemg"
+        ]
+      },
+      {
+        "name": "REFERENCES",
+        "type": "relationship_type",
+        "line": 93,
+        "tags": [
+          "relationship",
+          "mdemg"
+        ]
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P3_CLASS_STRUCT",
+    "P4_INTERFACE_TRAIT"
+  ]
+}

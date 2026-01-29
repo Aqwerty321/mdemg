@@ -1,0 +1,162 @@
+{
+  "upts_version": "1.0.0",
+  "language": "json",
+  "variants": [
+    ".json",
+    ".jsonc",
+    ".json5"
+  ],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "JSON parser - package.json, tsconfig.json, VS Code configs",
+    "parser_status": "planned",
+    "tags": [
+      "config",
+      "phase1"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_value": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/json_test_fixture.json",
+    "sha256": "febb89510ce52fc8bf9b13caff0687621230759c118f1a471f08169a648ab512"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 15,
+      "max": 30
+    },
+    "symbols": [
+      {
+        "name": "name",
+        "type": "constant",
+        "line": 2,
+        "value": "test-project",
+        "tags": [
+          "top-level",
+          "string"
+        ]
+      },
+      {
+        "name": "version",
+        "type": "constant",
+        "line": 3,
+        "value": "1.0.0",
+        "tags": [
+          "top-level",
+          "string"
+        ]
+      },
+      {
+        "name": "private",
+        "type": "constant",
+        "line": 6,
+        "value": "true",
+        "tags": [
+          "top-level",
+          "boolean"
+        ]
+      },
+      {
+        "name": "scripts",
+        "type": "section",
+        "line": 8,
+        "tags": [
+          "object"
+        ]
+      },
+      {
+        "name": "scripts.build",
+        "type": "constant",
+        "line": 9,
+        "value": "tsc",
+        "parent": "scripts"
+      },
+      {
+        "name": "scripts.test",
+        "type": "constant",
+        "line": 10,
+        "value": "jest",
+        "parent": "scripts"
+      },
+      {
+        "name": "dependencies",
+        "type": "section",
+        "line": 15,
+        "tags": [
+          "object",
+          "npm"
+        ]
+      },
+      {
+        "name": "dependencies.express",
+        "type": "constant",
+        "line": 16,
+        "value": "^4.18.0",
+        "parent": "dependencies"
+      },
+      {
+        "name": "devDependencies",
+        "type": "section",
+        "line": 21,
+        "tags": [
+          "object",
+          "npm"
+        ]
+      },
+      {
+        "name": "config",
+        "type": "section",
+        "line": 27,
+        "tags": [
+          "object"
+        ]
+      },
+      {
+        "name": "config.port",
+        "type": "constant",
+        "line": 28,
+        "value": "3000",
+        "parent": "config",
+        "tags": [
+          "number"
+        ]
+      },
+      {
+        "name": "config.debug",
+        "type": "constant",
+        "line": 30,
+        "value": "false",
+        "parent": "config",
+        "tags": [
+          "boolean"
+        ]
+      },
+      {
+        "name": "engines",
+        "type": "section",
+        "line": 33,
+        "tags": [
+          "object"
+        ]
+      },
+      {
+        "name": "engines.node",
+        "type": "constant",
+        "line": 34,
+        "value": ">=18.0.0",
+        "parent": "engines"
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P3_CLASS_STRUCT"
+  ]
+}

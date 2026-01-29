@@ -1,0 +1,170 @@
+{
+  "upts_version": "1.0.0",
+  "language": "toml",
+  "variants": [
+    ".toml"
+  ],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "TOML parser - Cargo.toml, pyproject.toml, tool configs",
+    "parser_status": "planned",
+    "tags": [
+      "config",
+      "phase1"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_value": true,
+    "validate_parent": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/toml_test_fixture.toml",
+    "sha256": "2b5b1d149ba8264cee1486897c88a2fef7a3befab286723b1717cfbc4dde3c9c"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 20,
+      "max": 35
+    },
+    "symbols": [
+      {
+        "name": "name",
+        "type": "constant",
+        "line": 7,
+        "value": "test-project",
+        "tags": [
+          "top-level"
+        ]
+      },
+      {
+        "name": "version",
+        "type": "constant",
+        "line": 8,
+        "value": "1.0.0",
+        "tags": [
+          "top-level"
+        ]
+      },
+      {
+        "name": "package",
+        "type": "section",
+        "line": 13,
+        "tags": [
+          "table",
+          "cargo"
+        ]
+      },
+      {
+        "name": "package.name",
+        "type": "constant",
+        "line": 14,
+        "value": "mdemg-parser",
+        "parent": "package"
+      },
+      {
+        "name": "dependencies",
+        "type": "section",
+        "line": 23,
+        "tags": [
+          "table",
+          "cargo"
+        ]
+      },
+      {
+        "name": "dependencies.serde",
+        "type": "constant",
+        "line": 24,
+        "parent": "dependencies",
+        "tags": [
+          "dependency"
+        ]
+      },
+      {
+        "name": "dev-dependencies",
+        "type": "section",
+        "line": 32,
+        "tags": [
+          "table",
+          "cargo"
+        ]
+      },
+      {
+        "name": "features",
+        "type": "section",
+        "line": 38,
+        "tags": [
+          "table",
+          "cargo"
+        ]
+      },
+      {
+        "name": "features.default",
+        "type": "constant",
+        "line": 39,
+        "parent": "features"
+      },
+      {
+        "name": "workspace",
+        "type": "section",
+        "line": 51,
+        "tags": [
+          "table",
+          "cargo"
+        ]
+      },
+      {
+        "name": "project",
+        "type": "section",
+        "line": 59,
+        "tags": [
+          "table",
+          "pyproject"
+        ]
+      },
+      {
+        "name": "tool.ruff",
+        "type": "section",
+        "line": 69,
+        "tags": [
+          "table",
+          "tool"
+        ]
+      },
+      {
+        "name": "tool.ruff.lint",
+        "type": "section",
+        "line": 73,
+        "tags": [
+          "table",
+          "tool"
+        ]
+      },
+      {
+        "name": "bin",
+        "type": "section",
+        "line": 83,
+        "tags": [
+          "array-of-tables"
+        ],
+        "doc_comment": "array of tables, 2 entries"
+      },
+      {
+        "name": "test",
+        "type": "section",
+        "line": 87,
+        "tags": [
+          "array-of-tables"
+        ]
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P3_CLASS_STRUCT"
+  ]
+}

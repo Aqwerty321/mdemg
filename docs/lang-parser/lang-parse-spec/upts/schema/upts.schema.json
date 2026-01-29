@@ -130,13 +130,17 @@
         "name": { "type": "string" },
         "type": {
           "type": "string",
-          "enum": ["constant", "function", "class", "method", "interface", "enum", "type", "struct", "trait", "macro", "kernel", "variable", "field"]
+          "enum": [
+            "constant", "function", "class", "method", "interface", "enum", "type", "struct", "trait",
+            "macro", "kernel", "variable", "field", "module", "namespace",
+            "table", "column", "index", "view", "trigger", "constraint",
+            "label", "relationship_type", "section"
+          ]
         },
         "line": { "type": "integer", "minimum": 1 },
         "line_end": { "type": "integer", "minimum": 1 },
         "exported": { "type": "boolean" },
-        "parent": { "type": "string", "description": "Owning class/struct for methods" },
-        "extends": { "type": "string", "description": "Base class/interface for inheritance" },
+        "parent": { "type": "string" },
         "signature": { "type": "string" },
         "signature_contains": { "type": "array", "items": { "type": "string" } },
         "value": { "type": "string" },

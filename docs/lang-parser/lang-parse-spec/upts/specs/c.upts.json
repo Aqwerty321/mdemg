@@ -1,0 +1,283 @@
+{
+  "upts_version": "1.0.0",
+  "language": "c",
+  "variants": [
+    ".c",
+    ".h"
+  ],
+  "metadata": {
+    "author": "auto-generated",
+    "created": "2026-01-29",
+    "description": "C parser spec - generated from actual parser output"
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_parent": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/c_test_fixture.c",
+    "sha256": "4ae54abd13525e397dc32448685ccbbf0c8ee4a8368bc1da1e1d584eba86b59e"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 36,
+      "max": 51
+    },
+    "symbols": [
+      {
+        "name": "TEST_FIXTURE_H",
+        "type": "macro",
+        "line": 8,
+        "exported": true
+      },
+      {
+        "name": "MAX_RETRIES",
+        "type": "macro",
+        "line": 17,
+        "exported": true,
+        "value": "3"
+      },
+      {
+        "name": "DEFAULT_TIMEOUT",
+        "type": "macro",
+        "line": 18,
+        "exported": true,
+        "value": "30"
+      },
+      {
+        "name": "API_VERSION",
+        "type": "macro",
+        "line": 19,
+        "exported": true,
+        "value": "\"1.0.0\""
+      },
+      {
+        "name": "DEBUG_MODE",
+        "type": "macro",
+        "line": 20,
+        "exported": true,
+        "value": "1"
+      },
+      {
+        "name": "BUFFER_SIZE",
+        "type": "macro",
+        "line": 23,
+        "exported": true,
+        "value": "1024"
+      },
+      {
+        "name": "MIN",
+        "type": "macro",
+        "line": 24,
+        "exported": true
+      },
+      {
+        "name": "MAX",
+        "type": "macro",
+        "line": 25,
+        "exported": true
+      },
+      {
+        "name": "STRINGIFY",
+        "type": "macro",
+        "line": 26,
+        "exported": true
+      },
+      {
+        "name": "UserId",
+        "type": "type",
+        "line": 30,
+        "exported": true
+      },
+      {
+        "name": "String",
+        "type": "type",
+        "line": 31,
+        "exported": true
+      },
+      {
+        "name": "ItemList",
+        "type": "type",
+        "line": 32,
+        "exported": true
+      },
+      {
+        "name": "Item",
+        "type": "struct",
+        "line": 32,
+        "exported": true
+      },
+      {
+        "name": "Status",
+        "type": "type",
+        "line": 36,
+        "exported": true
+      },
+      {
+        "name": "Priority",
+        "type": "type",
+        "line": 43,
+        "exported": true
+      },
+      {
+        "name": "Priority",
+        "type": "enum",
+        "line": 43,
+        "exported": true
+      },
+      {
+        "name": "User",
+        "type": "type",
+        "line": 51,
+        "exported": true
+      },
+      {
+        "name": "User",
+        "type": "struct",
+        "line": 51,
+        "exported": true
+      },
+      {
+        "name": "Item",
+        "type": "type",
+        "line": 60,
+        "exported": true
+      },
+      {
+        "name": "Item",
+        "type": "struct",
+        "line": 60,
+        "exported": true
+      },
+      {
+        "name": "UserService",
+        "type": "type",
+        "line": 68,
+        "exported": true
+      },
+      {
+        "name": "UserService",
+        "type": "struct",
+        "line": 68,
+        "exported": true
+      },
+      {
+        "name": "InternalCache",
+        "type": "struct",
+        "line": 76,
+        "exported": true
+      },
+      {
+        "name": "InternalCache",
+        "type": "type",
+        "line": 77,
+        "exported": true
+      },
+      {
+        "name": "InternalCache",
+        "type": "struct",
+        "line": 77,
+        "exported": true
+      },
+      {
+        "name": "user",
+        "type": "function",
+        "line": 82,
+        "exported": true
+      },
+      {
+        "name": "user",
+        "type": "function",
+        "line": 83,
+        "exported": true
+      },
+      {
+        "name": "item",
+        "type": "function",
+        "line": 87,
+        "exported": true
+      },
+      {
+        "name": "item",
+        "type": "function",
+        "line": 88,
+        "exported": true
+      },
+      {
+        "name": "service",
+        "type": "function",
+        "line": 92,
+        "exported": true
+      },
+      {
+        "name": "user",
+        "type": "function",
+        "line": 94,
+        "exported": true
+      },
+      {
+        "name": "email",
+        "type": "function",
+        "line": 97,
+        "exported": true
+      },
+      {
+        "name": "count",
+        "type": "function",
+        "line": 99,
+        "exported": true
+      },
+      {
+        "name": "id",
+        "type": "function",
+        "line": 103,
+        "exported": false
+      },
+      {
+        "name": "max",
+        "type": "function",
+        "line": 108,
+        "exported": false
+      },
+      {
+        "name": "email",
+        "type": "function",
+        "line": 116,
+        "exported": true
+      },
+      {
+        "name": "user",
+        "type": "function",
+        "line": 125,
+        "exported": true
+      },
+      {
+        "name": "user",
+        "type": "function",
+        "line": 130,
+        "exported": true
+      },
+      {
+        "name": "email",
+        "type": "function",
+        "line": 135,
+        "exported": true
+      },
+      {
+        "name": "user",
+        "type": "function",
+        "line": 140,
+        "exported": true
+      },
+      {
+        "name": "count",
+        "type": "function",
+        "line": 149,
+        "exported": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "upts_version": "1.0.0",
+  "language": "sql",
+  "variants": [
+    ".sql"
+  ],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "SQL parser - PostgreSQL dialect, tables, views, functions, triggers",
+    "parser_status": "planned",
+    "tags": [
+      "phase3",
+      "data"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_value": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/sql_test_fixture.sql",
+    "sha256": "51c5890b82e74c8d1346aa9d3bd22aec5593fa1dae6f8900a788d48400eb83b7"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 15,
+      "max": 30
+    },
+    "symbols": [
+      {
+        "name": "users",
+        "type": "table",
+        "line": 7,
+        "tags": [
+          "table",
+          "primary"
+        ]
+      },
+      {
+        "name": "users.id",
+        "type": "column",
+        "line": 8,
+        "parent": "users",
+        "doc_comment": "PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "users.status",
+        "type": "column",
+        "line": 11,
+        "parent": "users",
+        "value": "active",
+        "doc_comment": "DEFAULT 'active'"
+      },
+      {
+        "name": "items",
+        "type": "table",
+        "line": 17,
+        "tags": [
+          "table"
+        ]
+      },
+      {
+        "name": "items.value",
+        "type": "column",
+        "line": 21,
+        "parent": "items",
+        "value": "0",
+        "doc_comment": "DEFAULT 0"
+      },
+      {
+        "name": "items.priority",
+        "type": "column",
+        "line": 22,
+        "parent": "items",
+        "value": "medium",
+        "doc_comment": "DEFAULT 'medium'"
+      },
+      {
+        "name": "idx_users_email",
+        "type": "index",
+        "line": 28,
+        "parent": "users",
+        "tags": [
+          "index"
+        ]
+      },
+      {
+        "name": "idx_items_user_id",
+        "type": "index",
+        "line": 30,
+        "parent": "items",
+        "tags": [
+          "index"
+        ]
+      },
+      {
+        "name": "active_users",
+        "type": "view",
+        "line": 34,
+        "tags": [
+          "view"
+        ]
+      },
+      {
+        "name": "user_item_summary",
+        "type": "view",
+        "line": 44,
+        "tags": [
+          "view",
+          "aggregate"
+        ]
+      },
+      {
+        "name": "update_timestamp",
+        "type": "function",
+        "line": 56,
+        "signature": "RETURNS TRIGGER",
+        "tags": [
+          "function",
+          "trigger"
+        ]
+      },
+      {
+        "name": "get_user_items",
+        "type": "function",
+        "line": 65,
+        "signature": "RETURNS TABLE",
+        "tags": [
+          "function",
+          "table-returning"
+        ]
+      },
+      {
+        "name": "priority_level",
+        "type": "enum",
+        "line": 90,
+        "tags": [
+          "enum",
+          "postgres"
+        ]
+      },
+      {
+        "name": "order_number_seq",
+        "type": "constant",
+        "line": 94,
+        "tags": [
+          "sequence"
+        ]
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P2_FUNCTION",
+    "P3_CLASS_STRUCT",
+    "P5_ENUM"
+  ]
+}

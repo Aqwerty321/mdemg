@@ -1,0 +1,199 @@
+{
+  "upts_version": "1.0.0",
+  "language": "ini",
+  "variants": [
+    ".env",
+    ".ini",
+    ".cfg",
+    ".properties"
+  ],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "INI/dotenv parser - environment files, Java properties",
+    "parser_status": "planned",
+    "tags": [
+      "config",
+      "phase1",
+      "simple"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_value": true,
+    "validate_parent": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/ini_test_fixture.env",
+    "sha256": "3f2a7e2ea0be80db78919ee7ab12f8d669191cb2a10bcb9c2563f1076e92621a"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 30,
+      "max": 45
+    },
+    "symbols": [
+      {
+        "name": "APP_NAME",
+        "type": "constant",
+        "line": 7,
+        "value": "test-project",
+        "exported": true,
+        "tags": [
+          "env",
+          "string"
+        ]
+      },
+      {
+        "name": "DEBUG",
+        "type": "constant",
+        "line": 9,
+        "value": "true",
+        "exported": true,
+        "tags": [
+          "env",
+          "boolean"
+        ]
+      },
+      {
+        "name": "PORT",
+        "type": "constant",
+        "line": 11,
+        "value": "3000",
+        "exported": true,
+        "tags": [
+          "env",
+          "integer"
+        ]
+      },
+      {
+        "name": "DATABASE_URL",
+        "type": "constant",
+        "line": 16,
+        "value": "postgres://user:pass@localhost:5432/db",
+        "exported": true,
+        "tags": [
+          "env",
+          "quoted"
+        ]
+      },
+      {
+        "name": "database",
+        "type": "section",
+        "line": 22,
+        "tags": [
+          "ini",
+          "section"
+        ]
+      },
+      {
+        "name": "database.host",
+        "type": "constant",
+        "line": 23,
+        "value": "localhost",
+        "parent": "database",
+        "tags": [
+          "ini"
+        ]
+      },
+      {
+        "name": "database.port",
+        "type": "constant",
+        "line": 24,
+        "value": "5432",
+        "parent": "database",
+        "tags": [
+          "ini",
+          "integer"
+        ]
+      },
+      {
+        "name": "server",
+        "type": "section",
+        "line": 30,
+        "tags": [
+          "ini",
+          "section"
+        ]
+      },
+      {
+        "name": "server.workers",
+        "type": "constant",
+        "line": 33,
+        "value": "4",
+        "parent": "server",
+        "tags": [
+          "ini",
+          "integer"
+        ]
+      },
+      {
+        "name": "logging",
+        "type": "section",
+        "line": 37,
+        "tags": [
+          "ini",
+          "section"
+        ]
+      },
+      {
+        "name": "cache.redis",
+        "type": "section",
+        "line": 45,
+        "tags": [
+          "ini",
+          "nested-section"
+        ]
+      },
+      {
+        "name": "cache.redis.host",
+        "type": "constant",
+        "line": 46,
+        "value": "localhost",
+        "parent": "cache.redis"
+      },
+      {
+        "name": "cache.redis.spring.datasource.url",
+        "type": "constant",
+        "line": 53,
+        "parent": "cache.redis",
+        "value": "jdbc:postgresql://localhost:5432/db",
+        "tags": [
+          "properties",
+          "dotted-key"
+        ]
+      },
+      {
+        "name": "cache.redis.ENABLE_CACHE",
+        "type": "constant",
+        "line": 62,
+        "parent": "cache.redis",
+        "value": "true",
+        "exported": true,
+        "tags": [
+          "env",
+          "boolean"
+        ]
+      },
+      {
+        "name": "cache.redis.MAX_CONNECTIONS",
+        "type": "constant",
+        "line": 64,
+        "parent": "cache.redis",
+        "value": "100",
+        "exported": true,
+        "tags": [
+          "env",
+          "integer"
+        ]
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P3_CLASS_STRUCT"
+  ]
+}

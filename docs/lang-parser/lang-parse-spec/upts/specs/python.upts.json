@@ -1,35 +1,42 @@
 {
   "upts_version": "1.0.0",
   "language": "python",
-  "variants": [".py", ".pyi"],
-  
+  "variants": [
+    ".py",
+    ".pyi"
+  ],
   "metadata": {
     "author": "reh3376",
     "created": "2026-01-28",
     "updated": "2026-01-29",
     "description": "Python parser - all 7 canonical patterns including Protocol/dataclass",
     "parser_status": "enhanced",
-    "tags": ["canonical", "typing", "protocol", "dataclass", "async"]
+    "tags": [
+      "canonical",
+      "typing",
+      "protocol",
+      "dataclass",
+      "async"
+    ]
   },
-  
   "config": {
     "line_tolerance": 2,
     "require_all_symbols": true,
     "allow_extra_symbols": true,
     "validate_signature": false,
-    "validate_value": false,
+    "validate_value": true,
     "validate_parent": true
   },
-  
   "fixture": {
     "type": "file",
     "path": "../fixtures/python_test_fixture.py",
     "sha256": "8975b14f5f72c81f2184f2a7446e1ab332c108a14b2b6543479cd9c4154b11f5"
   },
-  
   "expected": {
-    "symbol_count": {"min": 35, "max": 40},
-    
+    "symbol_count": {
+      "min": 35,
+      "max": 40
+    },
     "symbols": [
       {
         "name": "MAX_RETRIES",
@@ -38,7 +45,10 @@
         "exported": true,
         "value": "3",
         "pattern": "P1_CONSTANT",
-        "tags": ["constant", "int"]
+        "tags": [
+          "constant",
+          "int"
+        ]
       },
       {
         "name": "DEFAULT_TIMEOUT",
@@ -47,7 +57,10 @@
         "exported": true,
         "value": "30",
         "pattern": "P1_CONSTANT",
-        "tags": ["constant", "int"]
+        "tags": [
+          "constant",
+          "int"
+        ]
       },
       {
         "name": "API_VERSION",
@@ -56,7 +69,10 @@
         "exported": true,
         "value": "\"1.0.0\"",
         "pattern": "P1_CONSTANT",
-        "tags": ["constant", "string"]
+        "tags": [
+          "constant",
+          "string"
+        ]
       },
       {
         "name": "DEBUG_MODE",
@@ -65,23 +81,31 @@
         "exported": true,
         "value": "True",
         "pattern": "P1_CONSTANT",
-        "tags": ["constant", "bool"]
+        "tags": [
+          "constant",
+          "bool"
+        ]
       },
       {
         "name": "UserId",
         "type": "type",
         "line": 18,
         "exported": true,
-                "pattern": "P7_TYPE_ALIAS",
-        "tags": ["type-alias"]
+        "pattern": "P7_TYPE_ALIAS",
+        "tags": [
+          "type-alias"
+        ]
       },
       {
         "name": "ItemList",
         "type": "type",
         "line": 19,
         "exported": true,
-                "pattern": "P7_TYPE_ALIAS",
-        "tags": ["type-alias", "generic"]
+        "pattern": "P7_TYPE_ALIAS",
+        "tags": [
+          "type-alias",
+          "generic"
+        ]
       },
       {
         "name": "calculate_total",
@@ -89,9 +113,16 @@
         "line": 23,
         "exported": true,
         "signature": "def calculate_total(items: List[\"Item\"]) -> int",
-        "signature_contains": ["items", "List", "int"],
+        "signature_contains": [
+          "items",
+          "List",
+          "int"
+        ],
         "pattern": "P2_FUNCTION",
-        "tags": ["function", "typed"]
+        "tags": [
+          "function",
+          "typed"
+        ]
       },
       {
         "name": "process_items",
@@ -99,9 +130,17 @@
         "line": 28,
         "exported": true,
         "signature": "def process_items(items: List[\"Item\"], timeout: int = DEFAULT_TIMEOUT) -> bool",
-        "signature_contains": ["items", "timeout", "bool"],
+        "signature_contains": [
+          "items",
+          "timeout",
+          "bool"
+        ],
         "pattern": "P2_FUNCTION",
-        "tags": ["function", "typed", "default-arg"]
+        "tags": [
+          "function",
+          "typed",
+          "default-arg"
+        ]
       },
       {
         "name": "fetch_user",
@@ -109,36 +148,52 @@
         "line": 36,
         "exported": true,
         "signature": "async def fetch_user(user_id: str) -> Optional[\"User\"]",
-        "signature_contains": ["async", "user_id", "Optional"],
+        "signature_contains": [
+          "async",
+          "user_id",
+          "Optional"
+        ],
         "pattern": "P2_FUNCTION",
-        "tags": ["function", "async"]
+        "tags": [
+          "function",
+          "async"
+        ]
       },
       {
         "name": "Status",
         "type": "enum",
         "line": 42,
         "exported": true,
-        "extends": "Enum",
-                "pattern": "P5_ENUM",
-        "tags": ["enum", "int-values"]
+        "parent": "Enum",
+        "pattern": "P5_ENUM",
+        "tags": [
+          "enum",
+          "int-values"
+        ]
       },
       {
         "name": "Priority",
         "type": "enum",
         "line": 49,
         "exported": true,
-        "extends": "Enum",
-                "pattern": "P5_ENUM",
-        "tags": ["enum", "string-values"]
+        "parent": "Enum",
+        "pattern": "P5_ENUM",
+        "tags": [
+          "enum",
+          "string-values"
+        ]
       },
       {
         "name": "UserRepository",
         "type": "interface",
         "line": 57,
         "exported": true,
-        "extends": "Protocol",
-                "pattern": "P4_INTERFACE_TRAIT",
-        "tags": ["protocol", "interface"]
+        "parent": "Protocol",
+        "pattern": "P4_INTERFACE_TRAIT",
+        "tags": [
+          "protocol",
+          "interface"
+        ]
       },
       {
         "name": "find_by_id",
@@ -146,9 +201,15 @@
         "line": 60,
         "exported": true,
         "parent": "UserRepository",
-        "signature_contains": ["user_id", "Optional"],
+        "signature_contains": [
+          "user_id",
+          "Optional"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method", "protocol-method"]
+        "tags": [
+          "method",
+          "protocol-method"
+        ]
       },
       {
         "name": "save",
@@ -156,18 +217,27 @@
         "line": 64,
         "exported": true,
         "parent": "UserRepository",
-        "signature_contains": ["user", "bool"],
+        "signature_contains": [
+          "user",
+          "bool"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method", "protocol-method"]
+        "tags": [
+          "method",
+          "protocol-method"
+        ]
       },
       {
         "name": "ItemValidator",
         "type": "interface",
         "line": 69,
         "exported": true,
-        "extends": "Protocol",
-                "pattern": "P4_INTERFACE_TRAIT",
-        "tags": ["protocol", "interface"]
+        "parent": "Protocol",
+        "pattern": "P4_INTERFACE_TRAIT",
+        "tags": [
+          "protocol",
+          "interface"
+        ]
       },
       {
         "name": "validate",
@@ -175,19 +245,30 @@
         "line": 72,
         "exported": true,
         "parent": "ItemValidator",
-        "signature_contains": ["item", "bool"],
+        "signature_contains": [
+          "item",
+          "bool"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method", "protocol-method"]
+        "tags": [
+          "method",
+          "protocol-method"
+        ]
       },
       {
         "name": "Item",
         "type": "class",
         "line": 79,
         "exported": true,
-        "decorators": ["dataclass"],
+        "decorators": [
+          "dataclass"
+        ],
         "doc_comment": "Decorators: @dataclass",
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["class", "dataclass"]
+        "tags": [
+          "class",
+          "dataclass"
+        ]
       },
       {
         "name": "is_valid",
@@ -195,9 +276,13 @@
         "line": 86,
         "exported": true,
         "parent": "Item",
-        "signature_contains": ["bool"],
+        "signature_contains": [
+          "bool"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method"]
+        "tags": [
+          "method"
+        ]
       },
       {
         "name": "calculate_discount",
@@ -205,9 +290,14 @@
         "line": 90,
         "exported": true,
         "parent": "Item",
-        "signature_contains": ["percentage", "float"],
+        "signature_contains": [
+          "percentage",
+          "float"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method"]
+        "tags": [
+          "method"
+        ]
       },
       {
         "name": "UserService",
@@ -215,7 +305,10 @@
         "line": 95,
         "exported": true,
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["class", "service"]
+        "tags": [
+          "class",
+          "service"
+        ]
       },
       {
         "name": "__init__",
@@ -223,9 +316,14 @@
         "line": 98,
         "exported": false,
         "parent": "UserService",
-        "signature_contains": ["repository"],
+        "signature_contains": [
+          "repository"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method", "constructor"]
+        "tags": [
+          "method",
+          "constructor"
+        ]
       },
       {
         "name": "find_by_id",
@@ -233,9 +331,14 @@
         "line": 102,
         "exported": true,
         "parent": "UserService",
-        "signature_contains": ["user_id", "Optional"],
+        "signature_contains": [
+          "user_id",
+          "Optional"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method"]
+        "tags": [
+          "method"
+        ]
       },
       {
         "name": "create_user",
@@ -243,9 +346,16 @@
         "line": 106,
         "exported": true,
         "parent": "UserService",
-        "signature_contains": ["async", "name", "email"],
+        "signature_contains": [
+          "async",
+          "name",
+          "email"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method", "async"]
+        "tags": [
+          "method",
+          "async"
+        ]
       },
       {
         "name": "update_user",
@@ -253,9 +363,15 @@
         "line": 110,
         "exported": true,
         "parent": "UserService",
-        "signature_contains": ["user_id", "data", "bool"],
+        "signature_contains": [
+          "user_id",
+          "data",
+          "bool"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method"]
+        "tags": [
+          "method"
+        ]
       },
       {
         "name": "BaseEntity",
@@ -263,7 +379,10 @@
         "line": 115,
         "exported": true,
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["class", "base"]
+        "tags": [
+          "class",
+          "base"
+        ]
       },
       {
         "name": "get_id",
@@ -271,18 +390,26 @@
         "line": 121,
         "exported": true,
         "parent": "BaseEntity",
-        "signature_contains": ["str"],
+        "signature_contains": [
+          "str"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method"]
+        "tags": [
+          "method"
+        ]
       },
       {
         "name": "User",
         "type": "class",
         "line": 126,
         "exported": true,
-        "extends": "BaseEntity",
+        "parent": "BaseEntity",
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["class", "entity", "extends"]
+        "tags": [
+          "class",
+          "entity",
+          "extends"
+        ]
       },
       {
         "name": "__init__",
@@ -290,9 +417,16 @@
         "line": 133,
         "exported": false,
         "parent": "User",
-        "signature_contains": ["id", "name", "email"],
+        "signature_contains": [
+          "id",
+          "name",
+          "email"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method", "constructor"]
+        "tags": [
+          "method",
+          "constructor"
+        ]
       },
       {
         "name": "deactivate",
@@ -300,9 +434,13 @@
         "line": 140,
         "exported": true,
         "parent": "User",
-        "signature_contains": ["None"],
+        "signature_contains": [
+          "None"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method"]
+        "tags": [
+          "method"
+        ]
       },
       {
         "name": "is_active",
@@ -310,9 +448,13 @@
         "line": 144,
         "exported": true,
         "parent": "User",
-        "signature_contains": ["bool"],
+        "signature_contains": [
+          "bool"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method"]
+        "tags": [
+          "method"
+        ]
       },
       {
         "name": "_INTERNAL_CONSTANT",
@@ -321,7 +463,10 @@
         "exported": false,
         "value": "\"internal\"",
         "pattern": "P1_CONSTANT",
-        "tags": ["constant", "private"]
+        "tags": [
+          "constant",
+          "private"
+        ]
       },
       {
         "name": "_private_helper",
@@ -329,9 +474,15 @@
         "line": 153,
         "exported": false,
         "signature": "def _private_helper(data: str) -> str",
-        "signature_contains": ["data", "str"],
+        "signature_contains": [
+          "data",
+          "str"
+        ],
         "pattern": "P2_FUNCTION",
-        "tags": ["function", "private"]
+        "tags": [
+          "function",
+          "private"
+        ]
       },
       {
         "name": "_InternalCache",
@@ -339,7 +490,10 @@
         "line": 158,
         "exported": false,
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["class", "private"]
+        "tags": [
+          "class",
+          "private"
+        ]
       },
       {
         "name": "__init__",
@@ -348,7 +502,11 @@
         "exported": false,
         "parent": "_InternalCache",
         "pattern": "P6_METHOD",
-        "tags": ["method", "constructor", "private"]
+        "tags": [
+          "method",
+          "constructor",
+          "private"
+        ]
       },
       {
         "name": "get",
@@ -356,26 +514,65 @@
         "line": 164,
         "exported": true,
         "parent": "_InternalCache",
-        "signature_contains": ["key"],
+        "signature_contains": [
+          "key"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method"]
+        "tags": [
+          "method"
+        ]
       }
     ],
-    
     "excluded": [
-      {"name": "_repository", "reason": "instance attribute"},
-      {"name": "_data", "reason": "instance attribute"}
+      {
+        "name": "_repository",
+        "reason": "instance attribute"
+      },
+      {
+        "name": "_data",
+        "reason": "instance attribute"
+      }
     ],
-    
     "relationships": [
-      {"source": "UserService", "relation": "DEFINES_METHOD", "target": "find_by_id"},
-      {"source": "UserService", "relation": "DEFINES_METHOD", "target": "create_user"},
-      {"source": "UserService", "relation": "DEFINES_METHOD", "target": "update_user"},
-      {"source": "User", "relation": "EXTENDS", "target": "BaseEntity"},
-      {"source": "Item", "relation": "DEFINES_METHOD", "target": "is_valid"},
-      {"source": "Item", "relation": "DEFINES_METHOD", "target": "calculate_discount"}
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "find_by_id"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "create_user"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "update_user"
+      },
+      {
+        "source": "User",
+        "relation": "EXTENDS",
+        "target": "BaseEntity"
+      },
+      {
+        "source": "Item",
+        "relation": "DEFINES_METHOD",
+        "target": "is_valid"
+      },
+      {
+        "source": "Item",
+        "relation": "DEFINES_METHOD",
+        "target": "calculate_discount"
+      }
     ]
   },
-  
-  "patterns_covered": ["P1_CONSTANT", "P2_FUNCTION", "P3_CLASS_STRUCT", "P4_INTERFACE_TRAIT", "P5_ENUM", "P6_METHOD", "P7_TYPE_ALIAS"]
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P2_FUNCTION",
+    "P3_CLASS_STRUCT",
+    "P4_INTERFACE_TRAIT",
+    "P5_ENUM",
+    "P6_METHOD",
+    "P7_TYPE_ALIAS"
+  ]
 }

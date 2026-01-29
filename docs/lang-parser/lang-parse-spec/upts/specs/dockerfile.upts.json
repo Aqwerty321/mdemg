@@ -1,0 +1,202 @@
+{
+  "upts_version": "1.0.0",
+  "language": "dockerfile",
+  "variants": [
+    "Dockerfile",
+    "Dockerfile.*",
+    "*.dockerfile"
+  ],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Dockerfile parser - container build and runtime definitions",
+    "parser_status": "planned",
+    "tags": [
+      "config",
+      "phase1",
+      "container"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_value": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/dockerfile_test_fixture.dockerfile",
+    "sha256": "e407b27853d2a914c41777d332e1e6a8a5e7175c475469e797871faf545127d1"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 20,
+      "max": 35
+    },
+    "symbols": [
+      {
+        "name": "GO_VERSION",
+        "type": "constant",
+        "line": 7,
+        "value": "1.22",
+        "tags": [
+          "arg",
+          "build-time"
+        ]
+      },
+      {
+        "name": "ALPINE_VERSION",
+        "type": "constant",
+        "line": 8,
+        "value": "3.19",
+        "tags": [
+          "arg",
+          "build-time"
+        ]
+      },
+      {
+        "name": "APP_NAME",
+        "type": "constant",
+        "line": 9,
+        "value": "mdemg-parser",
+        "tags": [
+          "arg",
+          "build-time"
+        ]
+      },
+      {
+        "name": "builder",
+        "type": "section",
+        "line": 13,
+        "tags": [
+          "stage",
+          "from"
+        ],
+        "doc_comment": "FROM golang:${GO_VERSION}-alpine"
+      },
+      {
+        "name": "CGO_ENABLED",
+        "type": "constant",
+        "line": 24,
+        "value": "0",
+        "tags": [
+          "env",
+          "build"
+        ]
+      },
+      {
+        "name": "GOOS",
+        "type": "constant",
+        "line": 25,
+        "value": "linux",
+        "tags": [
+          "env",
+          "build"
+        ]
+      },
+      {
+        "name": "APP_ENV",
+        "type": "constant",
+        "line": 27,
+        "value": "production",
+        "tags": [
+          "env",
+          "runtime"
+        ]
+      },
+      {
+        "name": "runtime",
+        "type": "section",
+        "line": 44,
+        "tags": [
+          "stage",
+          "from"
+        ],
+        "doc_comment": "FROM alpine:${ALPINE_VERSION}"
+      },
+      {
+        "name": "APP_PORT",
+        "type": "constant",
+        "line": 48,
+        "value": "8080",
+        "tags": [
+          "env",
+          "runtime"
+        ]
+      },
+      {
+        "name": "APP_HOST",
+        "type": "constant",
+        "line": 49,
+        "value": "0.0.0.0",
+        "tags": [
+          "env",
+          "runtime"
+        ]
+      },
+      {
+        "name": "CONFIG_PATH",
+        "type": "constant",
+        "line": 50,
+        "value": "/etc/app/config.yaml",
+        "tags": [
+          "env",
+          "runtime",
+          "path"
+        ]
+      },
+      {
+        "name": "EXPOSE:8080",
+        "type": "constant",
+        "line": 55,
+        "value": "8080",
+        "tags": [
+          "port",
+          "expose"
+        ]
+      },
+      {
+        "name": "EXPOSE:9090",
+        "type": "constant",
+        "line": 56,
+        "value": "9090",
+        "tags": [
+          "port",
+          "expose"
+        ]
+      },
+      {
+        "name": "VOLUME:/etc/app",
+        "type": "constant",
+        "line": 60,
+        "value": "/etc/app",
+        "tags": [
+          "volume"
+        ]
+      },
+      {
+        "name": "ENTRYPOINT",
+        "type": "function",
+        "line": 78,
+        "signature": "/usr/local/bin/app",
+        "tags": [
+          "entrypoint"
+        ]
+      },
+      {
+        "name": "CMD",
+        "type": "function",
+        "line": 79,
+        "signature": "--config /etc/app/config.yaml serve",
+        "tags": [
+          "cmd"
+        ]
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P2_FUNCTION",
+    "P3_CLASS_STRUCT"
+  ]
+}

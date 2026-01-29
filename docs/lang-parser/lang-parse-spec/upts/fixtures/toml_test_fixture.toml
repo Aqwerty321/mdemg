@@ -1,0 +1,89 @@
+# TOML Parser Test Fixture
+# Tests symbol extraction for Cargo.toml, pyproject.toml style files
+# Line numbers are predictable for UPTS validation
+
+# === Pattern 1: Top-level keys ===
+# Line 7-9
+name = "test-project"
+version = "1.0.0"
+edition = "2021"
+
+# === Pattern: Package section (Cargo.toml style) ===
+# Line 12-18
+[package]
+name = "mdemg-parser"
+version = "0.1.0"
+authors = ["reh3376"]
+description = "Parser for MDEMG"
+license = "MIT"
+readme = "README.md"
+
+# === Pattern: Dependencies ===
+# Line 21-26
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.0", features = ["full"] }
+clap = "4.0"
+anyhow = "1.0"
+thiserror = "1.0"
+
+# === Pattern: Dev dependencies ===
+# Line 29-31
+[dev-dependencies]
+pretty_assertions = "1.0"
+mockall = "0.11"
+
+# === Pattern: Features ===
+# Line 34-37
+[features]
+default = ["std"]
+std = []
+async = ["tokio"]
+
+# === Pattern: Build configuration ===
+# Line 40-42
+[build]
+target = "x86_64-unknown-linux-gnu"
+jobs = 4
+
+# === Pattern: Workspace (Cargo) ===
+# Line 45-49
+[workspace]
+members = [
+    "crates/core",
+    "crates/parser",
+]
+
+# === Pattern: pyproject.toml style ===
+# Line 52-58
+[project]
+name = "upts-runner"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "typer>=0.9.0",
+]
+
+# === Pattern: Tool configuration ===
+# Line 61-67
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I"]
+ignore = ["E501"]
+
+# === Pattern: Array of tables ===
+# Line 70-80
+[[bin]]
+name = "parser"
+path = "src/main.rs"
+
+[[bin]]
+name = "validator"
+path = "src/validator.rs"
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"

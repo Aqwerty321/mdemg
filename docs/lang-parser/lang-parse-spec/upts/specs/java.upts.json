@@ -1,0 +1,433 @@
+{
+  "upts_version": "1.0.0",
+  "language": "java",
+  "variants": [
+    ".java"
+  ],
+  "metadata": {
+    "author": "auto-generated",
+    "created": "2026-01-29",
+    "description": "JAVA parser spec - generated from actual parser output"
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_parent": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/java_test_fixture.java",
+    "sha256": "66c226e8d175bc7a980a81db3bcaf4162b34d6465e4d6b0e7d82a887969083f8"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 54,
+      "max": 69
+    },
+    "symbols": [
+      {
+        "name": "Constants",
+        "type": "class",
+        "line": 15,
+        "exported": true
+      },
+      {
+        "name": "MAX_RETRIES",
+        "type": "constant",
+        "line": 16,
+        "exported": true,
+        "parent": "Constants",
+        "value": "3"
+      },
+      {
+        "name": "DEFAULT_TIMEOUT",
+        "type": "constant",
+        "line": 17,
+        "exported": true,
+        "parent": "Constants",
+        "value": "30"
+      },
+      {
+        "name": "API_VERSION",
+        "type": "constant",
+        "line": 18,
+        "exported": true,
+        "parent": "Constants",
+        "value": "\"1.0.0\""
+      },
+      {
+        "name": "DEBUG_MODE",
+        "type": "constant",
+        "line": 19,
+        "exported": true,
+        "parent": "Constants",
+        "value": "true"
+      },
+      {
+        "name": "Status",
+        "type": "enum",
+        "line": 24,
+        "exported": true
+      },
+      {
+        "name": "Status",
+        "type": "method",
+        "line": 30,
+        "exported": true,
+        "parent": "Constants"
+      },
+      {
+        "name": "Priority",
+        "type": "enum",
+        "line": 34,
+        "exported": true
+      },
+      {
+        "name": "Priority",
+        "type": "method",
+        "line": 40,
+        "exported": true,
+        "parent": "Constants"
+      },
+      {
+        "name": "Repository",
+        "type": "interface",
+        "line": 45,
+        "exported": true
+      },
+      {
+        "name": "findById",
+        "type": "method",
+        "line": 46,
+        "exported": false,
+        "parent": "Constants"
+      },
+      {
+        "name": "save",
+        "type": "method",
+        "line": 47,
+        "exported": false,
+        "parent": "Constants"
+      },
+      {
+        "name": "delete",
+        "type": "method",
+        "line": 48,
+        "exported": false,
+        "parent": "Constants"
+      },
+      {
+        "name": "Validator",
+        "type": "interface",
+        "line": 52,
+        "exported": true
+      },
+      {
+        "name": "validate",
+        "type": "method",
+        "line": 53,
+        "exported": false,
+        "parent": "Constants"
+      },
+      {
+        "name": "getErrors",
+        "type": "method",
+        "line": 54,
+        "exported": false,
+        "parent": "Constants"
+      },
+      {
+        "name": "UserRepository",
+        "type": "interface",
+        "line": 58,
+        "exported": true
+      },
+      {
+        "name": "findByStatus",
+        "type": "method",
+        "line": 59,
+        "exported": false,
+        "parent": "Constants"
+      },
+      {
+        "name": "findByEmail",
+        "type": "method",
+        "line": 60,
+        "exported": false,
+        "parent": "Constants"
+      },
+      {
+        "name": "User",
+        "type": "class",
+        "line": 65,
+        "exported": true
+      },
+      {
+        "name": "User",
+        "type": "method",
+        "line": 72,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "getId",
+        "type": "method",
+        "line": 81,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "getName",
+        "type": "method",
+        "line": 82,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "getEmail",
+        "type": "method",
+        "line": 83,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "getStatus",
+        "type": "method",
+        "line": 84,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "deactivate",
+        "type": "method",
+        "line": 87,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "isActive",
+        "type": "method",
+        "line": 91,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "Item",
+        "type": "class",
+        "line": 97,
+        "exported": true
+      },
+      {
+        "name": "Item",
+        "type": "method",
+        "line": 103,
+        "exported": true,
+        "parent": "Item"
+      },
+      {
+        "name": "getId",
+        "type": "method",
+        "line": 110,
+        "exported": true,
+        "parent": "Item"
+      },
+      {
+        "name": "getName",
+        "type": "method",
+        "line": 111,
+        "exported": true,
+        "parent": "Item"
+      },
+      {
+        "name": "getValue",
+        "type": "method",
+        "line": 112,
+        "exported": true,
+        "parent": "Item"
+      },
+      {
+        "name": "isValid",
+        "type": "method",
+        "line": 114,
+        "exported": true,
+        "parent": "Item"
+      },
+      {
+        "name": "calculateDiscount",
+        "type": "method",
+        "line": 118,
+        "exported": true,
+        "parent": "Item"
+      },
+      {
+        "name": "UserService",
+        "type": "class",
+        "line": 125,
+        "exported": true
+      },
+      {
+        "name": "UserService",
+        "type": "method",
+        "line": 130,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "findById",
+        "type": "method",
+        "line": 135,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "createUser",
+        "type": "method",
+        "line": 140,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "createUserAsync",
+        "type": "method",
+        "line": 146,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "deleteUser",
+        "type": "method",
+        "line": 150,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "generateId",
+        "type": "method",
+        "line": 154,
+        "exported": false,
+        "parent": "UserService"
+      },
+      {
+        "name": "BaseEntity",
+        "type": "class",
+        "line": 161,
+        "exported": true
+      },
+      {
+        "name": "getId",
+        "type": "method",
+        "line": 166,
+        "exported": true,
+        "parent": "BaseEntity"
+      },
+      {
+        "name": "touch",
+        "type": "method",
+        "line": 168,
+        "exported": true,
+        "parent": "BaseEntity"
+      },
+      {
+        "name": "AdminUser",
+        "type": "class",
+        "line": 174,
+        "exported": true
+      },
+      {
+        "name": "AdminUser",
+        "type": "method",
+        "line": 177,
+        "exported": true,
+        "parent": "AdminUser"
+      },
+      {
+        "name": "addPermission",
+        "type": "method",
+        "line": 182,
+        "exported": true,
+        "parent": "AdminUser"
+      },
+      {
+        "name": "compareTo",
+        "type": "method",
+        "line": 187,
+        "exported": true,
+        "parent": "AdminUser"
+      },
+      {
+        "name": "Utils",
+        "type": "class",
+        "line": 194,
+        "exported": true
+      },
+      {
+        "name": "validateEmail",
+        "type": "method",
+        "line": 196,
+        "exported": true,
+        "parent": "Utils"
+      },
+      {
+        "name": "formatUser",
+        "type": "method",
+        "line": 200,
+        "exported": true,
+        "parent": "Utils"
+      },
+      {
+        "name": "calculateTotal",
+        "type": "method",
+        "line": 204,
+        "exported": true,
+        "parent": "Utils"
+      },
+      {
+        "name": "Cache",
+        "type": "class",
+        "line": 211,
+        "exported": true
+      },
+      {
+        "name": "Cache",
+        "type": "method",
+        "line": 215,
+        "exported": true,
+        "parent": "Cache"
+      },
+      {
+        "name": "put",
+        "type": "method",
+        "line": 220,
+        "exported": true,
+        "parent": "Cache"
+      },
+      {
+        "name": "get",
+        "type": "method",
+        "line": 226,
+        "exported": true,
+        "parent": "Cache"
+      },
+      {
+        "name": "clear",
+        "type": "method",
+        "line": 230,
+        "exported": true,
+        "parent": "Cache"
+      },
+      {
+        "name": "UserDto",
+        "type": "class",
+        "line": 237,
+        "exported": true
+      },
+      {
+        "name": "ItemDto",
+        "type": "class",
+        "line": 238,
+        "exported": true
+      }
+    ]
+  }
+}

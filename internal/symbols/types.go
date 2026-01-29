@@ -21,6 +21,9 @@ const (
 	SymbolTypeStruct    SymbolType = "struct"
 	SymbolTypeTrait     SymbolType = "trait"
 	SymbolTypeProperty  SymbolType = "property"
+	SymbolTypeMacro     SymbolType = "macro"
+	SymbolTypeModule    SymbolType = "module"
+	SymbolTypeNamespace SymbolType = "namespace"
 )
 
 // Language represents a programming language for parsing.
@@ -32,6 +35,10 @@ const (
 	LangGo         Language = "go"
 	LangPython     Language = "python"
 	LangRust       Language = "rust"
+	LangC          Language = "c"
+	LangCPP        Language = "cpp"
+	LangCUDA       Language = "cuda"
+	LangJava       Language = "java"
 	LangUnknown    Language = "unknown"
 )
 
@@ -163,6 +170,14 @@ func LanguageFromExtension(ext string) Language {
 		return LangPython
 	case ".rs":
 		return LangRust
+	case ".c", ".h":
+		return LangC
+	case ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx":
+		return LangCPP
+	case ".cu", ".cuh":
+		return LangCUDA
+	case ".java":
+		return LangJava
 	default:
 		return LangUnknown
 	}
@@ -176,13 +191,17 @@ func SupportedLanguages() []Language {
 		LangGo,
 		LangPython,
 		LangRust,
+		LangC,
+		LangCPP,
+		LangCUDA,
+		LangJava,
 	}
 }
 
 // IsSupported checks if a language is supported for parsing.
 func (l Language) IsSupported() bool {
 	switch l {
-	case LangTypeScript, LangJavaScript, LangGo, LangPython, LangRust:
+	case LangTypeScript, LangJavaScript, LangGo, LangPython, LangRust, LangC, LangCPP, LangCUDA, LangJava:
 		return true
 	default:
 		return false

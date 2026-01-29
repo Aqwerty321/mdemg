@@ -1,0 +1,91 @@
+# YAML Parser Test Fixture
+# Tests symbol extraction for config files
+# Line numbers are predictable for UPTS validation
+
+# === Pattern 1: Top-level keys (constants) ===
+# Line 8-11
+name: test-project
+version: "1.0.0"
+debug: true
+max_retries: 3
+
+# === Pattern: Nested structure ===
+# Line 14-18
+database:
+  host: localhost
+  port: 5432
+  name: testdb
+  pool_size: 10
+
+# === Pattern: Anchors and Aliases ===
+# Line 21-27
+defaults: &defaults
+  adapter: postgres
+  timeout: 30
+  
+development:
+  <<: *defaults
+  database: dev_db
+
+# Line 30-32
+production:
+  <<: *defaults
+  database: prod_db
+
+# === Pattern: Arrays/Lists ===
+# Line 35-40
+features:
+  - authentication
+  - logging
+  - caching
+
+# === Pattern: Complex nested (GitHub Actions style) ===
+# Line 43-62
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup
+        run: npm install
+      - name: Test
+        run: npm test
+        env:
+          CI: true
+          NODE_ENV: test
+  
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+# === Pattern: Kubernetes style ===
+# Line 65-78
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: default
+  labels:
+    app: test
+data:
+  APP_ENV: production
+  LOG_LEVEL: info
+
+# === Pattern: Docker Compose style ===
+# Line 81-97
+services:
+  web:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    environment:
+      - DEBUG=false
+    volumes:
+      - ./html:/usr/share/nginx/html
+  
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: user

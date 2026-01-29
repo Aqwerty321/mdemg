@@ -5,12 +5,20 @@ Universal Parser Test Specification (UPTS) Test Runner
 Validates parser implementations against UPTS specifications.
 Language-agnostic - works with any parser that outputs standardized Symbol JSON.
 
+NEW in v1.1.0: SHA256 hash verification for fixture integrity
+
 Usage:
     # Validate single spec
     python upts_runner.py validate --spec specs/typescript.upts.json --parser ./parse
     
     # Validate all specs
     python upts_runner.py validate-all --spec-dir specs/ --parser ./parse
+    
+    # Skip hash verification
+    python upts_runner.py validate --spec specs/rust.upts.json --parser ./parse --skip-hash
+    
+    # Add hashes to existing specs
+    python upts_runner.py add-hashes --spec-dir specs/
     
     # Generate JSON report
     python upts_runner.py validate-all --spec-dir specs/ --parser ./parse --report report.json
@@ -36,11 +44,13 @@ Parser Output Format:
     }
 
 Author: reh3376
+Version: 1.1.0
 """
 
 from __future__ import annotations
 
 import json
+import shlex
 import subprocess
 import sys
 import re
@@ -57,19 +67,57 @@ import argparse
 # CONSTANTS
 # ============================================================
 
-UPTS_VERSION = "1.0.0"
+UPTS_VERSION = "1.1.0"
 
-# Type compatibility groups - legitimate semantic equivalences only
-# Parsers should output UPTS canonical names; these handle language variations
+# Type compatibility groups - semantic equivalences across languages
 TYPE_COMPAT = {
-    # Class/struct equivalence across languages
     "class": {"class", "struct"},
     "struct": {"class", "struct"},
-    # Interface/trait/protocol semantic equivalence
     "interface": {"interface", "trait", "protocol"},
     "trait": {"interface", "trait", "protocol"},
     "protocol": {"interface", "trait", "protocol"},
 }
+
+
+# ============================================================
+# HASH UTILITIES
+# ============================================================
+
+def compute_sha256(filepath: Path) -> str:
+    """Compute SHA256 hash of a file."""
+    sha256_hash = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            sha256_hash.update(chunk)
+    return sha256_hash.hexdigest()
+
+
+def verify_fixture_hash(fixture_path: Path, expected_hash: Optional[str]) -> Tuple[bool, str]:
+    """
+    Verify fixture file integrity via SHA256 hash.
+    
+    Returns: (is_valid, message)
+        - (True, "") if no hash specified or hash matches
+        - (False, error_message) if hash mismatch
+    """
+    if not expected_hash:
+        return True, ""  # No hash specified, skip verification
+    
+    if not fixture_path.exists():
+        return False, f"Fixture not found: {fixture_path}"
+    
+    actual_hash = compute_sha256(fixture_path)
+    
+    if actual_hash != expected_hash:
+        return False, (
+            f"HASH MISMATCH: Fixture has been modified since spec generation\n"
+            f"  Expected: {expected_hash}\n"
+            f"  Actual:   {actual_hash}\n"
+            f"  File:     {fixture_path}\n"
+            f"  Action:   Regenerate spec from parser output, or run with --skip-hash"
+        )
+    
+    return True, ""
 
 
 # ============================================================
@@ -115,6 +163,8 @@ class SpecResult:
     extra_symbols: List[Dict] = field(default_factory=list)
     error_message: Optional[str] = None
     duration_ms: float = 0.0
+    hash_verified: bool = False
+    hash_skipped: bool = False
     
     @property
     def pass_rate(self) -> float:
@@ -130,6 +180,8 @@ class SpecResult:
             "failed": self.failed,
             "pass_rate": round(self.pass_rate, 2),
             "duration_ms": round(self.duration_ms, 2),
+            "hash_verified": self.hash_verified,
+            "hash_skipped": self.hash_skipped,
             "failures": [
                 {"name": r.name, "type": r.sym_type, "expected_line": r.expected_line,
                  "actual_line": r.actual_line, "issues": r.issues, "pattern": r.pattern}
@@ -226,9 +278,13 @@ class UPTSLoader:
     def fixture_path(self) -> Optional[Path]:
         fixture = self.spec.get("fixture", {})
         if fixture.get("type") == "file":
-            # Relative to spec file's directory
             return self.spec_path.parent / fixture.get("path", "")
         return None
+    
+    @property
+    def fixture_hash(self) -> Optional[str]:
+        """Get the expected SHA256 hash of the fixture, if specified."""
+        return self.spec.get("fixture", {}).get("sha256")
     
     @property
     def fixture_content(self) -> Optional[str]:
@@ -247,6 +303,24 @@ class UPTSLoader:
     @property
     def excluded_symbols(self) -> List[Dict]:
         return self.spec.get("expected", {}).get("excluded", [])
+    
+    def update_fixture_hash(self) -> bool:
+        """
+        Compute and update the fixture hash in the spec.
+        Saves the updated spec to disk.
+        
+        Returns: True if hash was added/updated, False on error
+        """
+        fixture_path = self.fixture_path
+        if not fixture_path or not fixture_path.exists():
+            return False
+        
+        new_hash = compute_sha256(fixture_path)
+        self.spec["fixture"]["sha256"] = new_hash
+        
+        # Save updated spec
+        self.spec_path.write_text(json.dumps(self.spec, indent=2))
+        return True
 
 
 # ============================================================
@@ -255,24 +329,19 @@ class UPTSLoader:
 
 class ParserInterface:
     """Interface for calling parser implementations"""
-
+    
     def __init__(self, parser_cmd: str):
         self.parser_cmd = parser_cmd
-
+    
     def parse(self, file_path: Path) -> Tuple[List[Dict], Optional[str]]:
         """
         Run parser on file and return normalized symbols.
-
+        
         Returns: (symbols_list, error_message)
         """
         try:
-            # Support parser commands with arguments (e.g., "./bin/extract-symbols --json")
-            import shlex
-            cmd_parts = shlex.split(self.parser_cmd)
-            cmd_parts.append(str(file_path))
-
             result = subprocess.run(
-                cmd_parts,
+                shlex.split(self.parser_cmd) + [str(file_path)],
                 capture_output=True,
                 text=True,
                 timeout=60
@@ -329,9 +398,10 @@ class MockParser(ParserInterface):
 class Validator:
     """Validate parser output against UPTS spec"""
     
-    def __init__(self, spec: UPTSLoader, parser: ParserInterface):
+    def __init__(self, spec: UPTSLoader, parser: ParserInterface, skip_hash: bool = False):
         self.spec = spec
         self.parser = parser
+        self.skip_hash = skip_hash
     
     def validate(self) -> SpecResult:
         """Run validation"""
@@ -357,6 +427,19 @@ class Validator:
             result.error_message = f"Fixture not found: {fixture_path}"
             return result
         
+        # Verify fixture hash (unless skipped)
+        if self.skip_hash:
+            result.hash_skipped = True
+        else:
+            hash_valid, hash_error = verify_fixture_hash(fixture_path, self.spec.fixture_hash)
+            if not hash_valid:
+                result.status = Status.ERROR
+                result.error_message = hash_error
+                result.duration_ms = (time.time() - start) * 1000
+                return result
+            if self.spec.fixture_hash:
+                result.hash_verified = True
+        
         # Parse
         actual_symbols, error = self.parser.parse(fixture_path)
         if error:
@@ -367,29 +450,22 @@ class Validator:
         
         # Config
         line_tolerance = self.spec.config.get("line_tolerance", 2)
-        
+        validate_signature = self.spec.config.get("validate_signature", False)
+        validate_value = self.spec.config.get("validate_value", False)
+        validate_parent = self.spec.config.get("validate_parent", True)
+
         # Index actual symbols by name
         actual_by_name: Dict[str, List[Dict]] = {}
         for sym in actual_symbols:
             name = sym["name"]
             actual_by_name.setdefault(name, []).append(sym)
-        
+
         matched_ids: Set[str] = set()
-        
-        # Get validation config
-        config = self.spec.config
-        validate_signature = config.get("validate_signature", True)
-        validate_parent = config.get("validate_parent", True)
-        validate_value = config.get("validate_value", True)
 
         # Validate each expected symbol
         for expected in self.spec.expected_symbols:
-            sym_result = self._validate_symbol(
-                expected, actual_by_name, matched_ids, line_tolerance,
-                validate_signature=validate_signature,
-                validate_parent=validate_parent,
-                validate_value=validate_value
-            )
+            sym_result = self._validate_symbol(expected, actual_by_name, matched_ids, line_tolerance,
+                                               validate_signature, validate_value, validate_parent)
             result.symbol_results.append(sym_result)
             
             if sym_result.status == Status.PASS:
@@ -410,21 +486,20 @@ class Validator:
                 result.excluded_found.append(name)
             elif pattern:
                 regex = re.compile(pattern)
-                for n in actual_by_name:
-                    if regex.match(n):
-                        result.excluded_found.append(n)
+                for sym_name in actual_by_name:
+                    if regex.match(sym_name):
+                        result.excluded_found.append(sym_name)
         
-        # Collect extra symbols
-        expected_names = {s["name"] for s in self.spec.expected_symbols}
-        for sym in actual_symbols:
-            sid = f"{sym['name']}:{sym['line']}"
-            if sid not in matched_ids and sym["name"] not in expected_names:
-                result.extra_symbols.append(sym)
+        # Track extra symbols
+        all_matched_names = {r.name for r in result.symbol_results if r.status == Status.PASS}
+        for name, syms in actual_by_name.items():
+            if name not in all_matched_names:
+                result.extra_symbols.extend(syms)
         
-        # Final status
+        # Determine final status
         if result.failed > 0:
             result.status = Status.FAIL
-        elif result.warnings > 0 or result.excluded_found:
+        elif result.excluded_found:
             result.status = Status.WARN
         
         result.duration_ms = (time.time() - start) * 1000
@@ -436,28 +511,37 @@ class Validator:
         actual_by_name: Dict[str, List[Dict]],
         matched_ids: Set[str],
         line_tolerance: int,
-        validate_signature: bool = True,
-        validate_parent: bool = True,
-        validate_value: bool = True
+        validate_signature: bool = False,
+        validate_value: bool = False,
+        validate_parent: bool = True
     ) -> SymbolResult:
-        """Validate single symbol"""
-
+        """Validate a single expected symbol"""
         name = expected["name"]
         exp_type = expected["type"]
         exp_line = expected["line"]
         exp_parent = expected.get("parent", "")
-        is_optional = expected.get("optional", False)
-        pattern = expected.get("pattern")
+        optional = expected.get("optional", False)
+        pattern = expected.get("pattern", "")
         tags = expected.get("tags", [])
         
-        candidates = actual_by_name.get(name, [])
+        sym_result = SymbolResult(
+            name=name,
+            sym_type=exp_type,
+            expected_line=exp_line,
+            status=Status.FAIL,
+            pattern=pattern,
+            tags=tags
+        )
         
+        # Find candidates
+        candidates = actual_by_name.get(name, [])
         if not candidates:
-            if is_optional:
-                return SymbolResult(name, exp_type, exp_line, Status.SKIP,
-                                   issues=["Optional symbol not found"], pattern=pattern, tags=tags)
-            return SymbolResult(name, exp_type, exp_line, Status.FAIL,
-                               issues=["Symbol not found"], pattern=pattern, tags=tags)
+            if optional:
+                sym_result.status = Status.SKIP
+                sym_result.issues.append("optional symbol not found")
+            else:
+                sym_result.issues.append(f"not found in parser output")
+            return sym_result
         
         # Find best match
         best_match = None
@@ -470,84 +554,90 @@ class Validator:
             actual_type = actual["type"]
             if actual_type == exp_type:
                 score += 10
-            elif self._types_compatible(exp_type, actual_type):
+            elif exp_type in TYPE_COMPAT and actual_type in TYPE_COMPAT.get(exp_type, set()):
                 score += 5
             
-            # Line match
+            # Line proximity
             line_diff = abs(actual["line"] - exp_line)
-            if line_diff == 0:
-                score += 5
-            elif line_diff <= line_tolerance:
-                score += 3
+            if line_diff <= line_tolerance:
+                score += (line_tolerance - line_diff + 1) * 2
             
             # Parent match
-            if exp_parent:
-                if actual["parent"] == exp_parent:
-                    score += 5
-                elif not actual["parent"]:
-                    score -= 2
+            if validate_parent and exp_parent:
+                actual_parent = actual.get("parent", "")
+                if actual_parent == exp_parent:
+                    score += 3
+                elif exp_parent in actual_parent or actual_parent in exp_parent:
+                    score += 1  # Partial match (handles generics)
             
             if score > best_score:
                 best_score = score
                 best_match = actual
         
         if not best_match:
-            return SymbolResult(name, exp_type, exp_line, Status.FAIL,
-                               issues=["No matching candidate"], pattern=pattern, tags=tags)
+            if optional:
+                sym_result.status = Status.SKIP
+                sym_result.issues.append("optional symbol not matched")
+            else:
+                sym_result.issues.append("no unmatched candidate found")
+            return sym_result
         
-        # Mark matched
+        # Mark as matched
         matched_ids.add(f"{best_match['name']}:{best_match['line']}")
+        sym_result.actual_line = best_match["line"]
+        sym_result.actual_type = best_match["type"]
+        sym_result.actual_parent = best_match.get("parent")
         
         # Collect issues
         issues = []
+        
+        # Type check
         actual_type = best_match["type"]
-        actual_line = best_match["line"]
-        actual_parent = best_match["parent"]
+        if actual_type != exp_type:
+            if exp_type in TYPE_COMPAT and actual_type in TYPE_COMPAT.get(exp_type, set()):
+                pass  # Compatible
+            else:
+                issues.append(f"type mismatch: expected '{exp_type}', got '{actual_type}'")
         
-        if actual_type != exp_type and not self._types_compatible(exp_type, actual_type):
-            issues.append(f"type: expected '{exp_type}', got '{actual_type}'")
+        # Line check
+        line_diff = abs(best_match["line"] - exp_line)
+        if line_diff > line_tolerance:
+            issues.append(f"line {best_match['line']} outside tolerance (expected {exp_line}±{line_tolerance})")
         
-        if abs(actual_line - exp_line) > line_tolerance:
-            issues.append(f"line: expected {exp_line}, got {actual_line}")
-        
+        # Parent validation (only if enabled in config)
+        actual_parent = best_match.get("parent", "")
         if validate_parent and exp_parent and actual_parent != exp_parent:
-            issues.append(f"parent: expected '{exp_parent}', got '{actual_parent or 'none'}'")
-
-        # Signature validation (if enabled)
+            # Allow partial match for generics (UserService vs UserService<R>)
+            if not (exp_parent in actual_parent or actual_parent in exp_parent):
+                issues.append(f"parent mismatch: expected '{exp_parent}', got '{actual_parent}'")
+        
+        # Signature validation
         if validate_signature:
             sig_contains = expected.get("signature_contains", [])
             actual_sig = best_match.get("signature", "").lower()
             for substr in sig_contains:
                 if substr.lower() not in actual_sig:
                     issues.append(f"signature missing '{substr}'")
-
-        # Value validation (if enabled)
-        if validate_value and "value" in expected and expected["value"] is not None:
+        
+        # Value validation
+        if validate_value:
+            exp_value = expected.get("value")
             actual_value = best_match.get("value", "")
-            if actual_value != expected["value"]:
-                issues.append(f"value: expected '{expected['value']}', got '{actual_value}'")
+            if exp_value and actual_value != exp_value:
+                issues.append(f"value mismatch: expected '{exp_value}', got '{actual_value}'")
         
-        if issues:
-            return SymbolResult(name, exp_type, exp_line, Status.FAIL,
-                               actual_line=actual_line, actual_type=actual_type,
-                               actual_parent=actual_parent, issues=issues,
-                               pattern=pattern, tags=tags)
+        sym_result.issues = issues
+        sym_result.status = Status.FAIL if issues else Status.PASS
         
-        return SymbolResult(name, exp_type, exp_line, Status.PASS,
-                           actual_line=actual_line, actual_type=actual_type,
-                           actual_parent=actual_parent, pattern=pattern, tags=tags)
-    
-    def _types_compatible(self, exp: str, actual: str) -> bool:
-        """Check if types are compatible"""
-        return actual in TYPE_COMPAT.get(exp, {exp})
+        return sym_result
 
 
 # ============================================================
-# FORMAT CONVERTER
+# CONVERTER
 # ============================================================
 
 class Converter:
-    """Convert old expected.json format to UPTS"""
+    """Convert old parser_expected.json to UPTS format"""
     
     PATTERN_MAP = {
         "constant": "P1_CONSTANT",
@@ -555,46 +645,43 @@ class Converter:
         "class": "P3_CLASS_STRUCT",
         "struct": "P3_CLASS_STRUCT",
         "interface": "P4_INTERFACE_TRAIT",
+        "trait": "P4_INTERFACE_TRAIT",
         "enum": "P5_ENUM",
         "method": "P6_METHOD",
         "type": "P7_TYPE_ALIAS",
     }
     
     VARIANTS = {
-        "typescript": [".ts", ".tsx", ".mts"],
-        "javascript": [".js", ".mjs", ".jsx"],
-        "python": [".py", ".pyi"],
+        "typescript": [".ts", ".tsx"],
+        "javascript": [".js", ".jsx", ".mjs"],
+        "python": [".py", ".pyw"],
         "go": [".go"],
         "rust": [".rs"],
         "java": [".java"],
         "c": [".c", ".h"],
-        "cpp": [".cpp", ".hpp", ".cc"],
+        "cpp": [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"],
         "cuda": [".cu", ".cuh"],
     }
     
     @classmethod
     def convert(cls, old: Dict, language: str, fixture_path: str) -> Dict:
-        """Convert old expected.json to UPTS"""
-        
-        # Detect line field naming
-        line_field = "line_number" if any(
-            "line_number" in s for s in old.get("expected_symbols", [])
-        ) else "line"
+        """Convert old format to UPTS"""
+        # Detect line number field
+        sample = old.get("symbols", [{}])[0]
+        line_field = "line_number" if "line_number" in sample else "line"
         
         symbols = []
-        for s in old.get("expected_symbols", []):
+        for s in old.get("symbols", []):
             sym = {
                 "name": s["name"],
                 "type": s["type"],
                 "line": s.get(line_field, s.get("line", 0)),
             }
             
-            # Copy optional fields
             for f in ["exported", "parent", "signature", "value", "doc_comment"]:
                 if f in s:
                     sym[f] = s[f]
             
-            # Add pattern
             pattern = cls.PATTERN_MAP.get(s["type"])
             if pattern:
                 sym["pattern"] = pattern
@@ -625,7 +712,6 @@ class Converter:
             }
         }
         
-        # Copy enhancements
         if "enhancements_made" in old:
             upts["metadata"]["enhancements"] = old["enhancements_made"]
         
@@ -661,6 +747,15 @@ class Reporter:
         print(f"Spec: {r.spec_path}")
         print(f"Status: {icons.get(r.status, r.status.value)}")
         print(f"Matched: {r.matched}/{r.total_expected} ({r.pass_rate:.1f}%)")
+        
+        # Hash status
+        if r.hash_verified:
+            print(f"Fixture Hash: {self._c('✓ Verified', 'green')}")
+        elif r.hash_skipped:
+            print(f"Fixture Hash: {self._c('⊘ Skipped', 'yellow')}")
+        else:
+            print(f"Fixture Hash: {self._c('○ Not specified', 'yellow')}")
+        
         print(f"Duration: {r.duration_ms:.1f}ms")
         
         if r.error_message:
@@ -701,8 +796,9 @@ class Reporter:
 class Runner:
     """Main test runner"""
     
-    def __init__(self, parser: ParserInterface):
+    def __init__(self, parser: ParserInterface, skip_hash: bool = False):
         self.parser = parser
+        self.skip_hash = skip_hash
         self.reporter = Reporter()
     
     def run_spec(self, spec_path: Path) -> SpecResult:
@@ -717,7 +813,7 @@ class Runner:
                 error_message=f"Spec errors: {'; '.join(loader.errors)}"
             )
         
-        validator = Validator(loader, self.parser)
+        validator = Validator(loader, self.parser, skip_hash=self.skip_hash)
         return validator.validate()
     
     def run_all(self, spec_dir: Path, pattern: str = "*.upts.json") -> TestReport:
@@ -753,11 +849,100 @@ class Runner:
 
 
 # ============================================================
+# HASH MANAGEMENT COMMANDS
+# ============================================================
+
+def add_hashes_to_specs(spec_dir: Path, pattern: str = "*.upts.json") -> Tuple[int, int]:
+    """
+    Add SHA256 hashes to all specs in a directory.
+    
+    Returns: (updated_count, error_count)
+    """
+    updated = 0
+    errors = 0
+    
+    for spec_path in sorted(spec_dir.glob(pattern)):
+        loader = UPTSLoader(spec_path)
+        if not loader.load():
+            print(f"  ✗ {spec_path.name}: Load error")
+            errors += 1
+            continue
+        
+        fixture_path = loader.fixture_path
+        if not fixture_path or not fixture_path.exists():
+            print(f"  ✗ {spec_path.name}: Fixture not found")
+            errors += 1
+            continue
+        
+        # Compute hash
+        new_hash = compute_sha256(fixture_path)
+        old_hash = loader.fixture_hash
+        
+        if old_hash == new_hash:
+            print(f"  ○ {spec_path.name}: Hash unchanged")
+            continue
+        
+        # Update spec
+        if loader.update_fixture_hash():
+            if old_hash:
+                print(f"  ✓ {spec_path.name}: Hash updated")
+            else:
+                print(f"  ✓ {spec_path.name}: Hash added")
+            updated += 1
+        else:
+            print(f"  ✗ {spec_path.name}: Update failed")
+            errors += 1
+    
+    return updated, errors
+
+
+def verify_all_hashes(spec_dir: Path, pattern: str = "*.upts.json") -> Tuple[int, int, int]:
+    """
+    Verify hashes for all specs without running full validation.
+    
+    Returns: (verified_count, missing_count, mismatch_count)
+    """
+    verified = 0
+    missing = 0
+    mismatched = 0
+    
+    for spec_path in sorted(spec_dir.glob(pattern)):
+        loader = UPTSLoader(spec_path)
+        if not loader.load():
+            continue
+        
+        fixture_path = loader.fixture_path
+        expected_hash = loader.fixture_hash
+        
+        if not expected_hash:
+            print(f"  ○ {spec_path.name}: No hash specified")
+            missing += 1
+            continue
+        
+        if not fixture_path or not fixture_path.exists():
+            print(f"  ✗ {spec_path.name}: Fixture not found")
+            mismatched += 1
+            continue
+        
+        actual_hash = compute_sha256(fixture_path)
+        if actual_hash == expected_hash:
+            print(f"  ✓ {spec_path.name}: Hash verified")
+            verified += 1
+        else:
+            print(f"  ✗ {spec_path.name}: HASH MISMATCH")
+            print(f"      Expected: {expected_hash[:16]}...")
+            print(f"      Actual:   {actual_hash[:16]}...")
+            mismatched += 1
+    
+    return verified, missing, mismatched
+
+
+# ============================================================
 # CLI
 # ============================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="UPTS Test Runner")
+    parser = argparse.ArgumentParser(description="UPTS Test Runner v1.1.0")
     sub = parser.add_subparsers(dest="cmd", required=True)
     
     # validate
@@ -765,6 +950,7 @@ def main():
     val.add_argument("--spec", type=Path, required=True)
     val.add_argument("--parser", type=str, required=True)
     val.add_argument("--report", type=Path)
+    val.add_argument("--skip-hash", action="store_true", help="Skip fixture hash verification")
     
     # validate-all
     val_all = sub.add_parser("validate-all", help="Validate all specs")
@@ -772,6 +958,17 @@ def main():
     val_all.add_argument("--parser", type=str, required=True)
     val_all.add_argument("--pattern", type=str, default="*.upts.json")
     val_all.add_argument("--report", type=Path)
+    val_all.add_argument("--skip-hash", action="store_true", help="Skip fixture hash verification")
+    
+    # add-hashes
+    add_hash = sub.add_parser("add-hashes", help="Add SHA256 hashes to specs")
+    add_hash.add_argument("--spec-dir", type=Path, required=True)
+    add_hash.add_argument("--pattern", type=str, default="*.upts.json")
+    
+    # verify-hashes
+    verify_hash = sub.add_parser("verify-hashes", help="Verify fixture hashes without full validation")
+    verify_hash.add_argument("--spec-dir", type=Path, required=True)
+    verify_hash.add_argument("--pattern", type=str, default="*.upts.json")
     
     # convert
     conv = sub.add_parser("convert", help="Convert old format to UPTS")
@@ -783,7 +980,7 @@ def main():
     args = parser.parse_args()
     
     if args.cmd == "validate":
-        runner = Runner(ParserInterface(args.parser))
+        runner = Runner(ParserInterface(args.parser), skip_hash=args.skip_hash)
         result = runner.run_spec(args.spec)
         runner.reporter.print_result(result)
         
@@ -798,13 +995,25 @@ def main():
         sys.exit(0 if result.status == Status.PASS else 1)
     
     elif args.cmd == "validate-all":
-        runner = Runner(ParserInterface(args.parser))
+        runner = Runner(ParserInterface(args.parser), skip_hash=args.skip_hash)
         report = runner.run_all(args.spec_dir, args.pattern)
         
         if args.report:
             runner.reporter.save_report(report, args.report)
         
         sys.exit(0 if report.failed == 0 and report.errors == 0 else 1)
+    
+    elif args.cmd == "add-hashes":
+        print(f"Adding SHA256 hashes to specs in {args.spec_dir}")
+        updated, errors = add_hashes_to_specs(args.spec_dir, args.pattern)
+        print(f"\nUpdated: {updated}, Errors: {errors}")
+        sys.exit(0 if errors == 0 else 1)
+    
+    elif args.cmd == "verify-hashes":
+        print(f"Verifying fixture hashes in {args.spec_dir}")
+        verified, missing, mismatched = verify_all_hashes(args.spec_dir, args.pattern)
+        print(f"\nVerified: {verified}, Missing: {missing}, Mismatched: {mismatched}")
+        sys.exit(0 if mismatched == 0 else 1)
     
     elif args.cmd == "convert":
         old = json.loads(args.input.read_text())

@@ -1,17 +1,20 @@
 {
   "upts_version": "1.0.0",
   "language": "go",
-  "variants": [".go"],
-  
+  "variants": [
+    ".go"
+  ],
   "metadata": {
     "author": "reh3376",
     "created": "2026-01-28",
     "updated": "2026-01-29",
     "description": "Go parser - all applicable canonical patterns (Go has no true enums)",
     "parser_status": "enhanced",
-    "tags": ["canonical", "stdlib"]
+    "tags": [
+      "canonical",
+      "stdlib"
+    ]
   },
-  
   "config": {
     "line_tolerance": 2,
     "require_all_symbols": true,
@@ -20,16 +23,16 @@
     "validate_value": false,
     "validate_parent": true
   },
-  
   "fixture": {
     "type": "file",
     "path": "../fixtures/go_test_fixture.go",
     "sha256": "37d181dc9edcdf8e133a6a0c436771ca5d734b05f1c52636f276cb21773712e9"
   },
-  
   "expected": {
-    "symbol_count": {"min": 17, "max": 22},
-    
+    "symbol_count": {
+      "min": 17,
+      "max": 22
+    },
     "symbols": [
       {
         "name": "MaxRetries",
@@ -37,7 +40,10 @@
         "line": 13,
         "exported": true,
         "pattern": "P1_CONSTANT",
-        "tags": ["constant", "int"]
+        "tags": [
+          "constant",
+          "int"
+        ]
       },
       {
         "name": "DefaultTimeout",
@@ -45,7 +51,10 @@
         "line": 14,
         "exported": true,
         "pattern": "P1_CONSTANT",
-        "tags": ["constant", "duration"]
+        "tags": [
+          "constant",
+          "duration"
+        ]
       },
       {
         "name": "StatusActive",
@@ -53,7 +62,11 @@
         "line": 16,
         "exported": true,
         "pattern": "P1_CONSTANT",
-        "tags": ["constant", "string", "iota-group"]
+        "tags": [
+          "constant",
+          "string",
+          "iota-group"
+        ]
       },
       {
         "name": "StatusInactive",
@@ -61,7 +74,11 @@
         "line": 17,
         "exported": true,
         "pattern": "P1_CONSTANT",
-        "tags": ["constant", "string", "iota-group"]
+        "tags": [
+          "constant",
+          "string",
+          "iota-group"
+        ]
       },
       {
         "name": "UserID",
@@ -69,7 +86,10 @@
         "line": 22,
         "exported": true,
         "pattern": "P7_TYPE_ALIAS",
-        "tags": ["type-alias", "string"]
+        "tags": [
+          "type-alias",
+          "string"
+        ]
       },
       {
         "name": "ItemList",
@@ -77,7 +97,10 @@
         "line": 23,
         "exported": true,
         "pattern": "P7_TYPE_ALIAS",
-        "tags": ["type-alias", "slice"]
+        "tags": [
+          "type-alias",
+          "slice"
+        ]
       },
       {
         "name": "UserRepository",
@@ -85,7 +108,9 @@
         "line": 27,
         "exported": true,
         "pattern": "P4_INTERFACE_TRAIT",
-        "tags": ["interface"]
+        "tags": [
+          "interface"
+        ]
       },
       {
         "name": "User",
@@ -93,7 +118,11 @@
         "line": 35,
         "exported": true,
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["struct", "entity", "json-tags"]
+        "tags": [
+          "struct",
+          "entity",
+          "json-tags"
+        ]
       },
       {
         "name": "UserService",
@@ -101,64 +130,106 @@
         "line": 45,
         "exported": true,
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["struct", "service"]
+        "tags": [
+          "struct",
+          "service"
+        ]
       },
       {
         "name": "FindByID",
         "type": "method",
         "line": 52,
-        "exported": true,
         "parent": "UserService",
-        "signature_contains": ["ctx", "UserID", "User", "error"],
+        "signature_contains": [
+          "ctx",
+          "UserID",
+          "User",
+          "error"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method", "receiver", "pointer"]
+        "tags": [
+          "method",
+          "receiver",
+          "pointer"
+        ]
       },
       {
         "name": "Create",
         "type": "method",
         "line": 57,
-        "exported": true,
         "parent": "UserService",
-        "signature_contains": ["ctx", "User", "error"],
+        "signature_contains": [
+          "ctx",
+          "User",
+          "error"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method", "receiver", "pointer"]
+        "tags": [
+          "method",
+          "receiver",
+          "pointer"
+        ]
       },
       {
         "name": "Delete",
         "type": "method",
         "line": 62,
-        "exported": true,
         "parent": "UserService",
-        "signature_contains": ["ctx", "UserID", "error"],
+        "signature_contains": [
+          "ctx",
+          "UserID",
+          "error"
+        ],
         "pattern": "P6_METHOD",
-        "tags": ["method", "receiver", "pointer"]
+        "tags": [
+          "method",
+          "receiver",
+          "pointer"
+        ]
       },
       {
         "name": "ValidateEmail",
         "type": "function",
         "line": 68,
         "exported": true,
-        "signature_contains": ["email", "bool"],
+        "signature_contains": [
+          "email",
+          "bool"
+        ],
         "pattern": "P2_FUNCTION",
-        "tags": ["function"]
+        "tags": [
+          "function"
+        ]
       },
       {
         "name": "FormatUser",
         "type": "function",
         "line": 73,
         "exported": true,
-        "signature_contains": ["User", "string"],
+        "signature_contains": [
+          "User",
+          "string"
+        ],
         "pattern": "P2_FUNCTION",
-        "tags": ["function"]
+        "tags": [
+          "function"
+        ]
       },
       {
         "name": "NewUserService",
         "type": "function",
         "line": 78,
         "exported": true,
-        "signature_contains": ["UserRepository", "Logger", "UserService"],
+        "signature_contains": [
+          "UserRepository",
+          "Logger",
+          "UserService"
+        ],
         "pattern": "P2_FUNCTION",
-        "tags": ["function", "constructor"]
+        "tags": [
+          "function",
+          "constructor"
+        ]
       },
       {
         "name": "Item",
@@ -166,7 +237,9 @@
         "line": 86,
         "exported": true,
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["struct"]
+        "tags": [
+          "struct"
+        ]
       },
       {
         "name": "Logger",
@@ -174,21 +247,45 @@
         "line": 91,
         "exported": true,
         "pattern": "P4_INTERFACE_TRAIT",
-        "tags": ["interface"]
+        "tags": [
+          "interface"
+        ]
       }
     ],
-    
     "excluded": [
-      {"name": "repo", "reason": "unexported struct field"},
-      {"name": "logger", "reason": "unexported struct field"}
+      {
+        "name": "repo",
+        "reason": "unexported struct field"
+      },
+      {
+        "name": "logger",
+        "reason": "unexported struct field"
+      }
     ],
-    
     "relationships": [
-      {"source": "UserService", "relation": "DEFINES_METHOD", "target": "FindByID"},
-      {"source": "UserService", "relation": "DEFINES_METHOD", "target": "Create"},
-      {"source": "UserService", "relation": "DEFINES_METHOD", "target": "Delete"}
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "FindByID"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "Create"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "Delete"
+      }
     ]
   },
-  
-  "patterns_covered": ["P1_CONSTANT", "P2_FUNCTION", "P3_CLASS_STRUCT", "P4_INTERFACE_TRAIT", "P6_METHOD", "P7_TYPE_ALIAS"]
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P2_FUNCTION",
+    "P3_CLASS_STRUCT",
+    "P4_INTERFACE_TRAIT",
+    "P6_METHOD",
+    "P7_TYPE_ALIAS"
+  ]
 }

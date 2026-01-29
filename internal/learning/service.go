@@ -211,6 +211,13 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 	}
 	nodes := make([]models.RetrieveResult, 0, len(resp.Results))
 	for _, r := range resp.Results {
+		// CRITICAL: Only L0 (code) nodes participate in learning.
+		// Hidden nodes (L1+) are structural abstractions that appear in many queries,
+		// causing them to become hubs that accumulate edges from unrelated code.
+		// This pollutes activation spreading and pushes hidden nodes to top results.
+		if r.Layer > 0 {
+			continue // Skip hidden/concept nodes
+		}
 		if r.Activation >= minAct && !isStopWord(r.Name) {
 			nodes = append(nodes, r)
 		}

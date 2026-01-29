@@ -111,9 +111,20 @@ func (p *SQLParser) ParseFile(root, path string, extractSymbols bool) ([]CodeEle
 		symbols = p.extractSymbols(content)
 	}
 
+	// Determine element name - use parent dir for migrations to avoid duplicates
+	// (Prisma migrations are all named migration.sql in different timestamped folders)
+	elementName := fileName
+	if fileType == "migration" && fileName == "migration.sql" {
+		parentDir := filepath.Dir(relPath)
+		migrationName := filepath.Base(parentDir)
+		if migrationName != "" && migrationName != "." {
+			elementName = migrationName
+		}
+	}
+
 	// Add file-level element
 	elements = append(elements, CodeElement{
-		Name:     fileName,
+		Name:     elementName,
 		Kind:     fileType,
 		Path:     "/" + relPath,
 		Content:  contentBuilder.String(),

@@ -1,0 +1,257 @@
+{
+  "language": "python",
+  "fixture_file": "python_test_fixture.py",
+  "expected_count": 35,
+  "parser_status": "Enhanced 2026-01-28",
+  "expected_symbols": [
+    {
+      "name": "MAX_RETRIES",
+      "type": "constant",
+      "line_number": 12,
+      "exported": true,
+      "value": "3"
+    },
+    {
+      "name": "DEFAULT_TIMEOUT",
+      "type": "constant",
+      "line_number": 13,
+      "exported": true,
+      "value": "30"
+    },
+    {
+      "name": "API_VERSION",
+      "type": "constant",
+      "line_number": 14,
+      "exported": true,
+      "value": "\"1.0.0\""
+    },
+    {
+      "name": "DEBUG_MODE",
+      "type": "constant",
+      "line_number": 15,
+      "exported": true,
+      "value": "True"
+    },
+    {
+      "name": "UserId",
+      "type": "type",
+      "line_number": 18,
+      "exported": true
+    },
+    {
+      "name": "ItemList",
+      "type": "type",
+      "line_number": 19,
+      "exported": true
+    },
+    {
+      "name": "calculate_total",
+      "type": "function",
+      "line_number": 23,
+      "exported": true,
+      "signature": "def calculate_total(items: List[\"Item\"]) -> int"
+    },
+    {
+      "name": "process_items",
+      "type": "function",
+      "line_number": 28,
+      "exported": true,
+      "signature": "def process_items(items: List[\"Item\"], timeout: int = DEFAULT_TIMEOUT) -> bool"
+    },
+    {
+      "name": "fetch_user",
+      "type": "function",
+      "line_number": 36,
+      "exported": true,
+      "signature": "async def fetch_user(user_id: str) -> Optional[\"User\"]"
+    },
+    {
+      "name": "Status",
+      "type": "enum",
+      "line_number": 42,
+      "exported": true,
+      "parent": "Enum"
+    },
+    {
+      "name": "Priority",
+      "type": "enum",
+      "line_number": 49,
+      "exported": true,
+      "parent": "Enum"
+    },
+    {
+      "name": "UserRepository",
+      "type": "interface",
+      "line_number": 57,
+      "exported": true,
+      "parent": "Protocol"
+    },
+    {
+      "name": "find_by_id",
+      "type": "method",
+      "line_number": 60,
+      "exported": true,
+      "parent": "UserRepository"
+    },
+    {
+      "name": "save",
+      "type": "method",
+      "line_number": 64,
+      "exported": true,
+      "parent": "UserRepository"
+    },
+    {
+      "name": "ItemValidator",
+      "type": "interface",
+      "line_number": 69,
+      "exported": true,
+      "parent": "Protocol"
+    },
+    {
+      "name": "validate",
+      "type": "method",
+      "line_number": 72,
+      "exported": true,
+      "parent": "ItemValidator"
+    },
+    {
+      "name": "Item",
+      "type": "class",
+      "line_number": 79,
+      "exported": true,
+      "doc_comment": "Decorators: @dataclass"
+    },
+    {
+      "name": "is_valid",
+      "type": "method",
+      "line_number": 86,
+      "exported": true,
+      "parent": "Item"
+    },
+    {
+      "name": "calculate_discount",
+      "type": "method",
+      "line_number": 90,
+      "exported": true,
+      "parent": "Item"
+    },
+    {
+      "name": "UserService",
+      "type": "class",
+      "line_number": 95,
+      "exported": true
+    },
+    {
+      "name": "__init__",
+      "type": "method",
+      "line_number": 98,
+      "exported": false,
+      "parent": "UserService"
+    },
+    {
+      "name": "find_by_id",
+      "type": "method",
+      "line_number": 102,
+      "exported": true,
+      "parent": "UserService"
+    },
+    {
+      "name": "create_user",
+      "type": "method",
+      "line_number": 106,
+      "exported": true,
+      "parent": "UserService"
+    },
+    {
+      "name": "update_user",
+      "type": "method",
+      "line_number": 110,
+      "exported": true,
+      "parent": "UserService"
+    },
+    {
+      "name": "BaseEntity",
+      "type": "class",
+      "line_number": 115,
+      "exported": true
+    },
+    {
+      "name": "get_id",
+      "type": "method",
+      "line_number": 121,
+      "exported": true,
+      "parent": "BaseEntity"
+    },
+    {
+      "name": "User",
+      "type": "class",
+      "line_number": 126,
+      "exported": true,
+      "parent": "BaseEntity"
+    },
+    {
+      "name": "__init__",
+      "type": "method",
+      "line_number": 133,
+      "exported": false,
+      "parent": "User"
+    },
+    {
+      "name": "deactivate",
+      "type": "method",
+      "line_number": 140,
+      "exported": true,
+      "parent": "User"
+    },
+    {
+      "name": "is_active",
+      "type": "method",
+      "line_number": 144,
+      "exported": true,
+      "parent": "User"
+    },
+    {
+      "name": "_INTERNAL_CONSTANT",
+      "type": "constant",
+      "line_number": 150,
+      "exported": false,
+      "value": "\"internal\""
+    },
+    {
+      "name": "_private_helper",
+      "type": "function",
+      "line_number": 153,
+      "exported": false,
+      "signature": "def _private_helper(data: str) -> str"
+    },
+    {
+      "name": "_InternalCache",
+      "type": "class",
+      "line_number": 158,
+      "exported": false
+    },
+    {
+      "name": "__init__",
+      "type": "method",
+      "line_number": 161,
+      "exported": false,
+      "parent": "_InternalCache"
+    },
+    {
+      "name": "get",
+      "type": "method",
+      "line_number": 164,
+      "exported": true,
+      "parent": "_InternalCache"
+    }
+  ],
+  "enhancements_made": {
+    "methods_extraction": "Methods inside classes now correctly typed as 'method' with Parent set",
+    "type_aliases": "Type aliases (CamelCase = Type) now extracted",
+    "enum_detection": "Enum subclasses detected as 'enum' type",
+    "protocol_detection": "Protocol subclasses detected as 'interface' type",
+    "async_functions": "async def functions properly handled",
+    "decorator_tracking": "Decorators captured in DocComment field",
+    "private_symbols": "Private symbols (_prefix) correctly marked as Exported=false"
+  }
+}

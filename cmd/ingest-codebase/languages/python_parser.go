@@ -139,21 +139,71 @@ func (p *PythonParser) extractSymbols(content string) []Symbol {
 	var symbols []Symbol
 	lines := strings.Split(content, "\n")
 
-	// Pattern: CONSTANT = value (uppercase name at module level)
+	// Patterns for various Python constructs
+	// Constants: UPPER_CASE = value (at module level)
 	constPattern := regexp.MustCompile(`^([A-Z][A-Z0-9_]*)\s*=\s*(.+)$`)
-	// Pattern: def function_name(args) -> Type:
-	fnPattern := regexp.MustCompile(`^def\s+(\w+)\s*\(([^)]*)\)(?:\s*->\s*([^:]+))?:`)
-	// Pattern: class ClassName(base):
+	// Private constants: _UPPER_CASE = value (at module level)
+	privateConstPattern := regexp.MustCompile(`^(_[A-Z][A-Z0-9_]*)\s*=\s*(.+)$`)
+	// Type aliases: TypeName = SomeType (CamelCase = type at module level)
+	typeAliasPattern := regexp.MustCompile(`^([A-Z][a-zA-Z0-9]*)\s*=\s*(str|int|float|bool|List\[|Dict\[|Set\[|Tuple\[|Optional\[|Union\[)`)
+	// Function: def function_name(args) -> Type: or async def function_name(args) -> Type:
+	fnPattern := regexp.MustCompile(`^(async\s+)?def\s+(\w+)\s*\(([^)]*)\)(?:\s*->\s*([^:]+))?:`)
+	// Class: class ClassName(base):
 	classPattern := regexp.MustCompile(`^class\s+(\w+)(?:\s*\(([^)]*)\))?:`)
+	// Decorator: @decorator_name or @decorator_name(args)
+	decoratorPattern := regexp.MustCompile(`^@(\w+)(?:\(|$)`)
+
+	var currentClass string
+	var classIndent int
+	var pendingDecorators []string
 
 	for i, line := range lines {
 		lineNum := i + 1
 		trimmedLine := strings.TrimSpace(line)
 
+		// Skip empty lines and comments
+		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") {
+			continue
+		}
+
+		// Calculate indentation
+		indent := len(line) - len(strings.TrimLeft(line, " \t"))
+
+		// Track decorators
+		if matches := decoratorPattern.FindStringSubmatch(trimmedLine); matches != nil {
+			pendingDecorators = append(pendingDecorators, matches[1])
+			continue
+		}
+
+		// Check if we've exited the current class (dedented to class level or lower)
+		if currentClass != "" && indent <= classIndent && !strings.HasPrefix(trimmedLine, "@") {
+			currentClass = ""
+			classIndent = 0
+		}
+
+		// Extract type aliases (at module level, CamelCase = Type)
+		if indent == 0 {
+			if matches := typeAliasPattern.FindStringSubmatch(trimmedLine); matches != nil {
+				// Don't capture if it matches class pattern
+				if !classPattern.MatchString(trimmedLine) {
+					sym := Symbol{
+						Name:       matches[1],
+						Type:       "type",
+						Line: lineNum,
+						Exported:   !strings.HasPrefix(matches[1], "_"),
+						Language:   "python",
+					}
+					symbols = append(symbols, sym)
+					pendingDecorators = nil
+					continue
+				}
+			}
+		}
+
 		// Extract module-level constants (must not be indented)
-		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+		if indent == 0 {
 			if matches := constPattern.FindStringSubmatch(trimmedLine); matches != nil {
-				// Skip if it looks like a class attribute
+				// Skip if it looks like a class or function definition
 				if strings.Contains(matches[2], "class") || strings.Contains(matches[2], "def") {
 					continue
 				}
@@ -162,49 +212,130 @@ func (p *PythonParser) extractSymbols(content string) []Symbol {
 					Type:       "constant",
 					Value:      CleanValue(matches[2]),
 					RawValue:   matches[2],
-					LineNumber: lineNum,
-					Exported:   !strings.HasPrefix(matches[1], "_"),
+					Line: lineNum,
+					Exported:   true,
 					Language:   "python",
 				}
 				symbols = append(symbols, sym)
+				pendingDecorators = nil
+				continue
 			}
-		}
-
-		// Extract function definitions
-		if matches := fnPattern.FindStringSubmatch(trimmedLine); matches != nil {
-			returnType := ""
-			if len(matches) > 3 && matches[3] != "" {
-				returnType = strings.TrimSpace(matches[3])
+			// Also capture private constants
+			if matches := privateConstPattern.FindStringSubmatch(trimmedLine); matches != nil {
+				if strings.Contains(matches[2], "class") || strings.Contains(matches[2], "def") {
+					continue
+				}
+				sym := Symbol{
+					Name:       matches[1],
+					Type:       "constant",
+					Value:      CleanValue(matches[2]),
+					RawValue:   matches[2],
+					Line: lineNum,
+					Exported:   false,
+					Language:   "python",
+				}
+				symbols = append(symbols, sym)
+				pendingDecorators = nil
+				continue
 			}
-
-			sym := Symbol{
-				Name:           matches[1],
-				Type:           "function",
-				Signature:      fmt.Sprintf("def %s(%s)%s", matches[1], matches[2], formatPythonReturn(returnType)),
-				TypeAnnotation: returnType,
-				LineNumber:     lineNum,
-				Exported:       !strings.HasPrefix(matches[1], "_"),
-				Language:       "python",
-			}
-			symbols = append(symbols, sym)
 		}
 
 		// Extract class definitions
 		if matches := classPattern.FindStringSubmatch(trimmedLine); matches != nil {
+			className := matches[1]
 			baseClasses := ""
 			if len(matches) > 2 && matches[2] != "" {
 				baseClasses = matches[2]
 			}
 
+			// Determine symbol type based on base class
+			symType := "class"
+			if strings.Contains(baseClasses, "Enum") {
+				symType = "enum"
+			} else if strings.Contains(baseClasses, "Protocol") {
+				symType = "interface"
+			}
+
+			// Build doc comment from decorators
+			docComment := ""
+			if len(pendingDecorators) > 0 {
+				docComment = "Decorators: @" + strings.Join(pendingDecorators, ", @")
+			}
+
 			sym := Symbol{
-				Name:       matches[1],
-				Type:       "class",
+				Name:       className,
+				Type:       symType,
 				Parent:     baseClasses,
-				LineNumber: lineNum,
-				Exported:   !strings.HasPrefix(matches[1], "_"),
+				DocComment: docComment,
+				Line: lineNum,
+				Exported:   !strings.HasPrefix(className, "_"),
 				Language:   "python",
 			}
 			symbols = append(symbols, sym)
+
+			// Track class context for method detection
+			currentClass = className
+			classIndent = indent
+			pendingDecorators = nil
+			continue
+		}
+
+		// Extract function/method definitions
+		if matches := fnPattern.FindStringSubmatch(trimmedLine); matches != nil {
+			isAsync := matches[1] != ""
+			funcName := matches[2]
+			params := matches[3]
+			returnType := ""
+			if len(matches) > 4 && matches[4] != "" {
+				returnType = strings.TrimSpace(matches[4])
+			}
+
+			// Skip dunder methods except __init__
+			if strings.HasPrefix(funcName, "__") && funcName != "__init__" {
+				pendingDecorators = nil
+				continue
+			}
+
+			// Determine if this is a method (inside a class) or function
+			symType := "function"
+			parent := ""
+			if currentClass != "" && indent > classIndent {
+				symType = "method"
+				parent = currentClass
+			}
+
+			// Build signature
+			prefix := "def "
+			if isAsync {
+				prefix = "async def "
+			}
+			sig := fmt.Sprintf("%s%s(%s)%s", prefix, funcName, params, formatPythonReturn(returnType))
+
+			// Build doc comment from decorators
+			docComment := ""
+			if len(pendingDecorators) > 0 {
+				docComment = "Decorators: @" + strings.Join(pendingDecorators, ", @")
+			}
+
+			sym := Symbol{
+				Name:           funcName,
+				Type:           symType,
+				Parent:         parent,
+				Signature:      sig,
+				TypeAnnotation: returnType,
+				DocComment:     docComment,
+				Line:     lineNum,
+				Exported:       !strings.HasPrefix(funcName, "_"),
+				Language:       "python",
+			}
+			symbols = append(symbols, sym)
+			pendingDecorators = nil
+			continue
+		}
+
+		// Clear pending decorators if we hit a line that didn't use them
+		if len(pendingDecorators) > 0 && !strings.HasPrefix(trimmedLine, "@") {
+			pendingDecorators = nil
 		}
 	}
 

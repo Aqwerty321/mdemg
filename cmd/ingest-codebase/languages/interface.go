@@ -25,19 +25,20 @@ type CodeElement struct {
 }
 
 // Symbol represents an extracted code symbol (constant, function signature, etc.)
+// Field names follow UPTS (Universal Parser Test Specification) v1.0.0
 type Symbol struct {
 	Name           string `json:"name"`
-	Type           string `json:"type"` // "constant", "function", "class", "interface", "variable", "struct", "enum", "method", "macro", "kernel", "device_function", "typedef"
-	Value          string `json:"value,omitempty"`
-	RawValue       string `json:"raw_value,omitempty"`
-	LineNumber     int    `json:"line_number"`
-	EndLine        int    `json:"end_line,omitempty"`
-	Exported       bool   `json:"exported"`
-	DocComment     string `json:"doc_comment,omitempty"`
-	Signature      string `json:"signature,omitempty"`
-	Parent         string `json:"parent,omitempty"` // Parent class/struct/module
-	TypeAnnotation string `json:"type_annotation,omitempty"`
-	Language       string `json:"language,omitempty"`
+	Type           string `json:"type"` // "constant", "function", "class", "interface", "variable", "struct", "enum", "method", "macro", "kernel", "trait", "field"
+	Line           int    `json:"line"`                      // 1-indexed line number (UPTS standard)
+	LineEnd        int    `json:"line_end,omitempty"`        // End line for multi-line symbols
+	Exported       bool   `json:"exported"`                  // Public visibility
+	Parent         string `json:"parent,omitempty"`          // Parent class/struct/module for methods
+	Signature      string `json:"signature,omitempty"`       // Full signature
+	Value          string `json:"value,omitempty"`           // Constant value
+	RawValue       string `json:"raw_value,omitempty"`       // Original source text
+	DocComment     string `json:"doc_comment,omitempty"`     // Documentation/decorators
+	TypeAnnotation string `json:"type_annotation,omitempty"` // Type annotation
+	Language       string `json:"language,omitempty"`        // Source language
 }
 
 // LanguageParser defines the interface that all language parsers must implement.

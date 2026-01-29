@@ -196,7 +196,7 @@ func (p *JavaParser) extractSymbols(content string) []Symbol {
 				symbols = append(symbols, Symbol{
 					Name:       matches[1],
 					Type:       "enum_value",
-					LineNumber: lineNum,
+					Line: lineNum,
 					Exported:   true,
 					Language:   "java",
 				})
@@ -215,7 +215,7 @@ func (p *JavaParser) extractSymbols(content string) []Symbol {
 				Type:           "constant",
 				TypeAnnotation: matches[1],
 				Value:          valueStr,
-				LineNumber:     lineNum,
+				Line:     lineNum,
 				Exported:       strings.Contains(line, "public"),
 				Language:       "java",
 			})
@@ -228,7 +228,7 @@ func (p *JavaParser) extractSymbols(content string) []Symbol {
 				Name:           matches[2],
 				Type:           "field",
 				TypeAnnotation: matches[1],
-				LineNumber:     lineNum,
+				Line:     lineNum,
 				Exported:       strings.Contains(line, "public"),
 				Language:       "java",
 			})
@@ -249,7 +249,7 @@ func (p *JavaParser) extractSymbols(content string) []Symbol {
 				Type:           "method",
 				Signature:      signature,
 				TypeAnnotation: returnType,
-				LineNumber:     lineNum,
+				Line:     lineNum,
 				Exported:       strings.Contains(line, "public"),
 				Language:       "java",
 			})

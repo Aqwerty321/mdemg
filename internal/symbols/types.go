@@ -36,12 +36,29 @@ const (
 )
 
 // Symbol represents an extracted code symbol with its metadata.
+// Field names follow UPTS (Universal Parser Test Specification) v1.0.0
 type Symbol struct {
 	// Name is the symbol identifier (e.g., "DEFAULT_FLUSH_INTERVAL").
 	Name string `json:"name"`
 
 	// Type is the kind of symbol (const, function, class, etc.).
 	Type SymbolType `json:"type"`
+
+	// Line is the 1-indexed start line of the symbol definition (UPTS standard).
+	Line int `json:"line"`
+
+	// LineEnd is the 1-indexed end line of the symbol definition.
+	LineEnd int `json:"line_end,omitempty"`
+
+	// Exported indicates whether the symbol is public/exported.
+	Exported bool `json:"exported"`
+
+	// Parent is the name of the containing class/struct for members.
+	Parent string `json:"parent,omitempty"`
+
+	// Signature is the function signature for functions/methods.
+	// Example: "(ctx context.Context, id string) (error)"
+	Signature string `json:"signature,omitempty"`
 
 	// Value is the literal value for constants, empty for functions/classes.
 	// For numeric constants, this is the evaluated value (e.g., "60000" not "60 * 1000").
@@ -50,40 +67,24 @@ type Symbol struct {
 	// RawValue is the original source text of the value (e.g., "60 * 1000").
 	RawValue string `json:"raw_value,omitempty"`
 
-	// FilePath is the relative path from the repository root.
-	FilePath string `json:"file_path"`
-
-	// LineNumber is the 1-indexed start line of the symbol definition.
-	LineNumber int `json:"line_number"`
-
-	// EndLine is the 1-indexed end line of the symbol definition.
-	EndLine int `json:"end_line"`
-
-	// Column is the 0-indexed start column of the symbol name.
-	Column int `json:"column,omitempty"`
-
-	// Exported indicates whether the symbol is public/exported.
-	Exported bool `json:"exported"`
-
 	// DocComment is the documentation comment above the symbol (JSDoc, GoDoc, etc.).
 	DocComment string `json:"doc_comment,omitempty"`
 
-	// Signature is the function signature for functions/methods.
-	// Example: "(ctx context.Context, id string) (error)"
-	Signature string `json:"signature,omitempty"`
+	// TypeAnnotation is the explicit type annotation if present.
+	// Example: "number", "string", "StorageScope"
+	TypeAnnotation string `json:"type_annotation,omitempty"`
 
-	// Parent is the name of the containing class/struct for members.
-	Parent string `json:"parent,omitempty"`
+	// FilePath is the relative path from the repository root.
+	FilePath string `json:"file_path"`
+
+	// Column is the 0-indexed start column of the symbol name.
+	Column int `json:"column,omitempty"`
 
 	// Snippet is the source code of the definition with context (2 lines above/below).
 	Snippet string `json:"snippet,omitempty"`
 
 	// Language is the programming language of the source file.
 	Language Language `json:"language"`
-
-	// TypeAnnotation is the explicit type annotation if present.
-	// Example: "number", "string", "StorageScope"
-	TypeAnnotation string `json:"type_annotation,omitempty"`
 }
 
 // FileSymbols represents all symbols extracted from a single file.

@@ -183,7 +183,7 @@ func (p *RustParser) extractSymbols(content string) []Symbol {
 				TypeAnnotation: strings.TrimSpace(matches[2]),
 				Value:          CleanValue(matches[3]),
 				RawValue:       matches[3],
-				LineNumber:     lineNum,
+				Line:     lineNum,
 				Exported:       strings.HasPrefix(strings.TrimSpace(line), "pub"),
 				Language:       "rust",
 			}
@@ -202,7 +202,7 @@ func (p *RustParser) extractSymbols(content string) []Symbol {
 				Type:           "function",
 				Signature:      fmt.Sprintf("fn %s(%s)%s", matches[1], matches[2], formatReturn(returnType)),
 				TypeAnnotation: returnType,
-				LineNumber:     lineNum,
+				Line:     lineNum,
 				Exported:       strings.HasPrefix(strings.TrimSpace(line), "pub"),
 				Language:       "rust",
 			}

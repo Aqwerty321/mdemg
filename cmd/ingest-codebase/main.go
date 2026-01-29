@@ -87,17 +87,19 @@ type BatchIngestItem struct {
 }
 
 // IngestSymbol represents a code symbol being ingested
+// IngestSymbol represents a code symbol extracted during ingestion.
+// Field names follow UPTS (Universal Parser Test Specification) v1.0.0
 type IngestSymbol struct {
 	Name           string `json:"name"`
 	Type           string `json:"type"`
+	Line           int    `json:"line"`                      // 1-indexed line number (UPTS standard)
+	LineEnd        int    `json:"line_end,omitempty"`        // End line for multi-line symbols
+	Exported       bool   `json:"exported"`
+	Parent         string `json:"parent,omitempty"`
+	Signature      string `json:"signature,omitempty"`
 	Value          string `json:"value,omitempty"`
 	RawValue       string `json:"raw_value,omitempty"`
-	LineNumber     int    `json:"line_number"`
-	EndLine        int    `json:"end_line,omitempty"`
-	Exported       bool   `json:"exported"`
 	DocComment     string `json:"doc_comment,omitempty"`
-	Signature      string `json:"signature,omitempty"`
-	Parent         string `json:"parent,omitempty"`
 	TypeAnnotation string `json:"type_annotation,omitempty"`
 	Language       string `json:"language,omitempty"`
 }
@@ -682,20 +684,20 @@ func main() {
 
 // convertLanguageElement converts a languages.CodeElement to main.CodeElement
 func convertLanguageElement(elem languages.CodeElement) CodeElement {
-	// Convert symbols
+	// Convert symbols (UPTS-compliant field mapping)
 	var symbols []IngestSymbol
 	for _, s := range elem.Symbols {
 		symbols = append(symbols, IngestSymbol{
 			Name:           s.Name,
 			Type:           s.Type,
+			Line:           s.Line,
+			LineEnd:        s.LineEnd,
+			Exported:       s.Exported,
+			Parent:         s.Parent,
+			Signature:      s.Signature,
 			Value:          s.Value,
 			RawValue:       s.RawValue,
-			LineNumber:     s.LineNumber,
-			EndLine:        s.EndLine,
-			Exported:       s.Exported,
 			DocComment:     s.DocComment,
-			Signature:      s.Signature,
-			Parent:         s.Parent,
 			TypeAnnotation: s.TypeAnnotation,
 			Language:       s.Language,
 		})

@@ -157,11 +157,13 @@ func (p *Parser) extractTypeScriptSymbols(root *sitter.Node, content []byte, fil
 				symbols = append(symbols, *sym)
 			}
 
-		case "class_declaration":
-			// class X { }
+		case "class_declaration", "abstract_class_declaration":
+			// class X { } or abstract class X { } - extract class and its methods
 			if sym := p.extractTSClass(node, content, lines, filePath); sym != nil {
 				symbols = append(symbols, *sym)
 			}
+			// Extract methods from the class
+			symbols = append(symbols, p.extractTSClassMethods(node, content, lines, filePath)...)
 
 		case "interface_declaration":
 			// interface X { }
@@ -198,15 +200,18 @@ func (p *Parser) extractTypeScriptSymbols(root *sitter.Node, content []byte, fil
 }
 
 // extractTSVariableDeclaration extracts const/let/var declarations.
+// Detects arrow functions assigned to const as functions.
 func (p *Parser) extractTSVariableDeclaration(node *sitter.Node, content []byte, lines []string, filePath string) []Symbol {
 	var symbols []Symbol
 
 	// Determine if const, let, or var
 	declKind := SymbolTypeVar
+	isConst := false
 	if node.Type() == "lexical_declaration" {
 		kindNode := node.ChildByFieldName("kind")
 		if kindNode != nil && kindNode.Content(content) == "const" {
 			declKind = SymbolTypeConst
+			isConst = true
 		}
 	}
 
@@ -225,12 +230,22 @@ func (p *Parser) extractTSVariableDeclaration(node *sitter.Node, content []byte,
 			}
 
 			name := nameNode.Content(content)
+			symType := declKind
+
+			// Check if value is an arrow function
+			if valueNode != nil && isConst {
+				valueType := valueNode.Type()
+				if valueType == "arrow_function" || valueType == "function" {
+					symType = SymbolTypeFunction
+				}
+			}
+
 			sym := Symbol{
 				Name:       name,
-				Type:       declKind,
+				Type:       symType,
 				FilePath:   filePath,
-				LineNumber: int(nameNode.StartPoint().Row) + 1,
-				EndLine:    int(node.EndPoint().Row) + 1,
+				Line:       int(nameNode.StartPoint().Row) + 1,
+				LineEnd:    int(node.EndPoint().Row) + 1,
 				Column:     int(nameNode.StartPoint().Column),
 				Exported:   exported,
 			}
@@ -238,6 +253,18 @@ func (p *Parser) extractTSVariableDeclaration(node *sitter.Node, content []byte,
 			if valueNode != nil {
 				sym.RawValue = valueNode.Content(content)
 				sym.Value = p.evaluateValue(sym.RawValue)
+
+				// Extract signature from arrow function
+				if symType == SymbolTypeFunction {
+					paramsNode := valueNode.ChildByFieldName("parameters")
+					if paramsNode != nil {
+						sym.Signature = paramsNode.Content(content)
+					}
+					returnNode := valueNode.ChildByFieldName("return_type")
+					if returnNode != nil {
+						sym.TypeAnnotation = returnNode.Content(content)
+					}
+				}
 			}
 
 			// Extract type annotation
@@ -252,7 +279,7 @@ func (p *Parser) extractTSVariableDeclaration(node *sitter.Node, content []byte,
 			}
 
 			// Add snippet
-			sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.EndLine)
+			sym.Snippet = p.extractSnippet(lines, sym.Line, sym.LineEnd)
 
 			symbols = append(symbols, sym)
 		}
@@ -275,8 +302,8 @@ func (p *Parser) extractTSFunction(node *sitter.Node, content []byte, lines []st
 		Name:       name,
 		Type:       SymbolTypeFunction,
 		FilePath:   filePath,
-		LineNumber: int(nameNode.StartPoint().Row) + 1,
-		EndLine:    int(node.EndPoint().Row) + 1,
+		Line: int(nameNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
 		Column:     int(nameNode.StartPoint().Column),
 		Exported:   exported,
 	}
@@ -297,7 +324,7 @@ func (p *Parser) extractTSFunction(node *sitter.Node, content []byte, lines []st
 		sym.DocComment = p.extractPrecedingComment(node, content)
 	}
 
-	sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.EndLine)
+	sym.Snippet = p.extractSnippet(lines, sym.Line, sym.LineEnd)
 
 	return &sym
 }
@@ -316,8 +343,8 @@ func (p *Parser) extractTSClass(node *sitter.Node, content []byte, lines []strin
 		Name:       name,
 		Type:       SymbolTypeClass,
 		FilePath:   filePath,
-		LineNumber: int(nameNode.StartPoint().Row) + 1,
-		EndLine:    int(node.EndPoint().Row) + 1,
+		Line:       int(nameNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
 		Column:     int(nameNode.StartPoint().Column),
 		Exported:   exported,
 	}
@@ -326,7 +353,87 @@ func (p *Parser) extractTSClass(node *sitter.Node, content []byte, lines []strin
 		sym.DocComment = p.extractPrecedingComment(node, content)
 	}
 
-	sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.LineNumber+5) // First few lines
+	sym.Snippet = p.extractSnippet(lines, sym.Line, sym.Line+5) // First few lines
+
+	return &sym
+}
+
+// extractTSClassMethods extracts methods from a class declaration.
+func (p *Parser) extractTSClassMethods(node *sitter.Node, content []byte, lines []string, filePath string) []Symbol {
+	var symbols []Symbol
+
+	nameNode := node.ChildByFieldName("name")
+	if nameNode == nil {
+		return symbols
+	}
+
+	className := nameNode.Content(content)
+	classExported := p.isExported(node)
+
+	// Find class body
+	bodyNode := node.ChildByFieldName("body")
+	if bodyNode == nil {
+		return symbols
+	}
+
+	// Walk body looking for method definitions
+	for i := 0; i < int(bodyNode.NamedChildCount()); i++ {
+		member := bodyNode.NamedChild(i)
+		memberType := member.Type()
+
+		// Handle method_definition
+		if memberType == "method_definition" {
+			if sym := p.extractTSMethod(member, content, lines, filePath, className, classExported); sym != nil {
+				symbols = append(symbols, *sym)
+			}
+		}
+	}
+
+	return symbols
+}
+
+// extractTSMethod extracts a single method from a class.
+func (p *Parser) extractTSMethod(node *sitter.Node, content []byte, lines []string, filePath string, className string, classExported bool) *Symbol {
+	nameNode := node.ChildByFieldName("name")
+	if nameNode == nil {
+		return nil
+	}
+
+	name := nameNode.Content(content)
+
+	// Skip private methods (start with #)
+	if strings.HasPrefix(name, "#") {
+		return nil
+	}
+
+	sym := Symbol{
+		Name:       name,
+		Type:       SymbolTypeMethod,
+		Parent:     className,
+		FilePath:   filePath,
+		Line:       int(nameNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
+		Column:     int(nameNode.StartPoint().Column),
+		Exported:   classExported, // Methods inherit class export status
+	}
+
+	// Extract parameters
+	paramsNode := node.ChildByFieldName("parameters")
+	if paramsNode != nil {
+		sym.Signature = paramsNode.Content(content)
+	}
+
+	// Extract return type
+	returnNode := node.ChildByFieldName("return_type")
+	if returnNode != nil {
+		sym.TypeAnnotation = returnNode.Content(content)
+	}
+
+	if p.config.IncludeDocComments {
+		sym.DocComment = p.extractPrecedingComment(node, content)
+	}
+
+	sym.Snippet = p.extractSnippet(lines, sym.Line, sym.Line+5)
 
 	return &sym
 }
@@ -402,8 +509,8 @@ func (p *Parser) extractTSClassField(node *sitter.Node, content []byte, lines []
 		Name:       name,
 		Type:       SymbolTypeConst, // Treat static fields as constants
 		FilePath:   filePath,
-		LineNumber: int(nameNode.StartPoint().Row) + 1,
-		EndLine:    int(node.EndPoint().Row) + 1,
+		Line: int(nameNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
 		Column:     int(nameNode.StartPoint().Column),
 		Exported:   classExported, // Inherit export status from class
 		Value:      value,
@@ -417,7 +524,7 @@ func (p *Parser) extractTSClassField(node *sitter.Node, content []byte, lines []
 			sym.Snippet += " = " + value
 		}
 	} else {
-		sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.LineNumber)
+		sym.Snippet = p.extractSnippet(lines, sym.Line, sym.Line)
 	}
 
 	if p.config.IncludeDocComments {
@@ -441,8 +548,8 @@ func (p *Parser) extractTSInterface(node *sitter.Node, content []byte, lines []s
 		Name:       name,
 		Type:       SymbolTypeInterface,
 		FilePath:   filePath,
-		LineNumber: int(nameNode.StartPoint().Row) + 1,
-		EndLine:    int(node.EndPoint().Row) + 1,
+		Line: int(nameNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
 		Column:     int(nameNode.StartPoint().Column),
 		Exported:   exported,
 	}
@@ -451,7 +558,7 @@ func (p *Parser) extractTSInterface(node *sitter.Node, content []byte, lines []s
 		sym.DocComment = p.extractPrecedingComment(node, content)
 	}
 
-	sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.LineNumber+5)
+	sym.Snippet = p.extractSnippet(lines, sym.Line, sym.Line+5)
 
 	return &sym
 }
@@ -470,8 +577,8 @@ func (p *Parser) extractTSTypeAlias(node *sitter.Node, content []byte, lines []s
 		Name:       name,
 		Type:       SymbolTypeType,
 		FilePath:   filePath,
-		LineNumber: int(nameNode.StartPoint().Row) + 1,
-		EndLine:    int(node.EndPoint().Row) + 1,
+		Line: int(nameNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
 		Column:     int(nameNode.StartPoint().Column),
 		Exported:   exported,
 	}
@@ -486,7 +593,7 @@ func (p *Parser) extractTSTypeAlias(node *sitter.Node, content []byte, lines []s
 		sym.DocComment = p.extractPrecedingComment(node, content)
 	}
 
-	sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.EndLine)
+	sym.Snippet = p.extractSnippet(lines, sym.Line, sym.LineEnd)
 
 	return &sym
 }
@@ -508,8 +615,8 @@ func (p *Parser) extractTSEnum(node *sitter.Node, content []byte, lines []string
 		Name:       enumName,
 		Type:       SymbolTypeEnum,
 		FilePath:   filePath,
-		LineNumber: int(nameNode.StartPoint().Row) + 1,
-		EndLine:    int(node.EndPoint().Row) + 1,
+		Line: int(nameNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
 		Column:     int(nameNode.StartPoint().Column),
 		Exported:   exported,
 	}
@@ -518,7 +625,7 @@ func (p *Parser) extractTSEnum(node *sitter.Node, content []byte, lines []string
 		enumSym.DocComment = p.extractPrecedingComment(node, content)
 	}
 
-	enumSym.Snippet = p.extractSnippet(lines, enumSym.LineNumber, enumSym.EndLine)
+	enumSym.Snippet = p.extractSnippet(lines, enumSym.Line, enumSym.LineEnd)
 	symbols = append(symbols, enumSym)
 
 	// Extract enum members
@@ -548,8 +655,8 @@ func (p *Parser) extractTSEnum(node *sitter.Node, content []byte, lines []string
 						Type:       SymbolTypeEnumValue,
 						Value:      memberValue,
 						FilePath:   filePath,
-						LineNumber: int(member.StartPoint().Row) + 1,
-						EndLine:    int(member.EndPoint().Row) + 1,
+						Line: int(member.StartPoint().Row) + 1,
+						LineEnd:    int(member.EndPoint().Row) + 1,
 						Column:     int(member.StartPoint().Column),
 						Exported:   exported,
 						Parent:     enumName,
@@ -619,8 +726,8 @@ func (p *Parser) extractGoConst(node *sitter.Node, content []byte, lines []strin
 				Name:       name,
 				Type:       SymbolTypeConst,
 				FilePath:   filePath,
-				LineNumber: int(nameNode.StartPoint().Row) + 1,
-				EndLine:    int(child.EndPoint().Row) + 1,
+				Line: int(nameNode.StartPoint().Row) + 1,
+				LineEnd:    int(child.EndPoint().Row) + 1,
 				Column:     int(nameNode.StartPoint().Column),
 				Exported:   exported,
 			}
@@ -640,7 +747,7 @@ func (p *Parser) extractGoConst(node *sitter.Node, content []byte, lines []strin
 				sym.DocComment = p.extractPrecedingComment(node, content)
 			}
 
-			sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.EndLine)
+			sym.Snippet = p.extractSnippet(lines, sym.Line, sym.LineEnd)
 			symbols = append(symbols, sym)
 		}
 	}
@@ -669,8 +776,8 @@ func (p *Parser) extractGoVar(node *sitter.Node, content []byte, lines []string,
 				Name:       name,
 				Type:       SymbolTypeVar,
 				FilePath:   filePath,
-				LineNumber: int(nameNode.StartPoint().Row) + 1,
-				EndLine:    int(child.EndPoint().Row) + 1,
+				Line: int(nameNode.StartPoint().Row) + 1,
+				LineEnd:    int(child.EndPoint().Row) + 1,
 				Column:     int(nameNode.StartPoint().Column),
 				Exported:   exported,
 			}
@@ -689,7 +796,7 @@ func (p *Parser) extractGoVar(node *sitter.Node, content []byte, lines []string,
 				sym.DocComment = p.extractPrecedingComment(node, content)
 			}
 
-			sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.EndLine)
+			sym.Snippet = p.extractSnippet(lines, sym.Line, sym.LineEnd)
 			symbols = append(symbols, sym)
 		}
 	}
@@ -711,8 +818,8 @@ func (p *Parser) extractGoFunction(node *sitter.Node, content []byte, lines []st
 		Name:       name,
 		Type:       SymbolTypeFunction,
 		FilePath:   filePath,
-		LineNumber: int(nameNode.StartPoint().Row) + 1,
-		EndLine:    int(node.EndPoint().Row) + 1,
+		Line: int(nameNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
 		Column:     int(nameNode.StartPoint().Column),
 		Exported:   exported,
 	}
@@ -732,7 +839,7 @@ func (p *Parser) extractGoFunction(node *sitter.Node, content []byte, lines []st
 		sym.DocComment = p.extractPrecedingComment(node, content)
 	}
 
-	sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.LineNumber+5)
+	sym.Snippet = p.extractSnippet(lines, sym.Line, sym.Line+5)
 
 	return &sym
 }
@@ -751,8 +858,8 @@ func (p *Parser) extractGoMethod(node *sitter.Node, content []byte, lines []stri
 		Name:       name,
 		Type:       SymbolTypeMethod,
 		FilePath:   filePath,
-		LineNumber: int(nameNode.StartPoint().Row) + 1,
-		EndLine:    int(node.EndPoint().Row) + 1,
+		Line: int(nameNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
 		Column:     int(nameNode.StartPoint().Column),
 		Exported:   exported,
 	}
@@ -788,7 +895,7 @@ func (p *Parser) extractGoMethod(node *sitter.Node, content []byte, lines []stri
 		sym.DocComment = p.extractPrecedingComment(node, content)
 	}
 
-	sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.LineNumber+5)
+	sym.Snippet = p.extractSnippet(lines, sym.Line, sym.Line+5)
 
 	return &sym
 }
@@ -813,8 +920,8 @@ func (p *Parser) extractGoType(node *sitter.Node, content []byte, lines []string
 			sym := Symbol{
 				Name:       name,
 				FilePath:   filePath,
-				LineNumber: int(nameNode.StartPoint().Row) + 1,
-				EndLine:    int(child.EndPoint().Row) + 1,
+				Line: int(nameNode.StartPoint().Row) + 1,
+				LineEnd:    int(child.EndPoint().Row) + 1,
 				Column:     int(nameNode.StartPoint().Column),
 				Exported:   exported,
 			}
@@ -836,7 +943,7 @@ func (p *Parser) extractGoType(node *sitter.Node, content []byte, lines []string
 				sym.DocComment = p.extractPrecedingComment(node, content)
 			}
 
-			sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.LineNumber+10)
+			sym.Snippet = p.extractSnippet(lines, sym.Line, sym.Line+10)
 			symbols = append(symbols, sym)
 		}
 	}
@@ -849,22 +956,37 @@ func (p *Parser) extractPythonSymbols(root *sitter.Node, content []byte, filePat
 	var symbols []Symbol
 	lines := strings.Split(string(content), "\n")
 
+	// Track class context for method detection
+	var currentClass string
+	var classEndLine int
+
 	p.walkTree(root, func(node *sitter.Node) bool {
 		nodeType := node.Type()
 
+		// Update class context
+		if currentClass != "" {
+			nodeLine := int(node.StartPoint().Row) + 1
+			if nodeLine > classEndLine {
+				currentClass = ""
+			}
+		}
+
 		switch nodeType {
 		case "assignment":
-			// CONSTANT = value (module-level with UPPER_CASE)
+			// CONSTANT = value or TypeAlias = Type
 			symbols = append(symbols, p.extractPythonAssignment(node, content, lines, filePath)...)
 
 		case "function_definition":
-			if sym := p.extractPythonFunction(node, content, lines, filePath); sym != nil {
+			if sym := p.extractPythonFunction(node, content, lines, filePath, currentClass); sym != nil {
 				symbols = append(symbols, *sym)
 			}
 
 		case "class_definition":
 			if sym := p.extractPythonClass(node, content, lines, filePath); sym != nil {
 				symbols = append(symbols, *sym)
+				// Set class context for method detection
+				currentClass = sym.Name
+				classEndLine = sym.LineEnd
 			}
 		}
 
@@ -874,7 +996,7 @@ func (p *Parser) extractPythonSymbols(root *sitter.Node, content []byte, filePat
 	return symbols
 }
 
-// extractPythonAssignment extracts Python assignments (constants use UPPER_CASE).
+// extractPythonAssignment extracts Python assignments (constants, type aliases, variables).
 func (p *Parser) extractPythonAssignment(node *sitter.Node, content []byte, lines []string, filePath string) []Symbol {
 	var symbols []Symbol
 
@@ -887,22 +1009,28 @@ func (p *Parser) extractPythonAssignment(node *sitter.Node, content []byte, line
 	}
 
 	name := leftNode.Content(content)
-
-	// Check if it's a constant (UPPER_CASE convention)
-	isConstant := isUpperCase(name)
 	exported := !strings.HasPrefix(name, "_")
 
+	// Determine symbol type
 	symType := SymbolTypeVar
-	if isConstant {
+
+	// Check if it's a constant (UPPER_CASE convention)
+	if isUpperCase(name) {
 		symType = SymbolTypeConst
+	} else if rightNode != nil {
+		// Check if it's a type alias (CamelCase = type expression)
+		rightContent := rightNode.Content(content)
+		if isPythonTypeAlias(name, rightContent) {
+			symType = SymbolTypeType
+		}
 	}
 
 	sym := Symbol{
 		Name:       name,
 		Type:       symType,
 		FilePath:   filePath,
-		LineNumber: int(leftNode.StartPoint().Row) + 1,
-		EndLine:    int(node.EndPoint().Row) + 1,
+		Line:       int(leftNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
 		Column:     int(leftNode.StartPoint().Column),
 		Exported:   exported,
 	}
@@ -916,14 +1044,53 @@ func (p *Parser) extractPythonAssignment(node *sitter.Node, content []byte, line
 		sym.DocComment = p.extractPrecedingComment(node, content)
 	}
 
-	sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.EndLine)
+	sym.Snippet = p.extractSnippet(lines, sym.Line, sym.LineEnd)
 	symbols = append(symbols, sym)
 
 	return symbols
 }
 
-// extractPythonFunction extracts Python function definitions.
-func (p *Parser) extractPythonFunction(node *sitter.Node, content []byte, lines []string, filePath string) *Symbol {
+// isPythonTypeAlias checks if an assignment looks like a type alias.
+// Type aliases are typically: CamelCase = str|int|List[...]|Dict[...]|Optional[...]|Union[...]
+func isPythonTypeAlias(name, value string) bool {
+	// Name must be CamelCase (starts with uppercase, has lowercase)
+	if len(name) == 0 {
+		return false
+	}
+	first := rune(name[0])
+	if first < 'A' || first > 'Z' {
+		return false
+	}
+	hasLower := false
+	for _, r := range name[1:] {
+		if r >= 'a' && r <= 'z' {
+			hasLower = true
+			break
+		}
+	}
+	if !hasLower {
+		return false // All caps = constant, not type alias
+	}
+
+	// Value must look like a type expression
+	value = strings.TrimSpace(value)
+	typePatterns := []string{
+		"str", "int", "float", "bool", "bytes", "None",
+		"List[", "Dict[", "Set[", "Tuple[", "Optional[", "Union[",
+		"Callable[", "Sequence[", "Mapping[", "Iterable[", "Iterator[",
+		"Type[", "Any", "TypeVar(",
+	}
+	for _, pattern := range typePatterns {
+		if strings.HasPrefix(value, pattern) || value == pattern {
+			return true
+		}
+	}
+
+	return false
+}
+
+// extractPythonFunction extracts Python function/method definitions.
+func (p *Parser) extractPythonFunction(node *sitter.Node, content []byte, lines []string, filePath string, currentClass string) *Symbol {
 	nameNode := node.ChildByFieldName("name")
 	if nameNode == nil {
 		return nil
@@ -932,12 +1099,21 @@ func (p *Parser) extractPythonFunction(node *sitter.Node, content []byte, lines 
 	name := nameNode.Content(content)
 	exported := !strings.HasPrefix(name, "_")
 
+	// Determine if this is a method (inside a class) or function
+	symType := SymbolTypeFunction
+	parent := ""
+	if currentClass != "" {
+		symType = SymbolTypeMethod
+		parent = currentClass
+	}
+
 	sym := Symbol{
 		Name:       name,
-		Type:       SymbolTypeFunction,
+		Type:       symType,
+		Parent:     parent,
 		FilePath:   filePath,
-		LineNumber: int(nameNode.StartPoint().Row) + 1,
-		EndLine:    int(node.EndPoint().Row) + 1,
+		Line:       int(nameNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
 		Column:     int(nameNode.StartPoint().Column),
 		Exported:   exported,
 	}
@@ -958,7 +1134,7 @@ func (p *Parser) extractPythonFunction(node *sitter.Node, content []byte, lines 
 		sym.DocComment = p.extractPythonDocstring(node, content)
 	}
 
-	sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.LineNumber+5)
+	sym.Snippet = p.extractSnippet(lines, sym.Line, sym.Line+5)
 
 	return &sym
 }
@@ -973,12 +1149,33 @@ func (p *Parser) extractPythonClass(node *sitter.Node, content []byte, lines []s
 	name := nameNode.Content(content)
 	exported := !strings.HasPrefix(name, "_")
 
+	// Determine symbol type based on base classes
+	symType := SymbolTypeClass
+	var parent string
+
+	// Check for base classes (superclasses)
+	superclassNode := node.ChildByFieldName("superclasses")
+	if superclassNode != nil {
+		bases := superclassNode.Content(content)
+		if strings.Contains(bases, "Enum") || strings.Contains(bases, "IntEnum") || strings.Contains(bases, "StrEnum") {
+			symType = SymbolTypeEnum
+			parent = "Enum"
+		} else if strings.Contains(bases, "Protocol") {
+			symType = SymbolTypeInterface
+			parent = "Protocol"
+		} else {
+			// Store base class for inheritance
+			parent = bases
+		}
+	}
+
 	sym := Symbol{
 		Name:       name,
-		Type:       SymbolTypeClass,
+		Type:       symType,
+		Parent:     parent,
 		FilePath:   filePath,
-		LineNumber: int(nameNode.StartPoint().Row) + 1,
-		EndLine:    int(node.EndPoint().Row) + 1,
+		Line:       int(nameNode.StartPoint().Row) + 1,
+		LineEnd:    int(node.EndPoint().Row) + 1,
 		Column:     int(nameNode.StartPoint().Column),
 		Exported:   exported,
 	}
@@ -987,7 +1184,7 @@ func (p *Parser) extractPythonClass(node *sitter.Node, content []byte, lines []s
 		sym.DocComment = p.extractPythonDocstring(node, content)
 	}
 
-	sym.Snippet = p.extractSnippet(lines, sym.LineNumber, sym.LineNumber+10)
+	sym.Snippet = p.extractSnippet(lines, sym.Line, sym.Line+10)
 
 	return &sym
 }

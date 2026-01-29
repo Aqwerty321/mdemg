@@ -1,0 +1,170 @@
+{
+  "upts_version": "1.0.0",
+  "language": "typescript",
+  "variants": [".ts", ".tsx", ".mts", ".cts"],
+  
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-28",
+    "updated": "2026-01-29",
+    "description": "TypeScript parser - all 7 canonical patterns",
+    "parser_status": "enhanced",
+    "tags": ["canonical", "nestjs", "decorators"]
+  },
+  
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_signature": false,
+    "validate_value": false,
+    "validate_parent": true
+  },
+  
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/typescript_test_fixture.ts",
+    "sha256": "76778e09f46d57890cbc947a1f3b34764ecdcce75f526c30985f3cf8d89f49d6"
+  },
+  
+  "expected": {
+    "symbol_count": {"min": 13, "max": 18},
+    
+    "symbols": [
+      {
+        "name": "MAX_RETRIES",
+        "type": "constant",
+        "line": 5,
+        "exported": true,
+        "pattern": "P1_CONSTANT",
+        "tags": ["constant"]
+      },
+      {
+        "name": "UserId",
+        "type": "type",
+        "line": 8,
+        "exported": true,
+        "pattern": "P7_TYPE_ALIAS",
+        "tags": ["type-alias"]
+      },
+      {
+        "name": "UserDto",
+        "type": "interface",
+        "line": 11,
+        "exported": true,
+        "pattern": "P4_INTERFACE_TRAIT",
+        "tags": ["interface"]
+      },
+      {
+        "name": "UserStatus",
+        "type": "enum",
+        "line": 18,
+        "exported": true,
+        "pattern": "P5_ENUM",
+        "tags": ["enum", "string-values"]
+      },
+      {
+        "name": "UserService",
+        "type": "class",
+        "line": 26,
+        "exported": true,
+        "decorators": ["Injectable"],
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["class", "decorated", "service"]
+      },
+      {
+        "name": "findById",
+        "type": "method",
+        "line": 37,
+        "exported": true,
+        "parent": "UserService",
+        "decorators": ["Transactional"],
+        "signature_contains": ["id", "Promise"],
+        "pattern": "P6_METHOD",
+        "tags": ["method", "async", "decorated"]
+      },
+      {
+        "name": "create",
+        "type": "method",
+        "line": 42,
+        "exported": true,
+        "parent": "UserService",
+        "signature_contains": ["data", "Promise"],
+        "pattern": "P6_METHOD",
+        "tags": ["method", "async"]
+      },
+      {
+        "name": "validateEmail",
+        "type": "method",
+        "line": 47,
+        "exported": true,
+        "parent": "UserService",
+        "signature_contains": ["email", "boolean"],
+        "pattern": "P6_METHOD",
+        "tags": ["method", "static"]
+      },
+      {
+        "name": "formatUser",
+        "type": "function",
+        "line": 53,
+        "exported": true,
+        "signature_contains": ["user", "string"],
+        "pattern": "P2_FUNCTION",
+        "tags": ["function"]
+      },
+      {
+        "name": "validateId",
+        "type": "function",
+        "line": 58,
+        "exported": true,
+        "signature_contains": ["id", "boolean"],
+        "pattern": "P2_FUNCTION",
+        "tags": ["function", "arrow"]
+      },
+      {
+        "name": "BaseEntity",
+        "type": "class",
+        "line": 63,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["class", "abstract"]
+      },
+      {
+        "name": "AdminUser",
+        "type": "class",
+        "line": 68,
+        "exported": true,
+        "extends": "BaseEntity",
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["class", "extends", "implements"]
+      },
+      {
+        "name": "getId",
+        "type": "method",
+        "line": 72,
+        "exported": true,
+        "parent": "AdminUser",
+        "signature_contains": ["string"],
+        "pattern": "P6_METHOD",
+        "tags": ["method", "override"]
+      }
+    ],
+    
+    "excluded": [
+      {"name": "logger", "reason": "private property"},
+      {"name": "userRepo", "reason": "constructor parameter"},
+      {"name_pattern": "^_", "reason": "private members start with underscore"}
+    ],
+    
+    "relationships": [
+      {"source": "UserService", "relation": "DEFINES_METHOD", "target": "findById"},
+      {"source": "UserService", "relation": "DEFINES_METHOD", "target": "create"},
+      {"source": "UserService", "relation": "DEFINES_METHOD", "target": "validateEmail"},
+      {"source": "AdminUser", "relation": "EXTENDS", "target": "BaseEntity"},
+      {"source": "AdminUser", "relation": "IMPLEMENTS", "target": "UserDto"},
+      {"source": "AdminUser", "relation": "DEFINES_METHOD", "target": "getId"}
+    ]
+  },
+  
+  "patterns_covered": ["P1_CONSTANT", "P2_FUNCTION", "P3_CLASS_STRUCT", "P4_INTERFACE_TRAIT", "P5_ENUM", "P6_METHOD", "P7_TYPE_ALIAS"]
+}

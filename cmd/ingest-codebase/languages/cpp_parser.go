@@ -219,7 +219,7 @@ func (p *CppParser) extractSymbols(content string) []Symbol {
 				Type:       "macro",
 				Value:      CleanValue(matches[2]),
 				RawValue:   matches[2],
-				LineNumber: lineNum,
+				Line: lineNum,
 				Exported:   true,
 				Language:   "cpp",
 			})
@@ -233,7 +233,7 @@ func (p *CppParser) extractSymbols(content string) []Symbol {
 				Type:       "constant",
 				Value:      CleanValue(matches[2]),
 				RawValue:   matches[2],
-				LineNumber: lineNum,
+				Line: lineNum,
 				Exported:   !strings.Contains(line, "private"),
 				Language:   "cpp",
 			})
@@ -247,7 +247,7 @@ func (p *CppParser) extractSymbols(content string) []Symbol {
 				Type:       "constant",
 				Value:      CleanValue(matches[2]),
 				RawValue:   matches[2],
-				LineNumber: lineNum,
+				Line: lineNum,
 				Exported:   !strings.Contains(line, "private"),
 				Language:   "cpp",
 			})
@@ -259,7 +259,7 @@ func (p *CppParser) extractSymbols(content string) []Symbol {
 			symbols = append(symbols, Symbol{
 				Name:       matches[1],
 				Type:       "enum",
-				LineNumber: lineNum,
+				Line: lineNum,
 				Exported:   true,
 				Language:   "cpp",
 			})
@@ -291,7 +291,7 @@ func (p *CppParser) extractSymbols(content string) []Symbol {
 				Type:           "function",
 				Signature:      signature,
 				TypeAnnotation: returnType,
-				LineNumber:     lineNum,
+				Line:     lineNum,
 				Exported:       !strings.Contains(line, "private"),
 				Language:       "cpp",
 			})

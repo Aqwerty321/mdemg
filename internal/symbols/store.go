@@ -56,14 +56,14 @@ func GenerateSymbolID(spaceID, filePath, name string, lineNumber int) string {
 func ToRecord(spaceID string, sym Symbol) SymbolRecord {
 	return SymbolRecord{
 		SpaceID:        spaceID,
-		SymbolID:       GenerateSymbolID(spaceID, sym.FilePath, sym.Name, sym.LineNumber),
+		SymbolID:       GenerateSymbolID(spaceID, sym.FilePath, sym.Name, sym.Line),
 		Name:           sym.Name,
 		SymbolType:     string(sym.Type),
 		Value:          sym.Value,
 		RawValue:       sym.RawValue,
 		FilePath:       sym.FilePath,
-		LineNumber:     sym.LineNumber,
-		EndLine:        sym.EndLine,
+		LineNumber:     sym.Line,    // UPTS: Line → LineNumber for storage
+		EndLine:        sym.LineEnd, // UPTS: LineEnd → EndLine for storage
 		Column:         sym.Column,
 		Exported:       sym.Exported,
 		DocComment:     sym.DocComment,

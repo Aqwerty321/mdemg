@@ -286,7 +286,7 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 				Name:       matches[1],
 				Type:       "kernel",
 				Signature:  signature,
-				LineNumber: lineNum,
+				Line: lineNum,
 				Exported:   true,
 				Language:   "cuda",
 			})
@@ -304,7 +304,7 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 				Type:           "function",
 				Signature:      signature,
 				TypeAnnotation: matches[1],
-				LineNumber:     lineNum,
+				Line:     lineNum,
 				Exported:       true,
 				Language:       "cuda",
 			})
@@ -322,7 +322,7 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 				Type:           "device_function",
 				Signature:      signature,
 				TypeAnnotation: matches[1],
-				LineNumber:     lineNum,
+				Line:     lineNum,
 				Exported:       true,
 				Language:       "cuda",
 			})
@@ -335,7 +335,7 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 				Name:           matches[2],
 				Type:           "variable",
 				TypeAnnotation: matches[1] + " __shared__",
-				LineNumber:     lineNum,
+				Line:     lineNum,
 				Exported:       false,
 				Language:       "cuda",
 			})
@@ -349,7 +349,7 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 				Type:       "macro",
 				Value:      CleanValue(matches[2]),
 				RawValue:   matches[2],
-				LineNumber: lineNum,
+				Line: lineNum,
 				Exported:   true,
 				Language:   "cuda",
 			})
@@ -363,7 +363,7 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 				Type:       "constant",
 				Value:      CleanValue(matches[2]),
 				RawValue:   matches[2],
-				LineNumber: lineNum,
+				Line: lineNum,
 				Exported:   true,
 				Language:   "cuda",
 			})

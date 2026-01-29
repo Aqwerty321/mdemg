@@ -1,0 +1,25 @@
+{
+  "parser": "go",
+  "fixture": "go_test_fixture.go",
+  "expected_symbols": [
+    {"name": "MaxRetries", "type": "constant", "line": 13, "exported": true},
+    {"name": "DefaultTimeout", "type": "constant", "line": 14, "exported": true},
+    {"name": "StatusActive", "type": "constant", "line": 16, "exported": true},
+    {"name": "StatusInactive", "type": "constant", "line": 17, "exported": true},
+    {"name": "UserID", "type": "type", "line": 21, "exported": true},
+    {"name": "ItemList", "type": "type", "line": 22, "exported": true},
+    {"name": "UserRepository", "type": "interface", "line": 25, "exported": true},
+    {"name": "User", "type": "struct", "line": 33, "exported": true},
+    {"name": "UserService", "type": "struct", "line": 43, "exported": true},
+    {"name": "FindByID", "type": "method", "line": 50, "parent": "UserService"},
+    {"name": "Create", "type": "method", "line": 55, "parent": "UserService"},
+    {"name": "Delete", "type": "method", "line": 60, "parent": "UserService"},
+    {"name": "ValidateEmail", "type": "function", "line": 65, "exported": true},
+    {"name": "FormatUser", "type": "function", "line": 70, "exported": true},
+    {"name": "NewUserService", "type": "function", "line": 75, "exported": true},
+    {"name": "Item", "type": "struct", "line": 84, "exported": true},
+    {"name": "Logger", "type": "interface", "line": 89, "exported": true}
+  ],
+  "expected_count": 17,
+  "line_tolerance": 2
+}

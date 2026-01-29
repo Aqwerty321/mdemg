@@ -1,0 +1,36 @@
+[project]
+name = "upts"
+version = "1.0.0"
+description = "Universal Parser Test Specification - language-agnostic test specs for MDEMG parsers"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "reh3376"}]
+requires-python = ">=3.12"
+
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+    "pytest>=7.4.0",
+]
+
+[project.scripts]
+upts = "runners.upts_runner:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+ignore_missing_imports = true

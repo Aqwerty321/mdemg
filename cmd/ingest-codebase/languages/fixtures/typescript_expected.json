@@ -1,0 +1,21 @@
+{
+  "parser": "typescript",
+  "fixture": "typescript_test_fixture.ts",
+  "expected_symbols": [
+    {"name": "MAX_RETRIES", "type": "constant", "line": 5, "exported": true},
+    {"name": "UserId", "type": "type", "line": 8, "exported": true},
+    {"name": "UserDto", "type": "interface", "line": 11, "exported": true},
+    {"name": "UserStatus", "type": "enum", "line": 18, "exported": true},
+    {"name": "UserService", "type": "class", "line": 26, "exported": true},
+    {"name": "findById", "type": "method", "line": 37, "parent": "UserService"},
+    {"name": "create", "type": "method", "line": 42, "parent": "UserService"},
+    {"name": "validateEmail", "type": "method", "line": 47, "parent": "UserService"},
+    {"name": "formatUser", "type": "function", "line": 53, "exported": true},
+    {"name": "validateId", "type": "function", "line": 58, "exported": true},
+    {"name": "BaseEntity", "type": "class", "line": 63, "exported": true},
+    {"name": "AdminUser", "type": "class", "line": 68, "exported": true},
+    {"name": "getId", "type": "method", "line": 72, "parent": "AdminUser"}
+  ],
+  "expected_count": 13,
+  "line_tolerance": 2
+}

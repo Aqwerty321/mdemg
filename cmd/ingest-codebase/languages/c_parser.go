@@ -198,7 +198,7 @@ func (p *CParser) extractSymbols(content string) []Symbol {
 				symbols = append(symbols, Symbol{
 					Name:       matches[1],
 					Type:       "enum_value",
-					LineNumber: lineNum,
+					Line: lineNum,
 					Exported:   true,
 					Language:   "c",
 				})
@@ -213,7 +213,7 @@ func (p *CParser) extractSymbols(content string) []Symbol {
 				Type:       "macro",
 				Value:      CleanValue(matches[2]),
 				RawValue:   matches[2],
-				LineNumber: lineNum,
+				Line: lineNum,
 				Exported:   true,
 				Language:   "c",
 			})
@@ -227,7 +227,7 @@ func (p *CParser) extractSymbols(content string) []Symbol {
 				Type:       "constant",
 				Value:      CleanValue(matches[2]),
 				RawValue:   matches[2],
-				LineNumber: lineNum,
+				Line: lineNum,
 				Exported:   !strings.Contains(line, "static"),
 				Language:   "c",
 			})

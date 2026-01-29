@@ -1,10 +1,18 @@
 // Command extract-symbols extracts code symbols from a codebase using tree-sitter
 // and stores them in Neo4j for evidence-locked retrieval.
+//
+// For UPTS (Universal Parser Test Specification) testing, use:
+//
+//	./extract-symbols --json path/to/file.go
+//
+// This outputs JSON to stdout in UPTS-compatible format.
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -27,13 +35,43 @@ var (
 	dryRun       = flag.Bool("dry-run", false, "Print what would be extracted without storing")
 	verbose      = flag.Bool("verbose", false, "Verbose output")
 	excludeDirs  = flag.String("exclude", ".git,node_modules,vendor,test,__tests__,.vscode", "Comma-separated directories to exclude")
+	jsonOutput   = flag.Bool("json", false, "Output symbols as JSON to stdout (for UPTS testing)")
 )
+
+// UPTSSymbol is the JSON output format for UPTS testing
+type UPTSSymbol struct {
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Line       int    `json:"line"`
+	LineEnd    int    `json:"line_end,omitempty"`
+	Exported   bool   `json:"exported"`
+	Parent     string `json:"parent,omitempty"`
+	Signature  string `json:"signature,omitempty"`
+	Value      string `json:"value,omitempty"`
+	DocComment string `json:"doc_comment,omitempty"`
+}
+
+// UPTSOutput is the JSON output structure for UPTS testing
+type UPTSOutput struct {
+	Symbols []UPTSSymbol `json:"symbols"`
+}
 
 func main() {
 	flag.Parse()
 
+	// Handle positional argument for --json mode
+	if *jsonOutput && *codebasePath == "" && flag.NArg() > 0 {
+		*codebasePath = flag.Arg(0)
+	}
+
 	if *codebasePath == "" {
 		log.Fatal("--path is required")
+	}
+
+	// JSON output mode for UPTS testing
+	if *jsonOutput {
+		runJSONMode(*codebasePath)
+		return
 	}
 
 	excludeSet := make(map[string]bool)
@@ -146,14 +184,14 @@ func main() {
 					for _, sym := range result.Symbols {
 						record := symbols.SymbolRecord{
 							SpaceID:        *spaceID,
-							SymbolID:       symbols.GenerateSymbolID(*spaceID, relPath, sym.Name, sym.LineNumber),
+							SymbolID:       symbols.GenerateSymbolID(*spaceID, relPath, sym.Name, sym.Line),
 							Name:           sym.Name,
 							SymbolType:     string(sym.Type),
 							Value:          sym.Value,
 							RawValue:       sym.RawValue,
 							FilePath:       relPath,
-							LineNumber:     sym.LineNumber,
-							EndLine:        sym.EndLine,
+							LineNumber:     sym.Line,    // UPTS: Line → LineNumber for storage
+							EndLine:        sym.LineEnd, // UPTS: LineEnd → EndLine for storage
 							Exported:       sym.Exported,
 							DocComment:     sym.DocComment,
 							Signature:      sym.Signature,
@@ -196,4 +234,67 @@ func main() {
 	log.Printf("=== Extraction Complete ===")
 	log.Printf("Files: %d, Symbols: %d, Errors: %d", totalFiles, totalSymbols, errors)
 	log.Printf("Time: %v, Rate: %.1f files/sec", elapsed, float64(totalFiles)/elapsed.Seconds())
+}
+
+// uptsTypeMap normalizes parser type names to UPTS canonical names
+var uptsTypeMap = map[string]string{
+	"const":      "constant",
+	"var":        "variable",
+	"func":       "function",
+	"type_alias": "type",
+	"typedef":    "type",
+}
+
+// normalizeType converts parser type to UPTS canonical type
+func normalizeType(t string) string {
+	if canonical, ok := uptsTypeMap[t]; ok {
+		return canonical
+	}
+	return t
+}
+
+// runJSONMode parses a single file and outputs UPTS-compatible JSON to stdout
+func runJSONMode(filePath string) {
+	cfg := symbols.ParserConfig{
+		IncludeDocComments: true,
+		EvaluateConstants:  true,
+		IncludePrivate:     true,
+	}
+	svc, err := symbols.NewService(cfg)
+	if err != nil {
+		log.Fatalf("Failed to create symbol service: %v", err)
+	}
+	defer svc.Close()
+
+	ctx := context.Background()
+	result, err := svc.ParseFile(ctx, filePath)
+	if err != nil {
+		log.Fatalf("Failed to parse file: %v", err)
+	}
+
+	output := UPTSOutput{
+		Symbols: make([]UPTSSymbol, 0, len(result.Symbols)),
+	}
+
+	for _, sym := range result.Symbols {
+		uptsSymbol := UPTSSymbol{
+			Name:       sym.Name,
+			Type:       normalizeType(string(sym.Type)),
+			Line:       sym.Line,
+			LineEnd:    sym.LineEnd,
+			Exported:   sym.Exported,
+			Parent:     sym.Parent,
+			Signature:  sym.Signature,
+			Value:      sym.Value,
+			DocComment: sym.DocComment,
+		}
+		output.Symbols = append(output.Symbols, uptsSymbol)
+	}
+
+	jsonBytes, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		log.Fatalf("Failed to marshal JSON: %v", err)
+	}
+
+	fmt.Println(string(jsonBytes))
 }

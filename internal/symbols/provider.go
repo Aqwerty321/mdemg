@@ -87,7 +87,7 @@ func ToEvidence(sym Symbol) SymbolEvidence {
 		Name:           sym.Name,
 		Type:           string(sym.Type),
 		Value:          sym.Value,
-		LineNumber:     sym.LineNumber,
+		LineNumber:     sym.Line, // UPTS: Line → LineNumber for evidence
 		Snippet:        sym.Snippet,
 		DocComment:     sym.DocComment,
 		Signature:      sym.Signature,

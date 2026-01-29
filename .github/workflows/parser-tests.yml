@@ -1,0 +1,104 @@
+name: Parser Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cmd/ingest-codebase/**'
+      - 'docs/lang-parser/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'cmd/ingest-codebase/**'
+      - 'docs/lang-parser/**'
+
+env:
+  GO_VERSION: '1.24'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  parser-validation:
+    name: UPTS Parser Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Build parser tools
+        run: |
+          mkdir -p bin
+          go build -v -o bin/extract-symbols ./cmd/extract-symbols
+          go build -v -o bin/ingest-codebase ./cmd/ingest-codebase
+
+      - name: Verify fixtures integrity
+        run: |
+          echo "Verifying fixture file hashes..."
+          cd docs/lang-parser/lang-parse-spec/upts/fixtures
+
+          # Check Python fixture
+          echo "8975b14f5f72c81f2184f2a7446e1ab332c108a14b2b6543479cd9c4154b11f5  python_test_fixture.py" | shasum -a 256 -c
+
+          # Check Go fixture
+          echo "37d181dc9edcdf8e133a6a0c436771ca5d734b05f1c52636f276cb21773712e9  go_test_fixture.go" | shasum -a 256 -c
+
+          # Check TypeScript fixture
+          echo "76778e09f46d57890cbc947a1f3b34764ecdcce75f526c30985f3cf8d89f49d6  typescript_test_fixture.ts" | shasum -a 256 -c
+
+          echo "All fixtures verified"
+
+      - name: Run UPTS validation
+        run: |
+          python3 docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py validate-all \
+            --spec-dir docs/lang-parser/lang-parse-spec/upts/specs/ \
+            --parser "./bin/extract-symbols --json" \
+            --report parser-report.json
+
+      - name: Upload parser report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: parser-validation-report
+          path: parser-report.json
+          retention-days: 30
+
+      - name: Check validation results
+        run: |
+          if [ -f parser-report.json ]; then
+            echo "=== Parser Validation Summary ==="
+            python3 -c "
+import json
+with open('parser-report.json') as f:
+    report = json.load(f)
+summary = report.get('summary', {})
+print(f\"Total specs: {summary.get('total_specs', 0)}\")
+print(f\"Passed: {summary.get('passed', 0)}\")
+print(f\"Failed: {summary.get('failed', 0)}\")
+print(f\"Errors: {summary.get('errors', 0)}\")
+print(f\"Pass rate: {summary.get('pass_rate', 0):.1f}%\")
+
+# Exit with error if any failures
+if summary.get('failed', 0) > 0 or summary.get('errors', 0) > 0:
+    print('\\n*** VALIDATION FAILED ***')
+    for result in report.get('results', []):
+        if result.get('status') != 'pass':
+            print(f\"\\n{result.get('language', 'unknown').upper()}: {result.get('status')}\")
+            for f in result.get('failures', [])[:5]:
+                print(f\"  - {f.get('name')}: {', '.join(f.get('issues', []))}\")
+    exit(1)
+"
+          fi

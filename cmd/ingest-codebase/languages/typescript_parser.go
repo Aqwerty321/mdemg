@@ -168,32 +168,153 @@ func (p *TypeScriptParser) extractSymbols(content string) []Symbol {
 	var symbols []Symbol
 	lines := strings.Split(content, "\n")
 
-	// Pattern: const NAME = value (exported constants)
-	constPattern := regexp.MustCompile(`^(?:export\s+)?const\s+([A-Z][A-Z0-9_]*)\s*(?::\s*\w+)?\s*=\s*(.+)$`)
-	// Pattern: export function name(args): Type
+	// Patterns for various TypeScript constructs
+	// Constants: const NAME = value (UPPER_CASE or camelCase exported)
+	constPattern := regexp.MustCompile(`^(?:export\s+)?const\s+([A-Z][A-Z0-9_]*)\s*(?::\s*[^=]+)?\s*=\s*(.+)$`)
+	// Functions: export function name(args): Type
 	fnPattern := regexp.MustCompile(`^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)(?:\s*:\s*([^\{]+))?`)
-	// Pattern: export const name = (args): Type =>
+	// Arrow functions: export const name = (args): Type =>
 	arrowPattern := regexp.MustCompile(`^(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s+)?\(([^)]*)\)(?:\s*:\s*([^=]+))?\s*=>`)
+	// Classes: export class ClassName extends/implements
+	classPattern := regexp.MustCompile(`^(?:@\w+\([^)]*\)\s*)*(?:export\s+)?(?:abstract\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([^{]+))?`)
+	// Interfaces: export interface InterfaceName extends
+	interfacePattern := regexp.MustCompile(`^(?:export\s+)?interface\s+(\w+)(?:\s+extends\s+([^{]+))?`)
+	// Type aliases: export type TypeName = ...
+	typePattern := regexp.MustCompile(`^(?:export\s+)?type\s+(\w+)(?:<[^>]+>)?\s*=`)
+	// Enums: export enum EnumName
+	enumPattern := regexp.MustCompile(`^(?:export\s+)?(?:const\s+)?enum\s+(\w+)`)
+	// Methods: async methodName(args): Type or methodName(args): Type
+	methodPattern := regexp.MustCompile(`^\s+(?:public\s+|private\s+|protected\s+)?(?:static\s+)?(?:async\s+)?(\w+)\s*\(([^)]*)\)(?:\s*:\s*([^{]+))?(?:\s*\{)?$`)
+	// Decorators on next line's class/method
+	decoratorPattern := regexp.MustCompile(`^\s*@(\w+)\(`)
+
+	var currentClass string
+	var pendingDecorators []string
 
 	for i, line := range lines {
 		lineNum := i + 1
 		trimmedLine := strings.TrimSpace(line)
 
-		// Extract constants
+		// Skip empty lines and comments
+		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "//") || strings.HasPrefix(trimmedLine, "/*") || strings.HasPrefix(trimmedLine, "*") {
+			continue
+		}
+
+		// Track decorators for the next declaration
+		if matches := decoratorPattern.FindStringSubmatch(trimmedLine); matches != nil {
+			pendingDecorators = append(pendingDecorators, matches[1])
+			continue
+		}
+
+		// Extract classes
+		if matches := classPattern.FindStringSubmatch(trimmedLine); matches != nil {
+			className := matches[1]
+			extends := ""
+			implements := ""
+			if len(matches) > 2 && matches[2] != "" {
+				extends = matches[2]
+			}
+			if len(matches) > 3 && matches[3] != "" {
+				implements = strings.TrimSpace(matches[3])
+			}
+
+			docComment := ""
+			if len(pendingDecorators) > 0 {
+				docComment = "Decorators: @" + strings.Join(pendingDecorators, ", @")
+			}
+
+			sym := Symbol{
+				Name:       className,
+				Type:       "class",
+				Signature:  fmt.Sprintf("class %s", className),
+				DocComment: docComment,
+				Line: lineNum,
+				Exported:   strings.Contains(trimmedLine, "export"),
+				Language:   "typescript",
+			}
+			if extends != "" {
+				sym.Signature += " extends " + extends
+			}
+			if implements != "" {
+				sym.Signature += " implements " + implements
+			}
+			symbols = append(symbols, sym)
+			currentClass = className
+			pendingDecorators = nil
+			continue
+		}
+
+		// Extract interfaces
+		if matches := interfacePattern.FindStringSubmatch(trimmedLine); matches != nil {
+			interfaceName := matches[1]
+			extends := ""
+			if len(matches) > 2 && matches[2] != "" {
+				extends = strings.TrimSpace(matches[2])
+			}
+
+			sym := Symbol{
+				Name:       interfaceName,
+				Type:       "interface",
+				Signature:  fmt.Sprintf("interface %s", interfaceName),
+				Line: lineNum,
+				Exported:   strings.Contains(trimmedLine, "export"),
+				Language:   "typescript",
+			}
+			if extends != "" {
+				sym.Signature += " extends " + extends
+			}
+			symbols = append(symbols, sym)
+			pendingDecorators = nil
+			continue
+		}
+
+		// Extract type aliases
+		if matches := typePattern.FindStringSubmatch(trimmedLine); matches != nil {
+			sym := Symbol{
+				Name:       matches[1],
+				Type:       "type",
+				Signature:  fmt.Sprintf("type %s", matches[1]),
+				Line: lineNum,
+				Exported:   strings.Contains(trimmedLine, "export"),
+				Language:   "typescript",
+			}
+			symbols = append(symbols, sym)
+			pendingDecorators = nil
+			continue
+		}
+
+		// Extract enums
+		if matches := enumPattern.FindStringSubmatch(trimmedLine); matches != nil {
+			sym := Symbol{
+				Name:       matches[1],
+				Type:       "enum",
+				Signature:  fmt.Sprintf("enum %s", matches[1]),
+				Line: lineNum,
+				Exported:   strings.Contains(trimmedLine, "export"),
+				Language:   "typescript",
+			}
+			symbols = append(symbols, sym)
+			pendingDecorators = nil
+			continue
+		}
+
+		// Extract constants (UPPER_CASE)
 		if matches := constPattern.FindStringSubmatch(trimmedLine); matches != nil {
 			sym := Symbol{
 				Name:       matches[1],
 				Type:       "constant",
 				Value:      CleanValue(matches[2]),
 				RawValue:   matches[2],
-				LineNumber: lineNum,
+				Line: lineNum,
 				Exported:   strings.HasPrefix(trimmedLine, "export"),
 				Language:   "typescript",
 			}
 			symbols = append(symbols, sym)
+			pendingDecorators = nil
+			continue
 		}
 
-		// Extract function definitions
+		// Extract function definitions (top-level)
 		if matches := fnPattern.FindStringSubmatch(trimmedLine); matches != nil {
 			returnType := ""
 			if len(matches) > 3 && matches[3] != "" {
@@ -205,11 +326,13 @@ func (p *TypeScriptParser) extractSymbols(content string) []Symbol {
 				Type:           "function",
 				Signature:      fmt.Sprintf("function %s(%s)%s", matches[1], matches[2], formatTSReturn(returnType)),
 				TypeAnnotation: returnType,
-				LineNumber:     lineNum,
+				Line:     lineNum,
 				Exported:       strings.HasPrefix(trimmedLine, "export"),
 				Language:       "typescript",
 			}
 			symbols = append(symbols, sym)
+			pendingDecorators = nil
+			continue
 		}
 
 		// Extract arrow functions
@@ -224,11 +347,62 @@ func (p *TypeScriptParser) extractSymbols(content string) []Symbol {
 				Type:           "function",
 				Signature:      fmt.Sprintf("const %s = (%s)%s =>", matches[1], matches[2], formatTSReturn(returnType)),
 				TypeAnnotation: returnType,
-				LineNumber:     lineNum,
+				Line:     lineNum,
 				Exported:       strings.HasPrefix(trimmedLine, "export"),
 				Language:       "typescript",
 			}
 			symbols = append(symbols, sym)
+			pendingDecorators = nil
+			continue
+		}
+
+		// Extract methods (inside classes) - must start with whitespace
+		if currentClass != "" && strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "\t") {
+			if matches := methodPattern.FindStringSubmatch(line); matches != nil {
+				methodName := matches[1]
+				// Skip constructor and common non-method patterns
+				if methodName == "constructor" || methodName == "if" || methodName == "for" || methodName == "while" || methodName == "switch" || methodName == "return" || methodName == "throw" {
+					pendingDecorators = nil
+					continue
+				}
+
+				returnType := ""
+				if len(matches) > 3 && matches[3] != "" {
+					returnType = strings.TrimSpace(matches[3])
+				}
+
+				docComment := ""
+				if len(pendingDecorators) > 0 {
+					docComment = "Decorators: @" + strings.Join(pendingDecorators, ", @")
+				}
+
+				sym := Symbol{
+					Name:           methodName,
+					Type:           "method",
+					Parent:         currentClass,
+					Signature:      fmt.Sprintf("%s.%s(%s)%s", currentClass, methodName, matches[2], formatTSReturn(returnType)),
+					TypeAnnotation: returnType,
+					DocComment:     docComment,
+					Line:     lineNum,
+					Exported:       true, // Methods are accessible via class
+					Language:       "typescript",
+				}
+				symbols = append(symbols, sym)
+				pendingDecorators = nil
+			}
+		}
+
+		// Reset class context at closing brace (simple heuristic)
+		if trimmedLine == "}" && currentClass != "" {
+			// Check if this might be end of class (no indentation)
+			if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+				currentClass = ""
+			}
+		}
+
+		// Clear pending decorators if we hit a line that didn't use them
+		if len(pendingDecorators) > 0 && !strings.HasPrefix(trimmedLine, "@") {
+			pendingDecorators = nil
 		}
 	}
 

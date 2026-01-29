@@ -34,12 +34,20 @@ func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda floa
 		act[c.NodeID] = v
 	}
 
-	// Build incoming lists
+	// Build incoming lists — only propagate through learned edges.
+	// Structural edges (ASSOCIATED_WITH, GENERALIZES, etc.) are used for
+	// graph expansion but NOT for activation spreading. This ensures that
+	// learned co-activation patterns (CO_ACTIVATED_WITH) are the sole
+	// driver of activation differentiation, preventing saturation from
+	// dense structural connectivity.
 	incoming := map[string][]Edge{}
 	inhib := map[string][]Edge{}
 	for _, e := range edges {
 		if e.RelType == "CONTRADICTS" {
 			inhib[e.Dst] = append(inhib[e.Dst], e)
+			continue
+		}
+		if e.RelType != "CO_ACTIVATED_WITH" {
 			continue
 		}
 		incoming[e.Dst] = append(incoming[e.Dst], e)
@@ -65,10 +73,18 @@ func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda floa
 		// Apply incoming excitatory and inhibitory
 		for dst, ins := range incoming {
 			acc := next[dst]
+			// Degree-normalized accumulation: divide by sqrt(degree) to prevent
+			// high-degree nodes from saturating to 1.0. This preserves relative
+			// signal strength — nodes with stronger/more relevant learned edges
+			// get higher activation without all nodes converging to the same value.
+			degreeNorm := math.Sqrt(float64(len(ins)))
+			if degreeNorm < 1 {
+				degreeNorm = 1
+			}
 			for _, e := range ins {
 				srcA := act[e.Src]
 				w := effectiveWeight(e)
-				acc += srcA * w
+				acc += (srcA * w) / degreeNorm
 			}
 			// inhibitory edges
 			for _, e := range inhib[dst] {

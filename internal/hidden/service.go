@@ -325,7 +325,7 @@ RETURN h.node_id AS hiddenId, count(b) AS edgeCount`
 		res, err := tx.Run(ctx, cypher, map[string]any{
 			"spaceId":     spaceID,
 			"name":        name,
-			"centroid":    centroid,
+			"centroid":    toFloat32Slice(centroid),
 			"memberCount": len(members),
 			"memberIds":   memberIDs,
 		})
@@ -836,7 +836,7 @@ RETURN c.node_id AS conceptId, count(m) AS edgeCount`
 			"spaceId":     spaceID,
 			"name":        name,
 			"layer":       layer,
-			"centroid":    centroid,
+			"centroid":    toFloat32Slice(centroid),
 			"memberCount": len(members),
 			"memberIds":   memberIDs,
 		})
@@ -1831,7 +1831,7 @@ RETURN c.node_id AS nodeId, count(m) AS edgeCount`
 		res, err := tx.Run(ctx, createCypher, map[string]any{
 			"spaceId":     spaceID,
 			"compName":    compName,
-			"centroid":    centroid,
+			"centroid":    toFloat32Slice(centroid),
 			"moduleCount": len(modules),
 			"moduleIds":   moduleIDs,
 			"summary":     summary,
@@ -2134,6 +2134,20 @@ func asFloat64Slice(v any) []float64 {
 		return arr
 	}
 	return nil
+}
+
+// toFloat32Slice converts []float64 to []float32 for Neo4j vector index compatibility.
+// The vector index expects float32 embeddings; hidden layer centroids are computed in
+// float64 for arithmetic precision but must be stored as float32.
+func toFloat32Slice(f64 []float64) []float32 {
+	if f64 == nil {
+		return nil
+	}
+	f32 := make([]float32, len(f64))
+	for i, v := range f64 {
+		f32[i] = float32(v)
+	}
+	return f32
 }
 
 // =============================================================================
@@ -3280,7 +3294,7 @@ RETURN t.node_id AS themeId, count(o) AS edgeCount`
 			"spaceId":      spaceID,
 			"name":         name,
 			"summary":      summary,
-			"centroid":     centroid,
+			"centroid":     toFloat32Slice(centroid),
 			"memberCount":  len(members),
 			"memberIds":    memberIDs,
 			"dominantType": dominantType,
@@ -4303,7 +4317,7 @@ RETURN c.node_id AS conceptId, count(m) AS edgeCount`
 			"name":         name,
 			"layer":        layer,
 			"summary":      summary,
-			"centroid":     centroid,
+			"centroid":     toFloat32Slice(centroid),
 			"keywords":     keywords,
 			"memberCount":  len(members),
 			"memberIds":    memberIDs,

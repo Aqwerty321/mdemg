@@ -122,6 +122,12 @@ func (p *PluginReasoningProvider) Process(ctx context.Context, req ReasoningRequ
 		}, nil
 	}
 
+	// Build lookup map to preserve fields not carried through proto (e.g., Layer)
+	originalByID := make(map[string]models.RetrieveResult, len(req.Candidates))
+	for _, c := range req.Candidates {
+		originalByID[c.NodeID] = c
+	}
+
 	// Convert proto results back to models
 	results := make([]models.RetrieveResult, len(resp.Results))
 	for i, r := range resp.Results {
@@ -133,6 +139,10 @@ func (p *PluginReasoningProvider) Process(ctx context.Context, req ReasoningRequ
 			Score:      float64(r.Score),
 			VectorSim:  float64(r.VectorSim),
 			Activation: float64(r.Activation),
+		}
+		// Restore fields not carried through proto
+		if orig, ok := originalByID[r.NodeId]; ok {
+			results[i].Layer = orig.Layer
 		}
 	}
 

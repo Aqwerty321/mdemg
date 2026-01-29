@@ -26,6 +26,7 @@ type RetrieveResult struct {
 	Path    string  `json:"path"`
 	Name    string  `json:"name"`
 	Summary string  `json:"summary"`
+	Layer   int     `json:"layer"`
 	Score   float64 `json:"score"`
 
 	// Normalized confidence metrics (immune to learning edge density)

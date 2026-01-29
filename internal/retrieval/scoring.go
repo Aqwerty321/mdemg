@@ -436,6 +436,7 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 				Path:       c.Path,
 				Name:       c.Name,
 				Summary:    c.Summary,
+				Layer:      c.Layer,
 				Score:      s,
 				VectorSim:  c.VectorSim,
 				Activation: a,

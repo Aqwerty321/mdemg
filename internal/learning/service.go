@@ -3,6 +3,7 @@ package learning
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -149,10 +150,43 @@ RETURN count(r) AS edge_count`
 }
 
 type pair struct {
-	src string
-	dst string
-	ai  float64
-	aj  float64
+	src     string
+	dst     string
+	ai      float64
+	aj      float64
+	pathSim float64
+}
+
+// pathPrefixSimilarity computes similarity based on shared path prefixes.
+// Same directory = 0.8, same top-level directory = 0.5, else 0.0.
+func pathPrefixSimilarity(a, b string) float64 {
+	if a == "" || b == "" {
+		return 0.0
+	}
+	dirA := a
+	if idx := strings.LastIndex(a, "/"); idx > 0 {
+		dirA = a[:idx]
+	}
+	dirB := b
+	if idx := strings.LastIndex(b, "/"); idx > 0 {
+		dirB = b[:idx]
+	}
+	if dirA == dirB {
+		return 0.8
+	}
+	// Check same top-level directory
+	topA := a
+	if idx := strings.Index(a, "/"); idx > 0 {
+		topA = a[:idx]
+	}
+	topB := b
+	if idx := strings.Index(b, "/"); idx > 0 {
+		topB = b[:idx]
+	}
+	if topA == topB && topA != "" {
+		return 0.5
+	}
+	return 0.0
 }
 
 // ApplyCoactivation performs bounded, regularized learning updates.
@@ -177,7 +211,7 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 	}
 	nodes := make([]models.RetrieveResult, 0, len(resp.Results))
 	for _, r := range resp.Results {
-		if r.Activation >= minAct {
+		if r.Activation >= minAct && !isStopWord(r.Name) {
 			nodes = append(nodes, r)
 		}
 	}
@@ -190,7 +224,8 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 	pairs := make([]pair, 0)
 	for i := 0; i < len(nodes); i++ {
 		for j := i + 1; j < len(nodes); j++ {
-			pairs = append(pairs, pair{src: nodes[i].NodeID, dst: nodes[j].NodeID, ai: nodes[i].Activation, aj: nodes[j].Activation})
+			ps := pathPrefixSimilarity(nodes[i].Path, nodes[j].Path)
+			pairs = append(pairs, pair{src: nodes[i].NodeID, dst: nodes[j].NodeID, ai: nodes[i].Activation, aj: nodes[j].Activation, pathSim: ps})
 		}
 	}
 
@@ -250,7 +285,7 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 		cypher := `UNWIND $pairs AS p
 MATCH (a:MemoryNode {space_id:$spaceId, node_id:p.src})
 MATCH (b:MemoryNode {space_id:$spaceId, node_id:p.dst})
-WITH a,b, (p.ai * p.aj) AS prod,
+WITH a,b, (p.ai * p.aj) AS prod, p.pathSim AS pathSim,
      coalesce(a.surprise_score, 0.0) AS surpriseA,
      coalesce(b.surprise_score, 0.0) AS surpriseB,
      coalesce(a.role_type, '') AS roleA,
@@ -260,7 +295,7 @@ WITH a,b, (p.ai * p.aj) AS prod,
      coalesce(a.session_id, '') AS sessionA,
      coalesce(b.session_id, '') AS sessionB
 // Calculate surprise factor (for conversation nodes)
-WITH a,b,prod,surpriseA,surpriseB,roleA,roleB,obsTypeA,obsTypeB,sessionA,sessionB,
+WITH a,b,prod,pathSim,surpriseA,surpriseB,roleA,roleB,obsTypeA,obsTypeB,sessionA,sessionB,
      CASE
        WHEN roleA = 'conversation_observation' OR roleB = 'conversation_observation' THEN
          CASE
@@ -271,20 +306,20 @@ WITH a,b,prod,surpriseA,surpriseB,roleA,roleB,obsTypeA,obsTypeB,sessionA,session
        ELSE 1.0  // Code nodes use standard factor
      END AS surpriseFactor
 // Calculate initial weight based on surprise factor
-WITH a,b,prod,surpriseA,surpriseB,roleA,roleB,obsTypeA,obsTypeB,sessionA,sessionB,surpriseFactor,
+WITH a,b,prod,pathSim,surpriseA,surpriseB,roleA,roleB,obsTypeA,obsTypeB,sessionA,sessionB,surpriseFactor,
      0.10 * surpriseFactor AS initialWeight
 // forward edge: create or update
 MERGE (a)-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(b)
 ON CREATE SET r.edge_id=randomUUID(), r.created_at=datetime(), r.updated_at=datetime(),
               r.last_activated_at=datetime(), r.status='active', r.weight=initialWeight,
-              r.evidence_count=1, r.version=1, r.dim_coactivation=1.0, r.decay_rate=0.001,
+              r.evidence_count=1, r.version=1, r.dim_coactivation=1.0, r.dim_semantic=pathSim, r.decay_rate=0.001,
               r.surprise_factor=surpriseFactor,
               r.session_id=CASE WHEN sessionA <> '' THEN sessionA WHEN sessionB <> '' THEN sessionB ELSE '' END,
               r.obs_type=CASE WHEN obsTypeA <> '' THEN obsTypeA WHEN obsTypeB <> '' THEN obsTypeB ELSE '' END
 ON MATCH SET r.updated_at=datetime(), r.last_activated_at=datetime(),
              r.evidence_count=coalesce(r.evidence_count,0)+1, r.version=coalesce(r.version,0)+1
-WITH a,b,prod,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r
-WITH a,b,prod,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r,
+WITH a,b,prod,pathSim,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r
+WITH a,b,prod,pathSim,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r,
      coalesce(r.weight,initialWeight) AS w
 // Apply Hebbian weight update: new_w = (1-μ)*w + η*prod, clamped to [wmin,wmax]
 SET r.weight = CASE
@@ -296,7 +331,7 @@ END
 MERGE (b)-[rr:CO_ACTIVATED_WITH {space_id:$spaceId}]->(a)
 ON CREATE SET rr.edge_id=randomUUID(), rr.created_at=datetime(), rr.updated_at=datetime(),
               rr.last_activated_at=datetime(), rr.status='active', rr.weight=r.weight,
-              rr.evidence_count=1, rr.version=1, rr.dim_coactivation=1.0, rr.decay_rate=0.001,
+              rr.evidence_count=1, rr.version=1, rr.dim_coactivation=1.0, rr.dim_semantic=pathSim, rr.decay_rate=0.001,
               rr.surprise_factor=surpriseFactor,
               rr.session_id=CASE WHEN sessionA <> '' THEN sessionA WHEN sessionB <> '' THEN sessionB ELSE '' END,
               rr.obs_type=CASE WHEN obsTypeA <> '' THEN obsTypeA WHEN obsTypeB <> '' THEN obsTypeB ELSE '' END
@@ -518,13 +553,30 @@ func pairsToMaps(pairs []pair) []map[string]any {
 	out := make([]map[string]any, 0, len(pairs))
 	for _, p := range pairs {
 		out = append(out, map[string]any{
-			"src": p.src,
-			"dst": p.dst,
-			"ai":  clamp01(p.ai),
-			"aj":  clamp01(p.aj),
+			"src":     p.src,
+			"dst":     p.dst,
+			"ai":      clamp01(p.ai),
+			"aj":      clamp01(p.aj),
+			"pathSim": p.pathSim,
 		})
 	}
 	return out
+}
+
+// stopWords are common English words that pollute the graph when used as node names.
+var stopWords = map[string]bool{
+	"for": true, "and": true, "is": true, "the": true, "of": true,
+	"to": true, "in": true, "a": true, "an": true, "or": true,
+	"not": true, "with": true, "as": true, "at": true, "by": true,
+}
+
+// isStopWord returns true if the name is a stop word or shorter than 3 characters.
+func isStopWord(name string) bool {
+	n := strings.ToLower(strings.TrimSpace(name))
+	if len(n) < 3 {
+		return true
+	}
+	return stopWords[n]
 }
 
 func clamp01(x float64) float64 {

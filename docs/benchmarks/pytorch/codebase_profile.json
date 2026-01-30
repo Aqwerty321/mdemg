@@ -1,0 +1,199 @@
+{
+  "codebase": "pytorch",
+  "description": "Deep learning framework for tensor computation and neural networks with dynamic computational graphs",
+  "collected_at": "2026-01-29",
+  "repo_path": "/tmp/pytorch-benchmark",
+  "space_id": "pytorch-benchmark-v4",
+  "total_files": 10363,
+  "file_counts": {
+    "python": 2764,
+    "cpp": 2237,
+    "headers": 2604,
+    "cuda": 409,
+    "total_source": 7684
+  },
+  "primary_language": "Python/C++",
+  "domain": "Deep Learning Framework",
+  "key_modules": [
+    "torch",
+    "torch.nn",
+    "torch.nn.functional",
+    "torch.autograd",
+    "torch.optim",
+    "torch.distributed",
+    "torch.cuda",
+    "torch.jit",
+    "torch.fx",
+    "torch.export",
+    "torch.quantization",
+    "torch.utils",
+    "torch.multiprocessing",
+    "torch.profiler",
+    "torch.onnx",
+    "torch.sparse",
+    "torch.linalg",
+    "torch.fft",
+    "torch.special",
+    "torch.distributions",
+    "torch.hub",
+    "torch.package",
+    "torch.compiler"
+  ],
+  "key_patterns": [
+    "autograd - automatic differentiation engine",
+    "tensor operations - multi-dimensional array computations",
+    "JIT compilation - TorchScript for graph optimization",
+    "dynamic graphs - define-by-run computation",
+    "dispatch system - operator routing via DispatchKey",
+    "torch.compile - graph compilation with Dynamo/Inductor",
+    "CUDA acceleration - GPU tensor operations",
+    "distributed training - data/model parallelism",
+    "quantization - INT8/FP16 model optimization",
+    "export - model serialization and deployment",
+    "functorch - function transforms (vmap, grad)",
+    "memory management - caching allocator",
+    "operator registration - ATen native functions"
+  ],
+  "subsystems": [
+    {
+      "name": "Tensor Core",
+      "path": "c10/core/, aten/src/ATen/core/",
+      "description": "Low-level tensor implementation, storage, device abstraction, scalar types"
+    },
+    {
+      "name": "ATen (A Tensor Library)",
+      "path": "aten/src/ATen/",
+      "description": "Core tensor operations, kernels, dispatch mechanism, CPU/CUDA implementations"
+    },
+    {
+      "name": "Neural Network Modules",
+      "path": "torch/nn/",
+      "description": "Layer implementations (Conv, Linear, RNN, Transformer), loss functions, functional API"
+    },
+    {
+      "name": "Autograd Engine",
+      "path": "torch/autograd/, torch/csrc/autograd/",
+      "description": "Automatic differentiation, gradient computation, computation graph management"
+    },
+    {
+      "name": "Optimizers",
+      "path": "torch/optim/",
+      "description": "SGD, Adam, AdamW, LBFGS, learning rate schedulers"
+    },
+    {
+      "name": "Distributed Training",
+      "path": "torch/distributed/",
+      "description": "DDP, FSDP, RPC, collective operations, device mesh"
+    },
+    {
+      "name": "CUDA Backend",
+      "path": "torch/cuda/, aten/src/ATen/cuda/, c10/cuda/",
+      "description": "CUDA tensor operations, memory management, streams, cuBLAS/cuDNN integration"
+    },
+    {
+      "name": "TorchScript (JIT)",
+      "path": "torch/jit/, torch/csrc/jit/",
+      "description": "Script compilation, tracing, graph optimization, serialization"
+    },
+    {
+      "name": "FX Graph Mode",
+      "path": "torch/fx/",
+      "description": "Symbolic tracing, graph transformations, pattern matching"
+    },
+    {
+      "name": "TorchDynamo",
+      "path": "torch/_dynamo/",
+      "description": "Python bytecode analysis, graph capture for torch.compile"
+    },
+    {
+      "name": "TorchInductor",
+      "path": "torch/_inductor/",
+      "description": "Compiler backend, Triton codegen, kernel fusion, scheduling"
+    },
+    {
+      "name": "Export",
+      "path": "torch/export/, torch/_export/",
+      "description": "Model export, graph signature, unflatten, deployment utilities"
+    },
+    {
+      "name": "Quantization",
+      "path": "torch/quantization/, torch/ao/",
+      "description": "Post-training quantization, QAT, FX-based quantization"
+    },
+    {
+      "name": "Code Generation",
+      "path": "torchgen/",
+      "description": "Native function generation, operator schemas, YAML-based code templates"
+    },
+    {
+      "name": "Functorch",
+      "path": "functorch/, torch/_functorch/",
+      "description": "Composable function transforms: vmap, grad, jacrev, jacfwd"
+    },
+    {
+      "name": "C++ Frontend",
+      "path": "torch/csrc/",
+      "description": "Python bindings, C++ API, libtorch extensions"
+    },
+    {
+      "name": "Data Loading",
+      "path": "torch/utils/data/",
+      "description": "Dataset, DataLoader, samplers, multiprocessing workers"
+    },
+    {
+      "name": "Profiler",
+      "path": "torch/profiler/, torch/autograd/profiler.py",
+      "description": "Performance profiling, CUDA events, TensorBoard integration"
+    },
+    {
+      "name": "ONNX Export",
+      "path": "torch/onnx/",
+      "description": "ONNX model export, operator conversion, symbolic functions"
+    },
+    {
+      "name": "MPS Backend",
+      "path": "torch/mps/, aten/src/ATen/mps/",
+      "description": "Metal Performance Shaders for Apple Silicon GPU acceleration"
+    }
+  ],
+  "key_classes": [
+    "torch.Tensor - multi-dimensional array",
+    "torch.nn.Module - neural network base class",
+    "torch.autograd.Function - custom autograd operation",
+    "torch.optim.Optimizer - optimizer base class",
+    "torch.utils.data.Dataset - data source abstraction",
+    "torch.utils.data.DataLoader - batched data loading",
+    "torch.nn.Parameter - learnable tensor wrapper",
+    "torch.fx.GraphModule - traced computation graph",
+    "torch.jit.ScriptModule - compiled module",
+    "torch.distributed.ProcessGroup - collective communications"
+  ],
+  "key_functions": [
+    "torch.compile() - compile model with Dynamo/Inductor",
+    "torch.export.export() - export model to ExportedProgram",
+    "torch.jit.script() - compile module to TorchScript",
+    "torch.jit.trace() - trace module execution",
+    "torch.autograd.grad() - compute gradients",
+    "torch.save() / torch.load() - model serialization",
+    "torch.no_grad() - disable gradient computation",
+    "torch.cuda.synchronize() - CUDA stream sync",
+    "torch.distributed.init_process_group() - initialize distributed"
+  ],
+  "architecture_notes": {
+    "dispatch_system": "Operators route through c10 dispatcher based on DispatchKey (CPU, CUDA, Autograd, etc.)",
+    "tensor_storage": "Tensors wrap TensorImpl which owns Storage for actual data",
+    "autograd_graph": "Forward pass builds DAG of grad_fn nodes; backward traverses in reverse",
+    "jit_vs_eager": "Eager mode executes operations immediately; JIT captures graphs for optimization",
+    "compile_stack": "torch.compile: Dynamo (capture) -> AOTAutograd (backward) -> Inductor (codegen)",
+    "memory_management": "Caching allocator pools GPU memory; automatic garbage collection",
+    "extension_points": "Custom operators via torch.library, custom backends via torch.backends"
+  },
+  "mdemg_stats": {
+    "memory_count": 18536,
+    "layer_0": 18298,
+    "layer_1": 234,
+    "layer_2": 3,
+    "layer_3": 1,
+    "health_score": 1.0
+  }
+}

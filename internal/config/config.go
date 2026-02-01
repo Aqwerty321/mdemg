@@ -78,7 +78,10 @@ type Config struct {
 	ScoringDelta       float64 // Confidence weight (default: 0.05)
 	ScoringPhi         float64 // Hub penalty coefficient (default: 0.08)
 	ScoringKappa       float64 // Redundancy penalty coefficient (default: 0.12)
-	ScoringRho         float64 // Recency decay rate per day (default: 0.05)
+	ScoringRho         float64 // Recency decay rate per day (default: 0.05) - legacy, used as fallback
+	ScoringRhoL0       float64 // Layer 0 decay rate per day (default: 0.05 - faster decay for files)
+	ScoringRhoL1       float64 // Layer 1 decay rate per day (default: 0.02 - slower for hidden/concepts)
+	ScoringRhoL2       float64 // Layer 2+ decay rate per day (default: 0.01 - slowest for abstractions)
 	ScoringConfigBoost float64 // Score multiplier for config nodes (default: 1.15)
 	ScoringPathBoost   float64 // Boost coefficient for path-matching nodes (default: 0.15)
 
@@ -99,6 +102,20 @@ type Config struct {
 	HiddenLayerBackwardSelf  float64 // Weight of self in backward pass (default: 0.2)
 	HiddenLayerBackwardBase  float64 // Weight of base signal in backward pass (default: 0.5)
 	HiddenLayerBackwardConc  float64 // Weight of concept signal in backward pass (default: 0.3)
+
+	// Concept merge settings (V0007) - deduplication during consolidation
+	ConceptMergeEnabled   bool    // Enable concept deduplication (default: true)
+	ConceptMergeThreshold float64 // Cosine similarity threshold for merging (default: 0.90)
+
+	// Edge-type attention settings (V0008) - query-aware edge weighting in activation spreading
+	EdgeAttentionEnabled     bool    // Feature toggle (default: true)
+	EdgeAttentionCoActivated float64 // Base weight for CO_ACTIVATED_WITH edges (default: 0.85)
+	EdgeAttentionAssociated  float64 // Base weight for ASSOCIATED_WITH edges (default: 0.65)
+	EdgeAttentionGeneralizes float64 // Base weight for GENERALIZES edges (default: 0.65)
+	EdgeAttentionAbstractsTo float64 // Base weight for ABSTRACTS_TO edges (default: 0.60)
+	EdgeAttentionTemporal    float64 // Base weight for TEMPORALLY_ADJACENT edges (default: 0.45)
+	EdgeAttentionCodeBoost   float64 // Multiplier for CO_ACTIVATED in code queries (default: 1.2)
+	EdgeAttentionArchBoost   float64 // Multiplier for hierarchical in arch queries (default: 1.5)
 
 	// Hybrid retrieval settings (V0006)
 	HybridRetrievalEnabled bool    // Enable hybrid vector+BM25 retrieval (default: true)
@@ -435,6 +452,28 @@ func FromEnv() (Config, error) {
 	if scoringRho < 0 {
 		return Config{}, errors.New("SCORING_RHO must be >= 0")
 	}
+	// Layer-specific decay rates (faster decay for L0 files, slower for abstractions)
+	scoringRhoL0, err := atof("SCORING_RHO_L0", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRhoL0 < 0 {
+		return Config{}, errors.New("SCORING_RHO_L0 must be >= 0")
+	}
+	scoringRhoL1, err := atof("SCORING_RHO_L1", 0.02)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRhoL1 < 0 {
+		return Config{}, errors.New("SCORING_RHO_L1 must be >= 0")
+	}
+	scoringRhoL2, err := atof("SCORING_RHO_L2", 0.01)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRhoL2 < 0 {
+		return Config{}, errors.New("SCORING_RHO_L2 must be >= 0")
+	}
 	scoringConfigBoost, err := atof("SCORING_CONFIG_BOOST", 1.15)
 	if err != nil {
 		return Config{}, err
@@ -549,6 +588,68 @@ func FromEnv() (Config, error) {
 	hiddenBackwardConc, err := atof("HIDDEN_LAYER_BACKWARD_CONC", 0.3)
 	if err != nil {
 		return Config{}, err
+	}
+
+	// Concept merge settings (V0007)
+	conceptMergeEnabled := getBool("CONCEPT_MERGE_ENABLED", true)
+	conceptMergeThreshold, err := atof("CONCEPT_MERGE_THRESHOLD", 0.90)
+	if err != nil {
+		return Config{}, err
+	}
+	if conceptMergeThreshold < 0.5 || conceptMergeThreshold > 1.0 {
+		return Config{}, errors.New("CONCEPT_MERGE_THRESHOLD must be in range [0.5, 1.0]")
+	}
+
+	// Edge-type attention settings (V0008)
+	edgeAttentionEnabled := getBool("EDGE_ATTENTION_ENABLED", true)
+	edgeAttentionCoActivated, err := atof("EDGE_ATTENTION_CO_ACTIVATED", 0.85)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionCoActivated < 0 || edgeAttentionCoActivated > 1 {
+		return Config{}, errors.New("EDGE_ATTENTION_CO_ACTIVATED must be in range [0, 1]")
+	}
+	edgeAttentionAssociated, err := atof("EDGE_ATTENTION_ASSOCIATED", 0.65)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionAssociated < 0 || edgeAttentionAssociated > 1 {
+		return Config{}, errors.New("EDGE_ATTENTION_ASSOCIATED must be in range [0, 1]")
+	}
+	edgeAttentionGeneralizes, err := atof("EDGE_ATTENTION_GENERALIZES", 0.65)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionGeneralizes < 0 || edgeAttentionGeneralizes > 1 {
+		return Config{}, errors.New("EDGE_ATTENTION_GENERALIZES must be in range [0, 1]")
+	}
+	edgeAttentionAbstractsTo, err := atof("EDGE_ATTENTION_ABSTRACTS_TO", 0.60)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionAbstractsTo < 0 || edgeAttentionAbstractsTo > 1 {
+		return Config{}, errors.New("EDGE_ATTENTION_ABSTRACTS_TO must be in range [0, 1]")
+	}
+	edgeAttentionTemporal, err := atof("EDGE_ATTENTION_TEMPORAL", 0.45)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionTemporal < 0 || edgeAttentionTemporal > 1 {
+		return Config{}, errors.New("EDGE_ATTENTION_TEMPORAL must be in range [0, 1]")
+	}
+	edgeAttentionCodeBoost, err := atof("EDGE_ATTENTION_CODE_BOOST", 1.2)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionCodeBoost < 0.5 || edgeAttentionCodeBoost > 3.0 {
+		return Config{}, errors.New("EDGE_ATTENTION_CODE_BOOST must be in range [0.5, 3.0]")
+	}
+	edgeAttentionArchBoost, err := atof("EDGE_ATTENTION_ARCH_BOOST", 1.5)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionArchBoost < 0.5 || edgeAttentionArchBoost > 3.0 {
+		return Config{}, errors.New("EDGE_ATTENTION_ARCH_BOOST must be in range [0.5, 3.0]")
 	}
 
 	// Hybrid retrieval settings (V0006)
@@ -755,6 +856,9 @@ func FromEnv() (Config, error) {
 		ScoringPhi:                scoringPhi,
 		ScoringKappa:              scoringKappa,
 		ScoringRho:                scoringRho,
+		ScoringRhoL0:              scoringRhoL0,
+		ScoringRhoL1:              scoringRhoL1,
+		ScoringRhoL2:              scoringRhoL2,
 		ScoringConfigBoost:        scoringConfigBoost,
 		ScoringPathBoost:          scoringPathBoost,
 		LogFormat:                 logFormat,
@@ -771,6 +875,16 @@ func FromEnv() (Config, error) {
 		HiddenLayerBackwardSelf:   hiddenBackwardSelf,
 		HiddenLayerBackwardBase:   hiddenBackwardBase,
 		HiddenLayerBackwardConc:   hiddenBackwardConc,
+		ConceptMergeEnabled:       conceptMergeEnabled,
+		ConceptMergeThreshold:     conceptMergeThreshold,
+		EdgeAttentionEnabled:      edgeAttentionEnabled,
+		EdgeAttentionCoActivated:  edgeAttentionCoActivated,
+		EdgeAttentionAssociated:   edgeAttentionAssociated,
+		EdgeAttentionGeneralizes:  edgeAttentionGeneralizes,
+		EdgeAttentionAbstractsTo:  edgeAttentionAbstractsTo,
+		EdgeAttentionTemporal:     edgeAttentionTemporal,
+		EdgeAttentionCodeBoost:    edgeAttentionCodeBoost,
+		EdgeAttentionArchBoost:    edgeAttentionArchBoost,
 		HybridRetrievalEnabled:    hybridEnabled,
 		BM25TopK:                  bm25TopK,
 		BM25Weight:                bm25Weight,

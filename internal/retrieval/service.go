@@ -250,8 +250,23 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		}
 	}
 
-	// 3) Activation physics
-	act := SpreadingActivation(cands, edges, 2, 0.15)
+	// 3) Activation physics with edge-type attention
+	// Build query context for attention modulation
+	queryCtx := QueryContext{
+		QueryText:   req.QueryText,
+		IsCodeQuery: isCodeQuery(req.QueryText),
+		IsArchQuery: isArchitectureQuery(req.QueryText),
+	}
+
+	// Compute attention weights or use default (original behavior)
+	var act map[string]float64
+	if s.cfg.EdgeAttentionEnabled {
+		attention := ComputeEdgeAttention(queryCtx, s.cfg)
+		act = SpreadingActivationWithAttention(cands, edges, 2, 0.15, attention)
+	} else {
+		// Fallback to original behavior (CO_ACTIVATED_WITH only)
+		act = SpreadingActivation(cands, edges, 2, 0.15)
+	}
 
 	// 4) Initial ranking (pass query text for path-based boosting)
 	// Request more candidates for re-ranking if enabled

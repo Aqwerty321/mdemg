@@ -1,0 +1,108 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Cancel Ingest Codebase Job",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "operation_id": "cancelIngestCodebaseJob",
+    "tags": [
+      "memory",
+      "ingest",
+      "codebase",
+      "jobs",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Cancel a running or queued ingest-codebase job",
+    "test_type": "contract",
+    "priority": "medium",
+    "status": "active"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "691842612fd071943c6d59f93b1103c57b2dc146e89689b82d7b4a2f5d8c70b2"
+  },
+  "variables": {
+    "job_id": "nonexistent-job-id"
+  },
+  "request": {
+    "method": "DELETE",
+    "path": "/v1/memory/ingest-codebase/{{job_id}}"
+  },
+  "expected": {
+    "status": [
+      200,
+      404
+    ],
+    "body_assertions": [
+      {
+        "name": "status when cancelled",
+        "path": "$.status",
+        "equals": "cancelled",
+        "optional": true
+      },
+      {
+        "name": "job_id echoed",
+        "path": "$.job_id",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "error when not found",
+        "path": "$.error",
+        "type": "string",
+        "optional": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "job_not_found",
+      "description": "Should return 404 for non-existent job",
+      "variables": {
+        "job_id": "definitely-not-a-real-job-id-cancel"
+      },
+      "expected": {
+        "status": 404,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "contains": "not found"
+          }
+        ]
+      }
+    },
+    {
+      "name": "already_completed",
+      "description": "Cancel already completed job (requires real job)",
+      "skip": true,
+      "skip_reason": "Requires test setup: create and complete a job first",
+      "expected": {
+        "status": [
+          200,
+          400
+        ],
+        "body_assertions": []
+      }
+    },
+    {
+      "name": "cancel_running",
+      "description": "Cancel a running job (requires real job)",
+      "skip": true,
+      "skip_reason": "Requires test setup: create job and cancel while running",
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.status",
+            "equals": "cancelled"
+          }
+        ]
+      }
+    }
+  ]
+}

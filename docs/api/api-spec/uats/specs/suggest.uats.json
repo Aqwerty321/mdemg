@@ -1,0 +1,49 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Memory Suggestions",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "suggest",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Memory Suggestions endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "32b73926bcff99a4e4611314ccc9612a62cec377c36f0a29afa30bc854e58890"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/suggest",
+    "body": {
+      "space_id": "{{test_space}}",
+      "context": "working on API design"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.suggestions",
+        "type": "array",
+        "optional": true
+      }
+    ]
+  }
+}

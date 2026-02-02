@@ -1,0 +1,45 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "List Modules",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "modules",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates List Modules endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "97502a762721bf6e0dc06ae7f9649a8571d463638b3e7479da6741654c71d26c"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/modules"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.enabled",
+        "type": "boolean"
+      },
+      {
+        "path": "$.data.modules",
+        "type": "array"
+      }
+    ]
+  }
+}

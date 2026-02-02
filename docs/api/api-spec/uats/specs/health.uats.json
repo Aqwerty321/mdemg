@@ -1,0 +1,40 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Health Check",
+    "base_url": "http://localhost:9999",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "health",
+      "smoke"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Health Check endpoint",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "e63a51418ba9497dbea578598a486f690628b362c0fdd25cb514f529a04f6750"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/healthz"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.status",
+        "equals": "ok"
+      }
+    ]
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Node Operations",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "nodes",
+      "archive"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Archive and delete operations on memory nodes",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "cb29e44eec564d0e2cadb57a11a54e45c66f20c20c10136d4424fcb084da233f"
+  },
+  "variables": {
+    "test_space": "demo",
+    "test_node_id": "nonexistent-node-uats"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/nodes/{{test_node_id}}/archive",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": [
+      200,
+      404
+    ],
+    "body_assertions": []
+  },
+  "variants": [
+    {
+      "name": "unarchive_node",
+      "description": "Unarchive a node by ID",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/nodes/{{test_node_id}}/unarchive",
+        "query": {
+          "space_id": "{{test_space}}"
+        }
+      },
+      "expected": {
+        "status": [
+          200,
+          404
+        ]
+      }
+    },
+    {
+      "name": "delete_node_missing_confirm",
+      "description": "Delete without confirm parameter returns 400",
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/memory/nodes/{{test_node_id}}",
+        "query": {
+          "space_id": "{{test_space}}"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "delete_node_with_confirm",
+      "description": "Delete with confirm=true",
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/memory/nodes/{{test_node_id}}",
+        "query": {
+          "space_id": "{{test_space}}",
+          "confirm": "true"
+        }
+      },
+      "expected": {
+        "status": [
+          200,
+          404
+        ]
+      }
+    }
+  ]
+}

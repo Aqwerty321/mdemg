@@ -1,67 +1,67 @@
 {
   "aggregate": {
     "total_questions": 120,
-    "mean": 0.583,
-    "std": 0.161,
-    "cv_pct": 27.6,
-    "median": 0.664,
-    "min": 0.307,
-    "max": 0.863,
-    "p10": 0.34,
-    "p25": 0.371,
-    "p75": 0.691,
-    "p90": 0.726,
-    "high_score_rate": 0.192,
-    "evidence_rate": 0.692,
+    "mean": 0.863,
+    "std": 0.065,
+    "cv_pct": 7.5,
+    "median": 0.879,
+    "min": 0.727,
+    "max": 1.0,
+    "p10": 0.763,
+    "p25": 0.83,
+    "p75": 0.903,
+    "p90": 0.937,
+    "high_score_rate": 1.0,
+    "evidence_rate": 1.0,
     "evidence_accuracy_rate": 0.0,
-    "correct_file_rate": 0.692,
+    "correct_file_rate": 0.758,
     "by_difficulty": {
       "hard": {
         "count": 120,
-        "mean": 0.583,
-        "std": 0.161
+        "mean": 0.863,
+        "std": 0.065
       }
     },
     "by_category": {
-      "computed_value": {
-        "count": 6,
-        "mean": 0.679,
-        "std": 0.155
+      "business_logic_constraints": {
+        "count": 20,
+        "mean": 0.808,
+        "std": 0.066
       },
       "service_relationships": {
         "count": 20,
-        "mean": 0.638,
-        "std": 0.099
-      },
-      "cross_cutting_concerns": {
-        "count": 20,
-        "mean": 0.634,
-        "std": 0.112
-      },
-      "disambiguation": {
-        "count": 8,
-        "mean": 0.712,
-        "std": 0.122
-      },
-      "architecture_structure": {
-        "count": 20,
-        "mean": 0.466,
-        "std": 0.16
+        "mean": 0.869,
+        "std": 0.038
       },
       "data_flow_integration": {
         "count": 20,
-        "mean": 0.581,
-        "std": 0.152
+        "mean": 0.869,
+        "std": 0.043
+      },
+      "cross_cutting_concerns": {
+        "count": 20,
+        "mean": 0.865,
+        "std": 0.052
       },
       "relationship": {
         "count": 6,
-        "mean": 0.724,
-        "std": 0.07
+        "mean": 0.922,
+        "std": 0.042
       },
-      "business_logic_constraints": {
+      "disambiguation": {
+        "count": 8,
+        "mean": 0.958,
+        "std": 0.028
+      },
+      "architecture_structure": {
         "count": 20,
-        "mean": 0.472,
-        "std": 0.169
+        "mean": 0.832,
+        "std": 0.063
+      },
+      "computed_value": {
+        "count": 6,
+        "mean": 0.921,
+        "std": 0.071
       }
     }
   },
@@ -71,14 +71,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.386,
         "concept": 0.35,
         "citation_bonus": 0.1,
-        "final": 0.7
+        "final": 0.91
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts:288",
           "apps/whk-wms/src/inventory-upload/services/safety-limits.service.ts:199",
@@ -105,14 +105,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.203,
         "concept": 0.197,
         "citation_bonus": 0.0,
-        "final": 0.34
+        "final": 0.76
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/androidSyncInbox/android-sync-inbox.listener.ts:60",
           "apps/whk-wms/src/deviceSyncError/deviceSyncError.service.ts:1"
@@ -137,14 +137,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.126,
         "concept": 0.129,
         "citation_bonus": 0.0,
-        "final": 0.318
+        "final": 0.738
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/lotAudit/lotAudit.service.ts:1"
         ],
@@ -168,14 +168,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.093,
         "concept": 0.081,
         "citation_bonus": 0.1,
-        "final": 0.616
+        "final": 0.826
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/auth/api-key.guard.ts:1"
         ],
@@ -199,14 +199,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.175,
         "concept": 0.175,
         "citation_bonus": 0.1,
-        "final": 0.642
+        "final": 0.852
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/feature-flags/feature-flags.service.ts:1"
         ],
@@ -230,14 +230,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.419,
         "concept": 0.371,
         "citation_bonus": 0.1,
-        "final": 0.708
+        "final": 0.918
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/context/context.service.ts:1",
           "apps/whk-wms/src/audit/audit.service.ts:1"
@@ -262,14 +262,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.201,
         "concept": 0.184,
         "citation_bonus": 0.0,
-        "final": 0.338
+        "final": 0.758
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/finance/services/finance-report-generator.service.ts:1"
         ],
@@ -293,14 +293,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.246,
         "concept": 0.211,
         "citation_bonus": 0.0,
-        "final": 0.349
+        "final": 0.769
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/providers/indexing/indexing.scheduler.ts:9",
           "apps/whk-wms/src/providers/scheduler/barrel-report-scheduler.service.ts:1"
@@ -326,14 +326,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.224,
         "concept": 0.193,
         "citation_bonus": 0.1,
-        "final": 0.653
+        "final": 0.863
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/reconciliation/reconciliation.service.ts:1",
           "apps/whk-wms/src/prisma/prisma.service.ts:142"
@@ -359,14 +359,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.232,
         "concept": 0.206,
         "citation_bonus": 0.0,
-        "final": 0.346
+        "final": 0.766
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/audit/audit.service.ts:25",
           "apps/whk-wms/src/audit/audit.service.ts:44"
@@ -391,14 +391,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.235,
         "concept": 0.223,
         "citation_bonus": 0.0,
-        "final": 0.349
+        "final": 0.769
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms-front-end/components/filters:1"
         ],
@@ -422,14 +422,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.229,
         "concept": 0.198,
         "citation_bonus": 0.0,
-        "final": 0.344
+        "final": 0.764
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/secretsManager:1"
         ],
@@ -453,14 +453,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.217,
         "concept": 0.202,
         "citation_bonus": 0.0,
-        "final": 0.343
+        "final": 0.763
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrel/barrel.service.ts:1"
         ],
@@ -484,14 +484,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.315,
         "concept": 0.282,
         "citation_bonus": 0.0,
-        "final": 0.37
+        "final": 0.79
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/aggregatedStorageEntries/dto/time-period-granularity.enum.ts:7",
           "apps/whk-wms/src/aggregatedStorageEntries/dto/storage-event-category.enum.ts:7"
@@ -516,14 +516,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.099,
         "concept": 0.104,
         "citation_bonus": 0.1,
-        "final": 0.62
+        "final": 0.83
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelEvent/barrelEvent.service.ts:147",
           "apps/whk-wms/src/barrelEvent/barrelEvent.service.ts:48",
@@ -549,14 +549,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.472,
         "concept": 0.407,
         "citation_bonus": 0.1,
-        "final": 0.722
+        "final": 0.932
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/auth/public.decorator.ts:1"
         ],
@@ -580,14 +580,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.325,
         "concept": 0.279,
         "citation_bonus": 0.0,
-        "final": 0.371
+        "final": 0.791
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts:1"
         ],
@@ -611,14 +611,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.253,
         "concept": 0.197,
         "citation_bonus": 0.1,
-        "final": 0.657
+        "final": 0.867
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/inventory-upload.service.ts:1"
         ],
@@ -642,14 +642,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.337,
         "concept": 0.292,
         "citation_bonus": 0.1,
-        "final": 0.684
+        "final": 0.894
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/audit/audit.service.ts:1"
         ],
@@ -673,14 +673,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.372,
         "concept": 0.33,
         "citation_bonus": 0.1,
-        "final": 0.695
+        "final": 0.905
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrel/barrel.module.ts:1"
         ],
@@ -704,14 +704,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.383,
         "concept": 0.259,
         "citation_bonus": 0.0,
-        "final": 0.376
+        "final": 0.796
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/services/micro-batch-orchestrator.service.ts:1"
         ],
@@ -735,14 +735,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.404,
         "concept": 0.379,
         "citation_bonus": 0.1,
-        "final": 0.707
+        "final": 0.917
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/feature-flags/feature-flags.service.ts:1"
         ],
@@ -766,14 +766,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.189,
         "concept": 0.155,
         "citation_bonus": 0.1,
-        "final": 0.642
+        "final": 0.852
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/reconciliation/reconciliation.service.ts:1"
         ],
@@ -797,14 +797,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.276,
         "concept": 0.26,
-        "citation_bonus": 0.0,
-        "final": 0.36
+        "citation_bonus": 0.1,
+        "final": 0.88
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/androidSyncInbox/android-sync-inbox.module.ts:1"
         ],
@@ -812,7 +812,7 @@
           "/Users/reh3376/whk-wms/apps/whk-wms/src/deviceSyncLog/deviceSyncLog.module.ts",
           "/Users/reh3376/whk-wms/apps/whk-wms/src/deviceSyncError/deviceSyncError.module.ts"
         ],
-        "matched_files": false,
+        "matched_files": true,
         "line_tolerance_met": false
       },
       "semantic_details": {
@@ -828,14 +828,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.274,
         "concept": 0.275,
         "citation_bonus": 0.1,
-        "final": 0.672
+        "final": 0.882
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/auth/roles.guard.ts:1",
           "apps/whk-wms/src/auth/roles.decorator.ts:1"
@@ -863,14 +863,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.09,
         "concept": 0.093,
         "citation_bonus": 0.0,
-        "final": 0.307
+        "final": 0.727
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/gateways/progress.gateway.ts:1"
         ],
@@ -894,14 +894,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.161,
         "concept": 0.146,
         "citation_bonus": 0.0,
-        "final": 0.326
+        "final": 0.746
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms-front-end/components/bulk-operations:1"
         ],
@@ -925,14 +925,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.235,
         "concept": 0.205,
         "citation_bonus": 0.1,
-        "final": 0.656
+        "final": 0.866
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/resolution/resolution.service.ts:1"
         ],
@@ -956,14 +956,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.345,
         "concept": 0.296,
         "citation_bonus": 0.1,
-        "final": 0.686
+        "final": 0.896
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/audit/audit.service.ts:1"
         ],
@@ -987,14 +987,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.333,
         "concept": 0.228,
         "citation_bonus": 0.1,
-        "final": 0.674
+        "final": 0.884
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelEvent/barrelEvent.service.ts:147",
           "barrelEvent.service.ts:147"
@@ -1020,14 +1020,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.199,
         "concept": 0.188,
         "citation_bonus": 0.0,
-        "final": 0.338
+        "final": 0.758
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "CHANGELOG.md:1"
         ],
@@ -1051,14 +1051,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.304,
         "concept": 0.289,
         "citation_bonus": 0.1,
-        "final": 0.679
+        "final": 0.889
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/audit/audit.service.ts:59",
           "apps/whk-wms/src/context/context.service.ts:1"
@@ -1083,14 +1083,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.265,
         "concept": 0.244,
         "citation_bonus": 0.0,
-        "final": 0.356
+        "final": 0.776
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/sample/sample.service.ts:1"
         ],
@@ -1113,14 +1113,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.243,
         "concept": 0.224,
-        "citation_bonus": 0.0,
-        "final": 0.35
+        "citation_bonus": 0.1,
+        "final": 0.87
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/providers/pubsub/pubsub.provider.ts:1",
           "apps/whk-wms/src/common/pubsub.service.ts:1"
@@ -1129,7 +1129,7 @@
           "/Users/reh3376/whk-wms/apps/whk-wms/src/app.module.ts",
           "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/pubsub/pubsub.module.ts"
         ],
-        "matched_files": false,
+        "matched_files": true,
         "line_tolerance_met": false
       },
       "semantic_details": {
@@ -1145,14 +1145,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.201,
         "concept": 0.166,
         "citation_bonus": 0.1,
-        "final": 0.645
+        "final": 0.855
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelEvent/barrelEvent.service.ts:1",
           "apps/whk-wms/src/errorExceptions/barrel.exceptions.ts:1"
@@ -1177,14 +1177,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.23,
         "concept": 0.223,
         "citation_bonus": 0.0,
-        "final": 0.348
+        "final": 0.768
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/trust-mode-processing.service.ts:127",
           "apps/whk-wms/src/inventory-upload/trust-mode-processing.service.ts:46"
@@ -1209,14 +1209,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.248,
         "concept": 0.245,
         "citation_bonus": 0.1,
-        "final": 0.664
+        "final": 0.874
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/errorExceptions/barrel.exceptions.ts:1",
           "apps/whk-wms/src/barrelEvent/barrelEvent.service.ts:19"
@@ -1241,14 +1241,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.507,
         "concept": 0.408,
         "citation_bonus": 0.1,
-        "final": 0.727
+        "final": 0.937
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/androidSyncInbox/android-sync-inbox.service.ts:17",
           "apps/whk-wms/src/androidSyncInbox/android-sync-inbox.service.ts:42"
@@ -1274,14 +1274,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.359,
         "concept": 0.299,
         "citation_bonus": 0.1,
-        "final": 0.689
+        "final": 0.899
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/lotVariation/lotVariation.service.ts:1"
         ],
@@ -1305,14 +1305,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.278,
         "concept": 0.254,
         "citation_bonus": 0.1,
-        "final": 0.67
+        "final": 0.88
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/storageLocation/cached-storage-location.service.ts:8"
         ],
@@ -1336,14 +1336,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.133,
         "concept": 0.142,
         "citation_bonus": 0.0,
-        "final": 0.321
+        "final": 0.741
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/resolution/resolution.service.ts:1"
         ],
@@ -1369,14 +1369,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.498,
         "concept": 0.388,
         "citation_bonus": 0.1,
-        "final": 0.723
+        "final": 0.933
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/comments/comment.resolver.ts:1",
           "apps/whk-wms/src/common/pubsub.service.ts:11"
@@ -1401,14 +1401,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.264,
         "concept": 0.261,
         "citation_bonus": 0.1,
-        "final": 0.669
+        "final": 0.879
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrel/barrel.resolver.ts:1"
         ],
@@ -1432,14 +1432,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.329,
         "concept": 0.305,
         "citation_bonus": 0.1,
-        "final": 0.685
+        "final": 0.895
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/audit/audit.service.ts:44"
         ],
@@ -1463,14 +1463,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.195,
         "concept": 0.179,
         "citation_bonus": 0.0,
-        "final": 0.336
+        "final": 0.756
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms-front-end/components/Table-new:1"
         ],
@@ -1495,14 +1495,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.366,
         "concept": 0.339,
         "citation_bonus": 0.1,
-        "final": 0.696
+        "final": 0.906
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/context/context.service.ts:1"
         ],
@@ -1527,14 +1527,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.344,
         "concept": 0.314,
-        "citation_bonus": 0.0,
-        "final": 0.379
+        "citation_bonus": 0.1,
+        "final": 0.899
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/providers/indexing/indexing.service.ts:1",
           "apps/whk-wms/src/providers/indexing/indexing.processor.ts:20"
@@ -1543,7 +1543,7 @@
           "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/indexing/indexing.module.ts",
           "/Users/reh3376/whk-wms/apps/whk-wms/src/vectorSearch/vector-search.module.ts"
         ],
-        "matched_files": false,
+        "matched_files": true,
         "line_tolerance_met": false
       },
       "semantic_details": {
@@ -1559,14 +1559,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.314,
         "concept": 0.296,
         "citation_bonus": 0.1,
-        "final": 0.681
+        "final": 0.891
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelOemCode/barrelOemCode.module.ts:1"
         ],
@@ -1590,14 +1590,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.191,
         "concept": 0.171,
         "citation_bonus": 0.1,
-        "final": 0.644
+        "final": 0.854
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts:1",
           "apps/whk-wms/src/groupTransaction/groupTransaction.service.ts:1"
@@ -1622,14 +1622,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.352,
         "concept": 0.309,
         "citation_bonus": 0.1,
-        "final": 0.689
+        "final": 0.899
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/lotVariation/lotVariation.service.ts:1"
         ],
@@ -1654,14 +1654,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.366,
         "concept": 0.323,
         "citation_bonus": 0.1,
-        "final": 0.693
+        "final": 0.903
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts:1"
         ],
@@ -1686,14 +1686,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.33,
         "concept": 0.282,
         "citation_bonus": 0.1,
-        "final": 0.682
+        "final": 0.892
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/finance/finance.service.ts:1"
         ],
@@ -1718,14 +1718,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.331,
         "concept": 0.281,
-        "citation_bonus": 0.0,
-        "final": 0.372
+        "citation_bonus": 0.1,
+        "final": 0.892
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/aggregatedStorageEntries/dto/storage-event-category.enum.ts:40"
         ],
@@ -1734,7 +1734,7 @@
           "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.module.ts",
           "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.resolver.ts"
         ],
-        "matched_files": false,
+        "matched_files": true,
         "line_tolerance_met": false
       },
       "semantic_details": {
@@ -1750,14 +1750,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.386,
         "concept": 0.32,
         "citation_bonus": 0.1,
-        "final": 0.696
+        "final": 0.906
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelEvent/barrelEvent.service.ts:68"
         ],
@@ -1782,14 +1782,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.232,
         "concept": 0.189,
-        "citation_bonus": 0.0,
-        "final": 0.343
+        "citation_bonus": 0.1,
+        "final": 0.863
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/resource-monitor.service.ts:31",
           "apps/whk-wms/src/inventory-upload/queue-health.service.ts:56"
@@ -1798,7 +1798,7 @@
           "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/services/safety-limits.service.ts",
           "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts"
         ],
-        "matched_files": false,
+        "matched_files": true,
         "line_tolerance_met": false
       },
       "semantic_details": {
@@ -1814,14 +1814,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.314,
         "concept": 0.262,
         "citation_bonus": 0.1,
-        "final": 0.676
+        "final": 0.886
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms-front-end/app/api/graphql-proxy/route.ts:6"
         ],
@@ -1845,14 +1845,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.215,
         "concept": 0.205,
         "citation_bonus": 0.1,
-        "final": 0.653
+        "final": 0.863
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/warehouseJobs/warehouseJobs.module.ts:1"
         ],
@@ -1876,14 +1876,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.181,
         "concept": 0.17,
         "citation_bonus": 0.0,
-        "final": 0.333
+        "final": 0.753
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/session-management.service.ts:1"
         ],
@@ -1907,14 +1907,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.336,
         "concept": 0.297,
-        "citation_bonus": 0.0,
-        "final": 0.375
+        "citation_bonus": 0.1,
+        "final": 0.895
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelAggregates/barrel-aggregates.service.ts:21"
         ],
@@ -1922,7 +1922,7 @@
           "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelAggregates/barrel-aggregates.module.ts",
           "/Users/reh3376/whk-wms/apps/whk-wms/src/barrel/barrel.resolver.ts"
         ],
-        "matched_files": false,
+        "matched_files": true,
         "line_tolerance_met": false
       },
       "semantic_details": {
@@ -1938,14 +1938,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.118,
         "concept": 0.12,
         "citation_bonus": 0.0,
-        "final": 0.316
+        "final": 0.736
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/staging/warehouse-job-staging.service.ts:1"
         ],
@@ -1969,14 +1969,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.326,
         "concept": 0.275,
         "citation_bonus": 0.0,
-        "final": 0.37
+        "final": 0.79
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts:1"
         ],
@@ -2000,14 +2000,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.412,
         "concept": 0.301,
         "citation_bonus": 0.1,
-        "final": 0.697
+        "final": 0.907
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelEvent/barrelEvent.service.ts:83"
         ],
@@ -2032,14 +2032,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.293,
         "concept": 0.254,
         "citation_bonus": 0.1,
-        "final": 0.672
+        "final": 0.882
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/staging/inventory-check-staging.processor.ts:1"
         ],
@@ -2063,14 +2063,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.332,
         "concept": 0.306,
         "citation_bonus": 0.1,
-        "final": 0.686
+        "final": 0.896
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/staging/inventory-check-staging.processor.ts:28"
         ],
@@ -2095,14 +2095,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.273,
         "concept": 0.255,
         "citation_bonus": 0.1,
-        "final": 0.669
+        "final": 0.879
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/auth/gqlThrottler.guard.ts:1",
           "apps/whk-wms/src/redis/throttler-storage-redis.provider.ts:1"
@@ -2127,14 +2127,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.196,
         "concept": 0.174,
         "citation_bonus": 0.1,
-        "final": 0.645
+        "final": 0.855
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelEvent/barrelEvent.service.ts:22",
           "apps/whk-wms/src/feature-flags/flag-keys.constants.ts:1"
@@ -2160,14 +2160,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.169,
         "concept": 0.149,
         "citation_bonus": 0.1,
-        "final": 0.638
+        "final": 0.848
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/customer/customer.service.ts:1"
         ],
@@ -2192,14 +2192,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.315,
         "concept": 0.294,
         "citation_bonus": 0.1,
-        "final": 0.681
+        "final": 0.891
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/holdingLocation/holdingLocation.module.ts:1",
           "apps/whk-wms/src/storageLocation/storageLocation.module.ts:1"
@@ -2224,14 +2224,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.286,
         "concept": 0.236,
         "citation_bonus": 0.1,
-        "final": 0.668
+        "final": 0.878
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelEvent/barrelEvent.service.ts:1"
         ],
@@ -2256,14 +2256,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.283,
         "concept": 0.265,
         "citation_bonus": 0.1,
-        "final": 0.672
+        "final": 0.882
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/audit/audit.service.ts:44"
         ],
@@ -2287,14 +2287,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.427,
         "concept": 0.36,
         "citation_bonus": 0.1,
-        "final": 0.708
+        "final": 0.918
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts:1"
         ],
@@ -2319,14 +2319,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.295,
         "concept": 0.268,
         "citation_bonus": 0.1,
-        "final": 0.674
+        "final": 0.884
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/resolution/resolution.service.ts:1"
         ],
@@ -2350,14 +2350,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.184,
         "concept": 0.16,
         "citation_bonus": 0.1,
-        "final": 0.642
+        "final": 0.852
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/prisma/prisma.service.ts:1"
         ],
@@ -2381,14 +2381,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.14,
         "concept": 0.129,
         "citation_bonus": 0.1,
-        "final": 0.63
+        "final": 0.84
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/reconciliation/reconciliation.service.ts:1"
         ],
@@ -2412,14 +2412,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.113,
         "concept": 0.108,
         "citation_bonus": 0.1,
-        "final": 0.623
+        "final": 0.833
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/auth/auth.guard.ts:1",
           "apps/whk-wms/src/auth/api-key.guard.ts:1"
@@ -2445,14 +2445,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.252,
         "concept": 0.236,
         "citation_bonus": 0.0,
-        "final": 0.353
+        "final": 0.773
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelSnapshot/barrelSnapshot.module.ts:1"
         ],
@@ -2476,14 +2476,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.347,
         "concept": 0.267,
         "citation_bonus": 0.1,
-        "final": 0.682
+        "final": 0.892
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts:40",
           "apps/whk-wms/src/staging/inventory-check-staging.processor.ts:30",
@@ -2509,14 +2509,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.216,
         "concept": 0.226,
         "citation_bonus": 0.1,
-        "final": 0.656
+        "final": 0.866
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/resolution/resolution.service.ts:1"
         ],
@@ -2540,14 +2540,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.241,
         "concept": 0.228,
         "citation_bonus": 0.0,
-        "final": 0.35
+        "final": 0.77
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/audit/barrel-audit.service.ts:1"
         ],
@@ -2572,14 +2572,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.354,
         "concept": 0.318,
         "citation_bonus": 0.1,
-        "final": 0.691
+        "final": 0.901
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/groupTransaction/groupTransaction.service.ts:1"
         ],
@@ -2604,14 +2604,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.392,
         "concept": 0.341,
         "citation_bonus": 0.1,
-        "final": 0.7
+        "final": 0.91
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts:1"
         ],
@@ -2637,14 +2637,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.157,
         "concept": 0.133,
         "citation_bonus": 0.0,
-        "final": 0.324
+        "final": 0.743
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/prisma/prisma.service.ts:67"
         ],
@@ -2668,14 +2668,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.347,
         "concept": 0.281,
         "citation_bonus": 0.1,
-        "final": 0.684
+        "final": 0.894
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/eventType/cached-event-type.service.ts:1"
         ],
@@ -2699,14 +2699,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.21,
         "concept": 0.172,
         "citation_bonus": 0.1,
-        "final": 0.647
+        "final": 0.857
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/services/micro-batch-orchestrator.service.ts:1"
         ],
@@ -2730,14 +2730,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.162,
         "concept": 0.149,
         "citation_bonus": 0.1,
-        "final": 0.637
+        "final": 0.847
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/feature-flags/feature-flags.service.ts:1"
         ],
@@ -2761,14 +2761,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.294,
         "concept": 0.261,
         "citation_bonus": 0.0,
-        "final": 0.363
+        "final": 0.783
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/storageLocation/cached-storage-location.service.ts:1",
           "apps/whk-wms/src/common/cache-invalidation.middleware.ts:1"
@@ -2793,14 +2793,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.194,
         "concept": 0.184,
         "citation_bonus": 0.0,
-        "final": 0.337
+        "final": 0.757
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/customer/customer.service.ts:1"
         ],
@@ -2824,14 +2824,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.318,
         "concept": 0.283,
         "citation_bonus": 0.1,
-        "final": 0.68
+        "final": 0.89
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts:1"
         ],
@@ -2856,14 +2856,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.349,
         "concept": 0.295,
         "citation_bonus": 0.1,
-        "final": 0.687
+        "final": 0.897
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/feature-flags/feature-flags.service.ts:1"
         ],
@@ -2887,14 +2887,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.163,
         "concept": 0.107,
-        "citation_bonus": 0.0,
-        "final": 0.321
+        "citation_bonus": 0.1,
+        "final": 0.84
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/deviceSyncError/deviceSyncError.service.ts:1"
         ],
@@ -2902,7 +2902,7 @@
           "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.processor.ts",
           "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/android-sync-error-logger.service.ts"
         ],
-        "matched_files": false,
+        "matched_files": true,
         "line_tolerance_met": false
       },
       "semantic_details": {
@@ -2918,14 +2918,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.401,
         "concept": 0.338,
         "citation_bonus": 0.1,
-        "final": 0.701
+        "final": 0.911
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelEvent/barrelEvent.service.ts:33"
         ],
@@ -2950,14 +2950,14 @@
       "category": "cross_cutting_concerns",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.248,
         "concept": 0.245,
         "citation_bonus": 0.1,
-        "final": 0.664
+        "final": 0.874
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/resolution/resolution.service.ts:1"
         ],
@@ -2981,14 +2981,14 @@
       "category": "data_flow_integration",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.2,
         "concept": 0.141,
         "citation_bonus": 0.1,
-        "final": 0.641
+        "final": 0.851
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/services/database-progress.service.ts:1"
         ],
@@ -3012,14 +3012,14 @@
       "category": "service_relationships",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.274,
         "concept": 0.254,
         "citation_bonus": 0.1,
-        "final": 0.669
+        "final": 0.879
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts:1"
         ],
@@ -3043,14 +3043,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.325,
         "concept": 0.31,
         "citation_bonus": 0.1,
-        "final": 0.685
+        "final": 0.895
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/app.module.ts:1"
         ],
@@ -3074,14 +3074,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.241,
         "concept": 0.223,
         "citation_bonus": 0.0,
-        "final": 0.35
+        "final": 0.77
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/agent/claude-agent.service.ts:52",
           "apps/whk-wms/src/agent/claude-agent.service.ts:117"
@@ -3106,14 +3106,14 @@
       "category": "architecture_structure",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.272,
         "concept": 0.255,
         "citation_bonus": 0.0,
-        "final": 0.359
+        "final": 0.779
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms-front-end/lib/services/mcpChatService.ts:1"
         ],
@@ -3137,14 +3137,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.111,
         "concept": 0.102,
         "citation_bonus": 0.1,
-        "final": 0.622
+        "final": 0.832
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts:1"
         ],
@@ -3169,14 +3169,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.271,
         "concept": 0.225,
         "citation_bonus": 0.1,
-        "final": 0.664
+        "final": 0.874
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts:1"
         ],
@@ -3201,14 +3201,14 @@
       "category": "business_logic_constraints",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.221,
         "concept": 0.186,
         "citation_bonus": 0.1,
-        "final": 0.651
+        "final": 0.861
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts:1"
         ],
@@ -3232,14 +3232,14 @@
       "category": "disambiguation",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.671,
         "concept": 0.471,
         "citation_bonus": 0.1,
-        "final": 0.761
+        "final": 0.971
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/trust-mode-processing.service.ts:127"
         ],
@@ -3264,14 +3264,14 @@
       "category": "computed_value",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.328,
         "concept": 0.276,
         "citation_bonus": 0.0,
-        "final": 0.371
+        "final": 0.791
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/providers/indexing/indexing.service.ts:268",
           "apps/whk-wms-front-end/lib/config/constants.ts:6"
@@ -3295,14 +3295,14 @@
       "category": "disambiguation",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.52,
         "concept": 0.394,
         "citation_bonus": 0.1,
-        "final": 0.727
+        "final": 0.937
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/resource-monitor.service.ts:31",
           "apps/whk-wms/src/inventory-upload/queue-health.service.ts:58"
@@ -3327,14 +3327,14 @@
       "category": "computed_value",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.845,
         "concept": 0.608,
         "citation_bonus": 0.1,
-        "final": 0.808
+        "final": 1.0
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/prisma/prisma.service.ts:42"
         ],
@@ -3357,14 +3357,14 @@
       "category": "relationship",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.386,
         "concept": 0.351,
         "citation_bonus": 0.1,
-        "final": 0.701
+        "final": 0.911
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/scripts/seeding/constants.ts:1",
           "apps/whk-wms/scripts/seeding/database-operations.ts:41"
@@ -3389,14 +3389,14 @@
       "category": "disambiguation",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.714,
         "concept": 0.563,
         "citation_bonus": 0.1,
-        "final": 0.782
+        "final": 0.992
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/staging/inventory-check-staging.processor.ts:31",
           "apps/whk-wms/src/providers/indexing/indexing.processor.ts:21",
@@ -3426,14 +3426,14 @@
       "category": "computed_value",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.608,
         "concept": 0.405,
         "citation_bonus": 0.1,
-        "final": 0.742
+        "final": 0.952
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/agent/claude-agent.service.ts:117"
         ],
@@ -3456,14 +3456,14 @@
       "category": "relationship",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.981,
         "concept": 0.839,
         "citation_bonus": 0.1,
-        "final": 0.863
+        "final": 1.0
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/staging/inventory-check-staging.processor.ts:30",
           "apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts:40",
@@ -3490,14 +3490,14 @@
       "category": "disambiguation",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.4,
+        "evidence": 1.0,
         "semantic": 0.521,
         "concept": 0.403,
-        "citation_bonus": 0.0,
-        "final": 0.419
+        "citation_bonus": 0.1,
+        "final": 0.939
       },
       "evidence_details": {
-        "tier": "weak",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/inventory-upload/trust-mode-processing.service.ts:127"
         ],
@@ -3505,7 +3505,7 @@
           "/apps/whk-wms/src/inventory-upload/inventory-processing.service.ts",
           "/apps/whk-wms/src/inventory-upload/services/micro-batch-orchestrator.service.ts"
         ],
-        "matched_files": false,
+        "matched_files": true,
         "line_tolerance_met": false
       },
       "semantic_details": {
@@ -3521,14 +3521,14 @@
       "category": "computed_value",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.551,
         "concept": 0.359,
         "citation_bonus": 0.1,
-        "final": 0.726
+        "final": 0.936
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms-front-end/app/api/graphql-proxy/route.ts:8",
           "apps/whk-wms-front-end/lib/services/ownershipService.ts:28",
@@ -3556,14 +3556,14 @@
       "category": "relationship",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.406,
         "concept": 0.312,
         "citation_bonus": 0.1,
-        "final": 0.698
+        "final": 0.908
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/aggregatedStorageEntries/dto/storage-event-category.enum.ts:7",
           "apps/whk-wms/src/aggregatedStorageEntries/dto/storage-event-category.enum.ts:23",
@@ -3589,14 +3589,14 @@
       "category": "disambiguation",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.54,
         "concept": 0.448,
         "citation_bonus": 0.1,
-        "final": 0.738
+        "final": 0.948
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/androidSyncInbox/android-sync-inbox.listener.ts:60",
           "apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts:52",
@@ -3623,14 +3623,14 @@
       "category": "disambiguation",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.579,
         "concept": 0.49,
         "citation_bonus": 0.1,
-        "final": 0.75
+        "final": 0.96
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/androidSyncInbox/android-sync-inbox.service.ts:17",
           "apps/whk-wms/src/barrelAggregates/barrel-aggregates.service.ts:27",
@@ -3657,14 +3657,14 @@
       "category": "relationship",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.304,
         "concept": 0.271,
         "citation_bonus": 0.1,
-        "final": 0.676
+        "final": 0.886
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/scripts/seeding/constants.ts:7"
         ],
@@ -3688,14 +3688,14 @@
       "category": "disambiguation",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.837,
         "concept": 0.614,
         "citation_bonus": 0.1,
-        "final": 0.808
+        "final": 1.0
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/androidSyncInbox/android-sync-inbox.listener.ts:56",
           "apps/whk-wms/src/providers/llama/llama.service.ts:818",
@@ -3726,14 +3726,14 @@
       "category": "computed_value",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.369,
         "concept": 0.305,
         "citation_bonus": 0.1,
-        "final": 0.691
+        "final": 0.901
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms-front-end/lib/config/constants.ts:6"
         ],
@@ -3756,14 +3756,14 @@
       "category": "relationship",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.528,
         "concept": 0.375,
         "citation_bonus": 0.1,
-        "final": 0.725
+        "final": 0.935
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/warehouse/warehouse.service.ts:481",
           "apps/whk-wms/src/warehouse/warehouse.service.ts:495"
@@ -3787,14 +3787,14 @@
       "category": "disambiguation",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.46,
         "concept": 0.34,
         "citation_bonus": 0.1,
-        "final": 0.71
+        "final": 0.92
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/androidSyncInbox/android-sync-inbox.listener.ts:60",
           "apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts:52",
@@ -3827,14 +3827,14 @@
       "category": "relationship",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.316,
         "concept": 0.285,
         "citation_bonus": 0.1,
-        "final": 0.68
+        "final": 0.89
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/aggregatedStorageEntries/dto/time-period-granularity.enum.ts:7",
           "apps/whk-wms/src/aggregatedStorageEntries/dto/time-period-granularity.enum.ts:21",
@@ -3860,14 +3860,14 @@
       "category": "computed_value",
       "difficulty": "hard",
       "scores": {
-        "evidence": 0.7,
+        "evidence": 1.0,
         "semantic": 0.536,
         "concept": 0.427,
         "citation_bonus": 0.1,
-        "final": 0.734
+        "final": 0.944
       },
       "evidence_details": {
-        "tier": "moderate",
+        "tier": "strong",
         "citations_found": [
           "apps/whk-wms/src/providers/indexing/indexing.service.ts:268",
           "indexing.service.ts:268"

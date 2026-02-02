@@ -1,0 +1,56 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Prometheus Metrics",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "metrics",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Prometheus Metrics endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "f528c823e3b3d0b49db986dd30393ffa1f789d7e6996d88987d345f41f51fb55"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/metrics"
+  },
+  "expected": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body_assertions": [
+      {
+        "path": "$.total_nodes",
+        "type": "integer"
+      },
+      {
+        "path": "$.total_edges",
+        "type": "integer"
+      },
+      {
+        "path": "$.nodes_by_layer",
+        "type": "object"
+      },
+      {
+        "path": "$.edges_by_type",
+        "type": "object"
+      }
+    ]
+  }
+}

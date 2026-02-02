@@ -1,0 +1,74 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Symbol Search",
+    "base_url": "http://localhost:9999",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "symbols",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Symbol Search endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "406eb916a7506666f51344f5eb0fd7a026402a39e0e899f0b4907c7c3677f045"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/symbols",
+    "query": {
+      "space_id": "{{test_space}}",
+      "q": "function"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.symbols",
+        "type": "array"
+      },
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.count",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_query_params",
+      "description": "Test validation error when q parameter is missing",
+      "request": {
+        "query": {
+          "space_id": "{{test_space}}",
+          "q": null
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

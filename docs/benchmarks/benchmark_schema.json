@@ -1,0 +1,305 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.local/benchmark/v1.0",
+  "title": "MDEMG Benchmark Framework Schema",
+  "description": "JSON Schema for MDEMG benchmark test framework v1.0",
+  "definitions": {
+    "evidence_item": {
+      "type": "object",
+      "description": "A piece of evidence from the codebase",
+      "properties": {
+        "file": { "type": "string", "description": "Path to source file" },
+        "line_start": { "type": "integer", "minimum": 1 },
+        "line_end": { "type": "integer", "minimum": 1 },
+        "snippet": { "type": "string", "description": "Code snippet" }
+      },
+      "required": ["file"]
+    },
+    "question": {
+      "type": "object",
+      "description": "A benchmark question",
+      "properties": {
+        "id": { "type": "string", "pattern": "^Q\\d{3}$" },
+        "category": {
+          "type": "string",
+          "enum": [
+            "architecture_structure",
+            "service_relationships",
+            "cross_cutting_concerns",
+            "data_flow_integration",
+            "business_logic_constraints",
+            "symbol_lookup",
+            "negative_control"
+          ]
+        },
+        "difficulty": { "type": "string", "enum": ["easy", "medium", "hard"] },
+        "question": { "type": "string", "minLength": 10 },
+        "expected_answer": { "type": "string" },
+        "requires_files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "file_line_refs": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[^:]+:\\d+(-\\d+)?$" }
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/evidence_item" }
+        }
+      },
+      "required": ["id", "category", "difficulty", "question", "expected_answer"]
+    },
+    "questions_file": {
+      "type": "object",
+      "description": "Complete questions file format",
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "source": { "type": "string" },
+            "total_questions": { "type": "integer", "minimum": 1 },
+            "random_seed": { "type": "integer" },
+            "generated_at": { "type": "string", "format": "date-time" }
+          }
+        },
+        "questions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/question" }
+        }
+      },
+      "required": ["questions"]
+    },
+    "answer": {
+      "type": "object",
+      "description": "An answer to a benchmark question",
+      "properties": {
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "files_consulted": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "file_line_refs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "confidence": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+        "latency_ms": { "type": "number", "minimum": 0 },
+        "activated_nodes": { "type": "integer", "minimum": 0 },
+        "l1_count": { "type": "integer", "minimum": 0 },
+        "rerank_applied": { "type": "boolean" }
+      },
+      "required": ["id", "answer"]
+    },
+    "grade": {
+      "type": "object",
+      "description": "Grade for a single answer",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "scores": {
+          "type": "object",
+          "properties": {
+            "evidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "semantic": { "type": "number", "minimum": 0, "maximum": 1 },
+            "concept": { "type": "number", "minimum": 0, "maximum": 1 },
+            "citation_bonus": { "type": "number", "minimum": 0, "maximum": 0.1 },
+            "final": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "required": ["evidence", "semantic", "concept", "final"]
+        },
+        "evidence_details": {
+          "type": "object",
+          "properties": {
+            "tier": { "type": "string", "enum": ["strong", "moderate", "weak", "minimal", "none"] },
+            "citations_found": { "type": "array", "items": { "type": "string" } },
+            "expected_files": { "type": "array", "items": { "type": "string" } },
+            "matched_files": { "type": "boolean" },
+            "line_tolerance_met": { "type": "boolean" }
+          }
+        },
+        "semantic_details": {
+          "type": "object",
+          "properties": {
+            "unigram": { "type": "number" },
+            "bigram": { "type": "number" },
+            "trigram": { "type": "number" },
+            "concept": { "type": "number" },
+            "idf_weighted": { "type": "number" }
+          }
+        }
+      },
+      "required": ["id", "scores"]
+    },
+    "run_metrics": {
+      "type": "object",
+      "description": "Aggregate metrics for a single benchmark run",
+      "properties": {
+        "run_id": { "type": "integer", "minimum": 1 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "questions_total": { "type": "integer", "minimum": 1 },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "mean": { "type": "number" },
+            "std": { "type": "number" },
+            "median": { "type": "number" },
+            "min": { "type": "number" },
+            "max": { "type": "number" },
+            "p10": { "type": "number" },
+            "p25": { "type": "number" },
+            "p75": { "type": "number" },
+            "p90": { "type": "number" },
+            "cv_pct": { "type": "number" },
+            "high_score_rate": { "type": "number" },
+            "evidence_rate": { "type": "number" }
+          }
+        },
+        "by_category": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "count": { "type": "integer" },
+              "mean": { "type": "number" },
+              "std": { "type": "number" }
+            }
+          }
+        },
+        "by_difficulty": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "count": { "type": "integer" },
+              "mean": { "type": "number" },
+              "std": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "aggregate_metrics": {
+      "type": "object",
+      "description": "Cross-run aggregate metrics",
+      "properties": {
+        "runs": { "type": "integer", "minimum": 1 },
+        "aggregate": {
+          "type": "object",
+          "properties": {
+            "mean_of_means": { "type": "number" },
+            "std_of_means": { "type": "number" },
+            "pooled_std": { "type": "number" },
+            "cv_across_runs": { "type": "number" },
+            "min_run_mean": { "type": "number" },
+            "max_run_mean": { "type": "number" }
+          }
+        }
+      }
+    },
+    "comparison_result": {
+      "type": "object",
+      "description": "Statistical comparison between baseline and MDEMG",
+      "properties": {
+        "baseline": { "$ref": "#/definitions/aggregate_metrics" },
+        "mdemg": { "$ref": "#/definitions/aggregate_metrics" },
+        "delta": {
+          "type": "object",
+          "properties": {
+            "mean_delta": { "type": "number" },
+            "percent_change": { "type": "number" }
+          }
+        },
+        "statistical_tests": {
+          "type": "object",
+          "properties": {
+            "paired_ttest": {
+              "type": "object",
+              "properties": {
+                "t_statistic": { "type": "number" },
+                "p_value": { "type": "number" },
+                "significant_at_001": { "type": "boolean" },
+                "significant_at_005": { "type": "boolean" }
+              }
+            },
+            "cohens_d": { "type": "number" },
+            "effect_size": {
+              "type": "string",
+              "enum": ["negligible", "small", "medium", "large"]
+            },
+            "confidence_interval_95": {
+              "type": "object",
+              "properties": {
+                "lower": { "type": "number" },
+                "upper": { "type": "number" }
+              }
+            }
+          }
+        },
+        "by_category": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "baseline_mean": { "type": "number" },
+              "mdemg_mean": { "type": "number" },
+              "delta": { "type": "number" }
+            }
+          }
+        },
+        "by_difficulty": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "baseline_mean": { "type": "number" },
+              "mdemg_mean": { "type": "number" },
+              "delta": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "benchmark_config": {
+      "type": "object",
+      "description": "Configuration for a benchmark run",
+      "properties": {
+        "version": { "type": "string", "const": "1.0" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "endpoint": { "type": "string", "format": "uri" },
+        "space_id": { "type": "string" },
+        "questions_file": { "type": "string" },
+        "question_count": { "type": "integer", "minimum": 1 },
+        "runs_per_mode": { "type": "integer", "minimum": 1, "default": 3 },
+        "random_seed": { "type": "integer", "default": 42 },
+        "warmup_questions": { "type": "integer", "default": 5 },
+        "baseline_params": {
+          "type": "object",
+          "properties": {
+            "candidate_k": { "type": "integer", "default": 50 },
+            "top_k": { "type": "integer", "default": 10 },
+            "hop_depth": { "type": "integer", "default": 0 },
+            "use_learning": { "type": "boolean", "default": false },
+            "use_hidden": { "type": "boolean", "default": false },
+            "use_rerank": { "type": "boolean", "default": false }
+          }
+        },
+        "mdemg_params": {
+          "type": "object",
+          "properties": {
+            "candidate_k": { "type": "integer", "default": 50 },
+            "top_k": { "type": "integer", "default": 10 },
+            "hop_depth": { "type": "integer", "default": 2 },
+            "use_learning": { "type": "boolean", "default": true },
+            "use_hidden": { "type": "boolean", "default": true },
+            "use_rerank": { "type": "boolean", "default": true }
+          }
+        }
+      },
+      "required": ["endpoint", "space_id", "questions_file"]
+    }
+  }
+}

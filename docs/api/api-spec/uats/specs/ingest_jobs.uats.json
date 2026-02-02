@@ -1,0 +1,48 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "List Ingest Jobs",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "ingest",
+      "jobs",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates List Ingest Jobs endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "e0f3673232ebcb4912873d1250156c52d3ce074d7b6ad92a8e580dd4a11f9f81"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/ingest/jobs",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.jobs",
+        "type": "array"
+      },
+      {
+        "path": "$.count",
+        "type": "integer"
+      }
+    ]
+  }
+}

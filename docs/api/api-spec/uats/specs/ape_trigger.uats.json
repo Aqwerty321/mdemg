@@ -1,0 +1,51 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "APE Trigger",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "ape",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates APE Trigger endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "febf65612fc268bcfc5282f1bacaffd6db6e13cda2c6455d4355ade8dfc54a90"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/ape/trigger",
+    "body": {
+      "event": "consolidate"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.triggered",
+        "type": "string"
+      },
+      {
+        "path": "$.data.message",
+        "type": "string"
+      }
+    ]
+  }
+}

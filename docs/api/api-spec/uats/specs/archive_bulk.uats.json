@@ -1,0 +1,82 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Bulk Archive",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "archive",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Bulk Archive endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "8dc8b6fadf4c5c9bbbb8866e0a8473ddb445a54d129f608fb8a867cd0fc65345"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/archive/bulk",
+    "body": {
+      "space_id": "{{test_space}}",
+      "node_ids": [
+        "nonexistent-node-id"
+      ]
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": [
+      200,
+      400
+    ],
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.total_items",
+        "type": "integer"
+      },
+      {
+        "path": "$.results",
+        "type": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "empty_node_ids",
+      "description": "Empty node_ids should return 400",
+      "request": {
+        "body": {
+          "space_id": "{{test_space}}",
+          "node_ids": []
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

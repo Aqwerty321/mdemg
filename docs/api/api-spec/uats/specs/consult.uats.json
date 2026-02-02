@@ -1,0 +1,57 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Consult Memory",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "consult",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Consult Memory endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "705da0da72bb424451d2d92b95a81b755b89d6695f9256b315f80112c7b49db9"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/consult",
+    "body": {
+      "space_id": "{{test_space}}",
+      "context": "UATS test context",
+      "question": "What patterns exist?"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.suggestions",
+        "type": "array"
+      },
+      {
+        "path": "$.confidence",
+        "type": "number"
+      }
+    ]
+  }
+}

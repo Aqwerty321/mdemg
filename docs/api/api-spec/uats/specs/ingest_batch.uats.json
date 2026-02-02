@@ -1,0 +1,96 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Batch Ingest",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "ingest",
+      "write",
+      "batch"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Batch Ingest endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "5eb7634345020c070e91d604e0692455287dfb09f722e9b934fbc7b8b3d5cb91"
+  },
+  "variables": {
+    "test_space": "uats-batch-{{$timestamp}}"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/ingest/batch",
+    "body": {
+      "space_id": "{{test_space}}",
+      "observations": [
+        {
+          "content": "Batch item 1 - {{$timestamp}}",
+          "source": "uats",
+          "timestamp": "2026-01-29T00:00:00Z"
+        },
+        {
+          "content": "Batch item 2 - {{$timestamp}}",
+          "source": "uats",
+          "timestamp": "2026-01-29T00:00:01Z"
+        }
+      ]
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": [
+      200,
+      207,
+      400
+    ],
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.total_items",
+        "type": "integer"
+      },
+      {
+        "path": "$.success_count",
+        "type": "integer"
+      },
+      {
+        "path": "$.results",
+        "type": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "empty_batch",
+      "request": {
+        "body": {
+          "space_id": "{{test_space}}",
+          "observations": []
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

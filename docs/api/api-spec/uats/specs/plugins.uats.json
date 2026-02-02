@@ -1,0 +1,41 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "List Plugins",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "plugins",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates List Plugins endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "3ffcbc49df45cfd73d132da1aaf422d7abce50689753c01d4adb8863ad4f4ce3"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/plugins"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.plugins",
+        "type": "array"
+      }
+    ]
+  }
+}

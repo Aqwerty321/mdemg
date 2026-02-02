@@ -1,0 +1,59 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Consolidate Conversation",
+    "base_url": "http://localhost:9999",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "consolidate",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Consolidate Conversation endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 30000,
+    "sha256": "9cb84be5524b5e8df6ac73b614072058b06229186129bc00784f84bed40ba1b6"
+  },
+  "variables": {
+    "test_space": "uats-consolidate-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/consolidate",
+    "body": {
+      "space_id": "{{test_space}}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.themes_created",
+        "type": "integer"
+      },
+      {
+        "path": "$.concepts_created",
+        "type": "integer"
+      },
+      {
+        "path": "$.duration_ms",
+        "type": "integer"
+      }
+    ]
+  }
+}

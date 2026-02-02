@@ -1,0 +1,89 @@
+{
+  "framework_version": "1.0",
+  "locked_date": "2026-01-30",
+  "purpose": "Stable benchmark framework for validating MDEMG improvements",
+
+  "agent_config": {
+    "model": "haiku",
+    "model_version": "Claude Haiku 4.5",
+    "rationale": "Consistent model ensures reproducible results across runs"
+  },
+
+  "files": {
+    "grader": {
+      "path": "grader_v4_locked.py",
+      "sha256": "24dc39216748b79bed0b06a7f998419aefd1fc0b6da4aea385e4d79f7124aa41",
+      "description": "V4 grader with V3-compatible evidence logic"
+    },
+    "runner": {
+      "path": "run_benchmark.py",
+      "description": "Benchmark runner with checksum validation"
+    }
+  },
+
+  "question_sets": {
+    "whk-wms": {
+      "master": {
+        "path": "../whk-wms/test_questions_120.json",
+        "sha256": "43201b16c0981fac000a6e15c95468fd8dd3ec55ae5978c365a8c21f669caaf4",
+        "questions": 120
+      },
+      "agent": {
+        "path": "../whk-wms/test_questions_120_agent.json",
+        "sha256": "24aa17a215e4e58b8b44c7faef9f14228edb0e6d3f8f657d867b1bfa850f7e9e",
+        "questions": 120
+      }
+    }
+  },
+
+  "baselines": {
+    "whk-wms": {
+      "established_date": "2026-01-30",
+      "reference_run": "benchmark_run_20260130",
+      "baseline": {
+        "mean_low": 0.82,
+        "mean_high": 0.86,
+        "std_range": "0.06-0.11",
+        "cv_range": "7-13%",
+        "evidence_rate": "96-100%"
+      },
+      "mdemg": {
+        "mean_low": 0.78,
+        "mean_high": 0.81,
+        "std_range": "0.12-0.13",
+        "cv_range": "14-16%",
+        "evidence_rate": "90-93%"
+      }
+    }
+  },
+
+  "scoring": {
+    "formula": "min(1.0, 0.70*evidence + 0.15*semantic + 0.15*concept + citation_bonus)",
+    "weights": {
+      "evidence": 0.70,
+      "semantic": 0.15,
+      "concept": 0.15,
+      "citation_bonus": 0.10
+    },
+    "evidence_tiers": {
+      "strong": {"score": 1.0, "criteria": "Any file:line citation"},
+      "minimal": {"score": 0.5, "criteria": "Files without line numbers"},
+      "none": {"score": 0.0, "criteria": "No file references"}
+    }
+  },
+
+  "usage": {
+    "verify": "python run_benchmark.py verify",
+    "grade": "python run_benchmark.py grade <answers.jsonl> <questions.json> <output.json>",
+    "baseline": "python run_benchmark.py baseline <codebase>"
+  },
+
+  "rules": [
+    "Use Haiku 4.5 model for all benchmark agents",
+    "DO NOT modify locked files",
+    "Verify checksums before each benchmark run",
+    "Minimum 2 runs per condition",
+    "100% question ID preservation required",
+    "Document any framework changes with new version"
+  ]
+}

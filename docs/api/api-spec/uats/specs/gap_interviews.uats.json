@@ -1,0 +1,46 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Gap Interviews",
+    "base_url": "http://localhost:8082",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "gaps",
+      "interviews",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Gap Interviews endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "428210117d25aacb056a42a9ccbb325ec794f73e89d1a94251fb2f907cdbc07a"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/system/gap-interviews"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.stats",
+        "type": "object"
+      },
+      {
+        "path": "$.stats.total",
+        "type": "integer"
+      }
+    ]
+  }
+}

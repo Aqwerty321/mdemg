@@ -180,6 +180,16 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		return models.RetrieveResponse{}, errors.New("query_embedding is required (wire your embedder upstream)")
 	}
 
+	// Compute query-type aware retrieval hints (V0011 - Query-Aware Retrieval)
+	hints := ComputeRetrievalHints(req.QueryText, s.cfg)
+	log.Printf("Query type detected: %s (seedN=%d, hopDepth=%d, vecW=%.2f, bm25W=%.2f)",
+		hints.QueryType, hints.SeedN, hints.HopDepth, hints.VectorWeight, hints.BM25Weight)
+
+	// Override hopDepth with hints if request didn't specify
+	if req.HopDepth <= 0 {
+		hopDepth = hints.HopDepth
+	}
+
 	// Normalize request for cache key (fill in defaults)
 	cacheReq := req
 	cacheReq.CandidateK = candK
@@ -212,6 +222,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	}
 
 	// 1b) Hybrid retrieval: BM25 search + RRF fusion (if enabled and query text provided)
+	// Uses query-type aware weights from retrieval hints (V0011)
 	var cands []Candidate
 	bm25Count := 0
 	if s.cfg.HybridRetrievalEnabled && req.QueryText != "" {
@@ -222,8 +233,8 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			cands = vectorCands
 		} else {
 			bm25Count = len(bm25Results)
-			// Fuse vector and BM25 results using RRF
-			fused := ReciprocalRankFusion(vectorCands, bm25Results, s.cfg.VectorWeight, s.cfg.BM25Weight)
+			// Fuse vector and BM25 results using RRF with query-type aware weights
+			fused := ReciprocalRankFusion(vectorCands, bm25Results, hints.VectorWeight, hints.BM25Weight)
 			cands = ConvertFusedToCandidates(fused)
 		}
 	} else {
@@ -234,14 +245,15 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: []models.RetrieveResult{}}, nil
 	}
 
-	// Seeds: use first N for expansion (keep bounded)
-	seedN := minInt(50, len(cands))
+	// Seeds: use query-type aware seed count (V0011)
+	seedN := minInt(hints.SeedN, len(cands))
 	seedIDs := make([]string, 0, seedN)
 	for i := 0; i < seedN; i++ {
 		seedIDs = append(seedIDs, cands[i].NodeID)
 	}
 
 	// 2) Expansion: iterative 1-hop fetch up to hopDepth
+	// Skip expansion for symbol lookups (V0011 - Query-Aware Retrieval)
 	edges := make([]Edge, 0, 1024)
 	seenEdge := map[string]struct{}{}
 	frontier := append([]string{}, seedIDs...)
@@ -250,7 +262,14 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		seenNode[id] = struct{}{}
 	}
 
-	for d := 0; d < hopDepth; d++ {
+	// Use query-type aware hop depth
+	effectiveHopDepth := hopDepth
+	if !hints.EnableExpansion {
+		effectiveHopDepth = 0 // Skip expansion entirely for symbol lookups
+		log.Printf("Skipping graph expansion for query type: %s", hints.QueryType)
+	}
+
+	for d := 0; d < effectiveHopDepth; d++ {
 		if len(frontier) == 0 {
 			break
 		}
@@ -469,7 +488,10 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			"candidate_k":            candK,
 			"seed_n":                 seedN,
 			"edges_fetched":          len(edges),
-			"hop_depth":              hopDepth,
+			"hop_depth":              effectiveHopDepth,
+			"query_type":             hints.QueryType,
+			"vector_weight":          hints.VectorWeight,
+			"bm25_weight":            hints.BM25Weight,
 			"hybrid_enabled":         s.cfg.HybridRetrievalEnabled,
 			"vector_count":           len(vectorCands),
 			"bm25_count":             bm25Count,

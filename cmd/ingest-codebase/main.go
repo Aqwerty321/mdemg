@@ -1115,9 +1115,10 @@ func generateSummaryAdapter(elem summarize.CodeElement) string {
 // generateSummary creates a brief summary of a code element for reranking.
 // This summary helps the LLM reranker understand what each node contains
 // without needing to read the full content.
+// NOTE: Includes key method/function names for better search precision.
 func generateSummary(elem CodeElement) string {
 	var summary strings.Builder
-	maxLen := 500 // Keep summaries concise for reranking
+	maxLen := 700 // Increased to accommodate key method names for search
 
 	// Start with the kind and name
 	switch elem.Kind {
@@ -1169,19 +1170,19 @@ func generateSummary(elem CodeElement) string {
 		}
 	}
 
-	// Add symbol count if symbols were extracted
+	// Add symbol information if symbols were extracted
 	if len(elem.Symbols) > 0 {
-		constCount := 0
-		funcCount := 0
 		var classNames []string
+		var methodNames []string
+		var funcNames []string
 		for _, s := range elem.Symbols {
 			switch s.Type {
-			case "const", "enum_value":
-				constCount++
-			case "function":
-				funcCount++
 			case "class":
 				classNames = append(classNames, s.Name)
+			case "method":
+				methodNames = append(methodNames, s.Name)
+			case "function":
+				funcNames = append(funcNames, s.Name)
 			}
 		}
 		// Include class names in summary (critical for re-ranking)
@@ -1192,16 +1193,26 @@ func generateSummary(elem CodeElement) string {
 				summary.WriteString(fmt.Sprintf(". Defines classes: %s", strings.Join(classNames, ", ")))
 			}
 		}
-		if constCount > 0 || funcCount > 0 {
-			summary.WriteString(". Contains ")
-			parts := []string{}
-			if constCount > 0 {
-				parts = append(parts, fmt.Sprintf("%d constants", constCount))
+		// Include key method names (critical for search - max 5 most relevant)
+		if len(methodNames) > 0 {
+			// Prioritize methods with meaningful names (not constructors, getters, etc)
+			keyMethods := filterKeyMethods(methodNames)
+			if len(keyMethods) > 0 {
+				if len(keyMethods) > 5 {
+					keyMethods = keyMethods[:5]
+				}
+				summary.WriteString(fmt.Sprintf(". Key methods: %s", strings.Join(keyMethods, ", ")))
 			}
-			if funcCount > 0 {
-				parts = append(parts, fmt.Sprintf("%d functions", funcCount))
+		}
+		// Include key function names
+		if len(funcNames) > 0 {
+			keyFuncs := filterKeyMethods(funcNames)
+			if len(keyFuncs) > 0 {
+				if len(keyFuncs) > 5 {
+					keyFuncs = keyFuncs[:5]
+				}
+				summary.WriteString(fmt.Sprintf(". Key functions: %s", strings.Join(keyFuncs, ", ")))
 			}
-			summary.WriteString(strings.Join(parts, " and "))
 		}
 	}
 
@@ -1222,6 +1233,46 @@ func generateSummary(elem CodeElement) string {
 	if len(result) > maxLen {
 		result = result[:maxLen-3] + "..."
 	}
+	return result
+}
+
+// filterKeyMethods filters out generic method names (constructors, getters, setters)
+// and returns only meaningful method names that are useful for search.
+func filterKeyMethods(names []string) []string {
+	// Patterns to exclude - these are too generic to be useful for search
+	excludePatterns := []string{
+		"constructor", "init", "__init__", "new",
+		"get", "set", "is", "has",
+		"toString", "valueOf", "equals", "hashCode",
+		"toJSON", "fromJSON", "parse", "stringify",
+		"copy", "clone", "close", "dispose",
+		"ngOnInit", "ngOnDestroy", "componentDidMount", "componentWillUnmount",
+		"render", "build", "create", "make",
+	}
+
+	var result []string
+	for _, name := range names {
+		nameLower := strings.ToLower(name)
+
+		// Skip very short names (likely abbreviations or generic)
+		if len(name) < 4 {
+			continue
+		}
+
+		// Check if name matches any exclude pattern
+		excluded := false
+		for _, pattern := range excludePatterns {
+			if nameLower == pattern || strings.HasPrefix(nameLower, pattern) {
+				excluded = true
+				break
+			}
+		}
+
+		if !excluded {
+			result = append(result, name)
+		}
+	}
+
 	return result
 }
 

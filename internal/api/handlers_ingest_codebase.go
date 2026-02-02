@@ -281,7 +281,12 @@ func (s *Server) buildIngestArgs(req *IngestCodebaseRequest) []string {
 	if endpoint == "" {
 		endpoint = "http://localhost:9999"
 	} else if !strings.HasPrefix(endpoint, "http") {
-		endpoint = "http://" + endpoint
+		// Handle port-only format like ":9999" -> "http://localhost:9999"
+		if strings.HasPrefix(endpoint, ":") {
+			endpoint = "http://localhost" + endpoint
+		} else {
+			endpoint = "http://" + endpoint
+		}
 	}
 
 	args := []string{

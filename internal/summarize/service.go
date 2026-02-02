@@ -301,11 +301,19 @@ func (s *Service) callLLM(ctx context.Context, elements []CodeElement) ([]string
 func (s *Service) buildPrompt(elements []CodeElement) string {
 	var sb strings.Builder
 
-	sb.WriteString(`You are a code analyzer. For each code element below, write a brief semantic summary (2-3 sentences, max 200 characters) that describes:
-1. WHAT the code does (its purpose, behavior, functionality)
-2. Key dependencies or integrations (if apparent)
+	sb.WriteString(`You are a code retrieval expert. Generate semantic summaries optimized for code search and retrieval.
 
-DO NOT describe the code's structure (e.g., "contains 5 functions"). Focus only on purpose and behavior.
+For each code element, write a summary (2-3 sentences, max 300 characters) that includes:
+1. PRIMARY PURPOSE: What specific problem or functionality does this implement?
+2. KEY OPERATIONS: Name the 2-3 most important methods/functions and what they do
+3. DOMAIN TERMS: Include specific technical terms that someone might search for (e.g., "circuit breaker", "retry logic", "batch processing", "validation", "rate limiting")
+
+CRITICAL: Include specific method names and domain vocabulary that would help find this code via search.
+DO NOT use generic terms like "handles data" or "manages state". Be specific about WHAT data and HOW.
+
+Example good summary: "Implements circuit breaker pattern for inventory processing. Key methods: resetCircuitBreaker (resets after success), checkThreshold (validates batch limits). Handles retry logic for failed uploads."
+
+Example bad summary: "Module for processing data. Contains methods for handling operations."
 
 Respond with a JSON array of summaries in the same order as the inputs. Each summary should be a string.
 

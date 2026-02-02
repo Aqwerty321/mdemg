@@ -195,7 +195,7 @@ type GraphContext struct {
 // BatchIngestRequest - request for batch ingest endpoint
 type BatchIngestRequest struct {
 	SpaceID      string            `json:"space_id" validate:"required,min=1"`
-	Observations []BatchIngestItem `json:"observations" validate:"required,min=1,max=100,dive"`
+	Observations []BatchIngestItem `json:"observations" validate:"required,min=1,max=2000,dive"`
 }
 
 // BatchIngestItem - single observation in a batch ingest request
@@ -464,6 +464,7 @@ type ConsolidateResponse struct {
 	HiddenNodesCreated  int     `json:"hidden_nodes_created"`
 	HiddenNodesUpdated  int     `json:"hidden_nodes_updated"`
 	ConceptNodesCreated int     `json:"concept_nodes_created"`      // Number of concept layer nodes created (L2+)
+	ConceptNodesMerged  int     `json:"concept_nodes_merged"`       // Number of clusters merged into existing concepts (V0007)
 	ConceptNodesUpdated int     `json:"concept_nodes_updated"`
 	ConcernNodesCreated int     `json:"concern_nodes_created"`      // Number of cross-cutting concern nodes created (P1)
 	ConcernEdgesCreated int     `json:"concern_edges_created"`      // Number of IMPLEMENTS_CONCERN edges created

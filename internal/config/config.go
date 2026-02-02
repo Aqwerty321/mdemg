@@ -122,6 +122,12 @@ type Config struct {
 	QueryAwareAttentionWeight  float64 // Weight of query-node similarity vs edge weight (default: 0.5)
 	NodeEmbeddingCacheSize     int     // LRU cache size for node embeddings (default: 5000)
 
+	// Hybrid Edge Type Strategy settings (V0010) - different edge types at different hop depths
+	EdgeTypeStrategy    string   // Strategy: "all", "structural_first", "learned_only", "hybrid" (default: "hybrid")
+	StructuralEdgeTypes []string // Edge types for structural hops (default: ASSOCIATED_WITH, GENERALIZES, ABSTRACTS_TO)
+	LearnedEdgeTypes    []string // Edge types for learned hops (default: CO_ACTIVATED_WITH)
+	HybridSwitchHop     int      // Hop depth at which to switch from structural to learned (default: 1)
+
 	// Hybrid retrieval settings (V0006)
 	HybridRetrievalEnabled bool    // Enable hybrid vector+BM25 retrieval (default: true)
 	BM25TopK               int     // Candidates from BM25 search (default: 100)
@@ -674,6 +680,45 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("NODE_EMBEDDING_CACHE_SIZE must be >= 100")
 	}
 
+	// Hybrid Edge Type Strategy settings (V0010)
+	edgeTypeStrategy := get("EDGE_TYPE_STRATEGY", "hybrid")
+	validStrategies := map[string]bool{"all": true, "structural_first": true, "learned_only": true, "hybrid": true}
+	if !validStrategies[edgeTypeStrategy] {
+		return Config{}, errors.New("EDGE_TYPE_STRATEGY must be one of: all, structural_first, learned_only, hybrid")
+	}
+
+	structuralEdgeTypesStr := get("STRUCTURAL_EDGE_TYPES", "ASSOCIATED_WITH,GENERALIZES,ABSTRACTS_TO")
+	structuralEdgeTypes := make([]string, 0)
+	for _, p := range strings.Split(structuralEdgeTypesStr, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			structuralEdgeTypes = append(structuralEdgeTypes, p)
+		}
+	}
+	if len(structuralEdgeTypes) == 0 {
+		return Config{}, errors.New("STRUCTURAL_EDGE_TYPES must not be empty")
+	}
+
+	learnedEdgeTypesStr := get("LEARNED_EDGE_TYPES", "CO_ACTIVATED_WITH")
+	learnedEdgeTypes := make([]string, 0)
+	for _, p := range strings.Split(learnedEdgeTypesStr, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			learnedEdgeTypes = append(learnedEdgeTypes, p)
+		}
+	}
+	if len(learnedEdgeTypes) == 0 {
+		return Config{}, errors.New("LEARNED_EDGE_TYPES must not be empty")
+	}
+
+	hybridSwitchHop, err := atoi("HYBRID_SWITCH_HOP", 1)
+	if err != nil {
+		return Config{}, err
+	}
+	if hybridSwitchHop < 0 || hybridSwitchHop > 3 {
+		return Config{}, errors.New("HYBRID_SWITCH_HOP must be in range [0, 3]")
+	}
+
 	// Hybrid retrieval settings (V0006)
 	hybridEnabled := getBool("HYBRID_RETRIEVAL_ENABLED", true)
 	bm25TopK, err := atoi("BM25_TOP_K", 100)
@@ -910,6 +955,10 @@ func FromEnv() (Config, error) {
 		QueryAwareExpansionEnabled:   queryAwareExpansionEnabled,
 		QueryAwareAttentionWeight:    queryAwareAttentionWeight,
 		NodeEmbeddingCacheSize:       nodeEmbeddingCacheSize,
+		EdgeTypeStrategy:             edgeTypeStrategy,
+		StructuralEdgeTypes:          structuralEdgeTypes,
+		LearnedEdgeTypes:             learnedEdgeTypes,
+		HybridSwitchHop:              hybridSwitchHop,
 		HybridRetrievalEnabled:       hybridEnabled,
 		BM25TopK:                  bm25TopK,
 		BM25Weight:                bm25Weight,

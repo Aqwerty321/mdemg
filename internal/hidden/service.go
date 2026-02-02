@@ -435,20 +435,20 @@ RETURN count(c) AS updated`
 //  - Epsilon increases with layer (allows more distant concepts to cluster)
 //  - MinSamples decreases with layer (smaller emergent groups allowed)
 //  - MaxClusterSize stays generous (concepts can be broad)
-func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, targetLayer int) (int, error) {
+func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, targetLayer int) (created int, merged int, err error) {
 	if !s.cfg.HiddenLayerEnabled {
-		return 0, nil
+		return 0, 0, nil
 	}
 
 	sourceLayer := targetLayer - 1
 	if sourceLayer < 1 {
-		return 0, fmt.Errorf("target layer must be >= 2 (source layer 1 = hidden)")
+		return 0, 0, fmt.Errorf("target layer must be >= 2 (source layer 1 = hidden)")
 	}
 
 	// Step 1: Fetch source layer nodes (includes name for secondary grouping)
 	sourceNodes, err := s.fetchOrphanLayerNodesWithName(ctx, spaceID, sourceLayer, targetLayer)
 	if err != nil {
-		return 0, fmt.Errorf("fetch orphan layer %d nodes: %w", sourceLayer, err)
+		return 0, 0, fmt.Errorf("fetch orphan layer %d nodes: %w", sourceLayer, err)
 	}
 
 	// Calculate ADAPTIVE parameters - constraints loosen as we go up
@@ -468,7 +468,7 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 	}
 
 	if len(sourceNodes) < adaptiveMinSamples {
-		return 0, nil // Not enough data to cluster at this layer
+		return 0, 0, nil // Not enough data to cluster at this layer
 	}
 
 	// Step 2: Filter to nodes with embeddings, use message_pass_embedding if available
@@ -485,7 +485,7 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 	}
 
 	if len(validNodes) < adaptiveMinSamples {
-		return 0, nil
+		return 0, 0, nil
 	}
 
 	// Step 3: Run DBSCAN with ADAPTIVE parameters
@@ -496,7 +496,7 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 	// Step 4: Get existing concept node count for unique naming
 	existingCount, err := s.countLayerNodes(ctx, spaceID, targetLayer)
 	if err != nil {
-		return 0, fmt.Errorf("count existing layer %d nodes: %w", targetLayer, err)
+		return 0, 0, fmt.Errorf("count existing layer %d nodes: %w", targetLayer, err)
 	}
 
 	// Max cluster size stays generous - don't artificially limit concept breadth
@@ -508,7 +508,8 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 	}
 
 	// Step 5: Process each natural cluster
-	created := 0
+	created = 0
+	merged = 0
 	clusterID := 0
 
 	for _, members := range clusters {
@@ -527,13 +528,27 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 				continue
 			}
 
+			// Check for existing similar concept to merge into
+			if s.cfg.ConceptMergeEnabled {
+				existingID, similarity, mergeErr := s.findSimilarConcept(ctx, spaceID, targetLayer, centroid, s.cfg.ConceptMergeThreshold)
+				if mergeErr == nil && existingID != "" && similarity > s.cfg.ConceptMergeThreshold {
+					// Merge into existing concept instead of creating new
+					mergeErr = s.mergeIntoExistingConcept(ctx, spaceID, existingID, members, centroid)
+					if mergeErr == nil {
+						merged++
+						continue // Skip creating new node
+					}
+					// If merge failed, fall through to create new node
+				}
+			}
+
 			// Name based on most common name prefix pattern
 			uniqueID := existingCount + clusterID
 			inferredName := inferConceptName(members)
 			name := fmt.Sprintf("Concept-L%d-%s-%d", targetLayer, inferredName, uniqueID)
 			err := s.createConceptNodeWithEdges(ctx, spaceID, name, centroid, members, targetLayer)
 			if err != nil {
-				return created, fmt.Errorf("create concept node %s: %w", name, err)
+				return created, merged, fmt.Errorf("create concept node %s: %w", name, err)
 			}
 			created++
 			clusterID++
@@ -565,11 +580,25 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 					continue
 				}
 
+				// Check for existing similar concept to merge into
+				if s.cfg.ConceptMergeEnabled {
+					existingID, similarity, mergeErr := s.findSimilarConcept(ctx, spaceID, targetLayer, centroid, s.cfg.ConceptMergeThreshold)
+					if mergeErr == nil && existingID != "" && similarity > s.cfg.ConceptMergeThreshold {
+						// Merge into existing concept instead of creating new
+						mergeErr = s.mergeIntoExistingConcept(ctx, spaceID, existingID, subMembers, centroid)
+						if mergeErr == nil {
+							merged++
+							continue // Skip creating new node
+						}
+						// If merge failed, fall through to create new node
+					}
+				}
+
 				uniqueID := existingCount + clusterID
 				name := fmt.Sprintf("Concept-L%d-%s-%d", targetLayer, sanitizePathPrefix(namePrefix), uniqueID)
 				err := s.createConceptNodeWithEdges(ctx, spaceID, name, centroid, subMembers, targetLayer)
 				if err != nil {
-					return created, fmt.Errorf("create concept node %s: %w", name, err)
+					return created, merged, fmt.Errorf("create concept node %s: %w", name, err)
 				}
 				created++
 				clusterID++
@@ -577,7 +606,7 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 		}
 	}
 
-	return created, nil
+	return created, merged, nil
 }
 
 // groupByNamePrefix groups nodes by extracting the prefix from their Path field (which contains the name for layer 1+ nodes)
@@ -852,6 +881,107 @@ RETURN c.node_id AS conceptId, count(m) AS edgeCount`
 	return err
 }
 
+// findSimilarConcept searches for an existing concept at the same layer with similar embedding.
+// Returns the node ID and similarity score if found, empty string otherwise.
+func (s *Service) findSimilarConcept(ctx context.Context, spaceID string, layer int, centroid []float64, threshold float64) (string, float64, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Query existing concepts at same layer and compute cosine similarity
+	cypher := `
+	MATCH (c:MemoryNode {space_id: $spaceId, layer: $layer, role_type: 'concept'})
+	WHERE c.embedding IS NOT NULL
+	WITH c, gds.similarity.cosine(c.embedding, $centroid) AS similarity
+	WHERE similarity > $threshold
+	RETURN c.node_id AS nodeId, similarity
+	ORDER BY similarity DESC
+	LIMIT 1`
+
+	var bestNodeID string
+	var bestSimilarity float64
+
+	_, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":   spaceID,
+			"layer":     layer,
+			"centroid":  toFloat32Slice(centroid),
+			"threshold": threshold,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			record := res.Record()
+			nodeID, _ := record.Get("nodeId")
+			similarity, _ := record.Get("similarity")
+			bestNodeID = nodeID.(string)
+			bestSimilarity = similarity.(float64)
+		}
+		return nil, res.Err()
+	})
+
+	return bestNodeID, bestSimilarity, err
+}
+
+// mergeIntoExistingConcept merges new cluster members into an existing concept.
+// Creates ABSTRACTS_TO edges and updates the concept's embedding via exponential moving average.
+func (s *Service) mergeIntoExistingConcept(ctx context.Context, spaceID, existingNodeID string, newMembers []BaseNode, newCentroid []float64) error {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	memberIDs := make([]string, len(newMembers))
+	for i, m := range newMembers {
+		memberIDs[i] = m.NodeID
+	}
+
+	// EMA alpha for updating embedding (0.3 weights new centroid, 0.7 keeps existing)
+	const emaAlpha = 0.3
+
+	// Two-phase update:
+	// 1. Create new ABSTRACTS_TO edges from new members to existing concept
+	// 2. Update concept's embedding using EMA: new = (1-α)*old + α*newCentroid
+	cypher := `
+	MATCH (c:MemoryNode {space_id: $spaceId, node_id: $conceptId})
+	WITH c
+	UNWIND $memberIds AS memberId
+	MATCH (m:MemoryNode {space_id: $spaceId, node_id: memberId})
+	WHERE NOT EXISTS((m)-[:ABSTRACTS_TO]->(c))
+	CREATE (m)-[:ABSTRACTS_TO {
+	  space_id: $spaceId,
+	  edge_id: randomUUID(),
+	  weight: 1.0,
+	  created_at: datetime(),
+	  updated_at: datetime()
+	}]->(c)
+	WITH c, count(m) AS newEdges
+	SET c.aggregation_count = c.aggregation_count + newEdges,
+	    c.embedding = [i IN range(0, size(c.embedding)-1) |
+	        (1.0 - $emaAlpha) * c.embedding[i] + $emaAlpha * $newCentroid[i]],
+	    c.message_pass_embedding = [i IN range(0, size(c.message_pass_embedding)-1) |
+	        (1.0 - $emaAlpha) * c.message_pass_embedding[i] + $emaAlpha * $newCentroid[i]],
+	    c.updated_at = datetime()
+	RETURN c.node_id AS conceptId, newEdges`
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":     spaceID,
+			"conceptId":   existingNodeID,
+			"memberIds":   memberIDs,
+			"newCentroid": toFloat32Slice(newCentroid),
+			"emaAlpha":    emaAlpha,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			// consume
+		}
+		return nil, res.Err()
+	})
+
+	return err
+}
+
 // ForwardPass updates hidden and concept layer embeddings by aggregating from lower layers
 func (s *Service) ForwardPass(ctx context.Context, spaceID string) (*ForwardPassResult, error) {
 	if !s.cfg.HiddenLayerEnabled {
@@ -1110,10 +1240,12 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	// This allows emergent concepts to form at any level of abstraction.
 	maxLayers := 5
 	for targetLayer := 2; targetLayer <= maxLayers; targetLayer++ {
-		conceptCreated, err := s.CreateConceptNodes(ctx, spaceID, targetLayer)
+		conceptCreated, conceptMerged, err := s.CreateConceptNodes(ctx, spaceID, targetLayer)
 		if err != nil {
 			return nil, fmt.Errorf("create concept nodes layer %d: %w", targetLayer, err)
 		}
+		// Track merged concepts
+		result.ConceptNodesMerged += conceptMerged
 		// Don't break on zero - upper layers may still form clusters
 		// due to adaptive (looser) constraints
 		if conceptCreated > 0 {

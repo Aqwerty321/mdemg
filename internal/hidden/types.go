@@ -69,6 +69,7 @@ type BackwardPassResult struct {
 type ConsolidationResult struct {
 	HiddenNodesCreated  int
 	ConceptNodesCreated map[int]int // layer -> count of concepts created
+	ConceptNodesMerged  int         // count of clusters merged into existing concepts
 	ForwardPass         *ForwardPassResult
 	BackwardPass        *BackwardPassResult
 	TotalDuration       time.Duration

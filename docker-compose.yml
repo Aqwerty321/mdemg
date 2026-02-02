@@ -8,10 +8,10 @@ services:
     environment:
       NEO4J_AUTH: "neo4j/testpassword"
       NEO4J_PLUGINS: '["apoc"]'
-      NEO4J_dbms_memory_pagecache_size: "4G"
-      NEO4J_dbms_memory_heap_initial__size: "2G"
-      NEO4J_dbms_memory_heap_max__size: "4G"
-      NEO4J_dbms_memory_transaction_total_max: "4G"
+      NEO4J_dbms_memory_pagecache_size: "12G"
+      NEO4J_dbms_memory_heap_initial__size: "6G"
+      NEO4J_dbms_memory_heap_max__size: "10G"
+      NEO4J_dbms_memory_transaction_total_max: "25G"
       NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
       NEO4J_dbms_security_procedures_allowlist: "apoc.*"
     volumes:
@@ -25,7 +25,7 @@ services:
       start_period: 30s
 
   neo4j-monitor:
-    image: python:3.11-slim
+    image: docker:cli
     container_name: mdemg-neo4j-monitor
     depends_on:
       - neo4j
@@ -33,21 +33,12 @@ services:
     volumes:
       - ./scripts:/scripts:ro
       - ./logs:/logs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      [
-        "python",
-        "/scripts/monitor_container.py",
-        "--container",
-        "mdemg-neo4j",
-        "--interval",
-        "2",
-        "--log",
-        "/logs/neo4j_monitor.log",
-        "--max-lines",
-        "20000",
-        "--max-bytes",
-        "5242880"
-      ]
+      - |
+        apk add --no-cache python3 py3-pip >/dev/null 2>&1
+        python3 /scripts/monitor_container.py --container mdemg-neo4j --interval 2 --log /logs/neo4j_monitor.log --max-lines 20000 --max-bytes 5242880
 
 volumes:
   neo4j_data:

@@ -20,6 +20,7 @@ type Service struct {
 	driver            neo4j.DriverWithContext
 	reasoningProvider ReasoningProvider
 	queryCache        *QueryCache
+	embeddingCache    *NodeEmbeddingCache // Cache for node embeddings (query-aware expansion)
 }
 
 // FileFilter specifies file extension filtering for retrieval queries.
@@ -87,13 +88,21 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
 		cacheCapacity = 500
 	}
 
+	// Initialize node embedding cache for query-aware expansion
+	embCacheSize := cfg.NodeEmbeddingCacheSize
+	if embCacheSize <= 0 {
+		embCacheSize = 5000
+	}
+
 	log.Printf("Query cache initialized: enabled=%v, capacity=%d, ttl=%v", cfg.QueryCacheEnabled, cacheCapacity, cacheTTL)
+	log.Printf("Node embedding cache initialized: enabled=%v, capacity=%d", cfg.QueryAwareExpansionEnabled, embCacheSize)
 
 	return &Service{
 		cfg:               cfg,
 		driver:            driver,
 		reasoningProvider: &NoOpReasoningProvider{}, // Default: no reasoning modules
 		queryCache:        NewQueryCache(cacheCapacity, cacheTTL),
+		embeddingCache:    NewNodeEmbeddingCache(embCacheSize),
 	}
 }
 
@@ -112,6 +121,16 @@ func (s *Service) QueryCacheStats() map[string]any {
 	}
 	stats := s.queryCache.Stats()
 	stats["enabled"] = s.cfg.QueryCacheEnabled
+	return stats
+}
+
+// EmbeddingCacheStats returns node embedding cache statistics (for query-aware expansion).
+func (s *Service) EmbeddingCacheStats() map[string]any {
+	if s.embeddingCache == nil {
+		return map[string]any{"enabled": false}
+	}
+	stats := s.embeddingCache.Stats()
+	stats["enabled"] = s.cfg.QueryAwareExpansionEnabled
 	return stats
 }
 
@@ -232,6 +251,33 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		if err != nil {
 			return models.RetrieveResponse{}, err
 		}
+
+		// Apply query-aware attention re-ranking if enabled (V0009)
+		// This uses cosine similarity between query and destination nodes
+		// to prioritize query-relevant neighbors over purely high-weight edges
+		if s.cfg.QueryAwareExpansionEnabled && len(req.QueryEmbedding) > 0 {
+			batchEdges, err = ReRankEdgesByAttention(
+				ctx,
+				s.driver,
+				s.embeddingCache,
+				req.SpaceID,
+				req.QueryEmbedding,
+				batchEdges,
+				s.cfg.MaxNeighborsPerNode,
+				s.cfg,
+			)
+			if err != nil {
+				// Log warning but continue with original edges
+				log.Printf("WARN: Query-aware attention re-ranking failed: %v", err)
+			}
+
+			// Rebuild nextNodes from re-ranked edges
+			nextNodes = nextNodes[:0]
+			for _, e := range batchEdges {
+				nextNodes = append(nextNodes, e.Dst)
+			}
+		}
+
 		frontier = frontier[:0]
 		for _, e := range batchEdges {
 			key := e.Src + "|" + e.RelType + "|" + e.Dst

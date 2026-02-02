@@ -117,6 +117,11 @@ type Config struct {
 	EdgeAttentionCodeBoost   float64 // Multiplier for CO_ACTIVATED in code queries (default: 1.2)
 	EdgeAttentionArchBoost   float64 // Multiplier for hierarchical in arch queries (default: 1.5)
 
+	// Query-Aware Expansion settings (V0009) - attention-based neighbor selection during graph expansion
+	QueryAwareExpansionEnabled bool    // Feature toggle (default: true)
+	QueryAwareAttentionWeight  float64 // Weight of query-node similarity vs edge weight (default: 0.5)
+	NodeEmbeddingCacheSize     int     // LRU cache size for node embeddings (default: 5000)
+
 	// Hybrid retrieval settings (V0006)
 	HybridRetrievalEnabled bool    // Enable hybrid vector+BM25 retrieval (default: true)
 	BM25TopK               int     // Candidates from BM25 search (default: 100)
@@ -652,6 +657,23 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("EDGE_ATTENTION_ARCH_BOOST must be in range [0.5, 3.0]")
 	}
 
+	// Query-Aware Expansion settings (V0009)
+	queryAwareExpansionEnabled := getBool("QUERY_AWARE_EXPANSION_ENABLED", true)
+	queryAwareAttentionWeight, err := atof("QUERY_AWARE_ATTENTION_WEIGHT", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	if queryAwareAttentionWeight < 0 || queryAwareAttentionWeight > 1 {
+		return Config{}, errors.New("QUERY_AWARE_ATTENTION_WEIGHT must be in range [0, 1]")
+	}
+	nodeEmbeddingCacheSize, err := atoi("NODE_EMBEDDING_CACHE_SIZE", 5000)
+	if err != nil {
+		return Config{}, err
+	}
+	if nodeEmbeddingCacheSize < 100 {
+		return Config{}, errors.New("NODE_EMBEDDING_CACHE_SIZE must be >= 100")
+	}
+
 	// Hybrid retrieval settings (V0006)
 	hybridEnabled := getBool("HYBRID_RETRIEVAL_ENABLED", true)
 	bm25TopK, err := atoi("BM25_TOP_K", 100)
@@ -883,9 +905,12 @@ func FromEnv() (Config, error) {
 		EdgeAttentionGeneralizes:  edgeAttentionGeneralizes,
 		EdgeAttentionAbstractsTo:  edgeAttentionAbstractsTo,
 		EdgeAttentionTemporal:     edgeAttentionTemporal,
-		EdgeAttentionCodeBoost:    edgeAttentionCodeBoost,
-		EdgeAttentionArchBoost:    edgeAttentionArchBoost,
-		HybridRetrievalEnabled:    hybridEnabled,
+		EdgeAttentionCodeBoost:       edgeAttentionCodeBoost,
+		EdgeAttentionArchBoost:       edgeAttentionArchBoost,
+		QueryAwareExpansionEnabled:   queryAwareExpansionEnabled,
+		QueryAwareAttentionWeight:    queryAwareAttentionWeight,
+		NodeEmbeddingCacheSize:       nodeEmbeddingCacheSize,
+		HybridRetrievalEnabled:       hybridEnabled,
 		BM25TopK:                  bm25TopK,
 		BM25Weight:                bm25Weight,
 		VectorWeight:              vectorWeight,

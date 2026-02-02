@@ -1,0 +1,21 @@
+{
+  "total": 120,
+  "processed": 120,
+  "successful": 120,
+  "failed": 0,
+  "validation_errors": 1,
+  "with_refs": 119,
+  "without_refs": 0,
+  "start_time": "2026-02-02T02:05:37.983057",
+  "errors": [
+    {
+      "id": 194,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    }
+  ],
+  "end_time": "2026-02-02T02:30:33.513249",
+  "duration_seconds": 1495.5301959514618,
+  "ref_rate": 0.9916666666666667
+}

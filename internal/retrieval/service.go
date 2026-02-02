@@ -54,6 +54,11 @@ func (f FileFilter) IsEmpty() bool {
 
 // BuildCypherFilter returns the Cypher WHERE clause fragment for file filtering.
 // Returns empty string if no filters are specified.
+//
+// Note: MDEMG paths can have symbol suffixes like "/path/file.ts#ClassName".
+// We use CONTAINS instead of ENDS WITH to handle both cases:
+// - /path/file.ts (normal path)
+// - /path/file.ts#Symbol (path with symbol suffix)
 func (f FileFilter) BuildCypherFilter() string {
 	if f.IsEmpty() {
 		return ""
@@ -61,14 +66,16 @@ func (f FileFilter) BuildCypherFilter() string {
 
 	clauses := []string{}
 
-	// Include filter: path must end with one of the specified extensions
+	// Include filter: path must contain one of the specified extensions
+	// Using CONTAINS '.ext' OR ENDS WITH '.ext' to handle #symbol suffix
 	if len(f.IncludeExtensions) > 0 {
-		clauses = append(clauses, `ANY(ext IN $includeExtensions WHERE node.path ENDS WITH ('.' + ext))`)
+		clauses = append(clauses, `ANY(ext IN $includeExtensions WHERE node.path CONTAINS ('.' + ext + '#') OR node.path ENDS WITH ('.' + ext))`)
 	}
 
-	// Exclude filter: path must NOT end with any of the specified extensions
+	// Exclude filter: path must NOT contain any of the specified extensions
+	// Using CONTAINS '.ext' OR ENDS WITH '.ext' to handle #symbol suffix
 	if len(f.ExcludeExtensions) > 0 {
-		clauses = append(clauses, `NOT ANY(ext IN $excludeExtensions WHERE node.path ENDS WITH ('.' + ext))`)
+		clauses = append(clauses, `NOT ANY(ext IN $excludeExtensions WHERE node.path CONTAINS ('.' + ext + '#') OR node.path ENDS WITH ('.' + ext))`)
 	}
 
 	if len(clauses) == 1 {
@@ -247,15 +254,30 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		if len(frontier) == 0 {
 			break
 		}
-		batchEdges, nextNodes, err := s.fetchOutgoingEdges(ctx, req.SpaceID, frontier)
-		if err != nil {
-			return models.RetrieveResponse{}, err
+
+		// Get edge types and attention flag for this hop depth (V0010 - Hybrid Edge Type Strategy)
+		edgeTypes, applyAttention := s.getEdgeTypesForHop(d)
+
+		// Fetch edges with the appropriate edge types for this hop
+		var batchEdges []Edge
+		var nextNodes []string
+		var fetchErr error
+		if s.cfg.EdgeTypeStrategy == "all" {
+			// Use original function for "all" strategy (backward compatible)
+			batchEdges, nextNodes, fetchErr = s.fetchOutgoingEdges(ctx, req.SpaceID, frontier)
+		} else {
+			// Use type-filtered function for other strategies
+			batchEdges, nextNodes, fetchErr = s.fetchOutgoingEdgesWithTypes(ctx, req.SpaceID, frontier, edgeTypes)
+		}
+		if fetchErr != nil {
+			return models.RetrieveResponse{}, fetchErr
 		}
 
-		// Apply query-aware attention re-ranking if enabled (V0009)
+		// Apply query-aware attention re-ranking if enabled for this hop (V0009 + V0010)
 		// This uses cosine similarity between query and destination nodes
 		// to prioritize query-relevant neighbors over purely high-weight edges
-		if s.cfg.QueryAwareExpansionEnabled && len(req.QueryEmbedding) > 0 {
+		// Note: applyAttention is determined by the hybrid edge type strategy
+		if applyAttention && len(req.QueryEmbedding) > 0 {
 			batchEdges, err = ReRankEdgesByAttention(
 				ctx,
 				s.driver,
@@ -460,6 +482,8 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			"rerank_tokens":          rerankTokens,
 			"jiminy_enabled":         req.JiminyEnabled,
 			"cache_hit":              false,
+			"edge_type_strategy":     s.cfg.EdgeTypeStrategy,
+			"hybrid_switch_hop":      s.cfg.HybridSwitchHop,
 		},
 	}
 
@@ -691,6 +715,143 @@ type Edge struct {
 	DimTemporal float64
 	DimCoactivation float64
 	UpdatedAt time.Time
+}
+
+// fetchOutgoingEdgesWithTypes is a variant that uses specific edge types instead of AllowedRelationshipTypes.
+// Used by the hybrid edge type strategy to fetch different edge types at different hop depths.
+func (s *Service) fetchOutgoingEdgesWithTypes(ctx context.Context, spaceID string, nodeIDs []string, edgeTypes []string) ([]Edge, []string, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Get decay parameters with defaults
+	decayPerDay := s.cfg.LearningDecayPerDay
+	if decayPerDay <= 0 {
+		decayPerDay = 0.05 // 5% decay per day
+	}
+	pruneThreshold := s.cfg.LearningPruneThreshold
+	if pruneThreshold <= 0 {
+		pruneThreshold = 0.05 // prune edges below 0.05 weight
+	}
+
+	params := map[string]any{
+		"spaceId":        spaceID,
+		"nodeIds":        nodeIDs,
+		"allowed":        edgeTypes, // Use provided edge types instead of AllowedRelationshipTypes
+		"maxNbr":         s.cfg.MaxNeighborsPerNode,
+		"maxTotal":       s.cfg.MaxTotalEdgesFetched,
+		"decayPerDay":    decayPerDay,
+		"pruneThreshold": pruneThreshold,
+	}
+
+	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Same query as fetchOutgoingEdges, but uses provided edge types
+		cypher := `UNWIND $nodeIds AS sid
+MATCH (src:MemoryNode {space_id:$spaceId, node_id:sid})
+CALL {
+  WITH src
+  MATCH (src)-[r]->(dst:MemoryNode {space_id:$spaceId})
+  WHERE type(r) IN $allowed AND coalesce(r.status,'active')='active'
+  WITH src, r, dst, type(r) AS relType,
+       CASE WHEN type(r) = 'CO_ACTIVATED_WITH' THEN
+         duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days
+       ELSE 0 END AS daysSinceActive,
+       coalesce(r.weight, 0.0) AS rawWeight,
+       coalesce(r.evidence_count, 1) AS evidenceCount
+  WITH src, r, dst, relType, daysSinceActive, rawWeight, evidenceCount,
+       CASE WHEN relType = 'CO_ACTIVATED_WITH' AND daysSinceActive > 0 THEN
+         rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount))) ^ daysSinceActive)
+       ELSE rawWeight END AS decayedWeight
+  WHERE NOT (relType = 'CO_ACTIVATED_WITH' AND decayedWeight < $pruneThreshold)
+  RETURN src.node_id AS s, dst.node_id AS d, relType AS t,
+         decayedWeight AS w,
+         coalesce(r.dim_semantic,0.0) AS ds,
+         coalesce(r.dim_temporal,0.0) AS dt,
+         coalesce(r.dim_coactivation,0.0) AS dc,
+         coalesce(r.updated_at, datetime()) AS upd
+  ORDER BY w DESC
+  LIMIT $maxNbr
+}
+RETURN s, d, t, w, ds, dt, dc, upd
+LIMIT $maxTotal`
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		edges := make([]Edge, 0, 1024)
+		next := make([]string, 0, 1024)
+		seenNext := map[string]struct{}{}
+		for res.Next(ctx) {
+			rec := res.Record()
+			s, _ := rec.Get("s")
+			d, _ := rec.Get("d")
+			t, _ := rec.Get("t")
+			w, _ := rec.Get("w")
+			ds, _ := rec.Get("ds")
+			dt, _ := rec.Get("dt")
+			dc, _ := rec.Get("dc")
+			upd, _ := rec.Get("upd")
+
+			e := Edge{
+				Src:             fmt.Sprint(s),
+				Dst:             fmt.Sprint(d),
+				RelType:         fmt.Sprint(t),
+				Weight:          toFloat64(w, 0),
+				DimSemantic:     toFloat64(ds, 0),
+				DimTemporal:     toFloat64(dt, 0),
+				DimCoactivation: toFloat64(dc, 0),
+				UpdatedAt:       time.Now(),
+			}
+			edges = append(edges, e)
+			if _, ok := seenNext[e.Dst]; !ok {
+				seenNext[e.Dst] = struct{}{}
+				next = append(next, e.Dst)
+			}
+			_ = upd
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+		return struct {
+			Edges []Edge
+			Next  []string
+		}{Edges: edges, Next: next}, nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	pack := outAny.(struct {
+		Edges []Edge
+		Next  []string
+	})
+	return pack.Edges, pack.Next, nil
+}
+
+// getEdgeTypesForHop returns the edge types to use based on hop depth and strategy (V0010).
+// This implements the Hybrid Edge Type Strategy from GAT Phase 2.
+func (s *Service) getEdgeTypesForHop(hopDepth int) (edgeTypes []string, applyAttention bool) {
+	switch s.cfg.EdgeTypeStrategy {
+	case "structural_first":
+		// Structural edges for early hops, all edges for later hops
+		if hopDepth < s.cfg.HybridSwitchHop {
+			return s.cfg.StructuralEdgeTypes, false
+		}
+		return s.cfg.AllowedRelationshipTypes, s.cfg.QueryAwareExpansionEnabled
+
+	case "learned_only":
+		// Only learned edges (CO_ACTIVATED_WITH), always with attention
+		return s.cfg.LearnedEdgeTypes, s.cfg.QueryAwareExpansionEnabled
+
+	case "hybrid":
+		// Structural edges for early hops, learned edges with attention for later hops
+		if hopDepth < s.cfg.HybridSwitchHop {
+			return s.cfg.StructuralEdgeTypes, false
+		}
+		return s.cfg.LearnedEdgeTypes, s.cfg.QueryAwareExpansionEnabled
+
+	default: // "all"
+		// All edge types with optional attention (original behavior)
+		return s.cfg.AllowedRelationshipTypes, s.cfg.QueryAwareExpansionEnabled
+	}
 }
 
 func (s *Service) fetchOutgoingEdges(ctx context.Context, spaceID string, nodeIDs []string) ([]Edge, []string, error) {

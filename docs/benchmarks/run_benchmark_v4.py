@@ -93,12 +93,17 @@ class BenchmarkRunner:
         self.validator = AnswerValidator(strict=True)
 
     def call_mdemg_api(self, query: str) -> List[Dict]:
-        """Call MDEMG retrieval API."""
+        """Call MDEMG retrieval API with code_only filter to get source files."""
         url = f"{self.mdemg_endpoint}/v1/memory/retrieve"
         data = {
             "space_id": self.space_id,
             "query_text": query,
-            "top_k": self.top_k
+            "top_k": self.top_k,
+            # CRITICAL: code_only=true filters out migration.sql, .md files, and
+            # abstract L1/L2 concept nodes that don't have file paths
+            "code_only": True,
+            # Exclude common non-code files that pollute results
+            "exclude_extensions": ["sql", "md", "txt", "json", "yaml", "yml"]
         }
 
         req = urllib.request.Request(
@@ -111,7 +116,11 @@ class BenchmarkRunner:
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 result = json.loads(resp.read().decode('utf-8'))
-                return result.get('results', [])
+                results = result.get('results', [])
+                # DEBUG: Log what MDEMG returned
+                paths = [r.get('path', '')[-40:] for r in results[:3]]
+                print(f"  DEBUG MDEMG: {len(results)} results, top3={paths}")
+                return results
         except Exception as e:
             print(f"  MDEMG API error: {e}")
             return []

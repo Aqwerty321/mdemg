@@ -474,6 +474,9 @@ Provide ONLY the answer text, no preamble:"""
             # Fallback: no files found, use MDEMG path
             for result in mdemg_results[:1]:
                 path = result.get('path', result.get('node_id', 'unknown.ts'))
+                # Strip #symbol suffix if present (MDEMG paths include symbol refs)
+                if '#' in path:
+                    path = path.split('#')[0]
                 filename = Path(path).name
                 file_line_refs = [f"{filename}:1"]
                 files_consulted = [filename]

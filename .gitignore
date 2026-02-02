@@ -80,3 +80,16 @@ temp/
 # Logs
 *.log
 logs/
+
+# Build artifacts
+mdemg
+
+# Neo4j data
+mdemg_neo4j/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Parser spec (generated)
+parser-spec/

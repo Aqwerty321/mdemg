@@ -1,0 +1,611 @@
+{
+  "metadata": {
+    "source": "/Users/reh3376/mdemg/docs/tests/plc-gbt/test_questions_v2.json",
+    "total_available": 115,
+    "selected_count": 100,
+    "random_seed": 42,
+    "generated_at": "2026-01-24T01:26:44.472110"
+  },
+  "questions": [
+    {
+      "id": "ai_007",
+      "category": "ai_ml_integration",
+      "difficulty": "medium",
+      "question": "What is the trainer_callback.py module used for in the OpenAI fine-tuning workflow?"
+    },
+    {
+      "id": "dms_005",
+      "category": "data_models_schema",
+      "difficulty": "hard",
+      "question": "In the CascadeConfiguration interface, what are the two possible values for cascade_type and what additional fields are used for each type?"
+    },
+    {
+      "id": "cla_004",
+      "category": "control_loop_architecture",
+      "difficulty": "hard",
+      "question": "What is the default value and valid range for the overshoot_limit parameter in master loop tuning configuration?"
+    },
+    {
+      "id": "n8n_002",
+      "category": "n8n_workflow",
+      "difficulty": "medium",
+      "question": "What PostgreSQL database name is used for N8N workflows in docker-compose?"
+    },
+    {
+      "id": "cfg_006",
+      "category": "configuration_infrastructure",
+      "difficulty": "medium",
+      "question": "What is the default cache TTL (time-to-live) in seconds for the CLI?"
+    },
+    {
+      "id": "cfg_002",
+      "category": "configuration_infrastructure",
+      "difficulty": "easy",
+      "question": "What is the OpenAI Seed value configured for deterministic responses in plc-gbt?"
+    },
+    {
+      "id": "api_009",
+      "category": "api_services",
+      "difficulty": "hard",
+      "question": "What temperature value does the OpenAIService use when calling the chat completion API for truth-seeking responses?"
+    },
+    {
+      "id": "dms_008",
+      "category": "data_models_schema",
+      "difficulty": "hard",
+      "question": "What are the four schema organization directories under plc-gbt-stack/schemas/control-loops/subtypes/?"
+    },
+    {
+      "id": "db_003",
+      "category": "database_persistence",
+      "difficulty": "hard",
+      "question": "What is the maximum number of command results stored in CLIExecutor's command_history?"
+    },
+    {
+      "id": "dms_004",
+      "category": "data_models_schema",
+      "difficulty": "medium",
+      "question": "What are the four ValidationLevel values in plc-gbt and what does each level validate?"
+    },
+    {
+      "id": "sec_002",
+      "category": "security_authentication",
+      "difficulty": "medium",
+      "question": "What port does the mTLS proxy expose in the docker-compose configuration for secure API access?"
+    },
+    {
+      "id": "acd_008",
+      "category": "acd_l5x_conversion",
+      "difficulty": "medium",
+      "question": "Which controller family has the highest I/O module capacity?"
+    },
+    {
+      "id": "concept_010",
+      "category": "ui_architecture",
+      "difficulty": "conceptual",
+      "question": "How does the plc-gbt UI implement a flexible, user-customizable layout system?"
+    },
+    {
+      "id": "dms_002",
+      "category": "data_models_schema",
+      "difficulty": "easy",
+      "question": "What is the regex pattern used for ProcessVariable tag_name validation in plc-gbt schemas?"
+    },
+    {
+      "id": "ai_001",
+      "category": "ai_ml_integration",
+      "difficulty": "medium",
+      "question": "What is the default OpenAI model used for fine-tuning in plc-gbt, and what base model is it derived from?"
+    },
+    {
+      "id": "uix_005",
+      "category": "ui_ux",
+      "difficulty": "medium",
+      "question": "What toast notification library is used in the Providers component, and where is its default position configured?"
+    },
+    {
+      "id": "cla_005",
+      "category": "control_loop_architecture",
+      "difficulty": "hard",
+      "question": "What is the default response_ratio for slave loop tuning, and what are its minimum and maximum allowed values?"
+    },
+    {
+      "id": "db_004",
+      "category": "database_persistence",
+      "difficulty": "medium",
+      "question": "What database is used for Neo4j knowledge graph storage in the RAG architecture?"
+    },
+    {
+      "id": "acd_003",
+      "category": "acd_l5x_conversion",
+      "difficulty": "hard",
+      "question": "What are the three Rockwell/Allen-Bradley controller families supported by plc-gbt?"
+    },
+    {
+      "id": "api_008",
+      "category": "api_services",
+      "difficulty": "medium",
+      "question": "What are the four ExecutionStatus enum values defined in cli_api_bridge.py?"
+    },
+    {
+      "id": "api_010",
+      "category": "api_services",
+      "difficulty": "medium",
+      "question": "What is the maximum number of command results stored in the CLIExecutor's command_history before older entries are trimmed?"
+    },
+    {
+      "id": "concept_005",
+      "category": "system_architecture",
+      "difficulty": "conceptual",
+      "question": "How does the cascade control configuration in plc-gbt enable complex multi-loop control strategies?"
+    },
+    {
+      "id": "ai_003",
+      "category": "ai_ml_integration",
+      "difficulty": "medium",
+      "question": "What temperature value is used in the OpenAI chat completion API to ensure deterministic responses?"
+    },
+    {
+      "id": "n8n_005",
+      "category": "n8n_workflow",
+      "difficulty": "hard",
+      "question": "What three workflow priority levels are defined in WorkflowMetadata?"
+    },
+    {
+      "id": "concept_012",
+      "category": "integration",
+      "difficulty": "conceptual",
+      "question": "What PLC controller families does plc-gbt support and what are their key capability differences?"
+    },
+    {
+      "id": "api_006",
+      "category": "api_services",
+      "difficulty": "easy",
+      "question": "What is the CLI version constant (CLI_VERSION) defined in the plc_control_loop_cli.py file?"
+    },
+    {
+      "id": "ai_009",
+      "category": "ai_ml_integration",
+      "difficulty": "hard",
+      "question": "What is the max_tokens parameter typically used in OpenAI completions for PLC assistance queries?"
+    },
+    {
+      "id": "acd_004",
+      "category": "acd_l5x_conversion",
+      "difficulty": "hard",
+      "question": "What are the capacity differences between ControlLogix and Micro800 controllers in terms of max programs and tags?"
+    },
+    {
+      "id": "uix_004",
+      "category": "ui_ux",
+      "difficulty": "hard",
+      "question": "In the Providers component, what is the default staleTime configured for React Query queries, and what is the gcTime (garbage collection time)?"
+    },
+    {
+      "id": "acd_010",
+      "category": "acd_l5x_conversion",
+      "difficulty": "medium",
+      "question": "How does plc-gbt bridge process control engineers and software developers?"
+    },
+    {
+      "id": "uix_008",
+      "category": "ui_ux",
+      "difficulty": "hard",
+      "question": "What drag-and-drop library is used for the IconStrip component's icon reordering functionality, and what two sensors are configured?"
+    },
+    {
+      "id": "acd_002",
+      "category": "acd_l5x_conversion",
+      "difficulty": "medium",
+      "question": "Why are .ACD files unsuitable for traditional version control systems?"
+    },
+    {
+      "id": "db_002",
+      "category": "database_persistence",
+      "difficulty": "medium",
+      "question": "What is the default chunk_size in bytes for file processing in FileStorageService?"
+    },
+    {
+      "id": "cla_001",
+      "category": "control_loop_architecture",
+      "difficulty": "easy",
+      "question": "What are the four PID controller types defined in the plc-gbt system?"
+    },
+    {
+      "id": "api_001",
+      "category": "api_services",
+      "difficulty": "easy",
+      "question": "What is the default timeout value (in seconds) for the CommandRequest model's timeout field in the CLI-to-API Bridge?"
+    },
+    {
+      "id": "acd_001",
+      "category": "acd_l5x_conversion",
+      "difficulty": "easy",
+      "question": "What is the core purpose of plc-gbt's ACD to L5X conversion capability?"
+    },
+    {
+      "id": "blw_004",
+      "category": "business_logic_workflows",
+      "difficulty": "hard",
+      "question": "What validation level includes simulation testing but not PLC connectivity validation?"
+    },
+    {
+      "id": "ai_008",
+      "category": "ai_ml_integration",
+      "difficulty": "easy",
+      "question": "What environment variable stores the OpenAI API key for AI service authentication?"
+    },
+    {
+      "id": "dms_010",
+      "category": "data_models_schema",
+      "difficulty": "hard",
+      "question": "What are all seven InstanceType enum values in plc-gbt?"
+    },
+    {
+      "id": "n8n_003",
+      "category": "n8n_workflow",
+      "difficulty": "hard",
+      "question": "What is the relationship between n8n-framework and plc-gbt event handling?"
+    },
+    {
+      "id": "ai_004",
+      "category": "ai_ml_integration",
+      "difficulty": "hard",
+      "question": "What OpenAI seed value is configured in plc-gbt for reproducible responses?"
+    },
+    {
+      "id": "acd_007",
+      "category": "acd_l5x_conversion",
+      "difficulty": "hard",
+      "question": "What DevOps capabilities are enabled by converting .ACD to .L5X format?"
+    },
+    {
+      "id": "n8n_004",
+      "category": "n8n_workflow",
+      "difficulty": "medium",
+      "question": "What type of workflows can be automated using n8n in the plc-gbt stack?"
+    },
+    {
+      "id": "blw_009",
+      "category": "business_logic_workflows",
+      "difficulty": "hard",
+      "question": "What are the four PID parameters that MUST be present for BASIC_PID instance type to pass STANDARD validation level?"
+    },
+    {
+      "id": "dms_003",
+      "category": "data_models_schema",
+      "difficulty": "medium",
+      "question": "List all InstanceStatus enum values in plc-gbt in the order they appear in the code."
+    },
+    {
+      "id": "blw_006",
+      "category": "business_logic_workflows",
+      "difficulty": "hard",
+      "question": "In the OpenAI service system prompt, what are the three critical behavior requirements listed (keywords only)?"
+    },
+    {
+      "id": "blw_005",
+      "category": "business_logic_workflows",
+      "difficulty": "medium",
+      "question": "What database column is used to implement soft delete functionality in the file storage service?"
+    },
+    {
+      "id": "cfg_004",
+      "category": "configuration_infrastructure",
+      "difficulty": "hard",
+      "question": "What is the full path to the CLI configuration file location?"
+    },
+    {
+      "id": "cla_006",
+      "category": "control_loop_architecture",
+      "difficulty": "medium",
+      "question": "What are the three scaling_type enum values available for setpoint scaling between master and slave loops?"
+    },
+    {
+      "id": "uix_009",
+      "category": "ui_ux",
+      "difficulty": "medium",
+      "question": "What are the three layout presets available in the useLayoutStore's applyLayoutPreset action?"
+    },
+    {
+      "id": "dms_006",
+      "category": "data_models_schema",
+      "difficulty": "medium",
+      "question": "What JSON Schema draft version is used in plc-gbt control loop schemas?"
+    },
+    {
+      "id": "sec_006",
+      "category": "security_authentication",
+      "difficulty": "medium",
+      "question": "What is the default session timeout value for the CLI security session?"
+    },
+    {
+      "id": "concept_007",
+      "category": "integration",
+      "difficulty": "conceptual",
+      "question": "How does plc-gbt's n8n integration enable workflow automation for industrial processes?"
+    },
+    {
+      "id": "sec_008",
+      "category": "security_authentication",
+      "difficulty": "medium",
+      "question": "What soft delete mechanism is used in the file storage service for audit compliance?"
+    },
+    {
+      "id": "dms_009",
+      "category": "data_models_schema",
+      "difficulty": "medium",
+      "question": "In plc-gbt, what keyword is used in JSON schemas to reference base schemas for inheritance?"
+    },
+    {
+      "id": "acd_006",
+      "category": "acd_l5x_conversion",
+      "difficulty": "easy",
+      "question": "What file format is .L5X based on?"
+    },
+    {
+      "id": "blw_001",
+      "category": "business_logic_workflows",
+      "difficulty": "easy",
+      "question": "What PLC connection mode is enforced by default in plc-gbt for safety reasons?"
+    },
+    {
+      "id": "cfg_010",
+      "category": "configuration_infrastructure",
+      "difficulty": "hard",
+      "question": "Which PostgreSQL database name is used for N8N workflows according to docker-compose.yml?"
+    },
+    {
+      "id": "uix_007",
+      "category": "ui_ux",
+      "difficulty": "easy",
+      "question": "What four types of widgets are supported in the analytics store Dashboard interface?"
+    },
+    {
+      "id": "uix_006",
+      "category": "ui_ux",
+      "difficulty": "hard",
+      "question": "In the ControlLoopGrid component, how many columns does the responsive grid display at different breakpoints (default, md, lg, xl)?"
+    },
+    {
+      "id": "api_004",
+      "category": "api_services",
+      "difficulty": "hard",
+      "question": "What is the default fine-tuned OpenAI model ID used by the OpenAIService when no OPENAI_MODEL environment variable is set?"
+    },
+    {
+      "id": "cfg_007",
+      "category": "configuration_infrastructure",
+      "difficulty": "easy",
+      "question": "What port does the mTLS proxy expose in the docker-compose configuration?"
+    },
+    {
+      "id": "concept_011",
+      "category": "data_architecture",
+      "difficulty": "conceptual",
+      "question": "How does plc-gbt ensure data integrity for file storage operations?"
+    },
+    {
+      "id": "sec_003",
+      "category": "security_authentication",
+      "difficulty": "hard",
+      "question": "What decorator is used in the CLI to enforce permission levels for protected operations?"
+    },
+    {
+      "id": "n8n_006",
+      "category": "n8n_workflow",
+      "difficulty": "medium",
+      "question": "What is the purpose of the WorkflowState type in workflow management?"
+    },
+    {
+      "id": "cla_003",
+      "category": "control_loop_architecture",
+      "difficulty": "medium",
+      "question": "In cascade control configuration, what are the four communication_method enum values that define how master-slave loops communicate?"
+    },
+    {
+      "id": "blw_003",
+      "category": "business_logic_workflows",
+      "difficulty": "easy",
+      "question": "What is the correct lifecycle state progression from DRAFT to DEPLOYED?"
+    },
+    {
+      "id": "db_005",
+      "category": "database_persistence",
+      "difficulty": "hard",
+      "question": "What is the default FILE_STORAGE_ROOT path for the CLI API bridge file storage?"
+    },
+    {
+      "id": "concept_001",
+      "category": "system_purpose",
+      "difficulty": "conceptual",
+      "question": "What is the core purpose of plc-gbt and how does it provide a novel solution to process control and automation version control?"
+    },
+    {
+      "id": "concept_003",
+      "category": "system_architecture",
+      "difficulty": "conceptual",
+      "question": "How does plc-gbt integrate AI assistance with traditional PLC programming workflows?"
+    },
+    {
+      "id": "blw_008",
+      "category": "business_logic_workflows",
+      "difficulty": "easy",
+      "question": "What is the default instance status when creating a new control loop instance via the wizard?"
+    },
+    {
+      "id": "cla_007",
+      "category": "control_loop_architecture",
+      "difficulty": "easy",
+      "question": "What are the six control modes defined in the ControlMode type?"
+    },
+    {
+      "id": "api_005",
+      "category": "api_services",
+      "difficulty": "medium",
+      "question": "What hashing algorithm does the FileStorageService use to calculate file checksums?"
+    },
+    {
+      "id": "acd_009",
+      "category": "acd_l5x_conversion",
+      "difficulty": "hard",
+      "question": "Which controller family supports motion control capabilities?"
+    },
+    {
+      "id": "acd_005",
+      "category": "acd_l5x_conversion",
+      "difficulty": "medium",
+      "question": "What is the external library used for ACD to L5X conversion in plc-gbt?"
+    },
+    {
+      "id": "ai_005",
+      "category": "ai_ml_integration",
+      "difficulty": "medium",
+      "question": "What is the purpose of the neural_tuning.py module in the plc-gbt AI integration?"
+    },
+    {
+      "id": "dms_001",
+      "category": "data_models_schema",
+      "difficulty": "easy",
+      "question": "What are the possible values for ProcessVariable quality in the plc-gbt control-loop.types.ts file?"
+    },
+    {
+      "id": "ai_010",
+      "category": "ai_ml_integration",
+      "difficulty": "medium",
+      "question": "How does plc-gbt's AI assistant handle domain-specific PLC terminology in responses?"
+    },
+    {
+      "id": "api_003",
+      "category": "api_services",
+      "difficulty": "medium",
+      "question": "What is the default chunk_size (in bytes) used by the FileStorageService for file operations?"
+    },
+    {
+      "id": "concept_014",
+      "category": "safety_security",
+      "difficulty": "conceptual",
+      "question": "What validation levels does plc-gbt provide and when would you use each?"
+    },
+    {
+      "id": "blw_002",
+      "category": "business_logic_workflows",
+      "difficulty": "medium",
+      "question": "What are the four communication methods supported for cascade master-slave loop coordination?"
+    },
+    {
+      "id": "uix_001",
+      "category": "ui_ux",
+      "difficulty": "easy",
+      "question": "What is the name of the Zustand store used for managing layout state in the plc-gbt UI, and what is its localStorage persistence key?"
+    },
+    {
+      "id": "cfg_009",
+      "category": "configuration_infrastructure",
+      "difficulty": "medium",
+      "question": "What is the default request timeout in seconds for the CLIExecutor class?"
+    },
+    {
+      "id": "n8n_001",
+      "category": "n8n_workflow",
+      "difficulty": "easy",
+      "question": "What is the purpose of the n8n-mcp module in the plc-gbt stack?"
+    },
+    {
+      "id": "uix_002",
+      "category": "ui_ux",
+      "difficulty": "medium",
+      "question": "What are the seven possible values for the ToolType type in the layout store?"
+    },
+    {
+      "id": "concept_009",
+      "category": "system_architecture",
+      "difficulty": "conceptual",
+      "question": "What is the instance lifecycle in plc-gbt and how does it track PLC program states?"
+    },
+    {
+      "id": "uix_003",
+      "category": "ui_ux",
+      "difficulty": "medium",
+      "question": "What two Google fonts are loaded in the root layout of the plc-gbt Next.js application?"
+    },
+    {
+      "id": "cla_009",
+      "category": "control_loop_architecture",
+      "difficulty": "medium",
+      "question": "What is the default stability_margin value for slave loop tuning, and what are its minimum and maximum constraints?"
+    },
+    {
+      "id": "ai_006",
+      "category": "ai_ml_integration",
+      "difficulty": "hard",
+      "question": "What RAG (Retrieval-Augmented Generation) database is used to store PLC program context for AI assistance?"
+    },
+    {
+      "id": "uix_010",
+      "category": "ui_ux",
+      "difficulty": "hard",
+      "question": "In the ControlLoopStats component, what are the three color thresholds for the avgPerformance value that determine whether it displays as green, yellow, or red?"
+    },
+    {
+      "id": "cfg_005",
+      "category": "configuration_infrastructure",
+      "difficulty": "medium",
+      "question": "What is the default session timeout value in seconds for the CLI?"
+    },
+    {
+      "id": "cla_008",
+      "category": "control_loop_architecture",
+      "difficulty": "hard",
+      "question": "What is the valid range for response_time_target in master loop tuning parameters?"
+    },
+    {
+      "id": "api_002",
+      "category": "api_services",
+      "difficulty": "medium",
+      "question": "What are the five fields defined in the APIResponse Pydantic model in cli_api_bridge.py?"
+    },
+    {
+      "id": "cfg_003",
+      "category": "configuration_infrastructure",
+      "difficulty": "medium",
+      "question": "What is the default port for the backend API in plc-gbt?"
+    },
+    {
+      "id": "cla_002",
+      "category": "control_loop_architecture",
+      "difficulty": "medium",
+      "question": "What is the maximum character length allowed for a tag_name in the plc-gbt system, and what regex pattern must it match?"
+    },
+    {
+      "id": "cfg_008",
+      "category": "configuration_infrastructure",
+      "difficulty": "hard",
+      "question": "What is the default FILE_STORAGE_ROOT path configured in the CLI API bridge?"
+    },
+    {
+      "id": "api_007",
+      "category": "api_services",
+      "difficulty": "hard",
+      "question": "In the CLIConfiguration dataclass, what is the default value for session_timeout and what unit is it measured in?"
+    },
+    {
+      "id": "sec_005",
+      "category": "security_authentication",
+      "difficulty": "hard",
+      "question": "What validation level includes simulation testing before deployment to verify safe operation?"
+    },
+    {
+      "id": "sec_001",
+      "category": "security_authentication",
+      "difficulty": "easy",
+      "question": "What connection mode is enforced by default in plc-gbt to prevent accidental PLC modifications?"
+    },
+    {
+      "id": "sec_004",
+      "category": "security_authentication",
+      "difficulty": "medium",
+      "question": "What permission level is required to delete a control loop instance?"
+    }
+  ]
+}

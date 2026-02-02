@@ -147,15 +147,24 @@ A persistent memory system for LLMs providing:
 - `internal/api/` - HTTP API handlers
 - `docs/tests/` - Benchmark tests and results
 
-### Current Issues (as of 2026-01-23)
-- Benchmark scores dropped from 0.710 to 0.522 (-26.5%)
-- Layer 1 (hidden) nodes showing 0.00/10 in results
-- Investigation needed for hidden layer retrieval
+### Current Status (as of 2026-02-02)
+
+**Benchmark Performance:**
+- MDEMG + Edge Attention: 0.898 mean score (whk-wms 120q)
+- Baseline: 0.854 mean score
+- Delta: +5.2% improvement over baseline
+
+**Key Features Implemented:**
+- Edge-Type Attention for query-aware activation spreading
+- Query-type detection (symbol_lookup, data_flow, architecture, generic)
+- RetrievalHints for fine-grained control
+- Layer-specific temporal decay (L0: 0.05/day, L1: 0.02/day, L2: 0.01/day)
 
 ## Testing
-- Benchmark tests in `docs/tests/whk-wms/`
-- Run V11 test: `python3 docs/tests/whk-wms/run_mdemg_test_v11_alltracks.py`
-- Question file: `test_questions_v4_selected.json` (100 questions, seed 42)
+- Canonical benchmark: `docs/benchmarks/whk-wms/benchmark_run_20260130/`
+- Question set: `test_questions_120.json` (120 questions)
+- Run V4 benchmark: `python docs/benchmarks/run_benchmark_v4.py`
+- Grader: `python docs/benchmarks/grader_v4.py`
 
 ---
 

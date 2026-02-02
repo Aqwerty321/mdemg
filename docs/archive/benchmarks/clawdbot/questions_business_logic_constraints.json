@@ -1,0 +1,209 @@
+[
+  {
+    "id": 41,
+    "category": "business_logic_constraints",
+    "question": "What are the three valid ExecSecurity modes that can be assigned to tools.elevated.security, and what is the default value if not specified?",
+    "answer": "The three valid ExecSecurity modes are 'deny', 'allowlist', and 'full' as defined in src/infra/exec-approvals.ts:10 (type ExecSecurity = 'deny' | 'allowlist' | 'full'). The default value is 'deny' as specified in src/infra/exec-approvals.ts:60 (const DEFAULT_SECURITY: ExecSecurity = 'deny'). This is used in the normalizeSecurity function at src/infra/exec-approvals.ts:250-253 which falls back to DEFAULT_SECURITY when an invalid or undefined value is provided.",
+    "required_files": [
+      "src/infra/exec-approvals.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 42,
+    "category": "business_logic_constraints",
+    "question": "What validation is performed on gateway.auth tokens to ensure they are sufficiently secure, and what warning severity level is assigned if the validation fails?",
+    "answer": "Gateway auth token validation checks that the token length is at least 24 characters at src/security/audit.ts:347-354. If auth.mode is 'token' and the token exists but is shorter than 24 characters, a security finding with severity='warn' is created with checkId='gateway.token_too_short' and the message indicates the actual token length and recommends 'a long random token'. Similarly, browser control tokens are validated at src/security/audit.ts:410-417 with the same 24-character minimum threshold.",
+    "required_files": [
+      "src/security/audit.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 43,
+    "category": "business_logic_constraints",
+    "question": "When gateway.bind is set to a value other than 'loopback' but no gateway.auth credentials are configured, what security audit finding is raised and what is its severity?",
+    "answer": "When gateway.bind is not 'loopback' and no shared secret (token or password) is configured, a critical severity finding is raised at src/security/audit.ts:270-278. The finding has checkId='gateway.bind_no_auth', severity='critical', and title='Gateway binds beyond loopback without auth'. The detail explains that gateway.bind=\"{bind}\" but no gateway.auth token/password is configured, and the remediation suggests setting gateway.auth (token recommended) or binding to loopback.",
+    "required_files": [
+      "src/security/audit.ts",
+      "src/config/types.gateway.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 44,
+    "category": "business_logic_constraints",
+    "question": "What constraint must be satisfied for a browser profile's cdpPort value in the config schema, and what happens if neither cdpPort nor cdpUrl is provided?",
+    "answer": "The cdpPort value must be an integer between 1 and 65535 as defined in src/config/zod-schema.ts:156 (z.number().int().min(1).max(65535).optional()). The schema enforces at src/config/zod-schema.ts:162-164 via a .refine() validation that either cdpPort or cdpUrl must be set, with the error message 'Profile must set cdpPort or cdpUrl'. This ensures every browser profile has a valid connection method configured.",
+    "required_files": [
+      "src/config/zod-schema.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 45,
+    "category": "business_logic_constraints",
+    "question": "What security patterns are detected in external content to identify potential prompt injection attempts, and how many distinct patterns are checked?",
+    "answer": "External content is checked against 14 suspicious patterns defined in src/security/external-content.ts:15-28 in the SUSPICIOUS_PATTERNS array. These patterns detect prompt injection attempts including: 'ignore previous instructions', 'disregard previous', 'forget your instructions', 'you are now a', 'new instructions:', 'system prompt/override/command', 'exec command=', 'elevated=true', 'rm -rf', 'delete all emails/files/data', '<system>' tags, and message role injection patterns. The detectSuspiciousPatterns function at src/security/external-content.ts:33-41 tests each pattern and returns matching pattern sources.",
+    "required_files": [
+      "src/security/external-content.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 46,
+    "category": "business_logic_constraints",
+    "question": "When evaluating exec command allowlists, which shell tokens are explicitly disallowed in pipeline splitting, and what specific error reasons are returned for '||' vs '$()'?",
+    "answer": "The splitShellPipeline function at src/infra/exec-approvals.ts:624-661 disallows multiple shell tokens. For '||' the function returns 'unsupported shell token: ||' at line 628. For '$()' (command substitution) it returns 'unsupported shell token: $()' at line 644. Additional disallowed tokens include: '|&' (line 631), '&' and ';' (lines 637-639), and the DISALLOWED_PIPELINE_TOKENS set at line 536 which includes '>', '<', '`', newlines, carriage returns, '(', and ')'. Each violation results in { ok: false, reason: <specific error> }.",
+    "required_files": [
+      "src/infra/exec-approvals.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 47,
+    "category": "business_logic_constraints",
+    "question": "What are the validation constraints on profile names in browser.profiles configuration, and what additional validation is performed beyond the regex pattern?",
+    "answer": "Browser profile names must match the regex /^[a-z0-9-]+$/ (alphanumeric with hyphens only) as defined in src/config/zod-schema.ts:153. Beyond the pattern validation, each profile must provide either cdpPort or cdpUrl, enforced by the .refine() check at src/config/zod-schema.ts:162-164 with the message 'Profile must set cdpPort or cdpUrl'. The cdpPort if provided must be an integer between 1-65535 (line 156), and profile objects must strictly conform to the schema (line 161).",
+    "required_files": [
+      "src/config/zod-schema.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 48,
+    "category": "business_logic_constraints",
+    "question": "When gateway.controlUi.dangerouslyDisableDeviceAuth is set to true, what security finding is raised, what is its severity, and what remediation is recommended?",
+    "answer": "When gateway.controlUi.dangerouslyDisableDeviceAuth is true, a critical severity finding is raised at src/security/audit.ts:334-342. The finding has checkId='gateway.control_ui.device_auth_disabled', severity='critical', and title='DANGEROUS: Control UI device auth disabled'. The detail explains that this setting 'disables device identity checks for the Control UI', and the remediation is 'Disable it unless you are in a short-lived break-glass scenario.' This is one of the most severe security misconfigurations.",
+    "required_files": [
+      "src/security/audit.ts",
+      "src/config/types.gateway.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 49,
+    "category": "business_logic_constraints",
+    "question": "What are the default safe bins that are automatically allowed for exec commands without explicit allowlist entries, and how is this set resolved when entries is undefined vs null?",
+    "answer": "The default safe bins are defined in src/infra/exec-approvals.ts:66 as DEFAULT_SAFE_BINS = ['jq', 'grep', 'cut', 'sort', 'uniq', 'head', 'tail', 'tr', 'wc']. The resolveSafeBins function at lines 831-834 handles entries in two ways: if entries is undefined (not specified), it returns normalizeSafeBins(DEFAULT_SAFE_BINS); if entries is null (explicitly disabled), it returns normalizeSafeBins([]) which yields an empty set, effectively disabling safe bin auto-approval.",
+    "required_files": [
+      "src/infra/exec-approvals.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 50,
+    "category": "business_logic_constraints",
+    "question": "What constraints are enforced on identity.avatar paths in agent configuration, and what specific validation ensures avatars cannot escape the workspace directory?",
+    "answer": "Agent identity.avatar validation is performed in src/config/validation.ts:32-70. Avatars must be either: (1) a data URI (AVATAR_DATA_RE), (2) an http/https URL (AVATAR_HTTP_RE), or (3) a workspace-relative path. Tilde (~) paths are rejected at lines 43-48. Paths with URI schemes (except Windows drive letters) are rejected at lines 50-56. The isWorkspaceAvatarPath function at lines 23-30 ensures the resolved path stays within the agent workspace by checking that path.relative(workspaceRoot, resolved) does not start with '..' and is not absolute. Violations produce a ConfigValidationIssue with path='agents.list.{index}.identity.avatar'.",
+    "required_files": [
+      "src/config/validation.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 51,
+    "category": "business_logic_constraints",
+    "question": "What is the minimum approval socket timeout for requestExecApprovalViaSocket, and what happens when the timeout is exceeded without receiving a decision?",
+    "answer": "The requestExecApprovalViaSocket function at src/infra/exec-approvals.ts:1210-1267 accepts a timeoutMs parameter with a default of 15,000ms (15 seconds) set at line 1218. When the timeout is exceeded without receiving a decision message, the timer at line 1234 fires and calls finish(null) at line 1234, which destroys the socket connection (line 1227) and resolves the Promise with null (line 1231), indicating no approval decision was received. The calling code must handle null returns as approval failures.",
+    "required_files": [
+      "src/infra/exec-approvals.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 52,
+    "category": "business_logic_constraints",
+    "question": "What validation is performed on config file permissions during security audits on POSIX systems, and what are the different severity levels assigned to world-writable vs world-readable config files?",
+    "answer": "Config file permission validation is performed in src/security/audit.ts:188-244. If the config file is world-writable OR group-writable, it generates a critical severity finding (checkId='fs.config.perms_writable', lines 202-215) because 'another user could change gateway/auth/tool policies'. If world-readable (but not writable), it generates a critical severity finding (checkId='fs.config.perms_world_readable', lines 216-229) because 'config can contain tokens and private settings'. If only group-readable, it generates a warn severity finding (checkId='fs.config.perms_group_readable', lines 230-243). The recommended permission is 0o600 (owner read/write only).",
+    "required_files": [
+      "src/security/audit.ts",
+      "src/security/audit-fs.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 53,
+    "category": "business_logic_constraints",
+    "question": "When Tailscale Serve mode is enabled for gateway authentication, what validation is performed to verify the Tailscale user identity, and which header mismatch would cause authentication to fail?",
+    "answer": "Tailscale user identity validation is performed in src/gateway/auth.ts:134-165 via resolveVerifiedTailscaleUser. The function first extracts the Tailscale user from the 'tailscale-user-login' header (lines 108-118). It then verifies the request has Tailscale proxy headers (x-forwarded-for, x-forwarded-proto, x-forwarded-host) via isTailscaleProxyRequest at lines 129-132. Most critically, it performs a Tailscale whois lookup on the client IP and validates at lines 154-156 that normalizeLogin(whois.login) matches normalizeLogin(tailscaleUser.login). If the logins don't match, it returns { ok: false, reason: 'tailscale_user_mismatch' }, preventing authentication even if the headers are present.",
+    "required_files": [
+      "src/gateway/auth.ts",
+      "src/config/types.gateway.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 54,
+    "category": "business_logic_constraints",
+    "question": "What specific conditions must be met for a safe bin (like 'jq' or 'grep') to be automatically allowed without an explicit allowlist entry, and why would file path arguments disqualify the command?",
+    "answer": "The isSafeBinUsage function at src/infra/exec-approvals.ts:836-873 enforces strict conditions for safe bin auto-approval. First, the executable name must match a safe bin (case-insensitive), including handling Windows .exe extensions (lines 847-850). Second, the command must have a resolved path (line 851). The critical constraint is that NO command-line arguments can be path-like or reference files: any token that is path-like (starts with ./, ../, ~, /, or Windows drive letter) at line 869, or any token that resolves to an existing file at line 870, causes the function to return false. This prevents attacks like 'grep secret /etc/passwd' from being auto-approved even though grep is in the safe bins list.",
+    "required_files": [
+      "src/infra/exec-approvals.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 55,
+    "category": "business_logic_constraints",
+    "question": "When discord slash commands are enabled with commands.useAccessGroups=false, what critical security finding is raised, and what specific configuration prevents this finding?",
+    "answer": "When Discord slash commands are enabled while commands.useAccessGroups=false, a critical finding is raised at src/security/audit.ts:628-642 with checkId='channels.discord.commands.native.unrestricted' ONLY IF: (1) groupPolicy is not 'disabled', (2) guilds are configured, AND (3) no per-guild/channel users allowlist is configured (checked via hasAnyUserAllowlist which scans guilds[].users and guilds[].channels[].users at lines 609-620). The detail warns 'any user in allowed guild channels can invoke /... commands'. The finding is prevented by either setting commands.useAccessGroups=true (recommended), or configuring channels.discord.guilds.<id>.users or channels.discord.guilds.<id>.channels.<channel>.users allowlists.",
+    "required_files": [
+      "src/security/audit.ts",
+      "src/config/config.js"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 56,
+    "category": "business_logic_constraints",
+    "question": "What happens when the exec approvals file contains a 'default' agent key, and how does this legacy handling interact with the main agent?",
+    "answer": "Legacy 'default' agent handling occurs in src/infra/exec-approvals.ts:137-146 within normalizeExecApprovals. If agents.default exists, it checks for agents[DEFAULT_AGENT_ID] (where DEFAULT_AGENT_ID is 'main'). If 'main' exists, it calls mergeLegacyAgent at lines 95-117 to combine allowlists from both, using the 'main' agent's settings as primary and 'default' as fallback. The merged allowlists are deduplicated by normalizeAllowlistPattern (lowercase pattern matching). After merging, 'delete agents.default' at line 145 removes the legacy key. This ensures backward compatibility while migrating configs from 'default' to 'main'.",
+    "required_files": [
+      "src/infra/exec-approvals.ts",
+      "src/routing/session-key.js"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 57,
+    "category": "business_logic_constraints",
+    "question": "What validation prevents plugin allowlists from accidentally disabling all core tools, and what log message would indicate this stripping has occurred?",
+    "answer": "The stripPluginOnlyAllowlist function at src/agents/tool-policy.ts:187-223 prevents plugin-only allowlists from disabling core tools. It normalizes the policy.allow entries (line 195), then checks each entry at lines 203-209: if an entry is a plugin entry (matching group:plugins, a plugin ID, or plugin tool) but NOT a core entry (checked via expandToolGroups against coreTools Set), it's added to unknownAllowlist. If hasCoreEntry is false (no core tools in the allowlist), strippedAllowlist is set to true at line 211. When stripped, the function returns { policy: { ...policy, allow: undefined }, strippedAllowlist: true } at line 219, effectively removing the plugin-only allowlist to avoid accidentally disabling core tools. The note at lines 214-216 indicates logging happens in the caller (pi-tools/tools-invoke).",
+    "required_files": [
+      "src/agents/tool-policy.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 58,
+    "category": "business_logic_constraints",
+    "question": "When Telegram group access is enabled with no sender allowlist, what critical security finding is raised, and what three configuration sources are checked for the allowlist?",
+    "answer": "When Telegram group access is enabled without a sender allowlist, a critical finding is raised at src/security/audit.ts:823-832 with checkId='channels.telegram.groups.allowFrom.missing'. The function checks three configuration sources for the sender allowlist at lines 775-800: (1) storeAllowFrom from the pairing store via readChannelAllowFromStore('telegram'), (2) groupAllowFrom from config at channels.telegram.groupAllowFrom, and (3) anyGroupOverride which checks channels.telegram.groups.<id>.allowFrom and channels.telegram.groups.<id>.topics.<topic>.allowFrom. If all three sources are empty (hasAnySenderAllowlist is false at line 815), the critical finding warns 'this allows any group member to invoke /... commands', with remediation to approve via pairing or set groupAllowFrom.",
+    "required_files": [
+      "src/security/audit.ts",
+      "src/pairing/pairing-store.js"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 59,
+    "category": "business_logic_constraints",
+    "question": "What are the three valid ExecAsk modes for exec approval prompting behavior, what is the default mode, and which mode would prompt even for allowlisted commands?",
+    "answer": "The three valid ExecAsk modes are 'off', 'on-miss', and 'always' as defined in src/infra/exec-approvals.ts:11 (type ExecAsk = 'off' | 'on-miss' | 'always'). The default mode is 'on-miss' as specified at line 61 (const DEFAULT_ASK: ExecAsk = 'on-miss'). The normalizeAsk function at lines 255-258 validates these values. The 'always' mode will prompt for every command, even if it's allowlisted, as determined by requiresExecApproval at lines 1139-1151: it returns true when params.ask === 'always' regardless of allowlistSatisfied status.",
+    "required_files": [
+      "src/infra/exec-approvals.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 60,
+    "category": "business_logic_constraints",
+    "question": "What error condition causes the device auth payload builder to determine whether to use version 'v1' vs 'v2', and what additional field is appended for v2 payloads?",
+    "answer": "The buildDeviceAuthPayload function at src/gateway/device-auth.ts:13-31 determines the version at line 14: version = params.version ?? (params.nonce ? 'v2' : 'v1'). If params.version is not provided, the presence of params.nonce determines the version. For both versions, the base payload includes version, deviceId, clientId, clientMode, role, scopes, signedAtMs, and token (lines 17-26). For v2 specifically, at lines 27-29, the function appends params.nonce ?? '' to the base array. The payload is joined with '|' delimiter at line 30. This allows v2 to include nonce-based replay protection while maintaining backward compatibility with v1.",
+    "required_files": [
+      "src/gateway/device-auth.ts"
+    ],
+    "complexity": "multi-file"
+  }
+]

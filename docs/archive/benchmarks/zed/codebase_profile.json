@@ -1,0 +1,62 @@
+{
+  "codebase": "zed",
+  "description": "Zed - High-performance, multiplayer code editor built in Rust",
+  "collected_at": "2026-01-28",
+  "repo_path": "/Users/reh3376/repos/zed",
+  "repo_url": "https://github.com/zed-industries/zed",
+  "repo_commit": "80f1cc032e259f7421c81ebfdb2b9700be3ac009",
+  "space_id": "zed",
+  "total_files": 2475,
+  "total_loc": 1079027,
+  "file_types": {
+    "rust": 1642,
+    "json": 346,
+    "toml": 275,
+    "markdown": 211,
+    "typescript": 1
+  },
+  "avg_file_loc": 657,
+  "primary_language": "Rust",
+  "domain": "Code Editor / IDE",
+  "crate_count": 216,
+  "key_crates": [
+    "gpui - GPU-accelerated UI framework (core rendering/layout/events)",
+    "editor - Text editor component with multi-buffer support",
+    "workspace - Window/pane layout and item management",
+    "project - Project system, buffers, LSP, git integration",
+    "language - Tree-sitter syntax, language configuration",
+    "lsp - Language Server Protocol client",
+    "text - Rope-based text storage and anchors",
+    "multi_buffer - Multiple buffer editing coordination",
+    "collab - Real-time collaboration server",
+    "client - Collaboration client and RPC",
+    "language_model - LLM provider abstraction",
+    "extension - Extension system and WASM runtime",
+    "settings - User settings and keybindings",
+    "theme - Theme engine and styling"
+  ],
+  "key_patterns": [
+    "Entity<T> - GPUI entity system for state management",
+    "Element trait - Immediate-mode UI element rendering",
+    "DisplayMap - Coordinate space transforms (folds, wraps, inlays)",
+    "Anchor - Stable position tracking through edits",
+    "Rope - Efficient text storage with O(log n) operations"
+  ],
+  "subsystems": [
+    "UI Framework (gpui, ui, component)",
+    "Text Editing (editor, multi_buffer, text, rope)",
+    "Language Intelligence (language, lsp, diagnostics)",
+    "Project Management (project, worktree, fs)",
+    "Collaboration (collab, client, rpc)",
+    "AI Features (language_model, agent, copilot)",
+    "Extensions (extension, extension_host, extension_api)",
+    "Settings (settings, theme, keybindings)"
+  ],
+  "mdemg_stats": {
+    "memory_count": 7799,
+    "layer_0": 7680,
+    "layer_1": 115,
+    "layer_2": 4,
+    "health_score": 1.0
+  }
+}

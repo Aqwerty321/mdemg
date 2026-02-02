@@ -90,18 +90,26 @@ Full reproducibility details for skeptics:
 
 > **Baseline definition:** Same agent runner and tool permissions, **no MDEMG retrieval**, relying on long-context + auto-compaction only (memory off).
 
-### Key Results (Q&A Battery, v22)
+### Key Results (2026-01-30, whk-wms 507K LOC)
 
-| Metric | Baseline | MDEMG | Notes |
-|--------|----------|-------|-------|
-| Mean Score | 0.834 | 0.820 | Within margin of error |
-| Evidence Rate | 100% | 97.1% | Both conditions high |
-| High Confidence (>0.7) | 100% | 94.2% | Run 1 cold start |
-| Run-to-Run Improvement | +2.9% | +3.0% | Similar learning |
+| Metric | Baseline | MDEMG + Edge Attention | Delta |
+|--------|----------|------------------------|-------|
+| **Mean Score** | 0.854 | **0.898** | **+5.2%** |
+| Standard Deviation | 0.088 | 0.059 | -51% variance |
+| High Score Rate (≥0.7) | 97.9% | **100%** | +2.1pp |
+| Strong Evidence Rate | 97.9% | **100%** | +2.1pp |
+
+**Category Performance (Edge Attention):**
+| Category | Mean Score |
+|----------|------------|
+| Disambiguation | 0.958 |
+| Service Relationships | 0.916 |
+| Architecture Structure | 0.889 |
+| Data Flow Integration | 0.882 |
 
 ### Key Metric: State Survival
 
-The Q&A battery measures single-turn retrieval accuracy. The more important metric is **state survival under compaction**:
+The Q&A battery measures single-turn retrieval accuracy. The critical differentiator is **state survival under compaction**:
 
 | Metric | Baseline | MDEMG | Source |
 |--------|----------|-------|--------|
@@ -127,9 +135,12 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 
 - **Multi-layer graph architecture**: Base observations (L0) → Hidden concepts (L1) → Abstract concepts (L2+)
 - **Hybrid search**: Combines vector similarity with graph traversal
+- **Conversation Memory System (CMS)**: Persistent memory across agent sessions with surprise-weighted learning
+- **Symbol extraction (UPTS)**: Unified Parser Test Schema supporting 30+ languages with file:line evidence
 - **Plugin system**: Extensible via ingestion, reasoning, and APE (Autonomous Pattern Extraction) modules
 - **Evidence-based retrieval**: Returns symbol-level citations (file:line references) with results
 - **Capability gap detection**: Identifies missing knowledge areas for targeted improvement
+- **Codebase ingestion API**: Background job processing for large codebase ingestion with consolidation
 
 ## Architecture
 
@@ -197,7 +208,7 @@ curl -X POST http://localhost:8090/v1/memory/consolidate \
 
 ## API Endpoints
 
-### Core Operations
+### Core Memory Operations
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -207,8 +218,71 @@ curl -X POST http://localhost:8090/v1/memory/consolidate \
 | `/v1/memory/ingest/batch` | POST | Store multiple observations |
 | `/v1/memory/consolidate` | POST | Trigger hidden layer creation |
 | `/v1/memory/stats` | GET | Per-space memory statistics |
+| `/v1/memory/ingest-codebase` | POST | Background codebase ingestion job |
+| `/v1/memory/symbols` | GET | Query extracted code symbols |
+
+### Conversation Memory System (CMS)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/conversation/resume` | POST | Restore session context with themes and concepts |
+| `/v1/conversation/observe` | POST | Record observations (decisions, corrections, learnings) |
+| `/v1/conversation/correct` | POST | Record user corrections for learning |
+| `/v1/conversation/recall` | POST | Query conversation history |
+| `/v1/conversation/consolidate` | POST | Create themes from observations |
+
+### Learning Control
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/learning/stats` | GET | Hebbian learning edge statistics |
+| `/v1/learning/freeze` | POST | Freeze learning for stable scoring |
+| `/v1/learning/unfreeze` | POST | Resume learning edge creation |
+| `/v1/learning/prune` | POST | Remove decayed edges |
 
 See [API Reference](docs/API_REFERENCE.md) for complete documentation.
+
+## Symbol Extraction (UPTS)
+
+MDEMG extracts code symbols during ingestion using the Unified Parser Test Schema (UPTS):
+
+**Supported Languages (30+):**
+- TypeScript, JavaScript, Python, Go, Rust, Java, C/C++, C#
+- Ruby, PHP, Swift, Kotlin, Scala, Dart
+- SQL, GraphQL, Protobuf, YAML, JSON, TOML, Dockerfile
+- And more...
+
+**Extracted Symbol Types:**
+- Functions, methods, classes, interfaces, types
+- Constants, variables, enums
+- Imports, exports, module declarations
+
+Symbols include file:line references for evidence-based retrieval.
+
+## Conversation Memory System (CMS)
+
+CMS provides persistent memory for AI agents across sessions:
+
+```bash
+# Resume session context (call at session start)
+curl -X POST http://localhost:8090/v1/conversation/resume \
+  -H "Content-Type: application/json" \
+  -d '{"space_id": "my-agent", "session_id": "session-1", "max_observations": 10}'
+
+# Record an observation (decision, learning, correction)
+curl -X POST http://localhost:8090/v1/conversation/observe \
+  -H "Content-Type: application/json" \
+  -d '{
+    "space_id": "my-agent",
+    "session_id": "session-1",
+    "content": "User prefers TypeScript for new files",
+    "obs_type": "preference"
+  }'
+```
+
+**Observation Types:** `decision`, `correction`, `learning`, `preference`, `error`, `progress`
+
+Observations are surprise-weighted (novel information persists longer) and form themes via consolidation.
 
 ## MCP Integration (Cursor IDE)
 

@@ -1,0 +1,125 @@
+{
+  "metadata": {
+    "created": "2026-01-21",
+    "total_reviewed": 43,
+    "verified_accurate": 24,
+    "needs_correction": 19,
+    "correction_rate": "44%"
+  },
+  "corrections": [
+    {
+      "id": 22,
+      "verified": false,
+      "corrected_answer": "CommentsModule (plural) and CommentModule (singular) are separated because they handle two distinct data models: CommentsModule manages the 'Comments' table with basic CRUD operations exposed via REST API (CommentsController), while CommentModule manages the 'Comment' table with advanced domain features including comment threading, activity tracking, visibility-based filtering, search, bulk operations, statistics, and real-time GraphQL subscriptions. CommentsModule includes CommentsController for REST endpoints and imports AuthModule via forwardRef for permissions, while CommentModule operates purely through GraphQL (CommentResolver) with no REST API. Both modules export their respective services for use by other feature modules that need comment functionality.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/comments/comment.service.ts", "/Users/reh3376/whk-wms/apps/whk-wms/src/comments/comment.resolver.ts"]
+    },
+    {
+      "id": 34,
+      "verified": false,
+      "corrected_answer": "ResolutionModule in resolution/base/ handles dynamic error resolution workflows that execute different resolution strategies based on error type and selected resolution option. ResolutionTemplateMappingModule manages the mapping between resolution types (e.g., 'RESOLVE:selectMatchedBarrel', 'RESOLVE:create9xxxBarrel') and printer templates used for print job creation. The 'base' subdirectory contains the core business logic (ResolutionService with createResolution method that validates requests, executes hierarchical resolution functions, and manages the DeviceSyncResolution lifecycle) along with supporting DTOs and the controller. This is NOT generated CRUD code - it's the foundational service layer for the resolution system. The architecture supports extensible error handling through the ERROR_CONFIGURATION map which dynamically defines resolution options and their corresponding execution functions for each error type.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/errorConfig/error-configuration.ts"]
+    },
+    {
+      "id": 35,
+      "verified": false,
+      "corrected_answer": "Next.js route groups (parentheses folders) like (dashboard) don't affect URL structure and enable shared layouts. The actual implementation differs from typical patterns: the (dashboard) route group at app/(dashboard)/ only contains a diagnostics subfolder with no layout.tsx file. Instead, authenticated pages under /app/dashboard/ use a shared layout.tsx at app/dashboard/layout.tsx. This dashboard layout wraps authenticated pages with AuthenticatedTemplate (from @azure/msal-react) with shared UI components including DashboardLayer, Navbar, and ProgressBar. The root layout.tsx wraps everything in MSAL_Provider and multiple context providers (QueryProvider, ApolloWrapper, FeatureFlagProvider). Authentication is implemented via: 1) MSAL_Provider for Azure AD integration, 2) AuthenticatedTemplate/UnauthenticatedTemplate components in dashboard/layout.tsx to conditionally render content, and 3) Middleware at middleware.ts that validates MSAL tokens for API routes.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms-front-end/app/layout.tsx", "/Users/reh3376/whk-wms/apps/whk-wms-front-end/app/dashboard/layout.tsx", "/Users/reh3376/whk-wms/apps/whk-wms-front-end/middleware.ts"]
+    },
+    {
+      "id": 39,
+      "verified": false,
+      "corrected_answer": "McpModule implements the Model Context Protocol by creating an MCP server that registers and exposes 9 specialized tools for AI agents to interact with warehouse data and operations. The module exports McpService, which implements: (1) Database tools - ping, get_schema, run_query for direct database access, (2) GraphQL tools - get_graphql_schema and run_graphql for querying the in-process GraphQL schema, (3) Vector search tool for similarity-based document retrieval using embeddings, and (4) RAG tools - rag_query, rag_inventory, and rag_operations for retrieval-augmented generation with domain-specific context. The service manages stateful MCP sessions via StreamableHTTPServerTransport, maintains request context across tool invocations, and provides both MCP protocol compliance and direct tool execution methods. Each tool is registered with Zod schema validation and returns standardized MCP result objects.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/mcp/mcp.controller.ts", "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/rag/rag.service.ts"]
+    },
+    {
+      "id": 40,
+      "verified": false,
+      "corrected_answer": "The backend uses a database-level aggregation pattern rather than materialized views or scheduled jobs. The BarrelEventWeeklySummary module uses raw SQL aggregation queries with Prisma ($queryRaw) to compute hierarchical summaries in real-time. The implementation uses: single optimized SQL query with JOINs (not separate materialized views), database-level GROUP BY clauses for aggregation, string aggregation (CONCAT_WS) for collecting barrel IDs, LATERAL joins for fetching latest weight per barrel, and a 10,000 record limit per query. The architecture uses direct REST/GraphQL endpoints that trigger on-demand queries rather than scheduled materialized view refreshes.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEventWeeklySummary/summary.controller.ts"]
+    },
+    {
+      "id": 46,
+      "verified": false,
+      "corrected_answer": "The changelog module serves two purposes: (1) GitHub Release Synchronization - syncs releases from GitHub API every 6 hours (via @Cron in ChangelogSyncService), stores release data with commit information, and detects backend vs frontend changes using regex patterns on commit messages. (2) AI-Generated Content Generation - ChangelogAiService uses OpenAI's gpt-4o-mini model to transform technical changelog entries into user-friendly content for warehouse operators. The AI service receives release body and commit messages, uses system prompt tailored for non-technical warehouse audience, and generates categorized content: summary, highlights, features, fixes, improvements, breaking changes. Webhook support enables real-time sync on release events.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/changelog/changelog.service.ts"]
+    },
+    {
+      "id": 56,
+      "verified": false,
+      "corrected_answer": "The trust-mode module does NOT enable high-throughput inventory operations through authorization checks. Instead, it implements a cutoff-date-based filtering mechanism for Android scan records. Purpose: Allows operators to set a cutoff date and only process AndroidSyncInbox records created before that date. Implementation: Uses Redis for distributed caching (24-hour TTL) with in-memory fallback. Key Methods: shouldProcessAndroidSyncRecord() checks if a record's creation date is before the cutoff. High-throughput enablement: By skipping records after the cutoff date, it reduces processing volume for faster inventory syncing during specific time windows. Not authorization-based: No caller/permission checking - it's purely temporal filtering.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/trust-mode/dto/trust-mode-config.dto.ts"]
+    },
+    {
+      "id": 57,
+      "verified": false,
+      "corrected_answer": "The SchedulerModule does NOT use NestJS's ScheduleModule directly in the way described. Instead, it: (1) Uses Bull Queue - integrates with @nestjs/bull for job processing (BullModule.registerQueue), (2) Uses @nestjs/schedule for decorators - The BarrelReportSchedulerService uses @Cron decorators to schedule weekly barrel reports at 4 PM EST Monday-Friday, (3) Implements distributed locking using Redis SETNX + EX to ensure only one instance runs across multiple nodes, (4) Stores process.pid in Redis lock for debugging. Architecture: ScheduleModule provides cron decorator framework, BullModule.registerQueue provides async job queue infrastructure, Redis is used for both Bull queue backend AND distributed locking.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/providers/notification/weekly-barrel-report.service.ts"]
+    },
+    {
+      "id": 58,
+      "verified": false,
+      "corrected_answer": "The barrel-audit-table module provides a comprehensive auditing service that generates tabular reports of barrel state changes at specific points in time. It implements time-series snapshots of barrel data by querying the BarrelAudit table for changes before a specified point-in-time, then reconstructs the current barrel state at that moment by joining with related entities. The service supports: point-in-time barrel state reconstruction using CTEs (Common Table Expressions), flexible filtering on 26+ barrel/location/customer/metadata fields with SQL injection protection, dynamic sorting on any allowed column, cursor-based and offset-based pagination, and data source tracking (marking records as 'AUDIT' or 'CURRENT' based on whether they were modified).",
+      "additional_files": []
+    },
+    {
+      "id": 63,
+      "verified": false,
+      "corrected_answer": "The notification provider currently integrates ONLY with Azure Communication Services for email. There is NO support for other notification channels (SMS, Slack, Teams, etc.) in the current codebase. AzureEmailService wraps Azure Communication Services EmailClient and provides: sendEmail() for generic custom emails, and sendFailedMessageNotification() for message queue failure alerts. WeeklyBarrelReportService generates barrel tracking variance reports (scanned vs processed vs reported counts) and sends only via AzureEmailService. NotificationModule exports AzureEmailService and WeeklyBarrelReportService with dependencies on PrismaModule and BarrelEventWeeklySummaryModule.",
+      "additional_files": []
+    },
+    {
+      "id": 64,
+      "verified": false,
+      "corrected_answer": "The UnifiedBarrelStorageModule provides a DENORMALIZED query interface that combines data from multiple tables into a single denormalized view with sophisticated filtering and sorting. Key differences from standard queries: (1) Primary Ownership Handling - Uses DISTINCT ON subquery to resolve joint ownership by selecting only the primary owner (highest ownership percentage) per barrel, (2) Denormalized Output - Returns flattened barrel + location + lot + ownership data in a single result set, (3) Complex Joins - Uses RIGHT and FULL OUTER JOINs instead of standard INNER JOINs, (4) Advanced Filtering - Supports 38+ filterable fields with special timestamp handling (range queries, before/after filters), (5) Dynamic Column Selection via SELECT_COLUMNS array.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/unifiedBarrelStorage/types/unifiedBarrelStorage.types.ts"]
+    },
+    {
+      "id": 68,
+      "verified": false,
+      "corrected_answer": "The Table-new directory supports different table configurations through component composition and specialization: (1) Specialized Table Components - Contains BarrelInventoryTableWithSelection.tsx, BarrelReceiptsTable.tsx, WarehouseDetailsTableWithSelection.tsx, PurchaseOrderCard.tsx. (2) Configuration via Sub-directories - /free-barrels/, /openLocationsTable/, /BarrelInventoryComponents/, /Actions/. (3) Table Customization Mechanisms - Dynamic Column Configuration via TableHeaderBarrelInventory.tsx with AVAILABLE_SORT_KEYS array, Hierarchical Sorting for storage location columns, Advanced Filtering via lazy-loaded FilterBuilder component, Feature Flags integration (useFeatureFlag hook), URL-based State Management for sort order, pagination, filters. (4) Dynamic Imports - Uses Next.js dynamic() for code-splitting. The 'new' suffix indicates component specialization/composition, not replacement.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms-front-end/components/Table-new/TableHeaderBarrelInventory.tsx"]
+    },
+    {
+      "id": 69,
+      "verified": false,
+      "corrected_answer": "The secretsManager module does NOT currently integrate with Azure Key Vault. Instead: (1) Current Implementation - SecretsManagerServiceBase uses NestJS ConfigService to retrieve secrets from environment variables. getSecret<T>(key) simply calls configService.get(key). (2) No Caching Mechanism - No TTL caching exists, no LRU cache implementation. Each call directly queries ConfigService. (3) Azure Configuration Present but Unused - .env.example shows Azure environment variables (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, etc.) but these are NOT used by SecretsManagerService. Azure AD is implemented in AzureAdService (authentication) but separate from secrets management. (4) Architecture - Minimal wrapper around NestJS ConfigService with no provider pattern for alternative implementations.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/providers/secrets/base/secretsManager.service.base.ts"]
+    },
+    {
+      "id": 249,
+      "verified": false,
+      "corrected_answer": "EnumSampleTypeTypeResultType at schema.prisma defines only TWO values: Boolean, Numeric. The actual implementation uses a simpler type system where sample result types are categorized as either Boolean (binary pass/fail) or Numeric (continuous value measurement). Sample analysis results are tracked separately in the Sample.sampleResult field (Boolean) and Sample.sampleValue field (Float), not through result type categorization. This differs from a predicted status-based approach (Pass, Fail, Pending, etc.).",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma"]
+    },
+    {
+      "id": 253,
+      "verified": false,
+      "corrected_answer": "Resolution services provide serial number suggestions for error correction: predict-next-9xxx-serial.dto.ts handles 9xxx-series temporary serials (e.g., 24E01A.01.9001 with nextNumber 9001-9999 range). suggest-serial-number.dto.ts returns SerialNumberSuggestionDto with suggestedSerial, confidence score (0-100), confidenceLevel (high/medium/low), lotAnalysis with barrelCount and percentage, reasoning, alternatives with multiple suggestions, and adjacentBarrels for visualization. The BarrelMatchingService matches scanned data against existing barrels considering: lot variations via LotVariationService and distance weights. The prediction algorithm uses weights defined in prediction-weights.dto.ts: adjacentLotsWithSequence (60%), currentJobLots (20%), horizontalPositionLots (20%).",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/prediction-weights.dto.ts", "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/barrelMatching/barrel-matching.service.ts"]
+    },
+    {
+      "id": 260,
+      "verified": false,
+      "corrected_answer": "EnumFeedbackType defines: FEATURE_REQUEST, BUG_REPORT, IMPROVEMENT (not 'Bug', 'Feature', 'Improvement'). feedback.dto.ts (CreateFeedbackRequestDto) defines feedback submission with type, title (5-200 chars), description, authorId, authorEmail, authorName, changelogEntryId, and structured fields (FeatureRequestFieldsDto, BugReportFieldsDto, ImprovementFieldsDto). Feedback collected from web interface with author identification. Feedback may trigger: changelog entries (via changelogEntryId link), linear issue creation (linearIssueId field). Anonymous feedback is NOT explicitly supported - all author fields are required.",
+      "additional_files": []
+    },
+    {
+      "id": 272,
+      "verified": false,
+      "corrected_answer": "chat-history.dto.ts defines conversation storage with ChatMessageRole enum: USER, ASSISTANT (no 'System' role). Messages stored with: id, createdAt, role (USER|ASSISTANT), content, metadata. Conversations with: id, createdAt, updatedAt, userId, title (optional, 255 char max), lastMessageAt, metadata, soft-delete support (deletedAt field). Chat history used by AI agent for context. Agent module (agent-chat.dto.ts, agent-stream-events.dto.ts) handles AI interactions with ConversationMessageDto (role: 'user'|'assistant'), AgentChatRequestDto for requests, and AgentStartEvent/AgentCancelEvent for WebSocket streaming. Message metadata includes response time, agent iterations, token usage, tools used.",
+      "additional_files": []
+    },
+    {
+      "id": 275,
+      "verified": false,
+      "corrected_answer": "WhiskeyType entity (separate from enum) allows custom types. create-whiskey-type.dto.ts, update-whiskey-type.dto.ts manage CRUD with fields: code (max 10 chars, unique), name, description, category, active (default true), isTTBDefinition (default false), and ttbWhiskeyTypeId (for parent category references). Lot.whiskeyTypeId references WhiskeyType.id. mapWhiskeyTypeCodeToEnum() in lot service converts code to EnumLotWhiskeyType for MES sync (e.g., 'RB' -> 'RyeBourbon'). This design allows: custom whiskey types per distillery, TTB compliance tracking, hierarchical type categories, standard types for reporting, and backward compatibility with enum-based systems.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/lot/helpers/whiskey-type-mapper.ts"]
+    },
+    {
+      "id": 492,
+      "verified": false,
+      "corrected_answer": "The categorizeError() function in business-logic-error-handler.ts enables intelligent error routing by pattern-matching error messages to 6 categories: RESOURCE_NOT_FOUND (triggers data creation or lookup workflows), RESOURCE_CONFLICT (suggests retry or different parameters), VALIDATION_ERROR (returns immediately to user with guidance), DATABASE_CONSTRAINT_ERROR (indicates concurrent modification requiring refresh), PERMISSION_ERROR (routes to access request workflow), EXTERNAL_SERVICE_ERROR (triggers retry with backoff). DeviceSyncErrorReprocessorService uses error categorization for reprocessability assessment via nonReprocessableTypes (4 types requiring manual data fix) and reprocessableTypes (6 types that can be automatically retried). This automation reduces manual triage and routes errors to appropriate handlers using array-based categorization, not a centralized ERROR_CONFIGURATION constant.",
+      "additional_files": ["/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/device-sync-error-reprocessor.service.ts"]
+    }
+  ]
+}

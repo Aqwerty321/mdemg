@@ -1,0 +1,178 @@
+{
+  "$schema": "benchmark_summary_v2",
+  "metadata": {
+    "benchmark_id": "plc-gbt-20260128-v2",
+    "date": "2026-01-28T19:30:00Z",
+    "framework_version": "2.3",
+    "operator": "orchestrator"
+  },
+  "environment": {
+    "mdemg_version": "b28adf73f6b09f6420724167f02310c31b272032",
+    "mdemg_endpoint": "http://localhost:9999",
+    "model": "claude-haiku-4-5-20251001",
+    "target_repo": {
+      "name": "plc-gbt",
+      "path": "/Users/reh3376/repos/plc-gbt",
+      "commit": "2f761094afe5df46ca9ea1a96bfc1c8dba303084"
+    },
+    "space_id": "plc-gbt",
+    "pre_benchmark_stats": {
+      "memory_count": 17801,
+      "layer_0_count": 17534,
+      "layer_1_count": 262,
+      "layer_2_count": 4,
+      "layer_3_count": 1,
+      "initial_learning_edges": 21734
+    }
+  },
+  "configuration": {
+    "question_file": "benchmark_questions_v1_agent.json",
+    "question_count": 115,
+    "grading_script": "grade_answers_v3.py v4.0",
+    "grading_weights": {
+      "evidence": 0.7,
+      "semantic": 0.15,
+      "concept": 0.15,
+      "file_bonus": 0.1
+    }
+  },
+  "runs": [
+    {
+      "run_id": "baseline_run1",
+      "type": "baseline",
+      "sequence": 1,
+      "status": "valid",
+      "completion": {
+        "questions_answered": 115,
+        "questions_expected": 115,
+        "completion_rate": 1.0
+      },
+      "grading": {
+        "graded": true,
+        "grades_file": "grades_baseline_run1.json",
+        "mean_score": 0.594,
+        "std_dev": 0.445,
+        "cv_percent": 75.0,
+        "high_score_rate": 0.609,
+        "evidence_tiers": {
+          "strong": 70,
+          "weak": 0,
+          "none": 45
+        },
+        "by_difficulty": {
+          "easy": {
+            "count": 20,
+            "mean": 0.728
+          },
+          "medium": {
+            "count": 45,
+            "mean": 0.609
+          },
+          "hard": {
+            "count": 35,
+            "mean": 0.534
+          }
+        }
+      }
+    },
+    {
+      "run_id": "mdemg_run1",
+      "type": "mdemg",
+      "sequence": 1,
+      "status": "valid",
+      "completion": {
+        "questions_answered": 115,
+        "questions_expected": 115,
+        "completion_rate": 1.0
+      },
+      "learning_edges": {
+        "before": 21734,
+        "after": 21992,
+        "delta": 258
+      },
+      "grading": {
+        "graded": true,
+        "grades_file": "grades_mdemg_run1.json",
+        "mean_score": 0.926,
+        "std_dev": 0.108,
+        "cv_percent": 11.7,
+        "high_score_rate": 0.965,
+        "evidence_tiers": {
+          "strong": 111,
+          "weak": 4,
+          "none": 0
+        },
+        "by_difficulty": {
+          "easy": {
+            "count": 20,
+            "mean": 0.969
+          },
+          "medium": {
+            "count": 45,
+            "mean": 0.919
+          },
+          "hard": {
+            "count": 35,
+            "mean": 0.93
+          }
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "baseline": {
+      "valid_runs": 1,
+      "mean_score": 0.594,
+      "std_dev": 0.445,
+      "completion_rate": 1.0,
+      "strong_evidence_rate": 0.609
+    },
+    "mdemg": {
+      "valid_runs": 1,
+      "mean_score": 0.926,
+      "std_dev": 0.108,
+      "completion_rate": 1.0,
+      "strong_evidence_rate": 0.965,
+      "total_learning_edges_created": 258
+    },
+    "comparison": {
+      "score_delta": 0.332,
+      "score_delta_percent": 55.9,
+      "evidence_delta": 0.356
+    }
+  },
+  "findings": {
+    "key_insights": [
+      "MDEMG provides +55.9% score improvement (0.926 vs 0.594)",
+      "Largest gains on domain-specific categories: acd_l5x_conversion (+0.730), system_purpose (+0.705), control_loop_architecture (+0.673)",
+      "MDEMG reduces failures from 45/115 to 1/115 (scores below 0.5)",
+      "Evidence quality: 96.5% strong evidence vs 60.9% baseline",
+      "Hard questions show largest advantage (+0.396 delta)",
+      "MDEMG consistency (CV 11.7%) far exceeds baseline (CV 75.0%)"
+    ],
+    "anomalies": [
+      "data_architecture is the only category where baseline slightly outperforms MDEMG (-0.028, n=2)",
+      "configuration_infrastructure shows identical scores (0.943) \u2014 common patterns need no retrieval"
+    ],
+    "excluded_runs": [
+      {
+        "run_id": "mdemg_run1_v1",
+        "reason": "Invalid: agent prompt missing code_only:true parameter, 108/115 placeholder answers"
+      }
+    ]
+  },
+  "improvement_recommendations": {
+    "mdemg_improvements": [
+      "Q82 (ai_ml_integration) is the only MDEMG failure \u2014 investigate retrieval gaps for ML pipeline questions"
+    ],
+    "framework_improvements": [
+      "MDEMG agent prompt MUST include code_only:true in all retrieve calls",
+      "Agent prompt MUST mandate fallback to Glob/Grep when MDEMG returns unusable results",
+      "Grading script v4.0 with adaptive similarity should be used for all future benchmarks"
+    ],
+    "question_improvements": [
+      "Add more questions in data_architecture category (currently n=2) for statistical significance",
+      "Consider adding negative control questions (features that do not exist) to test false positive rate"
+    ]
+  }
+}

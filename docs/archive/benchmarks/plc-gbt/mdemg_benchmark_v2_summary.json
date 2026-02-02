@@ -1,0 +1,196 @@
+{
+  "benchmark_metadata": {
+    "timestamp": "2026-01-26T08:13:38.499935",
+    "space_id": "plc-gbt",
+    "endpoint": "http://localhost:8090/v1/memory/retrieve",
+    "params": {
+      "candidate_k": 50,
+      "top_k": 10,
+      "hop_depth": 2
+    },
+    "total_questions": 100
+  },
+  "overall_stats": {
+    "mean_score": 0.6196,
+    "median_score": 0.6133,
+    "min_score": 0.478,
+    "max_score": 0.7939,
+    "stdev": 0.0746
+  },
+  "score_distribution": {
+    "high_score_count": 14,
+    "high_score_pct": 14.0,
+    "mid_score_count": 85,
+    "mid_score_pct": 85.0,
+    "low_score_count": 1,
+    "low_score_pct": 1.0
+  },
+  "top_categories": {
+    "data_architecture": {
+      "mean": 0.6706492519378662,
+      "median": 0.6706492519378662,
+      "count": 1,
+      "high": 0
+    },
+    "configuration_infrastructure": {
+      "mean": 0.6646354307730993,
+      "median": 0.6714426231384277,
+      "count": 9,
+      "high": 4
+    },
+    "safety_security": {
+      "mean": 0.6491936272382736,
+      "median": 0.6491936272382736,
+      "count": 1,
+      "high": 0
+    },
+    "api_services": {
+      "mean": 0.6423995784521103,
+      "median": 0.6479858860373496,
+      "count": 10,
+      "high": 2
+    },
+    "system_architecture": {
+      "mean": 0.641431107322375,
+      "median": 0.6437632101774216,
+      "count": 3,
+      "high": 0
+    }
+  },
+  "bottom_categories": {
+    "security_authentication": {
+      "mean": 0.6054583521400179,
+      "median": 0.5972547471523285,
+      "count": 7,
+      "high": 0
+    },
+    "system_purpose": {
+      "mean": 0.592138951420784,
+      "median": 0.592138951420784,
+      "count": 1,
+      "high": 0
+    },
+    "integration": {
+      "mean": 0.5890084880590438,
+      "median": 0.5890084880590438,
+      "count": 2,
+      "high": 0
+    },
+    "control_loop_architecture": {
+      "mean": 0.5840269690752029,
+      "median": 0.5781646203994751,
+      "count": 9,
+      "high": 0
+    },
+    "ui_ux": {
+      "mean": 0.5831547145247459,
+      "median": 0.5750921577215194,
+      "count": 10,
+      "high": 0
+    }
+  },
+  "all_categories": {
+    "data_architecture": {
+      "mean": 0.6706492519378662,
+      "median": 0.6706492519378662,
+      "count": 1,
+      "high": 0
+    },
+    "configuration_infrastructure": {
+      "mean": 0.6646354307730993,
+      "median": 0.6714426231384277,
+      "count": 9,
+      "high": 4
+    },
+    "safety_security": {
+      "mean": 0.6491936272382736,
+      "median": 0.6491936272382736,
+      "count": 1,
+      "high": 0
+    },
+    "api_services": {
+      "mean": 0.6423995784521103,
+      "median": 0.6479858860373496,
+      "count": 10,
+      "high": 2
+    },
+    "system_architecture": {
+      "mean": 0.641431107322375,
+      "median": 0.6437632101774216,
+      "count": 3,
+      "high": 0
+    },
+    "ai_ml_integration": {
+      "mean": 0.627457846932941,
+      "median": 0.5998292076587677,
+      "count": 9,
+      "high": 2
+    },
+    "data_models_schema": {
+      "mean": 0.6253843557834625,
+      "median": 0.6234061300754546,
+      "count": 9,
+      "high": 2
+    },
+    "acd_l5x_conversion": {
+      "mean": 0.6246108179688453,
+      "median": 0.6355309143662453,
+      "count": 10,
+      "high": 1
+    },
+    "database_persistence": {
+      "mean": 0.6236344926059246,
+      "median": 0.6027783691883086,
+      "count": 4,
+      "high": 1
+    },
+    "n8n_workflow": {
+      "mean": 0.6217339833577473,
+      "median": 0.5974224159121513,
+      "count": 6,
+      "high": 1
+    },
+    "ui_architecture": {
+      "mean": 0.613499380350113,
+      "median": 0.613499380350113,
+      "count": 1,
+      "high": 0
+    },
+    "business_logic_workflows": {
+      "mean": 0.6069192583113908,
+      "median": 0.5986745989322662,
+      "count": 8,
+      "high": 1
+    },
+    "security_authentication": {
+      "mean": 0.6054583521400179,
+      "median": 0.5972547471523285,
+      "count": 7,
+      "high": 0
+    },
+    "system_purpose": {
+      "mean": 0.592138951420784,
+      "median": 0.592138951420784,
+      "count": 1,
+      "high": 0
+    },
+    "integration": {
+      "mean": 0.5890084880590438,
+      "median": 0.5890084880590438,
+      "count": 2,
+      "high": 0
+    },
+    "control_loop_architecture": {
+      "mean": 0.5840269690752029,
+      "median": 0.5781646203994751,
+      "count": 9,
+      "high": 0
+    },
+    "ui_ux": {
+      "mean": 0.5831547145247459,
+      "median": 0.5750921577215194,
+      "count": 10,
+      "high": 0
+    }
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "aggregate": {
+    "total_questions": 2,
+    "mean": 0.76,
+    "std": 0.015,
+    "cv_pct": 2.0,
+    "median": 0.76,
+    "min": 0.749,
+    "max": 0.77,
+    "p10": 0.749,
+    "p25": 0.749,
+    "p75": 0.77,
+    "p90": 0.77,
+    "high_score_rate": 1.0,
+    "evidence_rate": 1.0,
+    "evidence_accuracy_rate": 0.0,
+    "correct_file_rate": 0.0,
+    "by_difficulty": {
+      "hard": {
+        "count": 2,
+        "mean": 0.76,
+        "std": 0.015
+      }
+    },
+    "by_category": {
+      "data_flow_integration": {
+        "count": 1,
+        "mean": 0.749,
+        "std": 0
+      },
+      "architecture_structure": {
+        "count": 1,
+        "mean": 0.77,
+        "std": 0
+      }
+    }
+  },
+  "per_question": [
+    {
+      "id": "379",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.168,
+        "concept": 0.16,
+        "citation_bonus": 0.0,
+        "final": 0.749
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "migration.sql:6",
+          "migration.sql:5",
+          "migration.sql:42",
+          "BATCH_PROCESSING_REDESIGN.md:136",
+          "BATCH_PROCESSING_REDESIGN.md:137",
+          "BATCH_PROCESSING_REDESIGN.md:138",
+          "BATCH_PROCESSING_REDESIGN.md:158",
+          "BATCH_PROCESSING_REDESIGN.md:170"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/services/safety-limits.service.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.136,
+        "bigram": 0.023,
+        "trigram": 0.011,
+        "concept": 0.16,
+        "idf_weighted": 0.187
+      }
+    },
+    {
+      "id": "77",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.238,
+        "concept": 0.23,
+        "citation_bonus": 0.0,
+        "final": 0.77
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "SyncRequestPayload.ts:2",
+          "printer.dto.ts:35",
+          "printer.dto.ts:69",
+          "printer.dto.ts:89",
+          "printer.dto.ts:125",
+          "printer.dto.ts:152"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/deviceSyncError/deviceSyncError.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/device-sync-error-management.module.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.227,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.23,
+        "idf_weighted": 0.28
+      }
+    }
+  ]
+}

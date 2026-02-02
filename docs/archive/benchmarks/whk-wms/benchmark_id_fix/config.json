@@ -1,0 +1,13 @@
+{
+  "version": "2.0",
+  "created_at": "2026-01-30T12:20:47.560686Z",
+  "repo_path": "/Users/reh3376/whk-wms",
+  "repo_name": "whk-wms",
+  "mdemg_endpoint": "http://localhost:9999",
+  "space_id": "whk-wms",
+  "questions_master_file": "whk-wms/test_questions_120.json",
+  "questions_agent_file": "whk-wms/test_questions_120_agent.json",
+  "question_count": 120,
+  "runs_per_mode": 1,
+  "model": "haiku"
+}

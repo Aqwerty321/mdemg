@@ -1,0 +1,436 @@
+{
+  "metadata": {
+    "version": "v5-comprehensive",
+    "total_questions": 60,
+    "created": "2026-01-23",
+    "design": "Evidence-locked, multi-hop, specific constants",
+    "scoring": {
+      "correct_with_evidence": 4,
+      "correct_partial_evidence": 2,
+      "correct_no_evidence": 0,
+      "wrong": 0
+    }
+  },
+  "questions": [
+    {
+      "id": "q001",
+      "category": "editor_config",
+      "question": "What is EDITOR_FONT_DEFAULTS.fontSize and does it differ by platform?",
+      "grep_hint": "EDITOR_FONT_DEFAULTS",
+      "expected": {"value": "12 (Mac) / 14 (Win/Linux)", "file": "fontInfo.ts"}
+    },
+    {
+      "id": "q002",
+      "category": "editor_config",
+      "question": "What is the default lineHeight in EDITOR_FONT_DEFAULTS?",
+      "grep_hint": "lineHeight.*EDITOR_FONT_DEFAULTS",
+      "expected": {"value": "0", "file": "fontInfo.ts"}
+    },
+    {
+      "id": "q003",
+      "category": "editor_config",
+      "question": "What is the default letterSpacing in EDITOR_FONT_DEFAULTS?",
+      "grep_hint": "letterSpacing.*EDITOR_FONT_DEFAULTS",
+      "expected": {"value": "0", "file": "fontInfo.ts"}
+    },
+    {
+      "id": "q004",
+      "category": "editor_config",
+      "question": "What is the default tabSize in editorOptions?",
+      "grep_hint": "tabSize.*default",
+      "expected": {"value": "4", "file": "editorOptions.ts"}
+    },
+    {
+      "id": "q005",
+      "category": "editor_config",
+      "question": "What is the default cursorBlinking style?",
+      "grep_hint": "cursorBlinking.*default",
+      "expected": {"value": "blink", "file": "editorOptions.ts"}
+    },
+    {
+      "id": "q006",
+      "category": "editor_config",
+      "question": "What is the default cursorWidth in pixels?",
+      "grep_hint": "cursorWidth.*default",
+      "expected": {"value": "2", "file": "editorOptions.ts"}
+    },
+    {
+      "id": "q007",
+      "category": "editor_config",
+      "question": "What is the default wordWrapColumn value?",
+      "grep_hint": "wordWrapColumn.*default",
+      "expected": {"value": "80", "file": "editorOptions.ts"}
+    },
+    {
+      "id": "q008",
+      "category": "editor_config",
+      "question": "What is quickSuggestionsDelay default in ms?",
+      "grep_hint": "quickSuggestionsDelay.*default\\|quickSuggestionsDelay.*10",
+      "expected": {"value": "10", "file": "editorOptions.ts"}
+    },
+    {
+      "id": "q009",
+      "category": "editor_config",
+      "question": "What is the default hover delay in ms?",
+      "grep_hint": "hover.*delay.*default\\|delay.*300",
+      "expected": {"value": "300", "file": "editorOptions.ts"}
+    },
+    {
+      "id": "q010",
+      "category": "editor_config",
+      "question": "What is the default hover hidingDelay in ms?",
+      "grep_hint": "hidingDelay.*default\\|hidingDelay.*300",
+      "expected": {"value": "300", "file": "editorOptions.ts"}
+    },
+    {
+      "id": "q011",
+      "category": "storage",
+      "question": "What is DEFAULT_FLUSH_INTERVAL for storage in ms?",
+      "grep_hint": "DEFAULT_FLUSH_INTERVAL",
+      "expected": {"value": "60000", "file": "storage.ts"}
+    },
+    {
+      "id": "q012",
+      "category": "storage",
+      "question": "What is BROWSER_DEFAULT_FLUSH_INTERVAL in ms?",
+      "grep_hint": "BROWSER_DEFAULT_FLUSH_INTERVAL",
+      "expected": {"value": "5000", "file": "storageService.ts"}
+    },
+    {
+      "id": "q013",
+      "category": "storage",
+      "question": "What are the StorageScope enum values (APPLICATION, PROFILE, WORKSPACE)?",
+      "grep_hint": "enum StorageScope",
+      "expected": {"value": "APPLICATION=-1, PROFILE=0, WORKSPACE=1", "file": "storage.ts"}
+    },
+    {
+      "id": "q014",
+      "category": "storage",
+      "question": "What are the StorageTarget enum values?",
+      "grep_hint": "enum StorageTarget",
+      "expected": {"value": "USER=0, MACHINE=1", "file": "storage.ts"}
+    },
+    {
+      "id": "q015",
+      "category": "workbench_layout",
+      "question": "What is the minimumWidth of SidebarPart in pixels?",
+      "grep_hint": "minimumWidth.*=.*sidebarPart",
+      "expected": {"value": "170", "file": "sidebarPart.ts"}
+    },
+    {
+      "id": "q016",
+      "category": "workbench_layout",
+      "question": "What is ACTION_HEIGHT in ActivitybarPart?",
+      "grep_hint": "ACTION_HEIGHT.*=",
+      "expected": {"value": "48", "file": "activitybarPart.ts"}
+    },
+    {
+      "id": "q017",
+      "category": "workbench_layout",
+      "question": "What is the minimumWidth of PanelPart?",
+      "grep_hint": "minimumWidth.*panelPart",
+      "expected": {"value": "300", "file": "panelPart.ts"}
+    },
+    {
+      "id": "q018",
+      "category": "workbench_layout",
+      "question": "What is DEFAULT_CUSTOM_TITLEBAR_HEIGHT?",
+      "grep_hint": "DEFAULT_CUSTOM_TITLEBAR_HEIGHT",
+      "expected": {"value": "35", "file": "titlebarPart.ts"}
+    },
+    {
+      "id": "q019",
+      "category": "workbench_layout",
+      "question": "What is the TITLE_BAR_SETTINGS storage key?",
+      "grep_hint": "TITLE_BAR_SETTINGS\\|titleBar.*storage",
+      "expected": {"value": "workbench.titleBar.settings", "file": "titlebarPart.ts"}
+    },
+    {
+      "id": "q020",
+      "category": "workbench_layout",
+      "question": "What is WindowMinimumSize width and height?",
+      "grep_hint": "WindowMinimumSize",
+      "expected": {"value": "width=400, height=270", "file": "window.ts"}
+    },
+    {
+      "id": "q021",
+      "category": "extensions",
+      "question": "What is the extension activation timeout in ms?",
+      "grep_hint": "activation.*timeout\\|timeout.*5000.*extension",
+      "expected": {"value": "5000", "file": "extensionsActivationProgress.ts"}
+    },
+    {
+      "id": "q022",
+      "category": "extensions",
+      "question": "What is the extension host startup timeout for web worker?",
+      "grep_hint": "60000.*Extension Host\\|Extension Host.*60",
+      "expected": {"value": "60000", "file": "webWorkerExtensionHost.ts"}
+    },
+    {
+      "id": "q023",
+      "category": "extensions",
+      "question": "What is the extension host startup timeout for local process?",
+      "grep_hint": "10000.*Extension Host\\|Extension Host.*10.*seconds",
+      "expected": {"value": "10000", "file": "localProcessExtensionHost.ts"}
+    },
+    {
+      "id": "q024",
+      "category": "extensions",
+      "question": "What are the ExtensionHostKind enum values?",
+      "grep_hint": "enum ExtensionHostKind",
+      "expected": {"value": "LocalProcess=1, LocalWebWorker=2, Remote=3", "file": "extensionHostKind.ts"}
+    },
+    {
+      "id": "q025",
+      "category": "extensions",
+      "question": "What is EXTENSION_FETCH_TIMEOUT_MS?",
+      "grep_hint": "EXTENSION_FETCH_TIMEOUT_MS",
+      "expected": {"value": "30000", "file": "preferences.ts"}
+    },
+    {
+      "id": "q026",
+      "category": "search",
+      "question": "What is DEFAULT_MAX_SEARCH_RESULTS?",
+      "grep_hint": "DEFAULT_MAX_SEARCH_RESULTS.*=",
+      "expected": {"value": "20000", "file": "search.ts"}
+    },
+    {
+      "id": "q027",
+      "category": "search",
+      "question": "What is SEARCH_RESULT_PREFIX_START?",
+      "grep_hint": "SEARCH_RESULT_PREFIX_START",
+      "expected": {"value": "(", "file": "search.contribution.ts"}
+    },
+    {
+      "id": "q028",
+      "category": "search",
+      "question": "What is the default value for search.searchOnType?",
+      "grep_hint": "searchOnType.*default",
+      "expected": {"value": "true", "file": "search.contribution.ts"}
+    },
+    {
+      "id": "q029",
+      "category": "search",
+      "question": "What is search.searchOnTypeDebouncePeriod default in ms?",
+      "grep_hint": "searchOnTypeDebouncePeriod.*default",
+      "expected": {"value": "300", "file": "search.contribution.ts"}
+    },
+    {
+      "id": "q030",
+      "category": "terminal",
+      "question": "What is the default terminal.integrated.scrollback lines?",
+      "grep_hint": "scrollback.*default",
+      "expected": {"value": "1000", "file": "terminalConfiguration.ts"}
+    },
+    {
+      "id": "q031",
+      "category": "terminal",
+      "question": "What is terminal.integrated.cursorBlinking default?",
+      "grep_hint": "cursorBlinking.*terminal.*default",
+      "expected": {"value": "false", "file": "terminalConfiguration.ts"}
+    },
+    {
+      "id": "q032",
+      "category": "terminal",
+      "question": "What is terminal.integrated.cursorStyle default?",
+      "grep_hint": "cursorStyle.*terminal.*default",
+      "expected": {"value": "block", "file": "terminalConfiguration.ts"}
+    },
+    {
+      "id": "q033",
+      "category": "terminal",
+      "question": "What is TERMINAL_SUGGEST_DEBOUNCE_DELAY?",
+      "grep_hint": "TERMINAL_SUGGEST_DEBOUNCE_DELAY\\|suggest.*debounce.*terminal",
+      "expected": {"value": "50", "file": "terminalSuggestAddon.ts"}
+    },
+    {
+      "id": "q034",
+      "category": "terminal",
+      "question": "What is DEFAULT_LOCAL_ECHO_THRESHOLD_MS?",
+      "grep_hint": "DEFAULT_LOCAL_ECHO_THRESHOLD_MS",
+      "expected": {"value": "30", "file": "terminalTypeAhead.ts"}
+    },
+    {
+      "id": "q035",
+      "category": "files",
+      "question": "What is DEFAULT_AUTO_SAVE_DELAY in ms?",
+      "grep_hint": "DEFAULT_AUTO_SAVE_DELAY.*=",
+      "expected": {"value": "1000", "file": "filesConfigurationService.ts"}
+    },
+    {
+      "id": "q036",
+      "category": "files",
+      "question": "What is HOT_EXIT_ON_EXIT_AND_WINDOW_CLOSE value?",
+      "grep_hint": "HOT_EXIT_ON_EXIT_AND_WINDOW_CLOSE\\|onExitAndWindowClose",
+      "expected": {"value": "onExitAndWindowClose", "file": "files.ts"}
+    },
+    {
+      "id": "q037",
+      "category": "files",
+      "question": "What is MAX_FILE_SIZE_MB for text files?",
+      "grep_hint": "MAX_FILE_SIZE_MB",
+      "expected": {"value": "50", "file": "files.ts"}
+    },
+    {
+      "id": "q038",
+      "category": "debug",
+      "question": "What is DEBUG_EXTENSION_HOST_PORT?",
+      "grep_hint": "DEBUG_EXTENSION_HOST_PORT",
+      "expected": {"value": "5870", "file": "debug.ts"}
+    },
+    {
+      "id": "q039",
+      "category": "debug",
+      "question": "What is the default debug console fontSize?",
+      "grep_hint": "debug.*console.*fontSize.*default",
+      "expected": {"value": "14", "file": "debugConfiguration.ts"}
+    },
+    {
+      "id": "q040",
+      "category": "debug",
+      "question": "What is DEBUG_CONSOLE_WORD_WRAP default?",
+      "grep_hint": "wordWrap.*debug.*default",
+      "expected": {"value": "true", "file": "debugConfiguration.ts"}
+    },
+    {
+      "id": "q041",
+      "category": "quickinput",
+      "question": "What is QuickInput debounce delay in ms?",
+      "grep_hint": "debounce.*100.*quickinput\\|quickinput.*debounce",
+      "expected": {"value": "100", "file": "quickInputController.ts"}
+    },
+    {
+      "id": "q042",
+      "category": "quickinput",
+      "question": "What is MAX_QUICK_INPUT_ITEMS_COUNT?",
+      "grep_hint": "MAX_QUICK_INPUT_ITEMS_COUNT",
+      "expected": {"value": "20000", "file": "quickInputList.ts"}
+    },
+    {
+      "id": "q043",
+      "category": "codelens",
+      "question": "What is CodeLens provide debounce min in ms?",
+      "grep_hint": "CodeLensProvide.*min\\|codelens.*debounce.*250",
+      "expected": {"value": "250", "file": "codelensController.ts"}
+    },
+    {
+      "id": "q044",
+      "category": "codelens",
+      "question": "What is CodeLens resolve debounce min in ms?",
+      "grep_hint": "CodeLensResolve.*min",
+      "expected": {"value": "250", "file": "codelensController.ts"}
+    },
+    {
+      "id": "q045",
+      "category": "diff",
+      "question": "What is the DIFF_EDITOR_EXPERIMENTAL_GUTTER_MENU default?",
+      "grep_hint": "experimentalGutterMenu.*default",
+      "expected": {"value": "true", "file": "diffEditorOptions.ts"}
+    },
+    {
+      "id": "q046",
+      "category": "diff",
+      "question": "What is diffEditor.hideUnchangedRegions.minimumLineCount default?",
+      "grep_hint": "minimumLineCount.*default.*diff",
+      "expected": {"value": "3", "file": "diffEditorOptions.ts"}
+    },
+    {
+      "id": "q047",
+      "category": "scm",
+      "question": "What is SCM_INPUT_MAX_LINES default?",
+      "grep_hint": "INPUT_MAX_LINES\\|inputMaxLines.*default",
+      "expected": {"value": "10", "file": "scm.contribution.ts"}
+    },
+    {
+      "id": "q048",
+      "category": "git",
+      "question": "What is git.autofetch period default in seconds?",
+      "grep_hint": "autofetchPeriod.*default\\|autofetch.*period",
+      "expected": {"value": "180", "file": "config.ts"}
+    },
+    {
+      "id": "q049",
+      "category": "git",
+      "question": "What is git.inputValidationSubjectLength default?",
+      "grep_hint": "inputValidationSubjectLength.*default",
+      "expected": {"value": "72", "file": "config.ts"}
+    },
+    {
+      "id": "q050",
+      "category": "notifications",
+      "question": "What are Severity enum values (Ignore, Info, Warning, Error)?",
+      "grep_hint": "enum Severity",
+      "expected": {"value": "Ignore=0, Info=1, Warning=2, Error=3", "file": "severity.ts"}
+    },
+    {
+      "id": "q051",
+      "category": "notifications",
+      "question": "What is NOTIFICATIONS_TOAST_VISIBLE_TIMEOUT_MS?",
+      "grep_hint": "TOAST.*TIMEOUT\\|notification.*timeout",
+      "expected": {"value": "10000", "file": "notificationsToasts.ts"}
+    },
+    {
+      "id": "q052",
+      "category": "workbench",
+      "question": "What is workbench.hover.delay default in ms?",
+      "grep_hint": "workbench.hover.delay.*default",
+      "expected": {"value": "500", "file": "hover.ts"}
+    },
+    {
+      "id": "q053",
+      "category": "workbench",
+      "question": "What are the LifecyclePhase enum values?",
+      "grep_hint": "enum LifecyclePhase",
+      "expected": {"value": "Starting=1, Ready=2, Restored=3, Eventually=4", "file": "lifecycle.ts"}
+    },
+    {
+      "id": "q054",
+      "category": "textmodel",
+      "question": "What is MAX_LINE_NUMBER constant?",
+      "grep_hint": "MAX_LINE_NUMBER.*=",
+      "expected": {"value": "1073741824", "file": "textModel.ts"}
+    },
+    {
+      "id": "q055",
+      "category": "textmodel",
+      "question": "What is LONG_LINE_BOUNDARY for performance?",
+      "grep_hint": "LONG_LINE_BOUNDARY",
+      "expected": {"value": "10000", "file": "textModel.ts"}
+    },
+    {
+      "id": "q056",
+      "category": "textmodel",
+      "question": "What is pieceTree AverageBufferSize constant?",
+      "grep_hint": "AverageBufferSize",
+      "expected": {"value": "65535", "file": "pieceTreeBase.ts"}
+    },
+    {
+      "id": "q057",
+      "category": "commands",
+      "question": "What is COMMAND_TIMEOUT_MS for command execution?",
+      "grep_hint": "COMMAND_TIMEOUT\\|command.*timeout",
+      "expected": {"value": "varies", "file": "commandService.ts"}
+    },
+    {
+      "id": "q058",
+      "category": "remote",
+      "question": "What is REMOTE_CONNECTION_TIMEOUT_MS?",
+      "grep_hint": "REMOTE.*TIMEOUT\\|connection.*timeout.*remote",
+      "expected": {"value": "30000", "file": "remoteAgentConnection.ts"}
+    },
+    {
+      "id": "q059",
+      "category": "workspace",
+      "question": "What is security.workspace.trust.emptyWindow default?",
+      "grep_hint": "trust.*emptyWindow.*default\\|WORKSPACE_TRUST_EMPTY_WINDOW",
+      "expected": {"value": "true", "file": "workspace.contribution.ts"}
+    },
+    {
+      "id": "q060",
+      "category": "tasks",
+      "question": "What is task.slowProviderWarning threshold in ms?",
+      "grep_hint": "slowProviderWarning.*default\\|SLOW_PROVIDER",
+      "expected": {"value": "3000", "file": "taskConfiguration.ts"}
+    }
+  ]
+}

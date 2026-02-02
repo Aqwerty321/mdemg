@@ -1,0 +1,211 @@
+[
+  {
+    "id": 81,
+    "category": "cross_cutting_concerns",
+    "question": "How does the subsystem logger format console output for non-JSON styles, and which file contains the logic for stripping redundant subsystem prefixes from log messages?",
+    "answer": "The subsystem logger uses formatConsoleLine() in src/logging/subsystem.ts:123-165 to format console output. For pretty/compact styles, it applies color coding with pickSubsystemColor() at line 60, formats timestamps, and uses stripRedundantSubsystemPrefixForConsole() at lines 91-121 to remove redundant prefixes like '[discord] discord:' from messages. The formatting includes subsystem-specific colors chosen via hash (lines 63-69) and level-based colors (lines 144-151). Console output is written via writeConsoleLine() at line 167.",
+    "required_files": [
+      "src/logging/subsystem.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 82,
+    "category": "cross_cutting_concerns",
+    "question": "What are the default redaction patterns for sensitive data in logs, and which specific token prefixes does the redaction system automatically mask?",
+    "answer": "The redaction system in src/logging/redact.ts defines DEFAULT_REDACT_PATTERNS at lines 14-37 with specific token prefixes: sk- (line 27 for OpenAI), ghp_/github_pat_ (lines 28-29 for GitHub), xox[baprs]-/xapp- (lines 30-31 for Slack), gsk_ (line 32 for Groq), AIza (line 33 for Google), pplx- (line 34 for Perplexity), npm_ (line 35 for npm), and Telegram bot tokens matching \\d{6,}:[A-Za-z0-9_-]{20,} (line 36). The maskToken() function at lines 67-72 keeps the first 6 and last 4 characters (DEFAULT_REDACT_KEEP_START=6, DEFAULT_REDACT_KEEP_END=4 at lines 11-12) for tokens >= 18 chars (DEFAULT_REDACT_MIN_LENGTH at line 10).",
+    "required_files": [
+      "src/logging/redact.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 83,
+    "category": "cross_cutting_concerns",
+    "question": "How does the file logger determine where to write logs, and what is the default log rotation strategy including the maximum age for old logs?",
+    "answer": "The file logger in src/logging/logger.ts resolves the log directory via resolveSettings() at lines 54-70, defaulting to defaultRollingPathForToday() at line 207 which creates dated files like /tmp/clawdbot/clawdbot-YYYY-MM-DD.log (DEFAULT_LOG_DIR=/tmp/clawdbot at line 15). The pruneOldRollingLogs() function at lines 221-241 automatically deletes logs older than MAX_LOG_AGE_MS = 24 * 60 * 60 * 1000 (24 hours, line 20). Rolling is detected via isRollingPath() at lines 212-219 which checks for the clawdbot-YYYY-MM-DD.log pattern. Pruning occurs during buildLogger() at line 88.",
+    "required_files": [
+      "src/logging/logger.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 84,
+    "category": "cross_cutting_concerns",
+    "question": "What error codes does the error handling system extract and format, and which function specifically handles EPIPE errors in console output?",
+    "answer": "The error handling system in src/infra/errors.ts uses extractErrorCode() at lines 1-7 to extract error codes from the 'code' property, supporting both string and number codes. formatErrorMessage() at lines 9-22 handles Error instances, strings, numbers, booleans, bigints, and falls back to JSON.stringify(). The formatUncaughtError() at lines 24-32 provides special handling for INVALID_CONFIG errors (line 25). In src/logging/console.ts, the isEpipeError() function at lines 126-129 specifically checks for EPIPE and EIO error codes, which are caught in the forward() function at lines 222 and 240 to prevent crashes when stdout/stderr pipes are broken.",
+    "required_files": [
+      "src/infra/errors.ts",
+      "src/logging/console.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 85,
+    "category": "cross_cutting_concerns",
+    "question": "How is gateway authentication resolved from config and environment variables, and which authentication methods support Tailscale Serve mode?",
+    "answer": "Gateway authentication is resolved in src/gateway/auth.ts via resolveGatewayAuth() at lines 167-185. It prioritizes authConfig.token, then env.CLAWDBOT_GATEWAY_TOKEN for token mode (line 174), and authConfig.password, then env.CLAWDBOT_GATEWAY_PASSWORD for password mode (line 175). The mode defaults to 'password' if password is set, otherwise 'token' (line 176). Tailscale authentication is enabled via allowTailscale at lines 177-178, which defaults to true when tailscaleMode === 'serve' AND mode !== 'password'. The authorizeGatewayConnect() function at lines 199-252 implements a three-tier auth system: Tailscale (lines 210-222 using resolveVerifiedTailscaleUser), token (lines 224-234), and password (lines 237-248).",
+    "required_files": [
+      "src/gateway/auth.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 86,
+    "category": "cross_cutting_concerns",
+    "question": "What are the default retry parameters for Discord and Telegram rate limiting, and how does the Telegram retry runner extract the retry_after value from API errors?",
+    "answer": "In src/infra/retry-policy.ts, DISCORD_RETRY_DEFAULTS at lines 8-13 sets attempts=3, minDelayMs=500, maxDelayMs=30000, jitter=0.1. TELEGRAM_RETRY_DEFAULTS at lines 15-20 uses attempts=3, minDelayMs=400, maxDelayMs=30000, jitter=0.1. The createDiscordRetryRunner() at lines 44-69 retries on RateLimitError instances (line 57) and extracts retryAfter via err.retryAfter * 1000 (line 58). The createTelegramRetryRunner() at lines 71-100 uses getTelegramRetryAfterMs() at lines 24-42, which searches for retry_after in err.parameters, err.response.parameters, or err.error.parameters, converting seconds to milliseconds (* 1000 at line 41). It also retries based on TELEGRAM_RETRY_RE pattern at line 22.",
+    "required_files": [
+      "src/infra/retry-policy.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 87,
+    "category": "cross_cutting_concerns",
+    "question": "How does the cache trace diagnostic system determine what information to include in trace events, and what is the default file path for cache traces?",
+    "answer": "The cache trace system in src/agents/cache-trace.ts uses resolveCacheTraceConfig() at lines 82-104 to determine inclusions. It checks CLAWDBOT_CACHE_TRACE env var and config.diagnostics.cacheTrace.enabled (lines 85-86). File path defaults to path.join(resolveStateDir(env), 'logs', 'cache-trace.jsonl') at line 90 if no override. The includeMessages flag (lines 92-93, default true at line 100) controls whether full messages are recorded. includePrompt (lines 94, 101) and includeSystem (lines 95, 102) control prompt and system message inclusion. The recordStage() function at lines 210-246 conditionally includes data: prompt if cfg.includePrompt (lines 218-220), system with digest if cfg.includeSystem (lines 221-224), and messages if cfg.includeMessages (lines 235-237).",
+    "required_files": [
+      "src/agents/cache-trace.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 88,
+    "category": "cross_cutting_concerns",
+    "question": "How does the console capture system route logs to stderr vs stdout, and which console messages are suppressed in non-verbose mode?",
+    "answer": "The console capture in src/logging/console.ts is enabled via enableConsoleCapture() at lines 156-253. The forward() function at lines 183-245 checks loggingState.forceConsoleToStderr at line 216 - when true (set by routeLogsToStderr() at line 80), all output goes to process.stderr.write() at line 220, keeping stdout clean for RPC/JSON modes. Otherwise, it uses the original console methods (lines 227-239). Suppression is handled by shouldSuppressConsoleMessage() at lines 112-124, which in non-verbose mode filters: 'Closing session:', 'Opening session:', 'Removing old closed session:', 'Session already closed', 'Session already open' (lines 104-110), and EventQueue slow listener warnings for DiscordMessageListener (lines 117-122). Suppressed messages are blocked at line 187.",
+    "required_files": [
+      "src/logging/console.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 89,
+    "category": "cross_cutting_concerns",
+    "question": "What diagnostic events are emitted by the logging system for webhook processing, and how often does the diagnostic heartbeat check for stuck sessions?",
+    "answer": "The diagnostic logging in src/logging/diagnostic.ts emits events via emitDiagnosticEvent(). For webhooks: 'webhook.received' at lines 71-76, 'webhook.processed' at lines 94-100, and 'webhook.error' at lines 116-122. Session events include 'message.queued' (lines 140-147), 'message.processed' (lines 178-189), 'session.state' (lines 214-222), and 'session.stuck' (lines 234-240). The startDiagnosticHeartbeat() at lines 294-345 runs every 30 seconds (30_000ms at line 343) and emits 'diagnostic.heartbeat' at lines 320-330. It checks for stuck sessions at lines 332-342: if state is 'processing' and ageMs > 120_000 (2 minutes), it calls logSessionStuck() which emits 'session.stuck' with the session state and age.",
+    "required_files": [
+      "src/logging/diagnostic.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 90,
+    "category": "cross_cutting_concerns",
+    "question": "How does the security audit system classify the severity of channel warnings, and what specific keywords trigger a 'critical' severity rating?",
+    "answer": "The security audit in src/security/audit.ts uses classifyChannelWarningSeverity() at lines 102-118 to classify warnings. It converts the message to lowercase (line 103) and checks for critical keywords: 'dms: open', 'grouppolicy=\"open\"', 'dmpolicy=\"open\"' (lines 104-110), 'allows any', 'anyone can dm', or 'public' (lines 111-113) all trigger 'critical' severity. Keywords 'locked' or 'disabled' (lines 114-116) result in 'info' severity. Otherwise, it defaults to 'warn' (line 117). This function is called at line 752 when processing plugin security warnings from collectChannelSecurityFindings() at lines 741-757.",
+    "required_files": [
+      "src/security/audit.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 91,
+    "category": "cross_cutting_concerns",
+    "question": "How does the logging subsystem determine whether to log to console based on log level, and which environment variable enables verbose debug logging globally?",
+    "answer": "The subsystem logger in src/logging/subsystem.ts uses shouldLogToConsole() at lines 27-32 to check if a message should be logged to console. It returns false immediately if settings.level === 'silent' (line 28), then uses levelToMinLevel() from src/logging/levels.ts to compare numeric levels: the message's level must be <= the minimum required level (lines 29-31). The emit() function at line 208 calls this check at line 222 after file logging. Console settings are resolved in src/logging/console.ts via normalizeConsoleLevel() at lines 21-24, which checks isVerbose() at line 22 - if true, it returns 'debug' level. The isVerbose() function is imported from src/globals.js and checks for verbose mode set by environment variables or CLI flags.",
+    "required_files": [
+      "src/logging/subsystem.ts",
+      "src/logging/console.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 92,
+    "category": "cross_cutting_concerns",
+    "question": "What is the mechanism for filtering console output by subsystem prefix, and how does the system handle subsystem name normalization for channels?",
+    "answer": "Console filtering in src/logging/console.ts is controlled by setConsoleSubsystemFilter() at lines 83-90, which stores normalized filter prefixes in loggingState.consoleSubsystemFilter. The shouldLogSubsystemToConsole() function at lines 96-102 checks if the subsystem matches any filter prefix exactly or starts with 'prefix/' (line 101). In src/logging/subsystem.ts, formatSubsystemForConsole() at lines 72-89 normalizes subsystem names: it drops SUBSYSTEM_PREFIXES_TO_DROP prefixes ('gateway', 'channels', 'providers' at line 56), handles CHANNEL_SUBSYSTEM_PREFIXES specially (returning just the channel name at lines 82-84), and limits to SUBSYSTEM_MAX_SEGMENTS=2 segments (lines 57, 85-86). This is used by formatConsoleLine() at line 131 for non-JSON output.",
+    "required_files": [
+      "src/logging/console.ts",
+      "src/logging/subsystem.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 93,
+    "category": "cross_cutting_concerns",
+    "question": "How does the gateway authentication system verify Tailscale user identity, and what specific checks are performed to prevent header spoofing?",
+    "answer": "The gateway authentication in src/gateway/auth.ts verifies Tailscale users via resolveVerifiedTailscaleUser() at lines 134-165. It performs four checks: (1) getTailscaleUser() at lines 106-118 extracts the 'tailscale-user-login' header (lines 108-109), (2) isTailscaleProxyRequest() at lines 129-132 verifies the request comes from loopback with hasTailscaleProxyHeaders() checking for x-forwarded-for, x-forwarded-proto, and x-forwarded-host headers (lines 120-127), (3) it extracts the client IP from x-forwarded-for via resolveTailscaleClientIp() at lines 68-72, and (4) calls tailscaleWhois(clientIp) to verify the IP matches the claimed login via normalizeLogin() comparison (lines 150-156). Only if all checks pass does it return the verified user at lines 157-164. This prevents header spoofing by requiring cryptographic proof from the Tailscale daemon.",
+    "required_files": [
+      "src/gateway/auth.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 94,
+    "category": "cross_cutting_concerns",
+    "question": "What TTL constants are defined for caching and deduplication across the codebase, and where is the web tool default cache TTL specified?",
+    "answer": "Cache TTL constants are defined in multiple files: src/gateway/server-constants.ts defines DEDUPE_TTL_MS = 5 * 60_000 (5 minutes) at line 29 for deduplication. src/agents/tools/web-shared.ts defines DEFAULT_CACHE_TTL_MINUTES = 15 at line 8 for web tool caching. src/agents/auth-profiles/constants.ts defines EXTERNAL_CLI_SYNC_TTL_MS = 15 * 60 * 1000 (15 minutes) at line 22 for external CLI synchronization. src/agents/pi-embedded-runner/cache-ttl.ts defines CACHE_TTL_CUSTOM_TYPE = 'clawdbot.cache-ttl' at line 3 as a type identifier. Cache enablement is checked via src/config/cache-utils.ts isCacheEnabled() at lines 17-19, which returns true if ttlMs > 0.",
+    "required_files": [
+      "src/gateway/server-constants.ts",
+      "src/agents/tools/web-shared.ts",
+      "src/agents/auth-profiles/constants.ts",
+      "src/config/cache-utils.ts"
+    ],
+    "complexity": "system-wide"
+  },
+  {
+    "id": 95,
+    "category": "cross_cutting_concerns",
+    "question": "How does the CLI progress indicator system detect terminal capabilities and choose between OSC progress, spinner, or line-based fallbacks?",
+    "answer": "The CLI progress system in src/cli/progress.ts uses createCliProgress() at lines 43-175 to select rendering strategies. It first checks if enabled===false (line 44) or activeProgress > 0 (line 45) for noop. It verifies stream.isTTY at line 48. At line 53, it checks canOsc = isTty && supportsOscProgress(process.env, isTty) from the osc-progress library to enable OSC 9;4 terminal sequences. The fallback parameter at lines 54-55 controls fallback strategies: allowSpinner (line 54) enables @clack/prompts spinner (line 78), allowLine (line 55) enables simple line rendering via renderLine() at lines 79-86 using clearActiveProgressLine() from src/terminal/progress-line.ts, and allowLog (line 49) enables throttled log output at lines 87-103. Progress state is managed via registerActiveProgressLine() at line 67.",
+    "required_files": [
+      "src/cli/progress.ts",
+      "src/terminal/progress-line.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 96,
+    "category": "cross_cutting_concerns",
+    "question": "How does the logging system prevent timestamp duplication when console output already has timestamps, and which log formats trigger this check?",
+    "answer": "The console capture in src/logging/console.ts prevents timestamp duplication in the forward() function at lines 189-196. It sets shouldPrefixTimestamp to true only if: (1) loggingState.consoleTimestampPrefix is enabled via setConsoleTimestampPrefix() at lines 92-94, (2) trimmed content is not empty, (3) hasTimestampPrefix() at lines 137-139 returns false - this regex checks for timestamps matching HH:MM:SS or ISO 8601 formats like YYYY-MM-DDTHH:MM:SS, and (4) isJsonPayload() at lines 141-149 returns false - which checks if content starts with { or [ and is valid JSON. If shouldPrefixTimestamp is false, timestamps are not added. The formatConsoleTimestamp() at lines 131-135 generates timestamps in HH:MM:SS format for 'pretty' style or ISO format otherwise, matching getConsoleSettings().style.",
+    "required_files": [
+      "src/logging/console.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 97,
+    "category": "cross_cutting_concerns",
+    "question": "What specific filesystem permission checks does the security audit perform on the config file, and what remediation commands does it recommend for each permission violation?",
+    "answer": "The security audit in src/security/audit.ts performs config file permission checks in collectFilesystemFindings() at lines 188-244. It uses inspectPathPermissions() at lines 188-192 and checks: (1) isSymlink at lines 194-200 triggers 'fs.config.symlink' warn, (2) worldWritable OR groupWritable at lines 202-215 triggers 'fs.config.perms_writable' critical with formatPermissionRemediation() using posixMode: 0o600, (3) worldReadable at lines 216-229 triggers 'fs.config.perms_world_readable' critical with 0o600 remediation, (4) groupReadable at lines 230-243 triggers 'fs.config.perms_group_readable' warn with 0o600 remediation. The formatPermissionRemediation() function is imported from src/security/audit-fs.ts and generates platform-specific commands (chmod for Unix, icacls for Windows) based on the permission check results.",
+    "required_files": [
+      "src/security/audit.ts",
+      "src/security/audit-fs.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 98,
+    "category": "cross_cutting_concerns",
+    "question": "How does the logging system integrate external log transports, and what safety guarantees does it provide to prevent transport failures from blocking logging?",
+    "answer": "The logging system in src/logging/logger.ts manages external transports via registerLogTransport() at lines 189-198. It adds transports to the externalTransports Set (line 190) and if a cachedLogger exists, immediately attaches via attachExternalTransport() at lines 43-52 and lines 192-194. The attachExternalTransport() function wraps the transport call in a try-catch at lines 46-50, silently catching all errors with the comment 'never block on logging failures' at line 49. During logger creation in buildLogger() at lines 84-110, the primary file transport at lines 96-104 also wraps fs.appendFileSync() in try-catch (lines 97, 101-103) with the same safety guarantee. Transport cleanup is handled by the returned cleanup function at lines 195-197 which removes the transport from externalTransports.",
+    "required_files": [
+      "src/logging/logger.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 99,
+    "category": "cross_cutting_concerns",
+    "question": "How does the security audit detect and warn about weak gateway authentication tokens, and what is the minimum recommended token length?",
+    "answer": "The security audit in src/security/audit.ts checks token strength in collectGatewayConfigFindings() at lines 345-354. It extracts the token from resolveGatewayAuth() result (lines 345-346), verifies auth.mode === 'token' (line 347), and if the token length < 24 characters (line 347), it creates a 'gateway.token_too_short' finding with 'warn' severity at lines 348-353. The minimum recommended length is 24 characters (line 347). Similar checks exist for browser control tokens at lines 410-417 with the same 24-character threshold. The audit also checks for token reuse between browser control and gateway at lines 428-436, warning if controlToken === gatewayToken to prevent 'compromise of browser control expands blast radius to the Gateway API' (line 433).",
+    "required_files": [
+      "src/security/audit.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 100,
+    "category": "cross_cutting_concerns",
+    "question": "How does the terminal progress line system manage concurrent progress indicators, and which ANSI escape sequences are used to clear progress lines?",
+    "answer": "The terminal progress line system in src/terminal/progress-line.ts uses a singleton activeStream variable at line 1 to manage concurrent access. registerActiveProgressLine() at lines 3-6 sets activeStream only if stream.isTTY is true. The clearActiveProgressLine() function at lines 8-11 uses the ANSI escape sequence '\\r\\x1b[2K' at line 10: \\r (carriage return) moves cursor to line start, \\x1b[2K (ESC[2K) clears the entire line. unregisterActiveProgressLine() at lines 13-17 clears activeStream but only if the provided stream matches (line 15). In src/cli/progress.ts, activeProgress counter at line 11 tracks concurrent progress indicators: it increments at line 65, and createCliProgress() returns noopReporter if activeProgress > 0 (line 45) to prevent conflicts. The counter decrements in done() at lines 162 and 171.",
+    "required_files": [
+      "src/terminal/progress-line.ts",
+      "src/cli/progress.ts"
+    ],
+    "complexity": "cross-module"
+  }
+]

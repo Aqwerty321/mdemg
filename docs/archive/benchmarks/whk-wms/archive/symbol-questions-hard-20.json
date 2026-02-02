@@ -1,0 +1,263 @@
+{
+  "metadata": {
+    "codebase": "whk-wms",
+    "type": "symbol_hard",
+    "created": "2026-01-23",
+    "purpose": "Hard symbol questions requiring disambiguation, relationships, or computed values",
+    "total_questions": 20,
+    "difficulty": "hard",
+    "why_hard": [
+      "Disambiguation - same symbol name in different contexts",
+      "Computed values - expressions with env var fallbacks",
+      "Relationship questions - what uses/depends on symbol",
+      "Runtime vs declared values - env var overrides",
+      "Multi-file synthesis - symbol defined in one file, used elsewhere"
+    ]
+  },
+  "questions": [
+    {
+      "id": "hard_sym_1",
+      "category": "disambiguation",
+      "question": "There are multiple BATCH_SIZE constants in the codebase. What is the BATCH_SIZE value used specifically in trust-mode-processing.service.ts, and why is it different from other BATCH_SIZE values?",
+      "answer": "10 (reduced from 100 to avoid Prisma transaction timeout with high network latency). Other BATCH_SIZE values: llama.service.ts=50, database-commands.ts=1000 or 500, micro-batch-orchestrator=1000",
+      "symbol_name": "BATCH_SIZE",
+      "required_files": [
+        "/apps/whk-wms/src/inventory-upload/trust-mode-processing.service.ts",
+        "/apps/whk-wms/src/providers/llama/llama.service.ts",
+        "/apps/whk-wms/scripts/seeding/database-commands.ts"
+      ],
+      "complexity": "disambiguation",
+      "why_hard": "Same symbol name appears with different values in 6+ files"
+    },
+    {
+      "id": "hard_sym_2",
+      "category": "computed_value",
+      "question": "What is the DEFAULT_PAGE_SIZE for vector indexing, and how can it be overridden at runtime?",
+      "answer": "Default is 500, overridden by VECTOR_INDEX_PAGE_SIZE environment variable. Expression: Number(process.env.VECTOR_INDEX_PAGE_SIZE ?? \"500\")",
+      "symbol_name": "DEFAULT_PAGE_SIZE",
+      "required_files": ["/apps/whk-wms/scripts/auto-index.ts"],
+      "complexity": "computed_value",
+      "why_hard": "Value is computed expression with env var fallback, not simple literal"
+    },
+    {
+      "id": "hard_sym_3",
+      "category": "disambiguation",
+      "question": "MAX_ACTIVE_JOBS appears in multiple services. What is the value in resource-monitor.service.ts vs queue-health.service.ts, and why do they differ?",
+      "answer": "resource-monitor.service.ts: 10 (resource constraint for system). queue-health.service.ts: 100 (queue capacity monitoring). Different purposes: one limits concurrency, other monitors queue health.",
+      "symbol_name": "MAX_ACTIVE_JOBS",
+      "required_files": [
+        "/apps/whk-wms/src/inventory-upload/resource-monitor.service.ts",
+        "/apps/whk-wms/src/inventory-upload/queue-health.service.ts"
+      ],
+      "complexity": "disambiguation",
+      "why_hard": "Same symbol, different values, different semantic purposes"
+    },
+    {
+      "id": "hard_sym_4",
+      "category": "computed_value",
+      "question": "What is the actual SLOW_QUERY_THRESHOLD_MS when the SLOW_QUERY_THRESHOLD_MS environment variable is not set? Where is the fallback defined?",
+      "answer": "1000ms (1 second). Defined as DEFAULT_SLOW_QUERY_THRESHOLD_MS = 1000 in prisma.service.ts. Runtime value: parseInt(process.env.SLOW_QUERY_THRESHOLD_MS || String(DEFAULT_SLOW_QUERY_THRESHOLD_MS))",
+      "symbol_name": "SLOW_QUERY_THRESHOLD_MS",
+      "required_files": ["/apps/whk-wms/src/prisma/prisma.service.ts"],
+      "complexity": "computed_value",
+      "why_hard": "Requires understanding DEFAULT constant and env var override relationship"
+    },
+    {
+      "id": "hard_sym_5",
+      "category": "relationship",
+      "question": "BARREL_STATUSES is defined in seeding/constants.ts. Which services or modules import and use these status values for validation?",
+      "answer": "Used by seeding domain scripts (barrels.ts), audit-integrity-validator.service.ts for status validation, and barrel status enum comparisons throughout the barrel module.",
+      "symbol_name": "BARREL_STATUSES",
+      "required_files": [
+        "/apps/whk-wms/scripts/seeding/constants.ts",
+        "/apps/whk-wms/scripts/seeding/domains/barrels.ts"
+      ],
+      "complexity": "relationship",
+      "why_hard": "Requires tracing symbol usage across module boundaries"
+    },
+    {
+      "id": "hard_sym_6",
+      "category": "disambiguation",
+      "question": "MAX_FILE_SIZE is defined in multiple frontend files. What are the different values and contexts for MAX_FILE_SIZE in chat.types.ts vs feedback.service.ts?",
+      "answer": "chat.types.ts: 10 * 1024 * 1024 (10MB) for chat file uploads. feedback.service.ts: 10 * 1024 * 1024 (10MB) for feedback image uploads. Same value but different validation contexts. Also MAX_IMAGE_SIZE = 5MB exists separately for images in chat.",
+      "symbol_name": "MAX_FILE_SIZE",
+      "required_files": [
+        "/apps/whk-wms-front-end/lib/types/chat.types.ts",
+        "/apps/whk-wms/src/feedback/feedback.service.ts"
+      ],
+      "complexity": "disambiguation",
+      "why_hard": "Same name, same value, but different module contexts and related constants"
+    },
+    {
+      "id": "hard_sym_7",
+      "category": "computed_value",
+      "question": "What is the AGENT_MAX_ITERATIONS default value and how can it be configured at runtime?",
+      "answer": "Default is 10 iterations. Configured via AGENT_MAX_ITERATIONS environment variable. Expression: parseInt(process.env.AGENT_MAX_ITERATIONS || \"10\")",
+      "symbol_name": "AGENT_MAX_ITERATIONS",
+      "required_files": ["/apps/whk-wms/src/agent/claude-agent.service.ts"],
+      "complexity": "computed_value",
+      "why_hard": "Env var override pattern, not a simple constant"
+    },
+    {
+      "id": "hard_sym_8",
+      "category": "relationship",
+      "question": "QUEUE_NAMES constant defines which BullMQ queues exist. What queues are defined and which processors handle each?",
+      "answer": "[\"android-sync-processing\", \"inventory-check-staging\"]. android-sync-processing handled by AndroidSyncProcessor, inventory-check-staging handled by InventoryCheckStagingProcessor.",
+      "symbol_name": "QUEUE_NAMES",
+      "required_files": [
+        "/apps/whk-wms/scripts/clear-bull-queues.ts",
+        "/apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts",
+        "/apps/whk-wms/src/staging/inventory-check-staging.processor.ts"
+      ],
+      "complexity": "relationship",
+      "why_hard": "Requires connecting constant definition to processor implementations"
+    },
+    {
+      "id": "hard_sym_9",
+      "category": "disambiguation",
+      "question": "DEFAULT_BATCH_SIZE vs MICRO_BATCH_SIZE in inventory processing - what are their values and when is each used?",
+      "answer": "DEFAULT_BATCH_SIZE = 2500 (inventory-processing.service.ts) for standard processing. MICRO_BATCH_SIZE = 1000 (micro-batch-orchestrator.service.ts) for predictable performance micro-batching.",
+      "symbol_name": "DEFAULT_BATCH_SIZE",
+      "required_files": [
+        "/apps/whk-wms/src/inventory-upload/inventory-processing.service.ts",
+        "/apps/whk-wms/src/inventory-upload/services/micro-batch-orchestrator.service.ts"
+      ],
+      "complexity": "disambiguation",
+      "why_hard": "Related but different constants with overlapping purposes"
+    },
+    {
+      "id": "hard_sym_10",
+      "category": "computed_value",
+      "question": "What is the GRAPHQL_BACKEND_TIMEOUT_MS default in graphql-proxy/route.ts vs ownershipService.ts?",
+      "answer": "graphql-proxy/route.ts: 60000ms (60 seconds). ownershipService.ts: 15000ms (15 seconds). transferService.ts also uses 15000ms. Different timeouts for different operation types.",
+      "symbol_name": "GRAPHQL_BACKEND_TIMEOUT_MS",
+      "required_files": [
+        "/apps/whk-wms-front-end/app/api/graphql-proxy/route.ts",
+        "/apps/whk-wms-front-end/lib/services/ownershipService.ts",
+        "/apps/whk-wms-front-end/lib/services/transferService.ts"
+      ],
+      "complexity": "computed_value",
+      "why_hard": "Same env var referenced but with different defaults in different services"
+    },
+    {
+      "id": "hard_sym_11",
+      "category": "relationship",
+      "question": "StorageEventCategory enum defines event types. Which aggregation services use these categories and how do they map to database operations?",
+      "answer": "Values: ENTRY, WITHDRAWAL, TRANSFER_IN, DUMP. Used by aggregatedStorageEntries module for categorizing barrel storage events in reporting. Maps to barrel_event table eventType field.",
+      "symbol_name": "StorageEventCategory",
+      "required_files": [
+        "/apps/whk-wms/src/aggregatedStorageEntries/dto/storage-event-category.enum.ts",
+        "/apps/whk-wms/src/aggregatedStorageEntries/aggregated-storage-entries.resolver.ts"
+      ],
+      "complexity": "relationship",
+      "why_hard": "Requires understanding enum usage in resolver/service layer"
+    },
+    {
+      "id": "hard_sym_12",
+      "category": "disambiguation",
+      "question": "ANDROID_SYNC_MAX_RETRIES appears in both android-sync-inbox.listener.ts and android-sync.processor.ts. Are they the same value and why might they be defined separately?",
+      "answer": "Both are 3. Defined separately because listener handles incoming message retry (for queue add failures) while processor handles job processing retry (for processing failures). Same value, different retry contexts.",
+      "symbol_name": "ANDROID_SYNC_MAX_RETRIES",
+      "required_files": [
+        "/apps/whk-wms/src/androidSyncInbox/android-sync-inbox.listener.ts",
+        "/apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts"
+      ],
+      "complexity": "disambiguation",
+      "why_hard": "Same name, same value, but in different components with different purposes"
+    },
+    {
+      "id": "hard_sym_13",
+      "category": "computed_value",
+      "question": "What is LLM_MAX_TOKENS default and LLM_TIMEOUT default for the email parser service?",
+      "answer": "LLM_MAX_TOKENS: 1500 (default if env not set). LLM_TIMEOUT: 20000ms (20 seconds, increased from 10 seconds as noted in comment).",
+      "symbol_name": "LLM_MAX_TOKENS",
+      "required_files": ["/apps/whk-wms-front-end/lib/services/llm-email-parser.ts"],
+      "complexity": "computed_value",
+      "why_hard": "Multiple env vars with different defaults, requires reading the parseInt expressions"
+    },
+    {
+      "id": "hard_sym_14",
+      "category": "relationship",
+      "question": "GLOBAL_ID_PREFIXES in seeding/constants.ts - what entity types have global ID prefixes defined and what are they used for?",
+      "answer": "Object mapping entity types to their CUID prefixes for globally unique IDs. Used by seeding scripts to generate consistent IDs across barrel, lot, customer, and other entities.",
+      "symbol_name": "GLOBAL_ID_PREFIXES",
+      "required_files": [
+        "/apps/whk-wms/scripts/seeding/constants.ts",
+        "/apps/whk-wms/scripts/seeding/domains/barrels.ts"
+      ],
+      "complexity": "relationship",
+      "why_hard": "Object constant with multiple entity mappings, need to understand seeding architecture"
+    },
+    {
+      "id": "hard_sym_15",
+      "category": "disambiguation",
+      "question": "MAX_LIMIT appears in config/constants.ts, warehouse-jobs.controller.ts, and search.service.ts. What are the values and contexts?",
+      "answer": "config/constants.ts: DEFAULT_MAX_LIMIT = 100 (frontend pagination). warehouse-jobs.controller.ts: MAX_PAGE_LIMIT = 100 (job listing). search.service.ts: MAX_LIMIT = 100 (search results). All 100 but enforced at different API layers.",
+      "symbol_name": "MAX_LIMIT",
+      "required_files": [
+        "/apps/whk-wms-front-end/lib/config/constants.ts",
+        "/apps/whk-wms/src/warehouseJobs/base/warehouse-jobs.controller.ts",
+        "/apps/whk-wms/src/search/search.service.ts"
+      ],
+      "complexity": "disambiguation",
+      "why_hard": "Same value, multiple definitions, need to understand why replicated"
+    },
+    {
+      "id": "hard_sym_16",
+      "category": "computed_value",
+      "question": "What is the BARREL_RECEIPTS_MAX_LIMIT and how is its parsing handled safely?",
+      "answer": "Uses safeParse function on process.env.BARREL_RECEIPTS_MAX_LIMIT. Safe parsing prevents NaN from invalid env values. Default behavior defined by safeParse implementation.",
+      "symbol_name": "BARREL_RECEIPTS_MAX_LIMIT",
+      "required_files": ["/apps/whk-wms-front-end/lib/config/constants.ts"],
+      "complexity": "computed_value",
+      "why_hard": "Requires understanding safeParse helper and env var handling"
+    },
+    {
+      "id": "hard_sym_17",
+      "category": "relationship",
+      "question": "MAX_RICKS constant is used in warehouse positioning. What is its value and how does it relate to the rick naming convention (A, B, C, Hallway)?",
+      "answer": "MAX_RICKS = 4, corresponding to rick positions: A, B, C, Hallway. Used in warehouse.service.ts for validating storage location coordinates and generating location strings.",
+      "symbol_name": "MAX_RICKS",
+      "required_files": ["/apps/whk-wms/src/warehouse/warehouse.service.ts"],
+      "complexity": "relationship",
+      "why_hard": "Requires understanding warehouse coordinate system and naming conventions"
+    },
+    {
+      "id": "hard_sym_18",
+      "category": "disambiguation",
+      "question": "MAX_RETRIES appears in multiple contexts (printer sync, inventory processing, chatbot fallback). Compare the values and retry strategies.",
+      "answer": "printer-full-sync.service.ts: 10 retries. inventory-processing.service.ts: MAX_AUTO_RETRIES = 3. chatBotFallback.ts: MAX_RETRY_ATTEMPTS = 3 with progressive delays [1000, 3000, 5000]ms.",
+      "symbol_name": "MAX_RETRIES",
+      "required_files": [
+        "/apps/whk-wms/src/printer-automation/printer-full-sync.service.ts",
+        "/apps/whk-wms/src/inventory-upload/inventory-processing.service.ts",
+        "/apps/whk-wms-front-end/lib/services/chatBotFallback.ts"
+      ],
+      "complexity": "disambiguation",
+      "why_hard": "Same concept, different values, different retry patterns"
+    },
+    {
+      "id": "hard_sym_19",
+      "category": "relationship",
+      "question": "TimePeriodGranularity enum (DAILY, WEEKLY, MONTHLY) - which services use this for aggregation and what query patterns does each granularity enable?",
+      "answer": "Used by aggregatedStorageEntries module. DAILY for day-by-day reports, WEEKLY for week-over-week analysis, MONTHLY for monthly summaries. Affects GROUP BY clause generation in storage entry queries.",
+      "symbol_name": "TimePeriodGranularity",
+      "required_files": [
+        "/apps/whk-wms/src/aggregatedStorageEntries/dto/time-period-granularity.enum.ts",
+        "/apps/whk-wms/src/aggregatedStorageEntries/aggregated-storage-entries.service.ts"
+      ],
+      "complexity": "relationship",
+      "why_hard": "Requires understanding how enum drives query generation"
+    },
+    {
+      "id": "hard_sym_20",
+      "category": "computed_value",
+      "question": "What is RAG_EVENTS_TAKE_LIMIT and its default value? How does this limit affect vector indexing batch sizes?",
+      "answer": "Default 10000 (from env RAG_EVENTS_TAKE_LIMIT). Limits how many events are fetched per indexing batch to prevent memory issues during RAG vector embedding generation.",
+      "symbol_name": "RAG_EVENTS_TAKE_LIMIT",
+      "required_files": ["/apps/whk-wms/src/providers/indexing/indexing.service.ts"],
+      "complexity": "computed_value",
+      "why_hard": "Env var with parseInt, need to understand RAG indexing context"
+    }
+  ]
+}

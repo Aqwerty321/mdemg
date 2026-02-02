@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1,
+    "question": "Describe the SQLite database integration module in Zed's storage layer and explain how it handles concurrent write operations.",
+    "category": "negative_control",
+    "difficulty": "medium",
+    "expected_answer": "This module does not exist in Zed. While Zed uses sqlez (a custom SQLite wrapper) for structured data storage, there is no dedicated 'SQLite integration module' for general database operations. The sqlez crate provides the low-level SQLite interface.",
+    "notes": "Zed does have sqlez and sqlez_macros crates for database operations, but no standalone SQLite integration module."
+  },
+  {
+    "id": 2,
+    "question": "Explain the BlockchainCollab protocol that Zed uses for distributed collaborative editing and how it ensures eventual consistency across peers.",
+    "category": "negative_control",
+    "difficulty": "medium",
+    "expected_answer": "No such protocol exists in Zed. Zed uses a CRDT-based (Conflict-free Replicated Data Type) approach with the collab crate for collaborative features, not blockchain technology. There is no BlockchainCollab protocol.",
+    "notes": "Fictional protocol name designed to test for hallucination about collaborative editing."
+  },
+  {
+    "id": 3,
+    "question": "How does the GraphQLQueryBuilder crate in Zed handle complex nested query optimization and schema validation?",
+    "category": "negative_control",
+    "difficulty": "medium",
+    "expected_answer": "This crate does not exist in Zed. Zed has no GraphQL-related crates. While it has rpc and cloud_api_client for API communication, there is no GraphQL support or GraphQLQueryBuilder.",
+    "notes": "Zed is a Rust editor with no GraphQL functionality."
+  },
+  {
+    "id": 4,
+    "question": "Describe the MachineLearningSuggestionEngine crate and how it trains models on user editing patterns to predict the next code completion.",
+    "category": "negative_control",
+    "difficulty": "medium",
+    "expected_answer": "No such crate exists in Zed. While Zed integrates with multiple language model providers (anthropic, openai, bedrock, ollama, etc.) for completions, it does not have an ML-based pattern learning engine. Completions come from external LLM providers, not trained local models.",
+    "notes": "Zed has various AI provider integrations but no machine learning training infrastructure."
+  },
+  {
+    "id": 5,
+    "question": "Explain the functionality of the MemcachedCacheLayer crate and how it improves performance in Zed's file system operations.",
+    "category": "negative_control",
+    "difficulty": "medium",
+    "expected_answer": "This crate does not exist in Zed. While Zed uses moka for in-memory caching in various places, there is no Memcached integration or MemcachedCacheLayer. Zed relies on built-in caching mechanisms, not distributed caching systems.",
+    "notes": "Zed has moka dependency for caching but no distributed cache layer like Memcached."
+  },
+  {
+    "id": 6,
+    "question": "How does the QuantumRenderEngine handle GPU acceleration for text rendering and what shader implementations does it use?",
+    "category": "negative_control",
+    "difficulty": "medium",
+    "expected_answer": "No QuantumRenderEngine crate exists in Zed. Zed uses the gpui (graphical programming UI) framework with blade-graphics for GPU rendering. The rendering is handled by gpui and blade, not a fictional QuantumRenderEngine.",
+    "notes": "Fictional name for the GPU rendering system designed to test hallucination detection."
+  },
+  {
+    "id": 7,
+    "question": "Describe how Zed's PostgreSQLConnectionPool manages connection pooling with automatic failover to replica databases and implements read-write splitting.",
+    "category": "negative_control",
+    "difficulty": "medium",
+    "expected_answer": "No such crate or feature exists in Zed. Zed does not have PostgreSQL integration or connection pooling. While Zed can connect to remote servers and has networking capabilities, there is no PostgreSQL database layer in the main codebase.",
+    "notes": "This might confuse with net-topo-toolkit which uses PostgreSQL, but that's a different project."
+  },
+  {
+    "id": 8,
+    "question": "Explain the KubernetesDeploymentManager crate and how Zed orchestrates plugin execution across distributed nodes.",
+    "category": "negative_control",
+    "difficulty": "medium",
+    "expected_answer": "This crate does not exist in Zed. Zed does not have Kubernetes integration or distributed orchestration. Plugins are managed locally through the extension_host crate and executed within Zed's process or via the extension API, not across distributed nodes.",
+    "notes": "Completely fictional module testing for LLM hallucination about modern DevOps concepts."
+  },
+  {
+    "id": 9,
+    "question": "How does the VectorDatabaseIndexer in Zed's semantic search module encode embeddings and implement approximate nearest neighbor search for code fragments?",
+    "category": "negative_control",
+    "difficulty": "medium",
+    "expected_answer": "This module does not exist in Zed. While Zed has search and file_finder capabilities, there is no vector database or embedding system for semantic code search. The search functionality uses text-based fuzzy matching and LSP-based symbol search, not vector embeddings.",
+    "notes": "Zed does not have semantic search or embedding capabilities built-in."
+  },
+  {
+    "id": 10,
+    "question": "Describe the RedisSessionManager crate that Zed uses to persist user sessions and synchronize state across multiple editor instances.",
+    "category": "negative_control",
+    "difficulty": "medium",
+    "expected_answer": "This crate does not exist in Zed. Although Zed has a session crate for managing editor sessions locally, there is no Redis integration or RedisSessionManager. Session state is managed through the session crate with local storage, not distributed Redis.",
+    "notes": "Zed has local session management but no Redis-based distributed session persistence."
+  }
+]

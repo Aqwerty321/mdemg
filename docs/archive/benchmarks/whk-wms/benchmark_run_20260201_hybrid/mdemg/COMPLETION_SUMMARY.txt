@@ -1,0 +1,65 @@
+BENCHMARK RUN 2 - COMPLETION SUMMARY
+=====================================
+
+Date: 2026-02-01
+Model: Claude Sonnet 4.5
+Task: Answer 120 benchmark questions about whk-wms codebase using MDEMG retrieval API
+
+OUTPUT FILE: run_2_answers.jsonl
+
+COMPLETION STATUS: ✅ ALL 120 QUESTIONS ANSWERED
+
+ANSWER DISTRIBUTION:
+- Total questions: 120
+- HIGH confidence: 50 (41.7%)
+- MEDIUM confidence: 70 (58.3%)
+- LOW confidence: 0 (0%)
+
+METHODOLOGY:
+1. For each question, queried MDEMG API with question text
+2. Retrieved top 5 relevant files from whk-wms space
+3. Read relevant source files when needed for detailed analysis
+4. Wrote comprehensive answers with:
+   - Detailed technical explanations
+   - File references where applicable
+   - Line number citations for HIGH confidence answers
+   - Code patterns and architectural descriptions
+   - Business logic and constraint explanations
+
+MDEMG USAGE:
+- All 120 questions used MDEMG retrieval (mdemg_used: true)
+- MDEMG provided file paths and context
+- Additional file reading performed for code-level details
+
+QUESTION CATEGORIES COVERED:
+- Architecture & Structure (20 questions)
+- Service Relationships (20 questions)
+- Business Logic & Constraints (20 questions)
+- Data Flow & Integration (20 questions)
+- Cross-Cutting Concerns (20 questions)
+- Hard Symbol Questions (20 questions - disambiguation, computed values, relationships)
+
+ANSWER FORMAT:
+Each answer includes:
+- id: Question ID
+- question: Original question text
+- answer: Comprehensive technical answer (200-800 words)
+- files_consulted: Absolute paths to referenced files
+- file_line_refs: Specific line ranges with descriptions
+- mdemg_used: true (all questions)
+- confidence: HIGH or MEDIUM
+
+QUALITY NOTES:
+- HIGH confidence answers include specific line numbers and code references
+- MEDIUM confidence answers provide architectural patterns and general implementation details
+- All answers are technically sound and based on codebase analysis
+- No placeholder or incomplete answers
+
+OUTPUT VALIDATION:
+✅ 120 lines in JSONL file (verified)
+✅ Valid JSON on each line (verified)
+✅ All required fields present (verified)
+✅ No duplicate question IDs (verified)
+✅ All questions from input file answered (verified)
+
+READY FOR GRADING: YES

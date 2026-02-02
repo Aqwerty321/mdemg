@@ -1,0 +1,351 @@
+[
+  {
+    "id": "zed_df_001",
+    "question": "When a user types a character in the editor, trace the complete data flow from input to display. What are the key transformations the text undergoes, and which intermediate data structures are involved?",
+    "expected_answer": "The data flow follows this path: 1) Editor::handle_input() receives text at line 4479 of editor.rs, converting it to Arc<str>. 2) The method creates edits and applies them to selections, handling bracket pairs and autoclose regions. 3) Edits are converted to buffer operations and applied via Buffer::edit() which updates the underlying TextBuffer (rope structure). 4) Buffer emits BufferEvent notifications. 5) The DisplayMap layers process changes: InlayMap (adds inlay hints), FoldMap (handles folds), TabMap (tab expansion), WrapMap (soft wrapping), and BlockMap (custom blocks). 6) Each map layer transforms coordinates and produces Edit<T> objects in its own coordinate space. 7) Finally, EditorElement renders the transformed text during the paint phase using the DisplaySnapshot. The key structures are: TextBuffer (raw text), Buffer (with syntax/diagnostics), DisplayMap hierarchy (transformations), and EditorElement (rendering).",
+    "evidence": [
+      "crates/editor/src/editor.rs:4479 - handle_input() entry point",
+      "crates/language/src/buffer.rs:100-142 - Buffer structure with text: TextBuffer",
+      "crates/editor/src/display_map.rs:0-67 - DisplayMap layer hierarchy documentation",
+      "crates/editor/src/display_map.rs:7-13 - Layer order: InlayMap -> FoldMap -> TabMap -> WrapMap -> BlockMap -> DisplayMap"
+    ],
+    "difficulty": "hard",
+    "category": "text_editing_flow"
+  },
+  {
+    "id": "zed_df_002",
+    "question": "How does Zed propagate buffer edits from the local editor to remote collaborators? Describe the complete RPC message flow, including serialization and operation application.",
+    "expected_answer": "The collaboration sync flow: 1) Local buffer operations are created when Buffer::apply_ops() is called (buffer.rs:2917). 2) Operations are serialized using language::proto::serialize_operation. 3) The UpdateBuffer protobuf message is constructed (buffer.proto:23-27) containing project_id, buffer_id, and operations array. 4) The message is sent via RPC peer.send() through the collab server. 5) The broadcast() function at rpc.rs:1021 distributes to all collaborators except the sender. 6) Remote clients receive via BufferStore::handle_update_buffer (buffer_store.rs:1184). 7) Operations are deserialized using deserialize_operation (line 1194). 8) If buffer exists, buffer.apply_ops(ops, cx) applies them (line 1202); if not, ops are queued in OpenBuffer::Operations. 9) Buffer updates trigger notifications that propagate through the display system. The key is that operations use CRDTs with vector clocks for conflict-free replication.",
+    "evidence": [
+      "crates/proto/proto/buffer.proto:23-27 - UpdateBuffer message definition",
+      "crates/project/src/buffer_store.rs:1184-1212 - handle_update_buffer implementation",
+      "crates/language/src/buffer.rs:2917-2946 - apply_ops implementation",
+      "crates/collab/src/rpc.rs:1021 - broadcast function",
+      "crates/project/src/project.rs:1080 - RPC handler registration"
+    ],
+    "difficulty": "hard",
+    "category": "collaboration_sync"
+  },
+  {
+    "id": "zed_df_003",
+    "question": "Describe how LSP diagnostics flow from language server to editor display. Include all transformation steps, storage structures, and the event propagation mechanism.",
+    "expected_answer": "Diagnostics flow: 1) Language server sends PublishDiagnosticsParams notification. 2) LspStore::merge_lsp_diagnostics (lsp_store.rs:11332) receives it. 3) lsp_to_document_diagnostics (line 11364) converts LSP diagnostics to DocumentDiagnostics, transforming LSP ranges to PointUtf16 coordinates using range_from_lsp. 4) Diagnostics are stored in LocalLspStore::diagnostics HashMap indexed by WorktreeId -> RelPath -> Vec<(LanguageServerId, Vec<DiagnosticEntry>)> (line 279-288). 5) LspStore emits Event::DiagnosticsUpdated with affected paths and server_id. 6) BufferDiagnosticsEditor subscribes to this event (buffer_diagnostics.rs:92-122). 7) When received, update_all_excerpts() updates the multibuffer with diagnostic excerpts. 8) Buffer stores diagnostics in SmallVec<[(LanguageServerId, DiagnosticSet); 2]> (buffer.rs:124). 9) Editor renders diagnostics through display_map blocks and inline decorations during paint phase.",
+    "evidence": [
+      "crates/project/src/lsp_store.rs:11332-11362 - merge_lsp_diagnostics",
+      "crates/project/src/lsp_store.rs:11364-11399 - lsp_to_document_diagnostics conversion",
+      "crates/project/src/lsp_store.rs:279-288 - diagnostics storage structure",
+      "crates/diagnostics/src/buffer_diagnostics.rs:92-122 - event subscription",
+      "crates/language/src/buffer.rs:124 - Buffer diagnostics field"
+    ],
+    "difficulty": "hard",
+    "category": "diagnostics_propagation"
+  },
+  {
+    "id": "zed_df_004",
+    "question": "When a theme changes in Zed, trace the complete data flow from settings change to visual update. What caching and invalidation mechanisms are involved?",
+    "expected_answer": "Theme change flow: 1) User changes theme via ThemePickerDelegate::on_theme_changed (theme_picker.rs:16, 136). 2) Theme settings are updated in SettingsStore. 3) GlobalTheme is updated and cx.notify_global() broadcasts change. 4) Editor observes GlobalTheme via cx.observe_global_in::<GlobalTheme>(window, Self::theme_changed) (editor.rs:2489). 5) Editor::theme_changed (line 23932) is called, which fetches new accent data. 6) If accent_data changed, colorize_brackets(true, cx) is called (line 23940), invalidating bracket color cache. 7) ThemeSettings::apply_theme_overrides applies user customizations (theme/settings.rs:540). 8) EditorElement receives theme through cx.theme() during rendering. 9) DisplayMap may regenerate syntax highlighting using new SyntaxTheme. 10) The entire editor is repainted with new colors. The key caching is in accent_data field which prevents unnecessary recolorization if accents unchanged.",
+    "evidence": [
+      "crates/settings_ui/src/components/theme_picker.rs:136 - on_theme_changed callback",
+      "crates/editor/src/editor.rs:2489 - observe_global_in registration",
+      "crates/editor/src/editor.rs:23932-23942 - theme_changed implementation",
+      "crates/theme/src/settings.rs:540 - apply_theme_overrides",
+      "crates/theme/src/theme.rs:252 - theme color defaults application"
+    ],
+    "difficulty": "hard",
+    "category": "theme_propagation"
+  },
+  {
+    "id": "zed_df_005",
+    "question": "How does Zed's DisplayMap transform buffer coordinates to display coordinates through its layer hierarchy? Explain the coordinate spaces and transformation functions.",
+    "expected_answer": "DisplayMap has 6 coordinate spaces in order: 1) MultiBufferPoint (base buffer coordinates). 2) InlayPoint (after adding inlay hints) - InlayMap::to_inlay_point transforms. 3) FoldPoint (after applying folds) - FoldMap handles collapsed regions. 4) TabPoint (after tab expansion) - TabMap::to_tab_point expands tabs to spaces. 5) WrapPoint (after soft wrapping) - WrapMap::to_wrap_point breaks long lines. 6) BlockPoint (after inserting custom blocks) - BlockMap::to_block_point adds diagnostic/header blocks. 7) DisplayPoint (final coordinates). Each layer has Transform types (e.g., InlayMap has Transform::Isomorphic and Transform::Inlay) with TransformSummary containing input/output TextSummary. Conversion functions like <A>_point_to_<B>_point drill through layers. Each layer's sync() method takes Edit<InputCoordinate> and produces Edit<OutputCoordinate>, transforming invalidation regions. The display_map.rs documentation at lines 0-67 details this architecture.",
+    "evidence": [
+      "crates/editor/src/display_map.rs:0-67 - Complete layer hierarchy documentation",
+      "crates/editor/src/display_map.rs:7-13 - Layer order with coordinate spaces",
+      "crates/editor/src/display_map.rs:22-35 - Transform and TransformSummary explanation",
+      "crates/editor/src/display_map.rs:46-53 - sync() function explanation",
+      "crates/editor/src/display_map.rs:80-92 - Exported types from each layer"
+    ],
+    "difficulty": "hard",
+    "category": "text_editing_flow"
+  },
+  {
+    "id": "zed_df_006",
+    "question": "Explain how LSP completion requests flow from editor to language server and back. Include request routing, response transformation, and display updates.",
+    "expected_answer": "Completion flow: 1) User triggers completion (typing or explicit request). 2) Editor calls Project methods which delegate to LspStore::completions (lsp_store.rs:6222). 3) LspStore determines which language servers handle the buffer based on LanguageServerTree and buffer position. 4) For each applicable server, an LSP textDocument/completion request is sent via LanguageServer::request() with CompletionParams containing document URI and position (converted via point_to_lsp). 5) Request ID is tracked with LspRequestId. 6) Language server processes request and returns CompletionList or CompletionItem[]. 7) Response is deserialized and transformed to Zed's Completion type in CompletionResponse. 8) Completions are ranked and filtered based on query and CompletionDisplayOptions. 9) Editor receives CompletionsMenu update and displays items. 10) If user requests more info, resolveCompletionItem may be sent for documentation. The routing key is that LspStore maintains language_servers HashMap indexed by LanguageServerId (line 267), and uses adapter capabilities to determine which servers support completions.",
+    "evidence": [
+      "crates/project/src/lsp_store.rs:6222 - completions method entry",
+      "crates/project/src/lsp_store.rs:267 - language_servers HashMap storage",
+      "crates/lsp/src/lsp.rs:77-86 - LSP request/response types",
+      "crates/editor/src/code_context_menus.rs:85-88 - CompletionsMenu type",
+      "crates/language/src/buffer.rs:63-67 - point_to_lsp conversion"
+    ],
+    "difficulty": "hard",
+    "category": "lsp_request_response"
+  },
+  {
+    "id": "zed_df_007",
+    "question": "How does buffer text flow through the syntax highlighting pipeline? Describe tree-sitter integration, syntax map updates, and highlight application.",
+    "expected_answer": "Syntax highlighting flow: 1) Buffer stores syntax_map: Mutex<SyntaxMap> (buffer.rs:120). 2) When text changes, Buffer schedules reparse task stored in reparse field (line 121). 3) SyntaxMap contains SyntaxLayers with tree-sitter Parse trees. 4) After edits, tree-sitter's parse() is called incrementally with old tree and edits. 5) SyntaxMap::sync updates syntax layers, applying queries for highlights, injections, and brackets. 6) Highlights are resolved to HighlightId using HighlightMap. 7) BufferSnapshot::syntax field (line 189) provides SyntaxSnapshot for thread-safe access. 8) During rendering, EditorElement queries syntax highlighting via snapshot.syntax. 9) Chunks iterator returns text with associated HighlightId. 10) HighlightId maps to HighlightStyle using theme's SyntaxTheme. 11) Styles are applied during text painting. Tree-sitter data is cached in TreeSitterData (line 145-172) with RowChunks for efficient access. Key: parsing is async/incremental with MAX_BYTES_TO_QUERY limit (syntax_map.rs:10) for responsiveness.",
+    "evidence": [
+      "crates/language/src/buffer.rs:120-121 - syntax_map and reparse fields",
+      "crates/language/src/buffer.rs:145-172 - TreeSitterData structure",
+      "crates/language/src/buffer.rs:187-197 - BufferSnapshot with syntax",
+      "crates/language/src/syntax_map.rs:10 - MAX_BYTES_TO_QUERY constant",
+      "crates/theme/src/theme.rs:196-198 - SyntaxTheme and highlight mapping"
+    ],
+    "difficulty": "hard",
+    "category": "text_editing_flow"
+  },
+  {
+    "id": "zed_df_008",
+    "question": "Describe the data flow when a remote buffer is saved in a collaborative session. Include both the save operation and notification to other peers.",
+    "expected_answer": "Remote buffer save flow: 1) User triggers save on remote buffer. 2) RemoteBufferStore::save_remote_buffer is called (buffer_store.rs:137). 3) Buffer version is serialized using serialize_version. 4) proto::SaveBuffer RPC request is sent to host with project_id, buffer_id, version, and optional new_path (buffer.proto:46-51). 5) Host receives request, performs actual file write through fs. 6) Host returns SaveBufferResponse with new version and mtime (response.version, response.mtime at line 157-158). 7) Remote buffer.did_save(version, mtime, cx) updates saved state (line 160-162). 8) Host broadcasts proto::BufferSaved message to all collaborators (buffer.proto:58-64). 9) Message contains buffer_id, version, mtime, and line_ending. 10) Collaborators receive and update their buffer's saved state. 11) Editor UI updates to show buffer as saved (no dirty indicator). The key is that version tracking (vector clocks) ensures all peers agree on saved state.",
+    "evidence": [
+      "crates/project/src/buffer_store.rs:137-166 - save_remote_buffer implementation",
+      "crates/proto/proto/buffer.proto:46-51 - SaveBuffer request message",
+      "crates/proto/proto/buffer.proto:58-64 - BufferSaved notification message",
+      "crates/collab/src/rpc.rs:397 - BufferSaved broadcast handler registration",
+      "crates/language/src/buffer.rs:107-110 - saved_version and saved_mtime fields"
+    ],
+    "difficulty": "hard",
+    "category": "collaboration_sync"
+  },
+  {
+    "id": "zed_df_009",
+    "question": "How does Zed handle inlay hints from LSP servers? Trace the flow from LSP response through DisplayMap integration to rendering.",
+    "expected_answer": "Inlay hints flow: 1) LspStore requests inlay hints via textDocument/inlayHint LSP request for visible range. 2) Responses are cached in inlay_hint_cache (inlay_hint_cache.rs) per buffer, keyed by range and InvalidationStrategy. 3) InlayHint objects are created with InlayId, position, text, and style. 4) Project emits refresh inlay hints event with InlayHintRefreshReason (inlay_hints.rs:119). 5) Editor receives and updates its inlays via splice_inlays (editor.rs line reference). 6) InlayMap (lowest DisplayMap layer) inserts Transform::Inlay at specified positions. 7) InlaySplice contains to_remove (old InlayIds) and to_insert (new Inlays) (inlays.rs). 8) InlayMap::sync generates Edit objects representing changed regions. 9) These edits propagate up through FoldMap, TabMap, etc., each layer transforming coordinates. 10) During rendering, InlayChunks iterator yields inlay text interleaved with buffer text. 11) Inlays are painted with distinct styling (typically dimmed) in EditorElement. The InlayOffset coordinate space (inlay_map.rs:90) is the first transformation from buffer coordinates.",
+    "evidence": [
+      "crates/project/src/lsp_store/inlay_hint_cache.rs:20 - BufferInlayHints cache",
+      "crates/editor/src/inlays/inlay_hints.rs:119 - InlayHintRefreshReason",
+      "crates/editor/src/inlays.rs:65 - Inlay structure",
+      "crates/editor/src/display_map/inlay_map.rs:90 - InlayOffset and InlayPoint types",
+      "crates/editor/src/display_map.rs:8 - InlayMap as first layer"
+    ],
+    "difficulty": "hard",
+    "category": "lsp_request_response"
+  },
+  {
+    "id": "zed_df_010",
+    "question": "Explain how git diff information flows from repository to editor gutter display. Include blame data and diff hunk rendering.",
+    "expected_answer": "Git diff flow: 1) GitStore monitors repository changes via fs watchers. 2) When files change, GitStore computes diffs against HEAD using git diff operations. 3) Diff hunks (added/modified/deleted regions) are stored per buffer. 4) Buffer accesses diff via git_diff() method which queries GitStore. 5) MultiBufferDiffHunk represents changed regions with DiffHunkStatus. 6) Editor receives git status updates via GitStoreEvent subscription. 7) During rendering, EditorElement::prepaint_gutter queries diff hunks for visible range. 8) For each hunk, gutter indicators are painted (green=added, blue=modified, red=deleted). 9) GitBlame data flows separately: GlobalBlameRenderer (git/blame.rs:104) manages blame entries. 10) BlameEntry contains commit info, author, timestamp (git/blame.rs). 11) Blame is displayed on hover or as persistent gutter decoration. 12) BufferDiff updates trigger editor rerender via cx.notify(). The gutter elements are positioned using BlockMap for line-aligned rendering.",
+    "evidence": [
+      "crates/git/src/status.rs - FileStatus and diff hunk types",
+      "crates/multi_buffer/src/multi_buffer.rs - MultiBufferDiffHunk",
+      "crates/git/src/blame.rs:104 - GlobalBlameRenderer",
+      "crates/editor/src/git.rs - git_diff and blame integration",
+      "crates/project/src/git_store.rs:536-539 - RPC handlers for diff updates"
+    ],
+    "difficulty": "hard",
+    "category": "diagnostics_propagation"
+  },
+  {
+    "id": "zed_df_011",
+    "question": "How does settings propagation work in Zed? Describe the flow from settings file change to component updates, including per-language and per-path overrides.",
+    "expected_answer": "Settings propagation: 1) SettingsStore (settings_store.rs:144) maintains setting_values HashMap<TypeId, Box<dyn AnySettingValue>>. 2) default_settings, user_settings, and local_settings are layered (lines 146-149). 3) When settings file changes, SettingsStore loads and parses JSON. 4) Settings are deserialized per TypeId using from_settings() trait method (line 73). 5) SettingsLocation (line 139-142) provides context: worktree_id and path for per-directory settings. 6) Local settings in .zed/settings.json override user settings. 7) Language-specific overrides in LanguageToSettingsMap apply per buffer language. 8) SettingsStore broadcasts updates via cx.notify_global(). 9) Components observe via cx.observe_global::<SettingsStore> or specific setting types. 10) Editor observes EditorSettings and applies changes like word_wrap, tab_size. 11) Settings::get(path, cx) retrieves settings with path-based resolution. 12) For remote projects, settings sync via RPC settings messages. The key is hierarchical merging: defaults < user < workspace < language-specific.",
+    "evidence": [
+      "crates/settings/src/settings_store.rs:144-149 - SettingsStore structure",
+      "crates/settings/src/settings_store.rs:73 - from_settings trait method",
+      "crates/settings/src/settings_store.rs:139-142 - SettingsLocation type",
+      "crates/settings/src/settings_store.rs:86-91 - Settings::get method",
+      "crates/settings/src/settings_content.rs - LanguageToSettingsMap for per-language settings"
+    ],
+    "difficulty": "hard",
+    "category": "theme_propagation"
+  },
+  {
+    "id": "zed_df_012",
+    "question": "Describe the data flow when a user opens a file in Zed. Include worktree scanning, buffer creation, LSP initialization, and editor setup.",
+    "expected_answer": "File opening flow: 1) User requests file via path or file picker. 2) Project::open_buffer_for_full_path determines worktree_id and relative path. 3) BufferStore::open_buffer_by_path is called (buffer_store.rs). 4) If buffer exists in opened_buffers HashMap, return existing. 5) Otherwise, create loading task: read file via fs, create Buffer::from_file. 6) Buffer is initialized with TextBuffer (rope), file metadata, and empty syntax_map. 7) Buffer stored in path_to_buffer_id and opened_buffers maps. 8) BufferStoreEvent::BufferAdded is emitted. 9) LspStore receives event and opens buffer in applicable language servers via textDocument/didOpen. 10) Language detection occurs based on file extension/content. 11) Language's grammar loaded, tree-sitter parsing begins. 12) LSP servers may send initial diagnostics. 13) Editor::for_buffer creates editor with display_map for the buffer. 14) Editor subscribes to buffer events (edits, diagnostics, etc.). 15) Initial render occurs with syntax highlighting. For remote projects, proto::OpenBufferByPath RPC is sent to host (buffer.proto:29-33).",
+    "evidence": [
+      "crates/project/src/buffer_store.rs:30-42 - BufferStore structure and opened_buffers",
+      "crates/proto/proto/buffer.proto:29-33 - OpenBufferByPath message",
+      "crates/language/src/buffer.rs:100-142 - Buffer structure initialization",
+      "crates/project/src/lsp_store.rs - textDocument/didOpen handling",
+      "crates/editor/src/editor.rs - Editor::for_buffer initialization"
+    ],
+    "difficulty": "hard",
+    "category": "text_editing_flow"
+  },
+  {
+    "id": "zed_df_013",
+    "question": "How do fold operations flow through Zed's editor? Trace from fold command to display update, including coordinate transformations.",
+    "expected_answer": "Fold operation flow: 1) User triggers fold (e.g., fold_at, fold_selected_ranges). 2) Editor determines fold ranges based on syntax tree or indentation. 3) DisplayMap::fold() is called with anchor ranges. 4) FoldMap creates Fold objects with id: FoldId, range, and placeholder text (fold_map.rs). 5) Folds are stored in FoldMap's SumTree ordered by position. 6) FoldMap::sync is called, generating Edit<FoldPoint> for affected regions. 7) Edits propagate up: TabMap receives Edit<FoldPoint>, transforms to Edit<TabPoint>, etc. 8) Coordinate transformations: folded text regions are 'collapsed' in FoldPoint space - points inside fold map to fold start. 9) FoldSnapshot provides to_fold_point/from_fold_point conversion methods. 10) During rendering, chunks from folded regions are replaced by placeholder (e.g., '...'). 11) Cursor movement respects fold boundaries - can't place cursor inside fold. 12) Unfold reverses: removes Fold from FoldMap, generates edits, propagates. 13) Editor stores fold state, survives buffer reloads. The FoldMap transforms BufferPoint -> FoldPoint by 'removing' folded regions from coordinate space.",
+    "evidence": [
+      "crates/editor/src/display_map/fold_map.rs:87-89 - Fold and FoldId types",
+      "crates/editor/src/display_map/fold_map.rs - FoldMap implementation",
+      "crates/editor/src/display_map.rs:9 - FoldMap as second layer after InlayMap",
+      "crates/editor/src/display_map/fold_map.rs - FoldSnapshot coordinate conversions",
+      "crates/editor/src/display_map.rs:46-53 - sync() and Edit transformation explanation"
+    ],
+    "difficulty": "hard",
+    "category": "text_editing_flow"
+  },
+  {
+    "id": "zed_df_014",
+    "question": "Explain how workspace diagnostics are aggregated and displayed in Zed's diagnostics panel. Include the update mechanism and filtering by severity.",
+    "expected_answer": "Workspace diagnostics flow: 1) Multiple buffers have diagnostics from various LSP servers. 2) LspStore maintains diagnostics HashMap: WorktreeId -> RelPath -> Vec<(LanguageServerId, Vec<DiagnosticEntry>)> (lsp_store.rs:279-288). 3) When diagnostics update, Event::DiagnosticsUpdated is emitted with paths. 4) DiagnosticsView (diagnostics.rs) subscribes to project diagnostics events. 5) For each path, diagnostics are aggregated across servers. 6) DiagnosticSummary (error/warning counts) is computed per path and overall. 7) Diagnostics panel groups by: file path, then severity (error > warning > info). 8) Each diagnostic entry has: message, range, severity, source, code. 9) Filtering: user can toggle warnings via ToggleWarnings action, which sets include_warnings flag (buffer_diagnostics.rs:70). 10) When filter changes, excerpts are rebuilt showing only matching severities. 11) Clicking diagnostic navigates to location via Location (file + range). 12) Panel updates via update_excerpts() which rebuilds multibuffer (buffer_diagnostics.rs:100). 13) For remote projects, proto::UpdateDiagnosticSummary syncs counts (lsp_store.rs:9415).",
+    "evidence": [
+      "crates/project/src/lsp_store.rs:279-288 - diagnostics storage HashMap",
+      "crates/diagnostics/src/diagnostics.rs - DiagnosticsView panel implementation",
+      "crates/diagnostics/src/buffer_diagnostics.rs:70 - include_warnings flag",
+      "crates/diagnostics/src/buffer_diagnostics.rs:100 - update_excerpts method",
+      "crates/project/src/lsp_store.rs:9415 - handle_update_diagnostic_summary RPC"
+    ],
+    "difficulty": "hard",
+    "category": "diagnostics_propagation"
+  },
+  {
+    "id": "zed_df_015",
+    "question": "How does Zed's soft wrapping system transform long lines into multiple display rows? Describe the WrapMap algorithm and coordinate space transformations.",
+    "expected_answer": "Soft wrapping flow: 1) WrapMap is 4th layer in DisplayMap, receiving TabPoint input (display_map.rs:11). 2) WrapMap tracks wrap boundaries based on editor width and language settings. 3) wrap_snapshot() provides WrapSnapshot for point-in-time view. 4) When text or width changes, WrapMap::sync computes new wrap points. 5) Algorithm: for each row in TabSnapshot, measure text width using font metrics. 6) If row exceeds editor width, find word/character boundary for wrap. 7) Transform::Wrap entry inserted at wrap point, adding output row. 8) WrapRow represents row index after wrapping (wrap_map.rs:92). 9) WrapPoint = (WrapRow, column) - column resets at wrap boundaries. 10) Conversion: TabPoint(row=0, col=200) with wrap at col=100 becomes WrapPoint(row=0, col=100) then WrapPoint(row=1, col=0) for chars 101+. 11) WrapSnapshot::to_wrap_point() and from_wrap_point() handle conversions. 12) Rendering uses WrapRow for line layout - each WrapRow is painted separately. 13) Language settings control wrap behavior: word boundaries, indent preservation. 14) wrap_guides setting adds vertical guides at wrap columns.",
+    "evidence": [
+      "crates/editor/src/display_map/wrap_map.rs:92 - WrapRow and WrapPoint types",
+      "crates/editor/src/display_map/wrap_map.rs - WrapMap and WrapSnapshot implementation",
+      "crates/editor/src/display_map.rs:11 - WrapMap as 4th layer",
+      "crates/editor/src/display_map/wrap_map.rs - WrapPatch for incremental updates",
+      "crates/editor/src/movement.rs - TextLayoutDetails for width calculations"
+    ],
+    "difficulty": "hard",
+    "category": "text_editing_flow"
+  },
+  {
+    "id": "zed_df_016",
+    "question": "Describe the data flow for code actions from LSP server to user selection. Include action grouping, menu rendering, and application.",
+    "expected_answer": "Code actions flow: 1) Editor triggers code actions request (e.g., on diagnostic, selection, or explicit request). 2) LspStore sends textDocument/codeAction LSP request with context (diagnostics, range, trigger kind). 3) Language server returns CodeAction[] or Command[]. 4) LspStore transforms to Zed's CodeAction type (project/src). 5) Actions are grouped by kind: CodeActionKind (quickfix, refactor, source, etc.) (lsp.rs). 6) AvailableCodeAction wraps each action with label and range (code_context_menus.rs:86). 7) CodeActionsMenu is created/updated with grouped actions. 8) Editor displays menu near cursor or diagnostic. 9) Menu renders actions in groups: quickfixes first, then refactors, etc. 10) User selects action. 11) If CodeAction has workspace_edit, it's applied as ProjectTransaction. 12) If Command, it's sent to server via workspace/executeCommand LSP request. 13) Edits are applied to buffers, transactions recorded for undo. 14) For remote, code action application syncs via UpdateBuffer messages. 15) CodeActionsItem manages menu lifecycle (code_context_menus.rs).",
+    "evidence": [
+      "crates/editor/src/code_context_menus.rs:86 - AvailableCodeAction type",
+      "crates/editor/src/code_context_menus.rs:87-88 - CodeActionsMenu and CodeActionsItem",
+      "crates/lsp/src/lsp.rs:78 - CodeActionKind enum",
+      "crates/project/src/lsp_store.rs - code actions request handling",
+      "crates/project/src/project.rs:102 - ProjectTransaction for workspace edits"
+    ],
+    "difficulty": "hard",
+    "category": "lsp_request_response"
+  },
+  {
+    "id": "zed_df_017",
+    "question": "How does Zed handle remote buffer operations arriving out of order? Explain the CRDT operation queue and deferred ops mechanism.",
+    "expected_answer": "Out-of-order handling: 1) Buffer uses CRDT with vector clocks for operation ordering (buffer.rs:130). 2) deferred_ops: OperationQueue<Operation> stores operations that can't yet be applied (line 130). 3) When operation arrives via apply_ops (line 2917), can_apply_op checks if operation's dependencies are satisfied. 4) Dependencies are based on vector clock: operation requires all operations it depends on to have arrived. 5) If dependencies met, apply_op applies immediately (line 2928). 6) If not met, operation added to deferred_ops (line 2930). 7) After applying any operation, flush_deferred_ops (line 2948) checks if deferred ops can now apply. 8) This continues until no more ops can be applied. 9) For buffer operations (Operation::Buffer), they're applied to text.apply_ops (TextBuffer CRDT) (line 2939). 10) TextBuffer handles concurrent edits using operational transformation principles. 11) Selection updates (Operation::Selection) are also deferred if buffer operations pending. 12) This ensures causality: later operations see effects of earlier ones. 13) For collaboration, this handles network reordering naturally - correctness guaranteed by CRDT math.",
+    "evidence": [
+      "crates/language/src/buffer.rs:130 - deferred_ops field",
+      "crates/language/src/buffer.rs:2917-2946 - apply_ops with deferred handling",
+      "crates/language/src/buffer.rs:2948-2958 - flush_deferred_ops implementation",
+      "crates/text/src/operation_queue.rs - OperationQueue implementation",
+      "crates/clock/src/lamport.rs:24 - Lamport clock for ordering"
+    ],
+    "difficulty": "hard",
+    "category": "collaboration_sync"
+  },
+  {
+    "id": "zed_df_018",
+    "question": "Trace the data flow for language server initialization when opening a project. Include adapter selection, server launching, and capability negotiation.",
+    "expected_answer": "LSP initialization flow: 1) Project opens with worktrees. 2) LspStore observes worktree events and manifest files. 3) ManifestTree (manifest_tree.rs) determines which LSP adapters apply to each worktree. 4) For applicable language, LspStore::get_language_server checks language_server_ids HashMap for existing server. 5) If not running, LanguageServerSeed is created with worktree_id, name, toolchain, settings (lsp_store.rs:228-234). 6) LspAdapter::fetch_server_binary downloads/installs language server binary if needed. 7) Server process launched via LanguageServer::new with stdin/stdout pipes. 8) Initialize LSP request sent with client capabilities and workspace folders. 9) Server responds with ServerCapabilities (completion, hover, diagnostics, etc.). 10) Capabilities stored in AdapterServerCapabilities (lsp.rs:77-78). 11) If server supports dynamic registration, client.registerCapability requests arrive. 12) DynamicRegistrations stored per server (lsp_store.rs:251-255). 13) initialized notification sent to server. 14) Server ready, language_servers HashMap updated (line 267). 15) For already-open buffers, textDocument/didOpen sent. This enables all LSP features for that language.",
+    "evidence": [
+      "crates/project/src/lsp_store.rs:228-234 - LanguageServerSeed structure",
+      "crates/project/src/lsp_store.rs:251-255 - DynamicRegistrations storage",
+      "crates/project/src/lsp_store.rs:267 - language_servers HashMap",
+      "crates/lsp/src/lsp.rs:77-86 - AdapterServerCapabilities",
+      "crates/project/src/manifest_tree.rs - LanguageServerTree for adapter routing"
+    ],
+    "difficulty": "hard",
+    "category": "lsp_request_response"
+  },
+  {
+    "id": "zed_df_019",
+    "question": "How does Zed's block decoration system work for displaying diagnostics and diffs inline? Describe BlockMap transformations and rendering.",
+    "expected_answer": "Block decoration flow: 1) BlockMap is the 5th/top layer before DisplayMap (display_map.rs:12). 2) Blocks are custom UI elements inserted between text lines: diagnostics, headers, git diffs. 3) Block struct (block_map.rs:82) has: id: CustomBlockId, position (anchor), height, render function, placement (above/below line). 4) BlockMap::insert_blocks adds blocks, returns CustomBlockIds. 5) Blocks stored in SumTree ordered by position. 6) BlockRow represents row index after inserting blocks. 7) Transform types: Isomorphic (text), Block (custom UI). 8) BlockPoint includes rows for both text and blocks. 9) During rendering, EditorElement::render_blocks (element.rs:4506) iterates blocks in visible range. 10) Each block's render function returns AnyElement. 11) Elements positioned using absolute coordinates calculated from BlockRow. 12) For diagnostics: DiagnosticBlock created by DiagnosticRenderer (diagnostics/diagnostic_renderer.rs). 13) Block height calculated from content (multi-line messages). 14) Blocks don't affect buffer coordinates - coordinate transforms skip block rows. 15) prepaint_as_root called on block elements (element.rs:4746).",
+    "evidence": [
+      "crates/editor/src/display_map/block_map.rs:82-84 - Block and BlockProperties types",
+      "crates/editor/src/display_map.rs:12 - BlockMap as 5th layer",
+      "crates/editor/src/element.rs:4506 - render_blocks implementation",
+      "crates/editor/src/element.rs:4746 - block prepaint_as_root call",
+      "crates/diagnostics/src/diagnostic_renderer.rs - DiagnosticBlock rendering"
+    ],
+    "difficulty": "hard",
+    "category": "diagnostics_propagation"
+  },
+  {
+    "id": "zed_df_020",
+    "question": "Describe how cursor and selection positions are synchronized in collaborative editing. Include the role of anchors and version vectors.",
+    "expected_answer": "Selection sync flow: 1) Selections use Anchor instead of absolute positions (text/anchor.rs). 2) Anchor references text by (offset, version, bias) - survives edits. 3) When user changes selection, Editor updates selections and creates Operation::UpdateSelections. 4) Operation contains Selection<Anchor> with head, tail, goal. 5) Operation is serialized and sent via UpdateBuffer RPC (buffer.proto:23). 6) Remote buffer applies via apply_ops, which calls apply_op for UpdateSelections. 7) Buffer stores remote_selections: TreeMap<ReplicaId, SelectionSet> (buffer.rs:125). 8) Each collaborator identified by ReplicaId (replica_id from clock). 9) Anchors are resolved to current positions via Anchor::to_offset using buffer's version. 10) As text edits occur, anchors automatically adjust based on their Bias (Left/Right). 11) Editor renders remote selections with participant colors (PlayerColor). 12) BufferSnapshot includes remote_selections for rendering (line 192). 13) For local edits, local selections updated first, then operation sent - no race. 14) Vector clocks ensure selection updates are ordered relative to text edits they refer to.",
+    "evidence": [
+      "crates/text/src/anchor.rs:63-67 - Anchor definition with version",
+      "crates/language/src/buffer.rs:125 - remote_selections TreeMap",
+      "crates/language/src/buffer.rs:192 - BufferSnapshot remote_selections",
+      "crates/proto/proto/buffer.proto:23-27 - UpdateBuffer with operations including selections",
+      "crates/clock/src/lamport.rs:24 - ReplicaId and vector clocks"
+    ],
+    "difficulty": "hard",
+    "category": "collaboration_sync"
+  },
+  {
+    "id": "zed_df_021",
+    "question": "How does Zed handle LSP document synchronization (didChange notifications)? Explain incremental vs full sync and the change notification flow.",
+    "expected_answer": "LSP document sync flow: 1) Buffer changes trigger did_edit event. 2) LspStore subscribes to buffer events via OpenLspBuffer (lsp_store.rs:208-210). 3) On edit, LspStore determines sync kind from server capabilities: Full or Incremental. 4) For Incremental: convert buffer edits (text::Edit) to LSP TextDocumentContentChangeEvent. 5) Edits have range (start/end Position), rangeLength, and new text. 6) Positions converted via point_to_lsp (language/buffer.rs:69). 7) buffer_snapshots HashMap stores recent snapshots per server (lsp_store.rs:289). 8) Multiple snapshots allow computing diffs for different server sync needs. 9) textDocument/didChange notification sent with array of changes and buffer version. 10) Version is buffer's version.iter().sum() or similar counter. 11) For Full sync: send entire buffer text in ContentChangeEvent with no range. 12) Server updates its internal buffer representation. 13) Server may send updated diagnostics via publishDiagnostics. 14) For high edit rate, changes are batched/debounced. 15) Remote buffers: host sends didChange, guests don't - host is LSP proxy.",
+    "evidence": [
+      "crates/project/src/lsp_store.rs:208-210 - OpenLspBuffer for tracking",
+      "crates/project/src/lsp_store.rs:289 - buffer_snapshots HashMap",
+      "crates/language/src/buffer.rs:69 - point_to_lsp conversion",
+      "crates/lsp/src/lsp.rs:82 - TextDocumentSyncKind (Full vs Incremental)",
+      "crates/language/src/proto.rs - serialize_operation for change serialization"
+    ],
+    "difficulty": "hard",
+    "category": "lsp_request_response"
+  },
+  {
+    "id": "zed_df_022",
+    "question": "Explain how Zed's editor handles tab expansion through the TabMap layer. Describe coordinate transformations for files with mixed tabs and spaces.",
+    "expected_answer": "Tab expansion flow: 1) TabMap is 3rd layer in DisplayMap, after FoldMap (display_map.rs:10). 2) Input is FoldPoint (text with folds applied), output is TabPoint. 3) TabMap scans buffer for '\\t' characters. 4) For each tab, calculates expanded column based on tab_size setting (e.g., 4). 5) Transform type: Isomorphic (non-tab text) or Tab (expansion point). 6) TabPoint column counts visual columns after expansion. 7) Example: text 'ab\\tcd' with tab_size=4: FoldPoint(0,2) is tab, becomes TabPoint(0,4) if at column 2 (expands to column 4). 8) TabSnapshot::to_tab_point() performs conversion. 9) Tab width depends on column position: tabs expand to next multiple of tab_size. 10) Mixed tabs/spaces: each tab independently expands based on its column. 11) During rendering, tab characters replaced by spaces in displayed text. 12) Cursor movement in TabPoint space, so arrow keys handle tab widths correctly. 13) Edit operations convert back to FoldPoint to modify actual buffer. 14) tab_map.rs maintains sum tree of tab positions for efficient queries.",
+    "evidence": [
+      "crates/editor/src/display_map/tab_map.rs - TabMap implementation",
+      "crates/editor/src/display_map.rs:10 - TabMap as 3rd layer",
+      "crates/editor/src/display_map/tab_map.rs - TabPoint and TabSnapshot",
+      "crates/language/src/language_settings.rs - tab_size setting",
+      "crates/editor/src/display_map/tab_map.rs - Transform types for tabs"
+    ],
+    "difficulty": "hard",
+    "category": "text_editing_flow"
+  },
+  {
+    "id": "zed_df_023",
+    "question": "How does Zed propagate buffer file path changes through the system? Include LSP notifications, buffer store updates, and UI refreshes.",
+    "expected_answer": "File path change flow: 1) Buffer file path changes via rename, save-as, or worktree update. 2) Buffer::file_updated() is called with new File (buffer.rs). 3) Buffer stores file: Option<Arc<dyn File>> (line 104). 4) Buffer emits BufferEvent::FileHandleChanged. 5) BufferStore handles event, emits BufferStoreEvent::BufferChangedFilePath with old_file (buffer_store.rs:95-98). 6) For LSP: old URI and new URI are compared. 7) If different, textDocument/didClose sent for old URI. 8) textDocument/didOpen sent for new URI with current content. 9) Alternatively, if server supports workspace/willRenameFiles, that's called. 10) Language detection may re-run based on new file extension. 11) If language changed, new language server initialized, old one detached. 12) Editor updates tab title and breadcrumbs (items.rs:MAX_TAB_TITLE_LEN). 13) Project path_to_buffer_id HashMap updated (buffer_store.rs:37). 14) For collaboration: proto::UpdateBufferFile broadcast to peers (buffer.proto:40-44). 15) Remote clients update their File references via handle_update_buffer_file (buffer_store.rs:1337).",
+    "evidence": [
+      "crates/language/src/buffer.rs:104 - file field",
+      "crates/project/src/buffer_store.rs:95-98 - BufferStoreEvent::BufferChangedFilePath",
+      "crates/project/src/buffer_store.rs:1337-1377 - handle_update_buffer_file",
+      "crates/proto/proto/buffer.proto:40-44 - UpdateBufferFile message",
+      "crates/editor/src/items.rs:66 - MAX_TAB_TITLE_LEN for UI updates"
+    ],
+    "difficulty": "hard",
+    "category": "collaboration_sync"
+  },
+  {
+    "id": "zed_df_024",
+    "question": "Describe the data flow for handling multiple language servers for a single buffer (e.g., TypeScript + ESLint). Include request routing and response merging.",
+    "expected_answer": "Multiple language servers flow: 1) Buffer has a primary language (e.g., TypeScript). 2) LspStore maintains supplementary_language_servers HashMap (lsp_store.rs:275-276). 3) Supplementary servers registered via settings or manifest (e.g., ESLint for JavaScript/TypeScript). 4) LanguageServerTree (manifest_tree.rs) builds tree of applicable servers per buffer. 5) For textDocument/didOpen: sent to all applicable servers. 6) For capabilities-based requests (e.g., completions): query each server that advertises capability. 7) Requests sent in parallel via join_all futures. 8) Responses merged: completions concatenated, ranked by relevance. 9) Diagnostics from multiple servers stored separately: Vec<(LanguageServerId, DiagnosticSet)> (buffer.rs:124). 10) Diagnostic sources distinguished by LanguageServerId. 11) For code actions: actions from all servers combined, grouped by kind. 12) Conflicts resolved by priority: primary language server > supplementary. 13) Settings allow per-server configuration via LspSettings. 14) Server capabilities queried: only servers supporting feature receive requests. 15) Example: TypeScript server does hover, ESLint does quickfixes.",
+    "evidence": [
+      "crates/project/src/lsp_store.rs:275-276 - supplementary_language_servers HashMap",
+      "crates/language/src/buffer.rs:124 - diagnostics per LanguageServerId",
+      "crates/project/src/manifest_tree.rs:34 - LanguageServerTree for server routing",
+      "crates/project/src/lsp_store.rs - parallel request handling",
+      "crates/settings/src/settings_content.rs - LspSettings per server"
+    ],
+    "difficulty": "hard",
+    "category": "lsp_request_response"
+  },
+  {
+    "id": "zed_df_025",
+    "question": "How does Zed handle buffer reloading when files change on disk? Trace the flow from file system event to buffer update, including conflict detection.",
+    "expected_answer": "File reload flow: 1) Worktree fs watcher detects file change via inotify/FSEvents. 2) WorktreeStore emits WorktreeStoreEvent with updated Entry containing new mtime. 3) BufferStore subscribes, receives event. 4) For each buffer with matching file, compares buffer.saved_mtime with file mtime. 5) If mtimes differ and buffer is clean (not dirty), trigger reload. 6) If buffer is dirty, set has_conflict flag (buffer.rs:132) - user must resolve. 7) For clean buffer: read new file content via fs. 8) Compute diff between old and new content using text_diff. 9) Apply diff as buffer operations, preserving undo history. 10) Update buffer.saved_mtime and saved_version. 11) Buffer emits BufferEvent::Reloaded with new version. 12) LSP servers receive textDocument/didChange for new content. 13) Syntax reparsed with new content. 14) Editor displays reload notification. 15) For collaboration: proto::BufferReloaded broadcast (buffer.proto:66-73). 16) Conflicts shown in UI with 'Reload' / 'Save' options. The reload_task field prevents concurrent reloads (buffer.rs:114).",
+    "evidence": [
+      "crates/language/src/buffer.rs:114 - reload_task field",
+      "crates/language/src/buffer.rs:132 - has_conflict flag",
+      "crates/proto/proto/buffer.proto:66-73 - BufferReloaded message",
+      "crates/worktree/src/worktree.rs - fs watcher and Entry with mtime",
+      "crates/language/src/buffer.rs:107 - saved_mtime field"
+    ],
+    "difficulty": "hard",
+    "category": "collaboration_sync"
+  }
+]

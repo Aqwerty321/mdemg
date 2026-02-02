@@ -1,0 +1,129 @@
+{
+  "metadata": {
+    "created": "2026-02-02",
+    "purpose": "Validation subset - first 20 questions",
+    "total_questions": 20
+  },
+  "questions": [
+    {
+      "id": 379,
+      "category": "data_flow_integration",
+      "question": "Trace the data flow for circuit breaker reset on successful batch.",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 77,
+      "category": "architecture_structure",
+      "question": "What is the architecture pattern for handling device sync errors across multiple modules?",
+      "complexity": "system-wide"
+    },
+    {
+      "id": 258,
+      "category": "business_logic_constraints",
+      "question": "What constraints govern lot audit actions?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 450,
+      "category": "cross_cutting_concerns",
+      "question": "How does the application secure API keys for machine-to-machine authentication?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 424,
+      "category": "cross_cutting_concerns",
+      "question": "How does the feature flag guard pattern work for conditionally enabling features?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 161,
+      "category": "service_relationships",
+      "question": "What is the role of ContextService in the audit logging flow?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 270,
+      "category": "business_logic_constraints",
+      "question": "What constraints govern the report generation system?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 57,
+      "category": "architecture_structure",
+      "question": "How does the SchedulerModule integrate with NestJS's ScheduleModule for cron jobs?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 172,
+      "category": "service_relationships",
+      "question": "What transaction boundaries exist in the ReconciliationService.createReconciliation flow?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 251,
+      "category": "business_logic_constraints",
+      "question": "How does the audit log system track entity changes?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 31,
+      "category": "architecture_structure",
+      "question": "How does the frontend filter components architecture support persistence and responsive design?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 69,
+      "category": "architecture_structure",
+      "question": "How does the secretsManager module integrate with Azure Key Vault for credential management?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 262,
+      "category": "business_logic_constraints",
+      "question": "What invariants must hold for the barrel-lot relationship?",
+      "complexity": "system-wide"
+    },
+    {
+      "id": 277,
+      "category": "business_logic_constraints",
+      "question": "How does the aggregated storage entries system work?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 336,
+      "category": "data_flow_integration",
+      "question": "How does location string parsing work for storage locations? Describe the extraction of floor, warehouse, row, bay, rick, and tier.",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 438,
+      "category": "cross_cutting_concerns",
+      "question": "How does the Public decorator work with Swagger documentation?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 391,
+      "category": "data_flow_integration",
+      "question": "Trace the data flow for resolving customer from lot for barrel ownership.",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 183,
+      "category": "service_relationships",
+      "question": "How does InventoryUploadService.validateCsvStructure handle header validation with BOM and encoding issues?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 189,
+      "category": "service_relationships",
+      "question": "How does AuditService.createAuditLogs handle bulk audit logging atomically?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 1,
+      "category": "architecture_structure",
+      "question": "What modules must be imported for the BarrelModule to function, and why does it use forwardRef for AuthModule and BarrelOwnershipModule?",
+      "complexity": "multi-file"
+    }
+  ]
+}

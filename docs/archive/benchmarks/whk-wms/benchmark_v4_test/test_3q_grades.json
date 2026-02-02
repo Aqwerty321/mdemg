@@ -1,0 +1,160 @@
+{
+  "aggregate": {
+    "total_questions": 3,
+    "mean": 0.702,
+    "std": 0.003,
+    "cv_pct": 0.4,
+    "median": 0.702,
+    "min": 0.7,
+    "max": 0.705,
+    "p10": 0.7,
+    "p25": 0.7,
+    "p75": 0.705,
+    "p90": 0.705,
+    "high_score_rate": 1.0,
+    "evidence_rate": 1.0,
+    "evidence_accuracy_rate": 0.0,
+    "correct_file_rate": 0.0,
+    "by_difficulty": {
+      "hard": {
+        "count": 3,
+        "mean": 0.702,
+        "std": 0.003
+      }
+    },
+    "by_category": {
+      "business_logic_constraints": {
+        "count": 1,
+        "mean": 0.7,
+        "std": 0
+      },
+      "architecture_structure": {
+        "count": 1,
+        "mean": 0.705,
+        "std": 0
+      },
+      "data_flow_integration": {
+        "count": 1,
+        "mean": 0.702,
+        "std": 0
+      }
+    }
+  },
+  "per_question": [
+    {
+      "id": "379",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.014,
+        "concept": 0.0,
+        "citation_bonus": 0.0,
+        "final": 0.702
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "migration.sql:6",
+          "migration.sql:5",
+          "migration.sql:42",
+          "BATCH_PROCESSING_REDESIGN.md:136",
+          "BATCH_PROCESSING_REDESIGN.md:137",
+          "BATCH_PROCESSING_REDESIGN.md:138",
+          "BATCH_PROCESSING_REDESIGN.md:158",
+          "BATCH_PROCESSING_REDESIGN.md:170"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/services/safety-limits.service.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.031,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.024
+      }
+    },
+    {
+      "id": "77",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.015,
+        "concept": 0.017,
+        "citation_bonus": 0.0,
+        "final": 0.705
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "SyncRequestPayload.ts:2",
+          "printer.dto.ts:35",
+          "printer.dto.ts:69",
+          "printer.dto.ts:89",
+          "printer.dto.ts:125",
+          "printer.dto.ts:152",
+          "SyncRequestPayload.ts:2",
+          "printer.dto.ts:35",
+          "printer.dto.ts:69"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/deviceSyncError/deviceSyncError.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/device-sync-error-management.module.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.017,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.017,
+        "idf_weighted": 0.012
+      }
+    },
+    {
+      "id": "258",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.0,
+        "concept": 0.0,
+        "citation_bonus": 0.0,
+        "final": 0.7
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "LOT_VARIATION_DUPLICATES.md:168",
+          "migration.sql:6",
+          "migration.sql:9",
+          "migration.sql:12",
+          "migration.sql:33",
+          "migration.sql:34",
+          "migration.sql:7",
+          "migration.sql:144"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/groupTransaction/groupTransaction.service.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    }
+  ]
+}

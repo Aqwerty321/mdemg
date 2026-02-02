@@ -1,0 +1,137 @@
+[
+  {
+    "question_id": 1,
+    "question": "What is the main struct in the editor crate?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/editor/src/editor.rs",
+    "line_number": 1124,
+    "expected_answer": "Editor"
+  },
+  {
+    "question_id": 2,
+    "question": "What is the name of the UI framework crate in Zed?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/Cargo.toml",
+    "line_number": 87,
+    "expected_answer": "gpui"
+  },
+  {
+    "question_id": 3,
+    "question": "What is the main struct in the workspace crate?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/workspace/src/workspace.rs",
+    "line_number": 1178,
+    "expected_answer": "Workspace"
+  },
+  {
+    "question_id": 4,
+    "question": "What is the name of the struct that represents the multi-buffer in Zed?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/multi_buffer/src/multi_buffer.rs",
+    "line_number": 74,
+    "expected_answer": "MultiBuffer"
+  },
+  {
+    "question_id": 5,
+    "question": "What is the main struct in the project crate?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/project/src/project.rs",
+    "line_number": 205,
+    "expected_answer": "Project"
+  },
+  {
+    "question_id": 6,
+    "question": "What is the name of the trait that represents a filesystem interface?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/fs/src/fs.rs",
+    "line_number": 91,
+    "expected_answer": "Fs"
+  },
+  {
+    "question_id": 7,
+    "question": "What is the struct used to represent a text buffer?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/text/src/text.rs",
+    "line_number": 52,
+    "expected_answer": "Buffer"
+  },
+  {
+    "question_id": 8,
+    "question": "What is the name of the struct in the theme crate for managing themes?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/theme/src/registry.rs",
+    "line_number": 58,
+    "expected_answer": "ThemeRegistry"
+  },
+  {
+    "question_id": 9,
+    "question": "What is the main struct in the rope crate?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/rope/src/rope.rs",
+    "line_number": 26,
+    "expected_answer": "Rope"
+  },
+  {
+    "question_id": 10,
+    "question": "What is the struct that represents language registry?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/language/src/language_registry.rs",
+    "line_number": 109,
+    "expected_answer": "LanguageRegistry"
+  },
+  {
+    "question_id": 11,
+    "question": "What is the struct that handles settings in Zed?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/settings/src/settings_store.rs",
+    "line_number": 145,
+    "expected_answer": "SettingsStore"
+  },
+  {
+    "question_id": 12,
+    "question": "What is the main struct for buffer diff operations?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/buffer_diff/src/buffer_diff.rs",
+    "line_number": 47,
+    "expected_answer": "BufferDiff"
+  },
+  {
+    "question_id": 13,
+    "question": "Where is the main function located in the Zed crate?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/zed/src/main.rs",
+    "line_number": 178,
+    "expected_answer": "main"
+  },
+  {
+    "question_id": 14,
+    "question": "What is the AppState struct used for in the collab crate?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/collab/src/lib.rs",
+    "line_number": 232,
+    "expected_answer": "AppState"
+  },
+  {
+    "question_id": 15,
+    "question": "What is the struct that represents an individual highlight ID?",
+    "difficulty": "easy",
+    "codebase": "zed",
+    "answer_file_path": "/Users/reh3376/repos/zed/crates/language/src/highlight_map.rs",
+    "line_number": 9,
+    "expected_answer": "HighlightId"
+  }
+]

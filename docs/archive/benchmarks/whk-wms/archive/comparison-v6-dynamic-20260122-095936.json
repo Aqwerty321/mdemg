@@ -1,0 +1,618 @@
+{
+  "test_name": "MDEMG v6 - Dynamic Types",
+  "timestamp": "2026-01-22T09:59:36.869544",
+  "duration_s": 96.21346807479858,
+  "total_questions": 100,
+  "avg_score": 0.5602753479856877,
+  "max_score": 0.8237413494239245,
+  "min_score": 0.34436959950904156,
+  "by_category": {
+    "data_flow_integration": 0.554130134915073,
+    "architecture_structure": 0.5406500518555529,
+    "cross_cutting_concerns": 0.5684910066178216,
+    "service_relationships": 0.5642118384324764,
+    "business_logic_constraints": 0.592838441683171
+  },
+  "results": [
+    {
+      "id": 400,
+      "question": "What is the complete data flow integration test strategy for the WMS?",
+      "score": 0.47208008984066385,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 61,
+      "question": "What is the purpose of having both DeltaSyncModule and SyncModule?",
+      "score": 0.4790872938990902,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 14,
+      "question": "Why does AppModule configure ThrottlerModule with both in-memory and Redis storage options?",
+      "score": 0.46821386487112604,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 472,
+      "question": "How does the application handle feature flag changes in real-time?",
+      "score": 0.5183269023653128,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 145,
+      "question": "What is the complete error logging flow when AndroidSyncProcessor encounters a processing failure?",
+      "score": 0.6127309673877007,
+      "category": "service_relationships"
+    },
+    {
+      "id": 130,
+      "question": "How does the FeatureFlagsService integrate with BarrelEventService to control barrel reentry behavio",
+      "score": 0.5064478637685618,
+      "category": "service_relationships"
+    },
+    {
+      "id": 119,
+      "question": "What services does BarrelEventService depend on for handling barrel entry events at holding location",
+      "score": 0.5706015654644125,
+      "category": "service_relationships"
+    },
+    {
+      "id": 75,
+      "question": "What is the purpose of the BarrelAggregatesModule and how does it optimize dashboard performance?",
+      "score": 0.4650906329247765,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 468,
+      "question": "How does the resolution service integrate with printer automation for label printing?",
+      "score": 0.5422578341751397,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 56,
+      "question": "How does the trust-mode module enable high-throughput inventory operations?",
+      "score": 0.5863843068004025,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 424,
+      "question": "How does the feature flag guard pattern work for conditionally enabling features?",
+      "score": 0.679980924376275,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 495,
+      "question": "How does the resolution system coordinate with the serial registry service?",
+      "score": 0.46364959738405775,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 308,
+      "question": "How does the GraphQL subscription system propagate comment updates to connected clients? Describe th",
+      "score": 0.4564548493805819,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 48,
+      "question": "How does the ACLModule (Access Control List) work with the RolesModule for authorization?",
+      "score": 0.5190632841135214,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 335,
+      "question": "Trace the data flow for Redis diagnostics during inventory processing. How are connection health iss",
+      "score": 0.4667403867286011,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 231,
+      "question": "How does the system track lot-level vs barrel-level transactions?",
+      "score": 0.7031956348410173,
+      "category": "business_logic_constraints"
+    },
+    {
+      "id": 19,
+      "question": "How does the frontend lib/graphql directory organize queries and support code generation?",
+      "score": 0.34436959950904156,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 18,
+      "question": "How does the WarehouseJobsModule demonstrate circular dependency resolution with BarrelModule?",
+      "score": 0.608406862348261,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 51,
+      "question": "How does the barrel aggregate calculation in the resolver ensure memory efficiency for large dataset",
+      "score": 0.5844956562659295,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 116,
+      "question": "What queue infrastructure does AndroidSyncProcessor use to route InventoryCheck events to the stagin",
+      "score": 0.4746641738340205,
+      "category": "service_relationships"
+    },
+    {
+      "id": 124,
+      "question": "What services subscribe to barrel events and how do they respond in the event-driven architecture?",
+      "score": 0.7057262041255521,
+      "category": "service_relationships"
+    },
+    {
+      "id": 285,
+      "question": "How does the bulk barrel operations system work?",
+      "score": 0.5841261147925083,
+      "category": "business_logic_constraints"
+    },
+    {
+      "id": 352,
+      "question": "How does the serial number format validation work? What patterns are considered valid?",
+      "score": 0.510405079384205,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 15,
+      "question": "How does the frontend API routes structure support both proxy and direct backend calls?",
+      "score": 0.6524753168686367,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 316,
+      "question": "How does the warehouse job staging system track scan processing status? Describe the state machine a",
+      "score": 0.5087006093130515,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 106,
+      "question": "Explain the transaction boundary and error propagation when GroupTransactionService creates a lot en",
+      "score": 0.6635675297222328,
+      "category": "service_relationships"
+    },
+    {
+      "id": 452,
+      "question": "How does the application handle authentication token refresh and expiration?",
+      "score": 0.5217069767512715,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 405,
+      "question": "How are metrics, logs, and traces collected and what can be monitored?",
+      "score": 0.46692438525429947,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 443,
+      "question": "How does the audit log query system support complex filtering and pagination?",
+      "score": 0.6499460554436484,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 481,
+      "question": "How does the resolution system ensure idempotency for resolution operations?",
+      "score": 0.6520429327971795,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 228,
+      "question": "What is the purpose of validFrom/validTo in barrel ownership and how does it enable historical queri",
+      "score": 0.4700570535373264,
+      "category": "business_logic_constraints"
+    },
+    {
+      "id": 117,
+      "question": "How does OwnershipTransactionService ensure ledger entries are created atomically with ownership tra",
+      "score": 0.457209759717627,
+      "category": "service_relationships"
+    },
+    {
+      "id": 252,
+      "question": "What constraints prevent overlapping barrel ownerships?",
+      "score": 0.7003751466339865,
+      "category": "business_logic_constraints"
+    },
+    {
+      "id": 334,
+      "question": "How does the Verified event type work? Describe the data flow and payload validation.",
+      "score": 0.665285769820413,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 147,
+      "question": "What services are involved when BarrelOwnershipService creates ownership with inheritance tracking?",
+      "score": 0.6003548307734181,
+      "category": "service_relationships"
+    },
+    {
+      "id": 4,
+      "question": "Why is PrismaModule marked as @Global() and what modules does it export?",
+      "score": 0.6057745202218442,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 85,
+      "question": "How does the frontend configuration page architecture support different setting categories?",
+      "score": 0.5271091382431615,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 440,
+      "question": "How does the application validate that device sync errors are not already resolved before resolution",
+      "score": 0.6114032320108624,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 477,
+      "question": "How does the application handle sensitive data in error messages and logs?",
+      "score": 0.51480565864439,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 181,
+      "question": "How does BarrelService.buildUnifiedDirectWhere implement default filtering for removed barrels?",
+      "score": 0.4672188412527777,
+      "category": "service_relationships"
+    },
+    {
+      "id": 449,
+      "question": "How does the resolution system handle partial batch failures?",
+      "score": 0.5778672274353853,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 83,
+      "question": "What is the purpose of having both HoldingLocationModule and StorageLocationModule?",
+      "score": 0.4686224098207792,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 115,
+      "question": "How does the codebase prevent circular dependencies between CustomerService and TransferService?",
+      "score": 0.5356438379952986,
+      "category": "service_relationships"
+    },
+    {
+      "id": 179,
+      "question": "How does BarrelOwnershipService use createId from @paralleldrive/cuid2 for identifier generation?",
+      "score": 0.46474852925481513,
+      "category": "service_relationships"
+    },
+    {
+      "id": 484,
+      "question": "How does the error configuration support custom field requirements per resolution option?",
+      "score": 0.6051932059544319,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 473,
+      "question": "How does the resolution system handle the ESCALATE resolution path?",
+      "score": 0.5757154620558761,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 201,
+      "question": "What validation rules prevent invalid barrel disposition transitions, and how does the BarrelDisposi",
+      "score": 0.6526227846842139,
+      "category": "business_logic_constraints"
+    },
+    {
+      "id": 53,
+      "question": "How does the frontend support different authentication modes (Azure AD vs demo mode)?",
+      "score": 0.669684797715685,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 190,
+      "question": "What services are involved when TransferService performs reconciliation status calculation?",
+      "score": 0.5780970311900909,
+      "category": "service_relationships"
+    },
+    {
+      "id": 183,
+      "question": "How does InventoryUploadService.validateCsvStructure handle header validation with BOM and encoding ",
+      "score": 0.4636532640626262,
+      "category": "service_relationships"
+    },
+    {
+      "id": 353,
+      "question": "What is the data flow when a location is already occupied during entry event processing?",
+      "score": 0.4879730457719804,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 140,
+      "question": "How does GroupTransactionService validate barrel existence before creating transactions, and what er",
+      "score": 0.6564962122733493,
+      "category": "service_relationships"
+    },
+    {
+      "id": 25,
+      "question": "Why does the BarrelOwnershipModule not use forwardRef for its imports while BarrelModule does?",
+      "score": 0.6552850562534502,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 260,
+      "question": "What business rules govern the feedback collection system?",
+      "score": 0.4638698195353004,
+      "category": "business_logic_constraints"
+    },
+    {
+      "id": 302,
+      "question": "How does the inventory upload processing system handle large CSV files? Describe the complete data t",
+      "score": 0.4762403750499148,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 67,
+      "question": "What is the purpose of the AggregatedStorageEntriesModule?",
+      "score": 0.46410905441573225,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 200,
+      "question": "What is the complete flow of services when a barrel is created through inventory upload processing?",
+      "score": 0.48149546148003064,
+      "category": "service_relationships"
+    },
+    {
+      "id": 43,
+      "question": "How does the frontend chatbot component architecture support AI-powered warehouse assistance?",
+      "score": 0.4749153816777696,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 311,
+      "question": "Trace the data flow when a frontend user queries barrels with pagination. How does the GraphQL resol",
+      "score": 0.6464249794954405,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 155,
+      "question": "How does the PubSubService enable real-time subscriptions across the application?",
+      "score": 0.6150223386296757,
+      "category": "service_relationships"
+    },
+    {
+      "id": 383,
+      "question": "Trace the data flow for resolving canonical lot from a lot variation serial number.",
+      "score": 0.6305798349942591,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 364,
+      "question": "How does the session validation work before processing a batch?",
+      "score": 0.5811785710226305,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 192,
+      "question": "What is the relationship between BarrelOwnershipService and GroupTransaction for ownership transfer ",
+      "score": 0.706672633748763,
+      "category": "service_relationships"
+    },
+    {
+      "id": 325,
+      "question": "What is the complete flow when a withdrawal/transfer-out event is processed? How does the barrel dis",
+      "score": 0.5448654454610923,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 103,
+      "question": "How does the AndroidSyncProcessor service coordinate with multiple cached services during record pro",
+      "score": 0.45419784303168964,
+      "category": "service_relationships"
+    },
+    {
+      "id": 38,
+      "question": "How does the barrel resolver handle primary owner filtering when ownership is stored in a separate t",
+      "score": 0.6975902387497025,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 26,
+      "question": "How does the inventory-upload module architecture support high-volume CSV processing?",
+      "score": 0.47235517457801757,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 121,
+      "question": "What is the relationship between SyncService and PrismaService for handling external entity synchron",
+      "score": 0.551699097743867,
+      "category": "service_relationships"
+    },
+    {
+      "id": 153,
+      "question": "What services does the FinanceReportProcessor depend on for scheduled report generation?",
+      "score": 0.6225395044641086,
+      "category": "service_relationships"
+    },
+    {
+      "id": 414,
+      "question": "How does the error resolution system validate resolution data and what validation layers exist?",
+      "score": 0.6524030393110497,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 469,
+      "question": "How does the application ensure consistent error responses across REST and GraphQL?",
+      "score": 0.46449810436209105,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 55,
+      "question": "What is the architecture of the reconciliation feature across frontend and backend?",
+      "score": 0.6738957199350725,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 435,
+      "question": "How does the ACL response filtering interceptor sanitize outgoing data?",
+      "score": 0.5846935771213515,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 442,
+      "question": "How does the system handle role-based attribute filtering for different entity types?",
+      "score": 0.5197028850294766,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 256,
+      "question": "What validation ensures storage location capacity is not exceeded?",
+      "score": 0.4798984948698731,
+      "category": "business_logic_constraints"
+    },
+    {
+      "id": 193,
+      "question": "How does FinanceService use Prisma's periodBreakdownEventInclude for efficient data loading?",
+      "score": 0.3542652700281613,
+      "category": "service_relationships"
+    },
+    {
+      "id": 87,
+      "question": "How does the frontend useAgentSocket hook support real-time AI interactions?",
+      "score": 0.46868552545134745,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 196,
+      "question": "What is the complete service coordination when ReconciliationService creates an approval request?",
+      "score": 0.5240537788771987,
+      "category": "service_relationships"
+    },
+    {
+      "id": 188,
+      "question": "What is the role of BarrelEventService.extractRelevantLocation in location string parsing?",
+      "score": 0.6637260904457465,
+      "category": "service_relationships"
+    },
+    {
+      "id": 112,
+      "question": "How does FinanceService coordinate with BarrelAuditService and LotAuditService to provide point-in-t",
+      "score": 0.5048871981892183,
+      "category": "service_relationships"
+    },
+    {
+      "id": 141,
+      "question": "How does the ReconciliationService calculate impact level from discrepancy details?",
+      "score": 0.4937738659867652,
+      "category": "service_relationships"
+    },
+    {
+      "id": 39,
+      "question": "How does the McpModule (Model Context Protocol) integrate AI capabilities into the warehouse system?",
+      "score": 0.45570884649946786,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 355,
+      "question": "Trace the complete data flow for bruteforce barrel creation when barrel doesn't exist in the system.",
+      "score": 0.6534667217991531,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 91,
+      "question": "How does the WhiskeyTypeModule support product categorization?",
+      "score": 0.5110209299470568,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 301,
+      "question": "Trace the complete data flow when an Android device scans a barrel QR code and submits it to the WMS",
+      "score": 0.4805412187759365,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 492,
+      "question": "How does the error categorization help with automated error routing?",
+      "score": 0.6050979105051201,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 389,
+      "question": "What is the complete flow for Trust Mode cutoff date processing?",
+      "score": 0.6914778966090438,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 261,
+      "question": "How does the group transaction status machine work?",
+      "score": 0.6611891389655005,
+      "category": "business_logic_constraints"
+    },
+    {
+      "id": 399,
+      "question": "Trace the data flow for parallel job queue operations with BullMQ.",
+      "score": 0.6333379343734353,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 143,
+      "question": "How does BarrelOwnershipService handle the joint ownership 2+ owner invariant during creation?",
+      "score": 0.8237413494239245,
+      "category": "service_relationships"
+    },
+    {
+      "id": 314,
+      "question": "How does Trust Mode processing work after inventory upload completion? Describe the cutoff date logi",
+      "score": 0.51445948573584,
+      "category": "data_flow_integration"
+    },
+    {
+      "id": 454,
+      "question": "How does the audit correlation ID enable request tracing across services?",
+      "score": 0.5846506004546156,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 172,
+      "question": "What transaction boundaries exist in the ReconciliationService.createReconciliation flow?",
+      "score": 0.6175598482481555,
+      "category": "service_relationships"
+    },
+    {
+      "id": 31,
+      "question": "How does the frontend filter components architecture support persistence and responsive design?",
+      "score": 0.6577405363181117,
+      "category": "architecture_structure"
+    },
+    {
+      "id": 122,
+      "question": "How does the error propagation flow work when BarrelOwnershipService.establishJointOwnership encount",
+      "score": 0.5554361778496578,
+      "category": "service_relationships"
+    },
+    {
+      "id": 476,
+      "question": "How does the audit log PubSub integration enable real-time audit monitoring?",
+      "score": 0.5789536209245971,
+      "category": "cross_cutting_concerns"
+    },
+    {
+      "id": 166,
+      "question": "What is the relationship between BarrelService and BarrelServiceBase for method inheritance?",
+      "score": 0.5898311524815177,
+      "category": "service_relationships"
+    },
+    {
+      "id": 214,
+      "question": "What business rules govern EnumOwnershipTransactionType and when is each type recorded?",
+      "score": 0.6202117872888129,
+      "category": "business_logic_constraints"
+    },
+    {
+      "id": 142,
+      "question": "What is the relationship between BarrelEventService and CachedEventTypeService for avoiding in-trans",
+      "score": 0.6102929315233301,
+      "category": "service_relationships"
+    },
+    {
+      "id": 36,
+      "question": "How does the FeatureFlagsModule integrate with LaunchDarkly and affect module loading?",
+      "score": 0.465517097105285,
+      "category": "architecture_structure"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "run_id": "benchmark-clawdbot-v1-20260126-214415",
+  "timestamp": "2026-01-26T21:44:15.421619Z",
+  "operator": "reh3376",
+  "mdemg_commit": "c5b779ba391c6430470c52ab9baf93b0253d20c0",
+  "codebase": {
+    "name": "clawdbot",
+    "commit": "2f7fff8dcdaf4c88eb2c5b7d70ed73bf5500f4d0",
+    "space_id": "clawdbot",
+    "path": "/Users/reh3376/clawdbot",
+    "loc": 510835,
+    "files": 3134
+  },
+  "question_set": {
+    "file": "test_questions_130_master.json",
+    "sha256": "049e8ee48c464e170aa3f6c2e88084e51b8cee9a54f29d2a918a23e5642ac904",
+    "n_questions": 130,
+    "categories": {
+      "architecture_structure": 20,
+      "service_relationships": 20,
+      "business_logic_constraints": 20,
+      "data_flow_integration": 20,
+      "cross_cutting_concerns": 20,
+      "symbol-lookup": 30
+    }
+  },
+  "config": {
+    "model": "claude-3-5-haiku-20241022",
+    "grading_weights": {
+      "evidence": 0.7,
+      "semantic": 0.15,
+      "concept": 0.15,
+      "file_bonus": 0.1
+    },
+    "runs_per_condition": 3,
+    "baseline_parallel": true,
+    "mdemg_sequential": true
+  },
+  "cold_start": {
+    "verified": true,
+    "initial_learning_edges": 0
+  },
+  "mdemg_stats": {
+    "memory_count": 10140,
+    "observation_count": 19106,
+    "layer_0": 10000,
+    "layer_1": 139,
+    "layer_2": 1,
+    "health_score": 1.0
+  }
+}

@@ -1,0 +1,764 @@
+{
+  "questions": [
+    {
+      "id": 379,
+      "category": "data_flow_integration",
+      "question": "Trace the data flow for circuit breaker reset on successful batch.",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 77,
+      "category": "architecture_structure",
+      "question": "What is the architecture pattern for handling device sync errors across multiple modules?",
+      "complexity": "system-wide"
+    },
+    {
+      "id": 258,
+      "category": "business_logic_constraints",
+      "question": "What constraints govern lot audit actions?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 450,
+      "category": "cross_cutting_concerns",
+      "question": "How does the application secure API keys for machine-to-machine authentication?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 424,
+      "category": "cross_cutting_concerns",
+      "question": "How does the feature flag guard pattern work for conditionally enabling features?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 161,
+      "category": "service_relationships",
+      "question": "What is the role of ContextService in the audit logging flow?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 270,
+      "category": "business_logic_constraints",
+      "question": "What constraints govern the report generation system?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 57,
+      "category": "architecture_structure",
+      "question": "How does the SchedulerModule integrate with NestJS's ScheduleModule for cron jobs?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 172,
+      "category": "service_relationships",
+      "question": "What transaction boundaries exist in the ReconciliationService.createReconciliation flow?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 251,
+      "category": "business_logic_constraints",
+      "question": "How does the audit log system track entity changes?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 31,
+      "category": "architecture_structure",
+      "question": "How does the frontend filter components architecture support persistence and responsive design?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 69,
+      "category": "architecture_structure",
+      "question": "How does the secretsManager module integrate with Azure Key Vault for credential management?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 262,
+      "category": "business_logic_constraints",
+      "question": "What invariants must hold for the barrel-lot relationship?",
+      "complexity": "system-wide"
+    },
+    {
+      "id": 277,
+      "category": "business_logic_constraints",
+      "question": "How does the aggregated storage entries system work?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 336,
+      "category": "data_flow_integration",
+      "question": "How does location string parsing work for storage locations? Describe the extraction of floor, warehouse, row, bay, rick, and tier.",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 438,
+      "category": "cross_cutting_concerns",
+      "question": "How does the Public decorator work with Swagger documentation?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 391,
+      "category": "data_flow_integration",
+      "question": "Trace the data flow for resolving customer from lot for barrel ownership.",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 183,
+      "category": "service_relationships",
+      "question": "How does InventoryUploadService.validateCsvStructure handle header validation with BOM and encoding issues?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 189,
+      "category": "service_relationships",
+      "question": "How does AuditService.createAuditLogs handle bulk audit logging atomically?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 1,
+      "category": "architecture_structure",
+      "question": "What modules must be imported for the BarrelModule to function, and why does it use forwardRef for AuthModule and BarrelOwnershipModule?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 374,
+      "category": "data_flow_integration",
+      "question": "How does the consecutive empty batch detection prevent infinite loops?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 436,
+      "category": "cross_cutting_concerns",
+      "question": "How does the FeatureFlagsService handle graceful shutdown and event flushing?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 220,
+      "category": "business_logic_constraints",
+      "question": "What business rules govern EnumReconciliationType and when is each type created?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 98,
+      "category": "architecture_structure",
+      "question": "How does the DeviceSyncLogModule support mobile device troubleshooting?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 404,
+      "category": "cross_cutting_concerns",
+      "question": "How do role guards interact with resolvers to enforce access control?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 466,
+      "category": "cross_cutting_concerns",
+      "question": "How does the application handle long-running GraphQL mutations?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 60,
+      "category": "architecture_structure",
+      "question": "How does the frontend components/bulk-operations architecture support multi-step wizards?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 481,
+      "category": "cross_cutting_concerns",
+      "question": "How does the resolution system ensure idempotency for resolution operations?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 448,
+      "category": "cross_cutting_concerns",
+      "question": "How does the audit service handle high-volume logging without impacting application performance?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 188,
+      "category": "service_relationships",
+      "question": "What is the role of BarrelEventService.extractRelevantLocation in location string parsing?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 265,
+      "category": "business_logic_constraints",
+      "question": "How does the changelog system track application changes?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 454,
+      "category": "cross_cutting_concerns",
+      "question": "How does the audit correlation ID enable request tracing across services?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 249,
+      "category": "business_logic_constraints",
+      "question": "How does the sample type result type affect sample processing?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 66,
+      "category": "architecture_structure",
+      "question": "How does the backend handle WebSocket connections for GraphQL subscriptions?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 353,
+      "category": "data_flow_integration",
+      "question": "What is the data flow when a location is already occupied during entry event processing?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 263,
+      "category": "business_logic_constraints",
+      "question": "How does the trust mode configuration affect validation?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 206,
+      "category": "business_logic_constraints",
+      "question": "What database constraints ensure data integrity for barrel-location relationships, and how does BarrelLocationConflictException prevent conflicts?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 211,
+      "category": "business_logic_constraints",
+      "question": "How does the Android sync inbox handle duplicate records and what strategy prevents deadlocks during bulk inserts?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 383,
+      "category": "data_flow_integration",
+      "question": "Trace the data flow for resolving canonical lot from a lot variation serial number.",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 173,
+      "category": "service_relationships",
+      "question": "How does the CachedStorageLocationService integrate with AndroidSyncProcessor for location validation?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 253,
+      "category": "business_logic_constraints",
+      "question": "How does the resolution system suggest serial numbers?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 308,
+      "category": "data_flow_integration",
+      "question": "How does the GraphQL subscription system propagate comment updates to connected clients? Describe the PubSub pattern and filtering mechanism.",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 33,
+      "category": "architecture_structure",
+      "question": "How does the barrel GraphQL query structure support unified filtering across multiple entity relationships?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 480,
+      "category": "cross_cutting_concerns",
+      "question": "How does the audit system handle entity history reconstruction?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 68,
+      "category": "architecture_structure",
+      "question": "How does the frontend Table-new directory structure support different table configurations?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 406,
+      "category": "cross_cutting_concerns",
+      "question": "How does the ContextService propagate user context across async operations and what data does it carry?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 80,
+      "category": "architecture_structure",
+      "question": "What is the purpose of the IndexingModule in the providers directory?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 79,
+      "category": "architecture_structure",
+      "question": "How does the BarrelOemCodeModule support cooperage/manufacturer tracking?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 192,
+      "category": "service_relationships",
+      "question": "What is the relationship between BarrelOwnershipService and GroupTransaction for ownership transfer tracking?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 226,
+      "category": "business_logic_constraints",
+      "question": "What validation prevents lot variation from matching canonical lot number?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 162,
+      "category": "service_relationships",
+      "question": "How does BarrelOwnershipService.getBulkBarrelOwnerships optimize fetching ownership for multiple barrels?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 171,
+      "category": "service_relationships",
+      "question": "How does FinanceService handle customer data parsing with defensive JSON handling?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 333,
+      "category": "data_flow_integration",
+      "question": "What is the data flow when a DumpForRegauge event is processed? How does this differ from other barrel events?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 119,
+      "category": "service_relationships",
+      "question": "What services does BarrelEventService depend on for handling barrel entry events at holding locations?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 310,
+      "category": "data_flow_integration",
+      "question": "How does the safety limits system prevent runaway inventory processing jobs? Describe the circuit breaker pattern and resource monitoring.",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 15,
+      "category": "architecture_structure",
+      "question": "How does the frontend API routes structure support both proxy and direct backend calls?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 18,
+      "category": "architecture_structure",
+      "question": "How does the WarehouseJobsModule demonstrate circular dependency resolution with BarrelModule?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 240,
+      "category": "business_logic_constraints",
+      "question": "What is the purpose of bulk operation status tracking?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 75,
+      "category": "architecture_structure",
+      "question": "What is the purpose of the BarrelAggregatesModule and how does it optimize dashboard performance?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 283,
+      "category": "business_logic_constraints",
+      "question": "How does the warehouse job aggregated staging work?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 338,
+      "category": "data_flow_integration",
+      "question": "How does the barrel ownership resolution work during event processing? Describe the data flow for determining customer ownership.",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 339,
+      "category": "data_flow_integration",
+      "question": "Trace the data flow for time zone handling in barrel events. How are Eastern timezone DST transitions handled?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 316,
+      "category": "data_flow_integration",
+      "question": "How does the warehouse job staging system track scan processing status? Describe the state machine and transitions.",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 304,
+      "category": "data_flow_integration",
+      "question": "How does the InventoryCheckStaging processor validate barrel scans and detect issues? Describe the complete validation pipeline including BAD_QR, NOLABEL, and duplicate detection.",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 482,
+      "category": "cross_cutting_concerns",
+      "question": "How does the application configure different rate limit tiers for different operation types?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 130,
+      "category": "service_relationships",
+      "question": "How does the FeatureFlagsService integrate with BarrelEventService to control barrel reentry behavior?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 185,
+      "category": "service_relationships",
+      "question": "How does CustomerService implement type guards for computed field sorting detection?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 83,
+      "category": "architecture_structure",
+      "question": "What is the purpose of having both HoldingLocationModule and StorageLocationModule?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 355,
+      "category": "data_flow_integration",
+      "question": "Trace the complete data flow for bruteforce barrel creation when barrel doesn't exist in the system.",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 443,
+      "category": "cross_cutting_concerns",
+      "question": "How does the audit log query system support complex filtering and pagination?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 217,
+      "category": "business_logic_constraints",
+      "question": "How does partial ownership transfer work and what happens to remaining percentage?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 487,
+      "category": "cross_cutting_concerns",
+      "question": "How does the resolution service handle the ACKNOWLEDGE resolution path?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 159,
+      "category": "service_relationships",
+      "question": "What transaction isolation considerations exist when BarrelEventService creates events with location checks?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 152,
+      "category": "service_relationships",
+      "question": "How does ReconciliationService integrate with GroupTransaction for barrel count reconciliation?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 408,
+      "category": "cross_cutting_concerns",
+      "question": "How does the multi-strategy authentication guard determine which authentication method to use?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 74,
+      "category": "architecture_structure",
+      "question": "How does the BarrelSnapshotModule support point-in-time inventory queries?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 133,
+      "category": "service_relationships",
+      "question": "How do BullMQ processor options differ between AndroidSyncProcessor and InventoryCheckStagingProcessor, and why?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 449,
+      "category": "cross_cutting_concerns",
+      "question": "How does the resolution system handle partial batch failures?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 165,
+      "category": "service_relationships",
+      "question": "How does BarrelAuditService handle the limitation of lot filtering using current vs historical assignments?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 140,
+      "category": "service_relationships",
+      "question": "How does GroupTransactionService validate barrel existence before creating transactions, and what error information does it provide?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 302,
+      "category": "data_flow_integration",
+      "question": "How does the inventory upload processing system handle large CSV files? Describe the complete data transformation pipeline from file upload to database persistence.",
+      "complexity": "system-wide"
+    },
+    {
+      "id": 477,
+      "category": "cross_cutting_concerns",
+      "question": "How does the application handle sensitive data in error messages and logs?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 328,
+      "category": "data_flow_integration",
+      "question": "How does the CachedEventTypeService optimize event type lookups? Describe the caching strategy and its impact on transaction performance.",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 318,
+      "category": "data_flow_integration",
+      "question": "How does the micro-batch orchestrator improve inventory processing performance? Describe the orchestration pattern and data flow.",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 472,
+      "category": "cross_cutting_concerns",
+      "question": "How does the application handle feature flag changes in real-time?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 194,
+      "category": "service_relationships",
+      "question": "What cache invalidation strategy do the cached services use, and how is it coordinated?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 268,
+      "category": "business_logic_constraints",
+      "question": "What validation prevents invalid customer data references?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 156,
+      "category": "service_relationships",
+      "question": "What is the data flow when BarrelOwnershipService processes a partial ownership transfer?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 464,
+      "category": "cross_cutting_concerns",
+      "question": "How does the feature flag context support multi-context targeting in LaunchDarkly?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 337,
+      "category": "data_flow_integration",
+      "question": "What is the complete error categorization system for device sync errors? Describe the error levels and their handling.",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 329,
+      "category": "data_flow_integration",
+      "question": "What is the data flow when processing an inspection event? How are repair reasons captured and persisted?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 444,
+      "category": "cross_cutting_concerns",
+      "question": "How does the application handle concurrent resolution attempts on the same error?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 366,
+      "category": "data_flow_integration",
+      "question": "How does the progress tracking checkpoint system work for large batch processing?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 116,
+      "category": "service_relationships",
+      "question": "What queue infrastructure does AndroidSyncProcessor use to route InventoryCheck events to the staging queue?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 82,
+      "category": "architecture_structure",
+      "question": "How does the LoggerModule provide structured logging across the backend?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 86,
+      "category": "architecture_structure",
+      "question": "What is the purpose of the AgentModule and how does it relate to AI functionality?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 43,
+      "category": "architecture_structure",
+      "question": "How does the frontend chatbot component architecture support AI-powered warehouse assistance?",
+      "complexity": "cross-module"
+    },
+    {
+      "id": 210,
+      "category": "business_logic_constraints",
+      "question": "What business rules govern ownership type normalization, and when should strict mode vs tolerant mode be used?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 252,
+      "category": "business_logic_constraints",
+      "question": "What constraints prevent overlapping barrel ownerships?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": 202,
+      "category": "business_logic_constraints",
+      "question": "How does the system enforce that barrel ownership percentages sum to 100%, and what tolerance is allowed for floating-point arithmetic?",
+      "complexity": "multi-file"
+    },
+    {
+      "id": "hard_sym_1",
+      "category": "disambiguation",
+      "question": "There are multiple BATCH_SIZE constants in the codebase. What is the BATCH_SIZE value used specifically in trust-mode-processing.service.ts, and why is it different from other BATCH_SIZE values?",
+      "symbol_name": "BATCH_SIZE",
+      "complexity": "disambiguation",
+      "why_hard": "Same symbol name appears with different values in 6+ files"
+    },
+    {
+      "id": "hard_sym_2",
+      "category": "computed_value",
+      "question": "What is the DEFAULT_PAGE_SIZE for vector indexing, and how can it be overridden at runtime?",
+      "symbol_name": "DEFAULT_PAGE_SIZE",
+      "complexity": "computed_value",
+      "why_hard": "Value is computed expression with env var fallback, not simple literal"
+    },
+    {
+      "id": "hard_sym_3",
+      "category": "disambiguation",
+      "question": "MAX_ACTIVE_JOBS appears in multiple services. What is the value in resource-monitor.service.ts vs queue-health.service.ts, and why do they differ?",
+      "symbol_name": "MAX_ACTIVE_JOBS",
+      "complexity": "disambiguation",
+      "why_hard": "Same symbol, different values, different semantic purposes"
+    },
+    {
+      "id": "hard_sym_4",
+      "category": "computed_value",
+      "question": "What is the actual SLOW_QUERY_THRESHOLD_MS when the SLOW_QUERY_THRESHOLD_MS environment variable is not set? Where is the fallback defined?",
+      "symbol_name": "SLOW_QUERY_THRESHOLD_MS",
+      "complexity": "computed_value",
+      "why_hard": "Requires understanding DEFAULT constant and env var override relationship"
+    },
+    {
+      "id": "hard_sym_5",
+      "category": "relationship",
+      "question": "BARREL_STATUSES is defined in seeding/constants.ts. Which services or modules import and use these status values for validation?",
+      "symbol_name": "BARREL_STATUSES",
+      "complexity": "relationship",
+      "why_hard": "Requires tracing symbol usage across module boundaries"
+    },
+    {
+      "id": "hard_sym_6",
+      "category": "disambiguation",
+      "question": "BullMQ processor concurrency is configured differently for each queue. What are the concurrency values for inventory-check-staging, rag-indexing, and android-sync-processing processors?",
+      "symbol_name": "concurrency",
+      "complexity": "disambiguation",
+      "why_hard": "Same config key, 3 different values (5, 1, 2) in different processors - must identify correct processor context"
+    },
+    {
+      "id": "hard_sym_7",
+      "category": "computed_value",
+      "question": "What is the AGENT_MAX_ITERATIONS default value and how can it be configured at runtime?",
+      "symbol_name": "AGENT_MAX_ITERATIONS",
+      "complexity": "computed_value",
+      "why_hard": "Env var override pattern, not a simple constant"
+    },
+    {
+      "id": "hard_sym_8",
+      "category": "relationship",
+      "question": "QUEUE_NAMES constant defines which BullMQ queues exist. What queues are defined and which processors handle each?",
+      "symbol_name": "QUEUE_NAMES",
+      "complexity": "relationship",
+      "why_hard": "Requires connecting constant definition to processor implementations"
+    },
+    {
+      "id": "hard_sym_9",
+      "category": "disambiguation",
+      "question": "DEFAULT_BATCH_SIZE vs MICRO_BATCH_SIZE in inventory processing - what are their values and when is each used?",
+      "symbol_name": "DEFAULT_BATCH_SIZE",
+      "complexity": "disambiguation",
+      "why_hard": "Related but different constants with overlapping purposes"
+    },
+    {
+      "id": "hard_sym_10",
+      "category": "computed_value",
+      "question": "What is the GRAPHQL_BACKEND_TIMEOUT_MS default in graphql-proxy/route.ts vs ownershipService.ts?",
+      "symbol_name": "GRAPHQL_BACKEND_TIMEOUT_MS",
+      "complexity": "computed_value",
+      "why_hard": "Same env var referenced but with different defaults in different services"
+    },
+    {
+      "id": "hard_sym_11",
+      "category": "relationship",
+      "question": "StorageEventCategory enum defines event types. Which aggregation services use these categories and how do they map to database operations?",
+      "symbol_name": "StorageEventCategory",
+      "complexity": "relationship",
+      "why_hard": "Requires understanding enum usage in resolver/service layer"
+    },
+    {
+      "id": "hard_sym_12",
+      "category": "disambiguation",
+      "question": "ANDROID_SYNC_MAX_RETRIES appears in both android-sync-inbox.listener.ts and android-sync.processor.ts. Are they the same value and why might they be defined separately?",
+      "symbol_name": "ANDROID_SYNC_MAX_RETRIES",
+      "complexity": "disambiguation",
+      "why_hard": "Same name, same value, but in different components with different purposes"
+    },
+    {
+      "id": "hard_sym_13",
+      "category": "disambiguation",
+      "question": "CHUNK_SIZE constants are used for batch processing but with different values. What is CHUNK_SIZE in android-sync-inbox.service.ts vs ID_CHUNK_SIZE in barrel-aggregates.service.ts, and why the 100x difference?",
+      "symbol_name": "CHUNK_SIZE",
+      "complexity": "disambiguation",
+      "why_hard": "Same concept (chunking), 100x different values (50 vs 5000), requires understanding why each context needs different chunk sizes"
+    },
+    {
+      "id": "hard_sym_14",
+      "category": "relationship",
+      "question": "GLOBAL_ID_PREFIXES in seeding/constants.ts - what entity types have global ID prefixes defined and what are they used for?",
+      "symbol_name": "GLOBAL_ID_PREFIXES",
+      "complexity": "relationship",
+      "why_hard": "Object constant with multiple entity mappings, need to understand seeding architecture"
+    },
+    {
+      "id": "hard_sym_15",
+      "category": "disambiguation",
+      "question": "Processing delay constants vary across services. What are RECORD_PROCESSING_DELAY_MS, BATCH_DELAY_MS, and CHUNK_DELAY_MS values, and which services define each?",
+      "symbol_name": "DELAY_MS",
+      "complexity": "disambiguation",
+      "why_hard": "Three different delay constants (25, 50, 100ms) in different services for different throttling purposes"
+    },
+    {
+      "id": "hard_sym_16",
+      "category": "computed_value",
+      "question": "What is the BARREL_RECEIPTS_MAX_LIMIT and how is its parsing handled safely?",
+      "symbol_name": "BARREL_RECEIPTS_MAX_LIMIT",
+      "complexity": "computed_value",
+      "why_hard": "Requires understanding safeParse helper and env var handling"
+    },
+    {
+      "id": "hard_sym_17",
+      "category": "relationship",
+      "question": "MAX_RICKS constant is used in warehouse positioning. What is its value and how does it relate to the rick naming convention (A, B, C, Hallway)?",
+      "symbol_name": "MAX_RICKS",
+      "complexity": "relationship",
+      "why_hard": "Requires understanding warehouse coordinate system and naming conventions"
+    },
+    {
+      "id": "hard_sym_18",
+      "category": "disambiguation",
+      "question": "MAX_RETRIES constants appear in multiple services with DIFFERENT values. List ALL MAX_RETRIES/MAX_RETRY_ATTEMPTS/MAX_AUTO_RETRIES values and their files. Which service has the highest retry count and why?",
+      "symbol_name": "MAX_RETRIES",
+      "complexity": "disambiguation",
+      "why_hard": "Requires finding ALL retry constants (most are 3, but printer is 10) - partial answer is wrong"
+    },
+    {
+      "id": "hard_sym_19",
+      "category": "relationship",
+      "question": "TimePeriodGranularity enum (DAILY, WEEKLY, MONTHLY) - which services use this for aggregation and what query patterns does each granularity enable?",
+      "symbol_name": "TimePeriodGranularity",
+      "complexity": "relationship",
+      "why_hard": "Requires understanding how enum drives query generation"
+    },
+    {
+      "id": "hard_sym_20",
+      "category": "computed_value",
+      "question": "What is RAG_EVENTS_TAKE_LIMIT and its default value? How does this limit affect vector indexing batch sizes?",
+      "symbol_name": "RAG_EVENTS_TAKE_LIMIT",
+      "complexity": "computed_value",
+      "why_hard": "Env var with parseInt, need to understand RAG indexing context"
+    }
+  ]
+}

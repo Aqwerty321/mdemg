@@ -1,0 +1,14 @@
+{
+  "total": 120,
+  "processed": 120,
+  "successful": 120,
+  "failed": 0,
+  "validation_errors": 0,
+  "with_refs": 120,
+  "without_refs": 0,
+  "start_time": "2026-02-02T06:24:46.226357",
+  "errors": [],
+  "end_time": "2026-02-02T06:25:50.264988",
+  "duration_seconds": 64.03863215446472,
+  "ref_rate": 1.0
+}

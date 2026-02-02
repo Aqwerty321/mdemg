@@ -1,0 +1,229 @@
+{
+  "metadata": {
+    "purpose": "validation_20q master"
+  },
+  "questions": [
+    {
+      "id": 379,
+      "category": "data_flow_integration",
+      "question": "Trace the data flow for circuit breaker reset on successful batch.",
+      "answer": "Circuit breaker reset: 1) After batch processing, if batchResult.errorCount === 0, 2) Reset metrics.consecutiveErrors = 0, 3) Call safetyLimitsService.resetCircuitBreaker(sessionId), 4) Service clears any error state for session, 5) Allows processing to continue without accumulated penalty, 6) If errors: increment consecutiveErrors, no reset, 7) Circuit breaker pattern: prevents cascading failures, 8) After MAX_CONSECUTIVE_ERRORS: circuit open, processing halts, 9) Recovery: manual intervention or time-based auto-reset.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/services/safety-limits.service.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 77,
+      "category": "architecture_structure",
+      "question": "What is the architecture pattern for handling device sync errors across multiple modules?",
+      "answer": "Device sync errors span: DeviceSyncErrorModule (entity storage with DeviceSyncErrorService/Controller), DeviceSyncErrorManagementModule (error processing with DeviceSyncErrorReprocessorService and EnhancedErrorLoggerService), and AndroidSyncInboxModule (receiving sync data). There is NO separate ResolutionModule - error resolution is handled by DeviceSyncErrorReprocessorService methods (reprocessErrors, bulkResolve, markForRetry). The flow: mobile sends data -> AndroidSyncInbox receives -> validation fails -> error stored in DeviceSyncError -> DeviceSyncErrorReprocessorService handles reprocessing/resolution. Frontend error display is in app/dashboard/jobs/[id] with error-context-utils.ts.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/deviceSyncError/deviceSyncError.module.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/device-sync-error-management.module.ts"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 258,
+      "category": "business_logic_constraints",
+      "question": "What constraints govern lot audit actions?",
+      "answer": "EnumLotAuditAction: Create, Increase, Decrease, Adjustment - tracks changes to Lot records with quantity-focused actions. LotAuditService (injected into GroupTransactionService) records lot-level changes. EnumBarrelAuditAction (Create, Update, Delete) mirrors for barrel changes. Audit actions recorded with: lotId, action, changedBy, changedAt, quantity snapshots (bblTotal, totalPGs, totalWGs), deltaUnits, deltaUnitType, groupTransactionId, transferId, notes. Lot audits are critical for: TTB compliance (federal regulations require complete lot history), customer reporting, production traceability. All lot modifications (bblTotal, status, quantities) generate audit records.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/groupTransaction/groupTransaction.service.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 450,
+      "category": "cross_cutting_concerns",
+      "question": "How does the application secure API keys for machine-to-machine authentication?",
+      "answer": "Security headers do NOT differ between development and production environments. The SecurityHeadersMiddleware applies the same headers universally: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Strict-Transport-Security, Content-Security-Policy. There is no environment-based conditional logic in the middleware implementation.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/api-key.guard.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/multi-strategy-auth.guard.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 424,
+      "category": "cross_cutting_concerns",
+      "question": "How does the feature flag guard pattern work for conditionally enabling features?",
+      "answer": "The McpFeatureFlagGuard demonstrates the pattern for feature-flag-controlled features. It implements CanActivate and injects FeatureFlagsService. In canActivate(), it first checks for local development override (MCP_SERVER_ENABLED env var in non-production). Then it evaluates the LaunchDarkly flag using evaluateBoolean() with a system context. If the flag is disabled, it throws HttpException with 404 status, making the feature appear non-existent. This pattern allows features to be toggled without code deployment. The guard runs BEFORE authentication, ensuring clean 404 responses even for unauthenticated requests. Multiple feature guards can be composed using @UseGuards().",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/mcp/mcp-feature-flag.guard.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/feature-flags/feature-flags.service.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 161,
+      "category": "service_relationships",
+      "question": "What is the role of ContextService in the audit logging flow?",
+      "answer": "AuditService injects ContextService but based on createAuditLog(), context is passed explicitly via CreateAuditLogDto (userId, sessionId, ipAddress, userAgent, correlationId). ContextService provides: 1) Request-scoped context storage (user from JWT, request metadata); 2) getCurrentUserId() for resolvers that don't pass explicitly; 3) Request correlation ID for tracing. The AuditService primarily uses passed parameters but ContextService serves as fallback and for request-scoped operations. This separation allows: explicit context passing for clarity, fallback to request context when convenient, async operations that outlive request scope.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.service.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/context/context.service.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 270,
+      "category": "business_logic_constraints",
+      "question": "What constraints govern the report generation system?",
+      "answer": "ReportType enumerates: CURRENT_INVENTORY, DAILY/WEEKLY/MONTHLY/QUARTERLY/ANNUAL_INVENTORY, TRANSACTION_SUMMARY/DETAIL, GROUP_TRANSACTION_SUMMARY, INVENTORY_AGING, WAREHOUSE_UTILIZATION, CUSTOMER_ALLOCATION, LOT_TRACKING, CUSTOM. ReportFormat: JSON, CSV, EXCEL, PDF, HTML. ReportStatus: PENDING, GENERATING, COMPLETED, FAILED, SCHEDULED. finance-report-templates.dto.ts defines report templates. Reports support: date range filters, entity filters, format selection. Large reports run asynchronously with status tracking. Reports used for: TTB compliance, customer statements, management dashboards.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/finance/dto/finance-report-templates.dto.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 57,
+      "category": "architecture_structure",
+      "question": "How does the SchedulerModule integrate with NestJS's ScheduleModule for cron jobs?",
+      "answer": "The SchedulerModule does NOT use NestJS's ScheduleModule directly in the way described. Instead, it: (1) Uses Bull Queue - integrates with @nestjs/bull for job processing (BullModule.registerQueue), (2) Uses @nestjs/schedule for decorators - The BarrelReportSchedulerService uses @Cron decorators to schedule weekly barrel reports at 4 PM EST Monday-Friday, (3) Implements distributed locking using Redis SETNX + EX to ensure only one instance runs across multiple nodes, (4) Stores process.pid in Redis lock for debugging. Architecture: ScheduleModule provides cron decorator framework, BullModule.registerQueue provides async job queue infrastructure, Redis is used for both Bull queue backend AND distributed locking.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/scheduler/scheduler.module.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/finance/finance.module.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/notification/weekly-barrel-report.service.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 172,
+      "category": "service_relationships",
+      "question": "What transaction boundaries exist in the ReconciliationService.createReconciliation flow?",
+      "answer": "createReconciliation does NOT use a single wrapping transaction: 1) Creates ReconciliationRecord (single Prisma create); 2) If barrelReconciliation needed, calls reconcileGroupBarrelCount (separate operation); 3) If that fails, updates ReconciliationRecord with error status (separate update); 4) If requiresApproval, creates ApprovalRequest (separate create); 5) Creates AuditLog (separate create). Design decision: allows partial success - reconciliation record exists even if barrel adjustment fails. Trade-off: potential inconsistency vs resilience. The separate operations each have their own transactions. For atomic behavior, would need prisma.$transaction wrapper around all operations.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/reconciliation/reconciliation.service.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/reconciliation/reconciliation.module.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/reconciliation/reconciliation.resolver.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 251,
+      "category": "business_logic_constraints",
+      "question": "How does the audit log system track entity changes?",
+      "answer": "EnumAuditOperationType defines operations: Create, Update, Delete, UPDATE (duplicate legacy). EnumAuditEntityType enumerates auditable entities: User, StorageLocation, Barrel, Sample, Customer, SalesOrder, Item, Lot, WeightLog, etc. EnumAuditOperationResult: success, failure. AuditService.createAuditLog() records: operationType, entityType, entityId, userId, correlationId, beforeState, afterState, operationDetails. Used throughout services for compliance (TTB regulations require complete audit trail). ReconciliationService creates audit logs for reconciliation operations. Audit reports support multiple formats and date ranges.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/reconciliation/reconciliation.service.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 31,
+      "category": "architecture_structure",
+      "question": "How does the frontend filter components architecture support persistence and responsive design?",
+      "answer": "The components/filters directory contains ResponsiveFilterBar/ with index.ts (barrel file for exports) and useActiveFilters.ts (hook for filter state). FilterPersistenceBridge.tsx connects to URL state for shareable filter links. FilterPresets.tsx allows saving/loading filter configurations. This architecture separates filter UI rendering (responsive breakpoints), state management (active filters hook), persistence (URL/local storage), and presets (saved configurations) into composable pieces.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms-front-end/components/filters/ResponsiveFilterBar/index.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms-front-end/components/Table-new/FilterPersistenceBridge.tsx"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 69,
+      "category": "architecture_structure",
+      "question": "How does the secretsManager module integrate with Azure Key Vault for credential management?",
+      "answer": "The secretsManager module does NOT currently integrate with Azure Key Vault. Instead: (1) Current Implementation - SecretsManagerServiceBase uses NestJS ConfigService to retrieve secrets from environment variables. getSecret<T>(key) simply calls configService.get(key). (2) No Caching Mechanism - No TTL caching exists, no LRU cache implementation. Each call directly queries ConfigService. (3) Azure Configuration Present but Unused - .env.example shows Azure environment variables (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, etc.) but these are NOT used by SecretsManagerService. Azure AD is implemented in AzureAdService (authentication) but separate from secrets management. (4) Architecture - Minimal wrapper around NestJS ConfigService with no provider pattern for alternative implementations.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/secrets/secretsManager.module.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/secrets/base/secretsManager.service.base.ts"
+      ],
+      "complexity": "cross-module"
+    },
+    {
+      "id": 262,
+      "category": "business_logic_constraints",
+      "question": "What invariants must hold for the barrel-lot relationship?",
+      "answer": "Every barrel must have a valid lotId (foreign key to Lot). populate_barrel_details() ensures lot exists or creates it before barrel. Barrel.serialNumber format typically includes lot number (e.g., '24A001.0478'). Lot.bblTotal should equal count of barrels with that lotId (maintained by events). Barrels in lot share: whiskeyType, recipe, fillDate (approximately). These invariants ensure: accurate lot-level reporting, proper inventory aggregation, regulatory compliance for batch tracking. Orphaned barrels (no lot) are invalid states.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/prisma/migrations/20250626000010_fix_barrel_lot_relationship/migration.sql",
+        "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma"
+      ],
+      "complexity": "system-wide"
+    },
+    {
+      "id": 277,
+      "category": "business_logic_constraints",
+      "question": "How does the aggregated storage entries system work?",
+      "answer": "aggregated-storage-entries-response.dto.ts returns paginated storage entries for TTB compliance reporting. aggregated-storage-entry.dto.ts defines per-entry metrics including: periodStart/End, lotNumber, eventCategory (ENTRY, WITHDRAWAL, TRANSFER_IN, DUMP), barrelCount, proofGallons. breakdown.dto.ts provides breakdowns by customer (StorageCustomerBreakdown), whiskey type (StorageWhiskeyTypeBreakdown), and recipe (StorageRecipeBreakdown). NOTE: This is NOT about warehouse locations, occupied positions, or capacity planning - it's specifically for TTB storage compliance aggregation by time period, lot, and event category.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/aggregatedStorageEntries/dto/aggregated-storage-entries-response.dto.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/aggregatedStorageEntries/dto/breakdown.dto.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 336,
+      "category": "data_flow_integration",
+      "question": "How does location string parsing work for storage locations? Describe the extraction of floor, warehouse, row, bay, rick, and tier.",
+      "answer": "Location components include: LocationService for CRUD operations, LocationResolver for GraphQL endpoints, LocationController for REST endpoints. The location hierarchy uses parentId for self-referential tree structure. StorageLocation is a separate entity representing physical storage positions within a Location, with fields for rack, level, position. The answer incorrectly implied a single location model - there are two distinct entities: Location (warehouse/building/area) and StorageLocation (specific barrel positions).",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/location-string.util.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 438,
+      "category": "cross_cutting_concerns",
+      "question": "How does the Public decorator work with Swagger documentation?",
+      "answer": "The @Public() decorator uses applyDecorators to combine two metadata settings. PublicAuthMiddleware sets IS_PUBLIC_KEY to true, which auth guards check via Reflector to bypass authentication. PublicAuthSwagger sets 'swagger/apiSecurity' metadata to ['isPublic'], which Swagger/OpenAPI generators use to mark the endpoint as not requiring authentication in API documentation. This dual approach ensures: 1) Runtime auth bypass works correctly, 2) Generated API docs accurately reflect that the endpoint is publicly accessible. The decorator can be applied at controller or method level, with method-level taking precedence for nested configurations.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/decorators/public.decorator.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/defaultAuth.guard.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 391,
+      "category": "data_flow_integration",
+      "question": "Trace the data flow for resolving customer from lot for barrel ownership.",
+      "answer": "Customer resolution flow: 1) resolveCustomerFromLot(lot) in staging service, 2) Lot has relation to Customer (via customer or customerLots), 3) Query lot with customer include, 4) Return lot.customer if present, 5) If no direct relation: fallback logic (default customer, lookup by lot prefix), 6) If not resolvable: return null, caller creates CRITICAL error, 7) Customer used for: BarrelOwnership creation, access control, reporting, 8) Ownership validFrom set to current date, validTo null (active).",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.service.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.resolver.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 183,
+      "category": "service_relationships",
+      "question": "How does InventoryUploadService.validateCsvStructure handle header validation with BOM and encoding issues?",
+      "answer": "validateCsvStructure(): 1) Sets validationTimeout (5000ms) with cleanup; 2) Converts buffer to UTF-8 string; 3) Creates stream from csv-parser; 4) On first row (isFirstRow): extracts headers via Object.keys(data); 5) Cleans headers: header.replace(/^\\uFEFF/, '').trim() - removes BOM (Byte Order Mark); 6) Case-insensitive comparison: header.toLowerCase() === required.toLowerCase(); 7) Checks for missing required headers; 8) Rejects with descriptive error if missing. This handles: Excel-exported CSVs with BOM, case variations in headers, early termination after validation (maxRowsToCheck=10), timeout prevention for large files.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-upload.service.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-upload.module.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 189,
+      "category": "service_relationships",
+      "question": "How does AuditService.createAuditLogs handle bulk audit logging atomically?",
+      "answer": "createAuditLogs(dataArray): 1) Wraps all operations in prisma.$transaction(async (tx) => {...}); 2) Iterates dataArray, for each: validates userId via validateUserId(data.userId, tx) using same tx; creates auditLog via tx.auditLog.create(); 3) Pushes to logs array; 4) After loop, publishes all to PubSubService; 5) Returns all created logs. Benefits: single transaction for all logs (atomic), user validation uses same transaction (consistent reads), batch PubSub publishing. Use case: bulk operations that need multiple related audit entries to be all-or-nothing.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.service.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.module.ts"
+      ],
+      "complexity": "multi-file"
+    },
+    {
+      "id": 1,
+      "category": "architecture_structure",
+      "question": "What modules must be imported for the BarrelModule to function, and why does it use forwardRef for AuthModule and BarrelOwnershipModule?",
+      "answer": "The BarrelModule imports BarrelModuleBase (base CRUD operations), AuthModule (authentication/authorization), BarrelOwnershipModule (ownership tracking), LotVariationModule (lot variation handling), AuditModule (audit logging), and ContextModule (request context). forwardRef is used for AuthModule and BarrelOwnershipModule to resolve circular dependencies - BarrelModule needs ownership services, but ownership may reference barrels back, creating a circular import that forwardRef lazily resolves.",
+      "required_files": [
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/barrel/barrel.module.ts",
+        "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.module.ts"
+      ],
+      "complexity": "multi-file"
+    }
+  ]
+}

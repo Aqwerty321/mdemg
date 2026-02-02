@@ -1,0 +1,214 @@
+[
+  {
+    "id": 1,
+    "category": "architecture_structure",
+    "question": "Which module is responsible for managing the active plugin registry, and what Symbol is used to store its state globally?",
+    "answer": "The src/plugins/runtime.ts module (lines 1-58) is responsible for managing the active plugin registry. It uses the Symbol REGISTRY_STATE = Symbol.for('clawdbot.pluginRegistryState') defined at line 19 to store the registry state globally. The state is accessed via a closure pattern (lines 26-37) that ensures a singleton instance across the application.",
+    "required_files": [
+      "src/plugins/runtime.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 2,
+    "category": "architecture_structure",
+    "question": "What is the architectural relationship between ChannelPlugin (src/channels/plugins/types.plugin.ts) and ChannelDock (src/channels/dock.ts), and why are they separated?",
+    "answer": "ChannelPlugin (src/channels/plugins/types.plugin.ts:48-84) is the full plugin contract with all adapters (config, setup, pairing, security, gateway, etc.), while ChannelDock (src/channels/dock.ts:40-64) is a lightweight metadata/behavior subset for shared code paths. The separation is explained in comments at src/channels/dock.ts:81-86: 'keep this module *light* (no monitors, probes, puppeteer/web login, etc)' - shared code should import from dock.ts (not from plugins) to avoid eagerly loading heavy channel implementations. The buildDockFromPlugin function (src/channels/dock.ts:374-397) extracts the dock subset from a plugin.",
+    "required_files": [
+      "src/channels/plugins/types.plugin.ts",
+      "src/channels/dock.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 3,
+    "category": "architecture_structure",
+    "question": "What interface must extension plugins implement to register channels, and what method from ClawdbotPluginApi is used to register them?",
+    "answer": "Extension plugins must implement a register() method that accepts ClawdbotPluginApi as a parameter (see extensions/discord/index.ts:12). The plugin calls api.registerChannel() with a ChannelPlugin object (extensions/discord/index.ts:14 and src/plugins/registry.ts:326-352). The ClawdbotPluginApi interface is defined in src/plugin-sdk/index.ts and exported as part of the SDK. The registerChannel method is created in src/plugins/registry.ts:486 within the createApi function.",
+    "required_files": [
+      "extensions/discord/index.ts",
+      "src/plugins/registry.ts",
+      "src/plugin-sdk/index.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 4,
+    "category": "architecture_structure",
+    "question": "Where is the ordered list of core chat channels defined, and how does the system normalize channel aliases?",
+    "answer": "The core chat channels are defined in src/channels/registry.ts as CHAT_CHANNEL_ORDER (lines 7-15): ['telegram', 'whatsapp', 'discord', 'googlechat', 'slack', 'signal', 'imessage']. Channel aliases are defined in CHAT_CHANNEL_ALIASES (lines 103-107), mapping shortcuts like 'imsg' -> 'imessage'. The normalizeChatChannelId function (lines 126-133) normalizes input by checking aliases and validating against CHAT_CHANNEL_ORDER.",
+    "required_files": [
+      "src/channels/registry.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 5,
+    "category": "architecture_structure",
+    "question": "What is the directory structure separation between src/channels/plugins/ and extensions/, and what determines which channels go in each location?",
+    "answer": "src/channels/plugins/ (lines 1-78 in src/channels/plugins/index.ts) contains the plugin infrastructure (types, registry, config helpers, onboarding adapters). The extensions/ directory contains the actual channel implementations (extensions/discord/, extensions/googlechat/, etc.). Core bundled channels are in extensions/ and loaded as plugins. This is evident from extensions/discord/index.ts:1-18 which imports from 'clawdbot/plugin-sdk' and registers via api.registerChannel(). The separation allows channels to be distributed as separate npm packages or local plugins.",
+    "required_files": [
+      "src/channels/plugins/index.ts",
+      "extensions/discord/index.ts",
+      "src/plugin-sdk/index.ts"
+    ],
+    "complexity": "system-wide"
+  },
+  {
+    "id": 6,
+    "category": "architecture_structure",
+    "question": "What module is responsible for building session keys, and what are the three default constants it exports for session identification?",
+    "answer": "The src/routing/session-key.ts module (lines 1-212) is responsible for building session keys. It exports three default constants: DEFAULT_AGENT_ID = 'main' (line 10), DEFAULT_MAIN_KEY = 'main' (line 11), and DEFAULT_ACCOUNT_ID = 'default' (line 12). These are used throughout the session key building functions like buildAgentMainSessionKey() (lines 101-108) and buildAgentPeerSessionKey() (lines 110-149).",
+    "required_files": [
+      "src/routing/session-key.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 7,
+    "category": "architecture_structure",
+    "question": "Which module exports the PluginRuntime type, and what are the four top-level namespaces it provides to plugins?",
+    "answer": "The src/plugins/runtime/types.ts module (lines 1-362) exports the PluginRuntime type. The four top-level namespaces are: config (line 180-183), system (lines 184-188), media (lines 189-196), tts (lines 197-199), tools (lines 200-204), channel (lines 205-350), logging (lines 351-357), and state (lines 358-360). Actually examining the structure more carefully, the main service groupings are: config, system, media, tts, tools, channel, logging, and state - so there are 8 top-level namespaces, not 4. The key architectural groupings are config, system, media, and channel.",
+    "required_files": [
+      "src/plugins/runtime/types.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 8,
+    "category": "architecture_structure",
+    "question": "What is the relationship between src/gateway/server-http.ts and src/gateway/hooks.ts in the HTTP request handling flow?",
+    "answer": "src/gateway/server-http.ts:59-200 defines createHooksRequestHandler which handles HTTP webhook requests at a configurable basePath. It imports hook utilities from src/gateway/hooks.ts including extractHookToken, resolveHookChannel, normalizeAgentPayload, normalizeWakePayload (lines 18-28). The handler validates tokens, normalizes payloads, and dispatches hook actions. The createGatewayHttpServer function (lines 203-302) creates the HTTP server and routes requests to handleHooksRequest first (line 241), establishing hooks as a primary HTTP handler in the gateway architecture.",
+    "required_files": [
+      "src/gateway/server-http.ts",
+      "src/gateway/hooks.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 9,
+    "category": "architecture_structure",
+    "question": "Where is the plugin registry's createApi function defined, and what are the registration methods it exposes on the ClawdbotPluginApi?",
+    "answer": "The createApi function is defined in src/plugins/registry.ts:464-495. It returns a ClawdbotPluginApi object with these registration methods: registerTool (line 481), registerHook (lines 482-483), registerHttpHandler (line 484), registerHttpRoute (line 485), registerChannel (line 486), registerProvider (line 487), registerGatewayMethod (line 488), registerCli (line 489), registerService (line 490), registerCommand (line 491), and the typed hook registration 'on' method (line 493).",
+    "required_files": [
+      "src/plugins/registry.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 10,
+    "category": "architecture_structure",
+    "question": "What is the purpose of src/agents/schema/typebox.ts, and what specific API does it wrap?",
+    "answer": "src/agents/schema/typebox.ts (lines 1-44) provides helper functions for building agent tool schemas using the @sinclair/typebox library. It wraps TypeBox's Type API with custom helpers like stringEnum() (lines 15-24) and optionalStringEnum() (lines 26-31) to create safer enum schemas that use 'enum' instead of 'anyOf' (comment at lines 13-14 explains some providers reject anyOf). It also provides channelTargetSchema() and channelTargetsSchema() helpers (lines 33-43) for channel target parameters.",
+    "required_files": [
+      "src/agents/schema/typebox.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 11,
+    "category": "architecture_structure",
+    "question": "How does the extension plugin system's runtime injection work, as demonstrated by extensions/discord/src/runtime.ts and extensions/discord/index.ts?",
+    "answer": "The plugin system uses a runtime injection pattern. Extensions/discord/index.ts:13 calls setDiscordRuntime(api.runtime) during plugin registration. Extensions/discord/src/runtime.ts implements a module-scoped variable to store the runtime, then exports getDiscordRuntime() for accessing it. The PluginRuntime (from src/plugins/runtime/types.ts) provides access to config, system, media, channel, and logging utilities. This allows the discord channel implementation (extensions/discord/src/channel.ts:35-40) to call getDiscordRuntime().channel.discord.messageActions.* without tight coupling to core modules.",
+    "required_files": [
+      "extensions/discord/index.ts",
+      "extensions/discord/src/runtime.ts",
+      "extensions/discord/src/channel.ts",
+      "src/plugins/runtime/types.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 12,
+    "category": "architecture_structure",
+    "question": "What is the architectural pattern used in src/channels/dock.ts for defining channel-specific behavior (DOCKS constant), and what is the fallback mechanism for plugin channels?",
+    "answer": "src/channels/dock.ts uses a static DOCKS constant (lines 91-372) mapping ChatChannelId to ChannelDock for core channels like telegram, whatsapp, discord, etc. Each dock entry defines capabilities, config resolvers, mention patterns, and threading behavior inline. For plugin channels not in DOCKS, the fallback is buildDockFromPlugin() (lines 374-397) which extracts a ChannelDock from a ChannelPlugin. The listChannelDocks() function (lines 415-432) combines both sources, prioritizing DOCKS entries and falling back to plugin-provided docks via listPluginDockEntries() (lines 399-413).",
+    "required_files": [
+      "src/channels/dock.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 13,
+    "category": "architecture_structure",
+    "question": "What is the responsibility boundary between src/auto-reply/reply/provider-dispatcher.ts and src/auto-reply/dispatch.ts?",
+    "answer": "src/auto-reply/reply/provider-dispatcher.ts (lines 1-45) exports high-level dispatcher functions like dispatchReplyWithBufferedBlockDispatcher() (lines 14-28) and dispatchReplyWithDispatcher() (lines 30-44) that accept MsgContext, ClawdbotConfig, and dispatcher options. These delegate to src/auto-reply/dispatch.ts which contains the actual dispatch implementation with dispatchInboundMessageWithBufferedDispatcher and dispatchInboundMessageWithDispatcher (imported at lines 5-8). The provider-dispatcher acts as a facade/adapter layer, normalizing parameters before calling the core dispatch logic.",
+    "required_files": [
+      "src/auto-reply/reply/provider-dispatcher.ts",
+      "src/auto-reply/dispatch.ts"
+    ],
+    "complexity": "cross-module"
+  },
+  {
+    "id": 14,
+    "category": "architecture_structure",
+    "question": "What are the three core module categories that MUST NOT be imported by src/channels/dock.ts, and why?",
+    "answer": "According to comments at src/channels/dock.ts:81-86, the dock module must remain 'light' and NOT import: monitors, probes, or puppeteer/web login implementations. The rationale is that shared code paths (reply flow, command auth, sandbox explain) should depend on dock.ts for channel metadata, but shouldn't eagerly load heavy channel-specific implementations. This architectural constraint ensures fast module loading for common operations. Heavy logic should stay in src/channels/plugins/<id>.ts or channel-specific modules.",
+    "required_files": [
+      "src/channels/dock.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 15,
+    "category": "architecture_structure",
+    "question": "What is the plugin registry structure (PluginRegistry type) and what are the 11 collection arrays it maintains?",
+    "answer": "The PluginRegistry type is defined in src/plugins/registry.ts:124-138. It maintains 11 collection arrays: plugins (PluginRecord[]), tools (PluginToolRegistration[]), hooks (PluginHookRegistration[]), typedHooks (TypedPluginHookRegistration[]), channels (PluginChannelRegistration[]), providers (PluginProviderRegistration[]), httpHandlers (PluginHttpRegistration[]), httpRoutes (PluginHttpRouteRegistration[]), cliRegistrars (PluginCliRegistration[]), services (PluginServiceRegistration[]), and commands (PluginCommandRegistration[]). It also has gatewayHandlers (GatewayRequestHandlers object) and diagnostics (PluginDiagnostic[]).",
+    "required_files": [
+      "src/plugins/registry.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 16,
+    "category": "architecture_structure",
+    "question": "How does src/index.ts serve as the entry point, and what CLI framework does it use?",
+    "answer": "src/index.ts (lines 1-95) is the main entry point (shebang at line 1). It loads environment (loadDotEnv line 37, normalizeEnv line 38), enables console capture (line 42), asserts runtime compatibility (line 45), then imports and builds the CLI program via buildProgram() from src/cli/program.ts (lines 47-49). It checks if running as main module (lines 76-78) and if so, installs error handlers (line 83) and calls program.parseAsync() (line 90). The CLI framework is Commander.js (implied by parseAsync API). It exports utility functions for programmatic use (lines 51-74).",
+    "required_files": [
+      "src/index.ts",
+      "src/entry.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 17,
+    "category": "architecture_structure",
+    "question": "What is the plugin-sdk module's purpose (src/plugin-sdk/index.ts), and what types of exports does it re-export?",
+    "answer": "src/plugin-sdk/index.ts (lines 1-372) serves as the public Plugin SDK entrypoint, re-exporting types and utilities for external plugins to use. It exports: 1) Channel plugin types (ChannelPlugin, ChannelId, ChannelConfigAdapter, etc. from lines 7-59), 2) Plugin runtime types (ClawdbotPluginApi, ClawdbotPluginService, PluginRuntime from lines 61-71), 3) Gateway types (GatewayRequestHandler, RespondFn from lines 66-70), 4) Config schemas (DiscordConfigSchema, SlackConfigSchema, etc. from lines 96-116), 5) Channel-specific utilities (line helpers, WhatsApp helpers, Discord helpers from lines 250-372), and 6) Common utilities (normalizePluginHttpPath, emptyPluginConfigSchema from lines 72-74).",
+    "required_files": [
+      "src/plugin-sdk/index.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 18,
+    "category": "architecture_structure",
+    "question": "What are the gateway protocol schema modules (src/gateway/protocol/schema/*.ts), and how are they aggregated?",
+    "answer": "The gateway protocol schemas are organized in separate files under src/gateway/protocol/schema/: agent.ts, agents-models-skills.ts, channels.ts, config.ts, cron.ts, error-codes.ts, exec-approvals.ts, devices.ts, frames.ts, logs-chat.ts, nodes.ts, protocol-schemas.ts, sessions.ts, snapshot.ts, types.ts, and wizard.ts. These are all re-exported through src/gateway/protocol/schema.ts (lines 1-16) using export * statements, creating a single aggregation point. This modular schema organization allows the gateway protocol to be version-controlled and imported as a cohesive unit.",
+    "required_files": [
+      "src/gateway/protocol/schema.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 19,
+    "category": "architecture_structure",
+    "question": "What pattern does src/agents/tools/common.ts use for parameter extraction, and what are the three readParam utility functions it exports?",
+    "answer": "src/agents/tools/common.ts (lines 1-100) implements a parameter extraction pattern for agent tools. It exports three readParam utilities: readStringParam() (lines 33-60) with overloaded signatures for required vs optional parameters, readStringOrNumberParam() (lines 62-78) for flexible numeric/string inputs, and readNumberParam() (lines 80-100+) for numeric parameters with optional integer validation. All three follow a pattern of: 1) accept params Record and key, 2) accept options for required/trim/label, 3) validate type, 4) throw with label if required and missing, 5) return typed value or undefined.",
+    "required_files": [
+      "src/agents/tools/common.ts"
+    ],
+    "complexity": "multi-file"
+  },
+  {
+    "id": 20,
+    "category": "architecture_structure",
+    "question": "How does the channel plugin system handle multiple accounts per channel, as demonstrated in extensions/discord/src/channel.ts config adapter?",
+    "answer": "The channel plugin system's config adapter (extensions/discord/src/channel.ts:71-107) implements multi-account support through several methods: listAccountIds() to enumerate accounts, resolveAccount() to fetch specific account config, defaultAccountId() to determine which account to use by default, setAccountEnabled() to toggle accounts on/off, and deleteAccount() to remove accounts. The ResolvedDiscordAccount type (imported from clawdbot/plugin-sdk line 27) encapsulates account-specific config. The security.resolveDmPolicy method (lines 108-122) dynamically determines the config path based on whether an accounts.<id> section exists, using either channels.discord.accounts.<id>.dm or channels.discord.dm as the fallback.",
+    "required_files": [
+      "extensions/discord/src/channel.ts",
+      "src/channels/plugins/types.ts"
+    ],
+    "complexity": "cross-module"
+  }
+]

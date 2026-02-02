@@ -1,0 +1,154 @@
+{
+  "metadata": {
+    "timestamp": "2026-01-29T02:07:55.767648",
+    "post_parser_fix": true
+  },
+  "aggregate": {
+    "mean_score": 0.975,
+    "median_score": 1.0,
+    "with_evidence_pct": 95.0,
+    "correct_file_pct": 20.0
+  },
+  "grades": [
+    {
+      "id": 379,
+      "score": 0.5,
+      "has_evidence": false,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 77,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 258,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 450,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 424,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 161,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 270,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 57,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": true,
+      "results_count": 10
+    },
+    {
+      "id": 172,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": true,
+      "results_count": 10
+    },
+    {
+      "id": 251,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 31,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 69,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 262,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": true,
+      "results_count": 10
+    },
+    {
+      "id": 277,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 336,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 438,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 391,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": true,
+      "results_count": 10
+    },
+    {
+      "id": 183,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 189,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    },
+    {
+      "id": 1,
+      "score": 1.0,
+      "has_evidence": true,
+      "correct_file": false,
+      "results_count": 10
+    }
+  ]
+}

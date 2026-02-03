@@ -107,6 +107,30 @@ curl -s -X POST http://localhost:9999/v1/learning/unfreeze -H "Content-Type: app
 
 ---
 
+## Git Workflow
+
+### Development Branch: `mdemg-dev01`
+- **All development work happens on `mdemg-dev01`** — never commit directly to `main`
+- `main` is branch-protected; changes reach it only via PR
+- On push to `mdemg-dev01`, a GitHub Actions workflow (`.github/workflows/auto-pr.yml`) automatically creates a PR to `main` if one doesn't already exist
+- Subsequent pushes update the existing PR automatically
+- Always verify you are on `mdemg-dev01` before starting work: `git branch --show-current`
+
+### Commit & Push Flow
+```bash
+# 1. Ensure you're on the dev branch
+git checkout mdemg-dev01
+
+# 2. Make changes, stage, commit (conventional commits)
+git add <files>
+git commit -m "feat: description"
+
+# 3. Push — auto-PR is created/updated on GitHub
+git push -u origin mdemg-dev01
+```
+
+---
+
 ## Orchestration Protocol
 
 When working on this project, follow these mandatory guidelines:

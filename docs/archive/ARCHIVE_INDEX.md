@@ -20,6 +20,13 @@ docs/archive/
 │   ├── vscode-scale/         # VS Code scale tests
 │   ├── llm-summary/          # LLM summarization tests
 │   └── pytorch/              # PyTorch benchmark
+├── uats-duplicates-20260203/  # Duplicate UATS spec/runner/schema files
+│   ├── specs-v1.0.0/         # 45 specs (no SHA256 hashes, compact format)
+│   ├── runners-v1.0.0/       # Runner v1.0.0 (no hash verification)
+│   ├── schema/                # Identical schema copy
+│   ├── uats-spec-v1/         # Distribution archive (tarball + example)
+│   ├── Makefile.uats          # Identical Makefile copy
+│   └── README-top-level.md    # Older README variant
 └── investigations/           # Completed investigations
     ├── BENCHMARK_RUN3_INVESTIGATION.md
     └── CONFIDENCE_SCORE_INVESTIGATION.md
@@ -93,6 +100,17 @@ diff docs/archive/benchmarks/whk-wms/archive/benchmark_v22_test/grades_mdemg_run
 
 ---
 
+### UATS Duplicates (2026-02-03)
+
+**Reason:** Duplicate UATS files existed at `docs/api/api-spec/` top level alongside the canonical `docs/api/api-spec/uats/` directory.
+
+- **Canonical (kept):** `docs/api/api-spec/uats/` — v1.1.0 runner, SHA256 hashes in specs, referenced by Makefile and CONTRIBUTING.md
+- **Archived:** Top-level `specs/`, `runners/`, `schema/`, `README.md`, `Makefile.uats` — v1.0.0 runner, no SHA256 hashes, not referenced by any tooling
+- **Archived:** `uats-spec-v1/` — distribution directory with tarball (v1.0.1)
+
+---
+
 ## Archive Date
 
-All files archived on **2026-02-02** as part of documentation cleanup and consolidation effort.
+- **2026-02-02:** Benchmark and investigation archives
+- **2026-02-03:** UATS duplicate consolidation

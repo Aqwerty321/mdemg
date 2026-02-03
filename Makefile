@@ -1,6 +1,13 @@
 # MDEMG Makefile
 # Build, test, and utility targets
 
+# Dynamic port discovery: read .mdemg.port if available, fall back to 9999
+BASE_URL ?= http://localhost:$(shell cat .mdemg.port 2>/dev/null || echo 9999)
+
+# Export MDEMG_BASE_URL so UATS spec files can resolve ${MDEMG_BASE_URL}
+# via the runner's env-var fallback when --base-url is not passed directly
+export MDEMG_BASE_URL ?= $(BASE_URL)
+
 .PHONY: all build build-parser test test-parsers clean
 
 # Default target
@@ -78,7 +85,7 @@ test-api:
 	@echo "Running UATS API validation (41 endpoints)..."
 	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
 		--spec-dir docs/api-spec/uats/specs/ \
-		--base-url http://localhost:8082 \
+		--base-url $(BASE_URL) \
 		--report /tmp/api-report.json
 	@echo "Report saved to /tmp/api-report.json"
 
@@ -88,17 +95,17 @@ test-api-%:
 	@echo "Validating $* API..."
 	python3 docs/api-spec/uats/runners/uats_runner.py validate \
 		--spec docs/api-spec/uats/specs/$*.uats.json \
-		--base-url http://localhost:8082
+		--base-url $(BASE_URL)
 
 # Smoke tests (health + readiness only)
 test-smoke:
 	@echo "Running smoke tests..."
 	python3 docs/api-spec/uats/runners/uats_runner.py validate \
 		--spec docs/api-spec/uats/specs/health.uats.json \
-		--base-url http://localhost:8082
+		--base-url $(BASE_URL)
 	python3 docs/api-spec/uats/runners/uats_runner.py validate \
 		--spec docs/api-spec/uats/specs/readiness.uats.json \
-		--base-url http://localhost:8082
+		--base-url $(BASE_URL)
 
 # Run all tests (parsers + API)
 test-all: test-parsers test-api

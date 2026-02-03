@@ -6,9 +6,10 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Go 1.24 or later
 - Neo4j 5.x with vector index support
 - An embedding provider (OpenAI API or Ollama)
+- Python 3.10+ (for benchmark and parser test runners)
 
 ### Development Setup
 
@@ -46,6 +47,7 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 
 - Follow standard Go conventions and idioms
 - Run `go fmt` before committing
+- Run `golangci-lint run` to catch lint issues (this runs in CI)
 - Use meaningful variable and function names
 - Add comments for exported functions and complex logic
 - Keep functions focused and reasonably sized
@@ -55,9 +57,46 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 - Write tests for new functionality
 - Run existing tests before submitting:
   ```bash
-  go test ./...
+  # Unit tests
+  go test ./internal/...
+
+  # Integration tests (requires running Neo4j + MDEMG server)
+  go test -tags=integration ./tests/integration/...
+
+  # Parser validation (UPTS - Universal Parser Test Specification)
+  make test-parsers
+
+  # Validate a single language parser
+  make test-parser-go
+  make test-parser-python
+  make test-parser-typescript
+
+  # API validation (UATS - requires running server)
+  make test-api
+
+  # Smoke tests (health + readiness only)
+  make test-smoke
+
+  # All tests (UPTS + UATS)
+  make test-all
   ```
 - Include both unit tests and integration tests where appropriate
+
+### Test Frameworks
+
+**UPTS (Universal Parser Test Specification)** validates language parsers against JSON spec files. Specs live in `docs/lang-parser/lang-parse-spec/upts/specs/`. To add or update a parser test:
+1. Create or edit `docs/lang-parser/lang-parse-spec/upts/specs/<language>.upts.json`
+2. Add fixture files in `docs/lang-parser/lang-parse-spec/upts/fixtures/`
+3. Run `make test-parser-<language>` to validate
+
+**UATS (Universal API Test Specification)** validates API endpoints against JSON spec files. Specs live in `docs/api/api-spec/uats/specs/`. The `--base-url` flag in the Makefile dynamically reads the server's port from `.mdemg.port` (see Dynamic Port Allocation below). To add or update an API test:
+1. Create or edit `docs/api/api-spec/uats/specs/<endpoint>.uats.json`
+2. Run `make test-api-<endpoint>` to validate
+3. Install UATS dependencies: `make uats-setup`
+
+### Dynamic Port Allocation
+
+The MDEMG server uses dynamic port allocation. When started, it writes the actual bound port to `.mdemg.port`. All test commands (`make test-api`, `make test-smoke`) read this file automatically. If the file doesn't exist, port `9999` is used as the fallback default.
 
 ## Submitting Changes
 
@@ -100,27 +139,103 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 
 ```
 mdemg/
-├── cmd/           # CLI entry points (server, ingest-codebase, etc.)
-├── internal/      # Internal packages
-│   ├── api/       # HTTP API handlers
-│   ├── retrieval/ # Core retrieval algorithms
-│   ├── hidden/    # Hidden layer and concept abstraction
-│   ├── learning/  # Hebbian learning edges
-│   ├── embeddings/# Embedding providers
-│   └── ...
-├── docs/          # Documentation
-└── plugins/       # Plugin modules
+├── cmd/                  # CLI entry points (server, ingest-codebase, mcp-server, etc.)
+├── internal/             # Internal packages
+│   ├── api/              # HTTP API handlers
+│   ├── retrieval/        # Core retrieval algorithms
+│   ├── hidden/           # Hidden layer and concept abstraction
+│   ├── learning/         # Hebbian learning edges
+│   ├── embeddings/       # Embedding providers (OpenAI, Ollama)
+│   ├── conversation/     # Conversation Memory System (CMS)
+│   ├── symbols/          # Code symbol extraction
+│   └── plugins/          # Plugin system
+├── migrations/           # Neo4j schema migrations (Cypher)
+├── tests/                # Integration tests
+├── scripts/              # Utility scripts
+├── docs/                 # Documentation and benchmarks
+└── plugins/              # Plugin modules
 ```
+
+## API Endpoints
+
+Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endpoint). Below is the complete endpoint list registered in `internal/api/server.go`:
+
+### Health & Readiness
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/healthz` | Liveness check |
+| GET | `/readyz` | Readiness check (includes embedding provider status) |
+
+### Memory Operations
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/memory/retrieve` | Semantic retrieval with graph expansion |
+| POST | `/v1/memory/ingest` | Ingest a single observation |
+| POST | `/v1/memory/ingest/batch` | Batch ingest observations |
+| POST | `/v1/memory/reflect` | Deep reflection on a topic |
+| GET | `/v1/memory/stats` | Memory graph statistics |
+| POST | `/v1/memory/consolidate` | Trigger hidden layer consolidation |
+| POST | `/v1/memory/archive/bulk` | Bulk archive nodes |
+| * | `/v1/memory/nodes/{id}` | Node CRUD operations |
+| GET | `/v1/memory/symbols` | Search code symbols |
+| GET | `/v1/memory/distribution` | Score distribution stats |
+| GET | `/v1/memory/cache/stats` | Embedding/query cache stats |
+| GET | `/v1/memory/query/metrics` | Query performance metrics |
+| POST | `/v1/memory/consult` | SME-style Q&A |
+| POST | `/v1/memory/suggest` | Suggest related concepts |
+
+### Codebase Ingestion (Background Jobs)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/memory/ingest/trigger` | Start background ingestion job |
+| GET | `/v1/memory/ingest/status/{id}` | Check job progress |
+| POST | `/v1/memory/ingest/cancel/{id}` | Cancel running job |
+| GET | `/v1/memory/ingest/jobs` | List all ingestion jobs |
+| * | `/v1/memory/ingest-codebase` | Codebase ingestion route |
+
+### Learning & Hebbian Edges
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/learning/prune` | Prune low-weight edges |
+| GET | `/v1/learning/stats` | Learning edge statistics |
+| POST | `/v1/learning/freeze` | Freeze learning for stable scoring |
+| POST | `/v1/learning/unfreeze` | Unfreeze learning |
+| GET | `/v1/learning/freeze/status` | Check freeze status |
+
+### Conversation Memory System (CMS)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/conversation/observe` | Store observation |
+| POST | `/v1/conversation/correct` | Store correction |
+| POST | `/v1/conversation/resume` | Resume session (restore context) |
+| POST | `/v1/conversation/recall` | Recall conversation memory |
+| POST | `/v1/conversation/consolidate` | Consolidate conversation themes |
+| GET | `/v1/conversation/volatile/stats` | Volatile memory stats |
+| POST | `/v1/conversation/graduate` | Graduate volatile to permanent |
+
+### System & Plugins
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/metrics` | Prometheus-style metrics |
+| GET | `/v1/modules` | List modules |
+| * | `/v1/modules/{id}` | Module sync |
+| * | `/v1/plugins` | Plugin operations |
+| GET | `/v1/ape/status` | APE (Autonomous Prompt Evolution) status |
+| POST | `/v1/ape/trigger` | Trigger APE |
+| POST | `/v1/feedback` | Submit feedback |
+| GET | `/v1/system/capability-gaps` | List capability gaps |
+| GET | `/v1/system/gap-interviews` | Gap interview sessions |
+| GET | `/v1/system/pool-metrics` | Neo4j connection pool metrics |
 
 ## Reporting Issues
 
-When reporting bugs, please include:
-
-- Go version (`go version`)
-- Neo4j version
-- Steps to reproduce
-- Expected vs actual behavior
-- Relevant logs or error messages
+Use the [bug report](https://github.com/reh3376/mdemg/issues/new?template=bug_report.yml) or [feature request](https://github.com/reh3376/mdemg/issues/new?template=feature_request.yml) templates when opening issues.
 
 ## Code of Conduct
 

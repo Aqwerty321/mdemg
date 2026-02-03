@@ -2,10 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -54,11 +58,25 @@ func main() {
 	srv.StartPeriodicConsolidation("mdemg-dev", 5*time.Minute)
 
 	h := &http.Server{
-		Addr:              cfg.ListenAddr,
 		Handler:           srv.Routes(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       time.Duration(cfg.HTTPReadTimeout) * time.Second,
 		WriteTimeout:      time.Duration(cfg.HTTPWriteTimeout) * time.Second,
+	}
+
+	// Dynamic port allocation: try preferred port, then scan range
+	listener, err := listenWithFallback(cfg)
+	if err != nil {
+		log.Fatalf("failed to bind: %v", err)
+	}
+
+	// Extract actual port and write port file for client discovery
+	_, portStr, _ := net.SplitHostPort(listener.Addr().String())
+	portFile, _ := filepath.Abs(cfg.PortFilePath)
+	if err := writePortFile(portFile, portStr); err != nil {
+		log.Printf("warning: failed to write port file %s: %v", portFile, err)
+	} else {
+		log.Printf("port file written: %s", portFile)
 	}
 
 	// Set up graceful shutdown
@@ -66,8 +84,8 @@ func main() {
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("listening on %s", cfg.ListenAddr)
-		if err := h.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Printf("MDEMG server started on http://localhost:%s", portStr)
+		if err := h.Serve(listener); err != nil && err != http.ErrServerClosed {
 			log.Printf("server error: %v", err)
 		}
 	}()
@@ -75,6 +93,9 @@ func main() {
 	// Wait for shutdown signal
 	<-shutdown
 	log.Println("shutdown signal received")
+
+	// Remove port file
+	os.Remove(portFile)
 
 	// Create shutdown context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -96,4 +117,44 @@ func main() {
 	}
 
 	log.Println("shutdown complete")
+}
+
+// listenWithFallback tries the preferred address first, then scans the port range.
+func listenWithFallback(cfg config.Config) (net.Listener, error) {
+	// Try preferred address first
+	ln, err := net.Listen("tcp", cfg.ListenAddr)
+	if err == nil {
+		return ln, nil
+	}
+
+	// Only fallback if the error is "address already in use"
+	var opErr *net.OpError
+	if !errors.As(err, &opErr) {
+		return nil, fmt.Errorf("listen on %s: %w", cfg.ListenAddr, err)
+	}
+	if !errors.Is(opErr.Err, syscall.EADDRINUSE) {
+		return nil, fmt.Errorf("listen on %s: %w", cfg.ListenAddr, err)
+	}
+
+	log.Printf("preferred address %s in use, scanning range %d-%d",
+		cfg.ListenAddr, cfg.PortRangeStart, cfg.PortRangeEnd)
+
+	for port := cfg.PortRangeStart; port <= cfg.PortRangeEnd; port++ {
+		addr := fmt.Sprintf(":%d", port)
+		ln, err = net.Listen("tcp", addr)
+		if err == nil {
+			return ln, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no available port in range %d-%d", cfg.PortRangeStart, cfg.PortRangeEnd)
+}
+
+// writePortFile writes the port number atomically (write tmp, then rename).
+func writePortFile(path, port string) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(port+"\n"), 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }

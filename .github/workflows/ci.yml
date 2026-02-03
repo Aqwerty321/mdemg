@@ -104,26 +104,22 @@ jobs:
 
       - name: Start MDEMG server
         run: |
-          # Find an available port in range 8090-8199
-          for port in $(seq 8090 8199); do
-            if ! nc -z localhost "$port" 2>/dev/null; then
-              echo "Found available port: $port"
-              echo "MDEMG_PORT=$port" >> "$GITHUB_ENV"
-              break
-            fi
-          done
-
           export NEO4J_URI=bolt://localhost:7687
           export NEO4J_USER=neo4j
           export NEO4J_PASS=testpassword
-          export LISTEN_ADDR=:$port
+          export LISTEN_ADDR=:8090
+          export PORT_RANGE_START=8090
+          export PORT_RANGE_END=8199
+          export PORT_FILE_PATH=.mdemg.port
           export EMBEDDING_PROVIDER=
           export REQUIRED_SCHEMA_VERSION=10
           ./bin/mdemg &
 
-          # Wait for server to be ready
-          timeout 30s bash -c "until curl -s http://localhost:$port/healthz > /dev/null 2>&1; do sleep 1; done"
-          echo "MDEMG server is ready on port $port"
+          # Wait for port file (server writes it after binding)
+          timeout 30s bash -c 'until [ -f .mdemg.port ]; do sleep 1; done'
+          MDEMG_PORT=$(cat .mdemg.port)
+          echo "MDEMG_PORT=$MDEMG_PORT" >> "$GITHUB_ENV"
+          echo "MDEMG server is ready on port $MDEMG_PORT"
 
       - name: Run Integration Tests
         run: go test -v -tags=integration ./tests/integration/...

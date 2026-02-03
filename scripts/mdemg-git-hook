@@ -22,7 +22,17 @@ fi
 # Configuration
 REPO_ROOT=$(git rev-parse --show-toplevel)
 SPACE_ID="${MDEMG_SPACE_ID:-$(basename "$REPO_ROOT")}"
-ENDPOINT="${MDEMG_ENDPOINT:-http://localhost:8090}"
+
+# Dynamic port discovery: env var > .mdemg.port file > default
+if [ -n "$MDEMG_ENDPOINT" ]; then
+    ENDPOINT="$MDEMG_ENDPOINT"
+elif [ -f "$REPO_ROOT/.mdemg.port" ]; then
+    ENDPOINT="http://localhost:$(cat "$REPO_ROOT/.mdemg.port")"
+elif [ -f .mdemg.port ]; then
+    ENDPOINT="http://localhost:$(cat .mdemg.port)"
+else
+    ENDPOINT="http://localhost:9999"
+fi
 VERBOSE="${MDEMG_VERBOSE:-false}"
 SKIP_PATTERNS="${MDEMG_SKIP_PATTERNS:-.git,node_modules,vendor,.worktrees}"
 

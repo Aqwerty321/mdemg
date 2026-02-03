@@ -2,7 +2,7 @@
   "uats_version": "1.0.0",
   "api": {
     "name": "Cancel Ingest Codebase Job",
-    "base_url": "http://localhost:8082",
+    "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
     "operation_id": "cancelIngestCodebaseJob",

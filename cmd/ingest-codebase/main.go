@@ -22,6 +22,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"mdemg/cmd/ingest-codebase/languages"
+	"mdemg/internal/config"
 	"mdemg/internal/summarize"
 )
 
@@ -429,19 +430,10 @@ func main() {
 		log.Printf("Note: No .env file found, using defaults/flags")
 	}
 
-	// Resolve endpoint dynamically from LISTEN_ADDR if not provided
+	// Resolve endpoint via priority chain: --endpoint flag > MDEMG_ENDPOINT env > .mdemg.port > LISTEN_ADDR > default
 	if *mdemgEndpoint == "" {
-		listenAddr := os.Getenv("LISTEN_ADDR")
-		if listenAddr == "" {
-			listenAddr = ":8090" // fallback default
-		}
-		// Convert :8090 to http://localhost:8090
-		if strings.HasPrefix(listenAddr, ":") {
-			*mdemgEndpoint = "http://localhost" + listenAddr
-		} else {
-			*mdemgEndpoint = "http://" + listenAddr
-		}
-		log.Printf("Resolved endpoint from LISTEN_ADDR: %s", *mdemgEndpoint)
+		*mdemgEndpoint = config.ResolveEndpoint("http://localhost:9999")
+		log.Printf("Resolved endpoint: %s", *mdemgEndpoint)
 	}
 
 	if *codebasePath == "" {

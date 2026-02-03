@@ -15,21 +15,19 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"mdemg/internal/config"
 )
 
 const (
-	defaultMDEMGEndpoint = "http://localhost:8082"
+	defaultMDEMGEndpoint = "http://localhost:9999"
 	defaultSpaceID       = "ide-agent"
 )
 
 var mdemgEndpoint string
 
 func main() {
-	// Allow override via environment
-	mdemgEndpoint = os.Getenv("MDEMG_ENDPOINT")
-	if mdemgEndpoint == "" {
-		mdemgEndpoint = defaultMDEMGEndpoint
-	}
+	// Resolve endpoint via priority chain: MDEMG_ENDPOINT env > .mdemg.port file > LISTEN_ADDR > default
+	mdemgEndpoint = config.ResolveEndpoint(defaultMDEMGEndpoint)
 
 	// Create MCP server
 	s := server.NewMCPServer(

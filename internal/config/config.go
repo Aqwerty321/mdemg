@@ -174,6 +174,11 @@ type Config struct {
 	Neo4jAcquireTimeoutSec   int // Connection acquire timeout in seconds (default: 60)
 	Neo4jMaxConnLifetimeSec  int // Maximum connection lifetime in seconds (default: 3600)
 	Neo4jConnIdleTimeoutSec  int // Connection idle timeout in seconds (default: 0 = disabled)
+
+	// Dynamic port allocation
+	PortRangeStart int    // Start of fallback port range (default: derived from ListenAddr port)
+	PortRangeEnd   int    // End of fallback port range (default: 8999)
+	PortFilePath   string // Path to write allocated port for client discovery (default: .mdemg.port)
 }
 
 func FromEnv() (Config, error) {
@@ -871,6 +876,27 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// Dynamic port allocation
+	// Derive default PortRangeStart from ListenAddr port
+	defaultPortStart := 9999
+	if idx := strings.LastIndex(listen, ":"); idx >= 0 {
+		if p, parseErr := strconv.Atoi(listen[idx+1:]); parseErr == nil {
+			defaultPortStart = p
+		}
+	}
+	portRangeStart, err := atoi("PORT_RANGE_START", defaultPortStart)
+	if err != nil {
+		return Config{}, err
+	}
+	portRangeEnd, err := atoi("PORT_RANGE_END", 8999)
+	if err != nil {
+		return Config{}, err
+	}
+	if portRangeStart > portRangeEnd {
+		return Config{}, errors.New("PORT_RANGE_START must be <= PORT_RANGE_END")
+	}
+	portFilePath := get("PORT_FILE_PATH", ".mdemg.port")
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -992,5 +1018,43 @@ func FromEnv() (Config, error) {
 		Neo4jAcquireTimeoutSec:    neo4jAcquireTimeout,
 		Neo4jMaxConnLifetimeSec:   neo4jMaxConnLifetime,
 		Neo4jConnIdleTimeoutSec:   neo4jConnIdleTimeout,
+		PortRangeStart:            portRangeStart,
+		PortRangeEnd:              portRangeEnd,
+		PortFilePath:              portFilePath,
 	}, nil
+}
+
+// ResolveEndpoint determines the MDEMG API endpoint using a priority chain:
+//  1. MDEMG_ENDPOINT env var (explicit override)
+//  2. .mdemg.port file (dynamic port discovery)
+//  3. LISTEN_ADDR env var (static config)
+//  4. defaultAddr fallback
+func ResolveEndpoint(defaultAddr string) string {
+	// Priority 1: explicit env override
+	if ep := strings.TrimSpace(os.Getenv("MDEMG_ENDPOINT")); ep != "" {
+		return ep
+	}
+
+	// Priority 2: read port file
+	portFile := strings.TrimSpace(os.Getenv("PORT_FILE_PATH"))
+	if portFile == "" {
+		portFile = ".mdemg.port"
+	}
+	if data, err := os.ReadFile(portFile); err == nil {
+		port := strings.TrimSpace(string(data))
+		if port != "" {
+			return "http://localhost:" + port
+		}
+	}
+
+	// Priority 3: LISTEN_ADDR env var
+	if addr := strings.TrimSpace(os.Getenv("LISTEN_ADDR")); addr != "" {
+		if strings.HasPrefix(addr, ":") {
+			return "http://localhost" + addr
+		}
+		return "http://" + addr
+	}
+
+	// Priority 4: fallback
+	return defaultAddr
 }

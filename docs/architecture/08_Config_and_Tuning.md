@@ -22,9 +22,27 @@ REQUIRED_SCHEMA_VERSION=4
 # HTTP Server
 LISTEN_ADDR=:8082                    # Service listen address (default :8082)
 
+# Dynamic Port Allocation
+# If LISTEN_ADDR port is busy, the server scans this range for an available port.
+# PORT_RANGE_START=9999              # Start of fallback range (default: derived from LISTEN_ADDR)
+# PORT_RANGE_END=8999                # End of fallback range (default: 8999)
+# PORT_FILE_PATH=.mdemg.port        # Port file for client discovery (default: .mdemg.port)
+
 # Vector Index
 VECTOR_INDEX_NAME=memNodeEmbedding   # Neo4j vector index name
 ```
+
+### Dynamic Port Allocation
+
+The server writes a `.mdemg.port` file containing the actual bound port. Client tools (`mcp-server`, `ingest-codebase`, shell scripts) read this file automatically.
+
+**Resolution priority** (used by `config.ResolveEndpoint()`):
+1. `MDEMG_ENDPOINT` environment variable (explicit override)
+2. `.mdemg.port` file (dynamic discovery)
+3. `LISTEN_ADDR` environment variable (static config)
+4. Hardcoded default (`http://localhost:9999`)
+
+The port file is removed on graceful shutdown (SIGINT/SIGTERM).
 
 ---
 
@@ -211,6 +229,11 @@ REQUIRED_SCHEMA_VERSION=4
 
 # Service
 LISTEN_ADDR=:8082
+
+# Dynamic Port Allocation (optional)
+# PORT_RANGE_START=9999
+# PORT_RANGE_END=8999
+# PORT_FILE_PATH=.mdemg.port
 
 # Embedding Provider
 EMBEDDING_PROVIDER=openai

@@ -81,6 +81,10 @@ temp/
 *.log
 logs/
 
+# Dynamic port file
+.mdemg.port
+.mdemg.port.tmp
+
 # Build artifacts
 mdemg
 

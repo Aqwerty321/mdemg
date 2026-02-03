@@ -2,7 +2,7 @@
   "uats_version": "1.0.0",
   "api": {
     "name": "Learning Freeze Status",
-    "base_url": "http://localhost:9999",
+    "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
     "tags": [

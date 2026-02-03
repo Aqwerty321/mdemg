@@ -2183,10 +2183,10 @@ func TestValidateBatchIngestRequest(t *testing.T) {
 			errorField:  "observations",
 		},
 		{
-			name: "too many observations (101) fails",
+			name: "too many observations (2001) fails",
 			request: models.BatchIngestRequest{
 				SpaceID:      "test-space",
-				Observations: validItems(101),
+				Observations: validItems(2001),
 			},
 			expectError: true,
 			errorField:  "observations",

@@ -59,8 +59,8 @@ func TestToRecord(t *testing.T) {
 		Value:          "10000",
 		RawValue:       "10000",
 		FilePath:       "src/vs/editor/cursor.ts",
-		LineNumber:     25,
-		EndLine:        25,
+		Line:           25,
+		LineEnd:        25,
 		Column:         0,
 		Exported:       true,
 		DocComment:     "Maximum number of cursors",
@@ -85,8 +85,8 @@ func TestToRecord(t *testing.T) {
 	if record.FilePath != sym.FilePath {
 		t.Errorf("FilePath = %s, want %s", record.FilePath, sym.FilePath)
 	}
-	if record.LineNumber != sym.LineNumber {
-		t.Errorf("LineNumber = %d, want %d", record.LineNumber, sym.LineNumber)
+	if record.Line != sym.Line {
+		t.Errorf("Line = %d, want %d", record.Line, sym.Line)
 	}
 	if record.Exported != sym.Exported {
 		t.Errorf("Exported = %v, want %v", record.Exported, sym.Exported)

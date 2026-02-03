@@ -23,12 +23,12 @@ Instead, please report them via email to:
 
 Please include the following information in your report:
 
-- Type of vulnerability (e.g., SQL injection, XSS, authentication bypass)
+- Type of vulnerability (e.g., input validation issues, access control problems, data exposure)
 - Full paths of source file(s) related to the vulnerability
 - Location of the affected source code (tag/branch/commit or direct URL)
 - Step-by-step instructions to reproduce the issue
-- Proof-of-concept or exploit code (if possible)
-- Impact of the issue, including how an attacker might exploit it
+- Proof-of-concept demonstrating the issue (if possible)
+- Impact of the issue, including how an attacker might leverage it
 
 ### Response Timeline
 

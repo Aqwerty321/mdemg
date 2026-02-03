@@ -193,16 +193,15 @@ BEFORE ANY DECISION:
 ```
 
 ### Destructive Action Blocklist
-The `pre-bash-check.py` hook automatically blocks these. If you hit a block,
-you MUST ask the user for explicit confirmation before retrying.
-```
-BLOCKED WITHOUT EXPLICIT USER CONFIRMATION:
-- reset-db, clear-space, DELETE nodes
-- rm -rf, rm -fr
-- git reset --hard, git push --force, git clean -f, git branch -D
-- DROP TABLE, TRUNCATE, DELETE FROM, DETACH DELETE
-- Any MATCH (n) DETACH DELETE n pattern
-```
+The `pre-bash-check.py` hook automatically blocks dangerous operations.
+Blocked categories include:
+- **Database destruction**: reset/clear operations, table/schema drops, truncation, bulk deletes
+- **File system destruction**: recursive forced deletion operations
+- **Git history rewrites**: hard resets, force pushes, forced branch deletes, forced cleans
+- **Graph database destruction**: node deletion patterns (Neo4j/Cypher)
+
+See `.claude/hooks/pre-bash-check.py` for the complete pattern list.
+If you hit a block, you MUST ask the user for explicit confirmation before retrying.
 
 ### Communication Protocol
 ```

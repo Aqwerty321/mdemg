@@ -124,9 +124,7 @@ When reporting bugs, please include:
 
 ## Code of Conduct
 
-- Be respectful and constructive
-- Focus on the code, not the person
-- Welcome newcomers and help them get started
+This project follows a Code of Conduct to ensure a welcoming and respectful environment for everyone. Please read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before participating.
 
 ## License
 

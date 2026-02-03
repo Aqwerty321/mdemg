@@ -77,28 +77,27 @@ jobs:
           retention-days: 30
 
       - name: Check validation results
+        shell: bash
         run: |
           if [ -f parser-report.json ]; then
             echo "=== Parser Validation Summary ==="
-            python3 -c "
-import json
-with open('parser-report.json') as f:
-    report = json.load(f)
-summary = report.get('summary', {})
-print(f\"Total specs: {summary.get('total_specs', 0)}\")
-print(f\"Passed: {summary.get('passed', 0)}\")
-print(f\"Failed: {summary.get('failed', 0)}\")
-print(f\"Errors: {summary.get('errors', 0)}\")
-print(f\"Pass rate: {summary.get('pass_rate', 0):.1f}%\")
-
-# Exit with error if any failures
-if summary.get('failed', 0) > 0 or summary.get('errors', 0) > 0:
-    print('\\n*** VALIDATION FAILED ***')
-    for result in report.get('results', []):
-        if result.get('status') != 'pass':
-            print(f\"\\n{result.get('language', 'unknown').upper()}: {result.get('status')}\")
-            for f in result.get('failures', [])[:5]:
-                print(f\"  - {f.get('name')}: {', '.join(f.get('issues', []))}\")
-    exit(1)
-"
+            python3 << 'PYEOF'
+          import json
+          with open('parser-report.json') as f:
+              report = json.load(f)
+          summary = report.get('summary', {})
+          print(f"Total specs: {summary.get('total_specs', 0)}")
+          print(f"Passed: {summary.get('passed', 0)}")
+          print(f"Failed: {summary.get('failed', 0)}")
+          print(f"Errors: {summary.get('errors', 0)}")
+          print(f"Pass rate: {summary.get('pass_rate', 0):.1f}%")
+          if summary.get('failed', 0) > 0 or summary.get('errors', 0) > 0:
+              print('\n*** VALIDATION FAILED ***')
+              for result in report.get('results', []):
+                  if result.get('status') != 'pass':
+                      print(f"\n{result.get('language', 'unknown').upper()}: {result.get('status')}")
+                      for f in result.get('failures', [])[:5]:
+                          print(f"  - {f.get('name')}: {', '.join(f.get('issues', []))}")
+              exit(1)
+          PYEOF
           fi

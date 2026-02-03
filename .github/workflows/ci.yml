@@ -106,9 +106,9 @@ jobs:
         run: |
           # Find an available port in range 8090-8199
           for port in $(seq 8090 8199); do
-            if ! nc -z localhost $port 2>/dev/null; then
+            if ! nc -z localhost "$port" 2>/dev/null; then
               echo "Found available port: $port"
-              echo "MDEMG_PORT=$port" >> $GITHUB_ENV
+              echo "MDEMG_PORT=$port" >> "$GITHUB_ENV"
               break
             fi
           done
@@ -139,7 +139,6 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

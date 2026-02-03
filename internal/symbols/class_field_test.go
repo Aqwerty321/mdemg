@@ -72,7 +72,7 @@ export const TOP_LEVEL_CONST = 'hello';
 
 	t.Logf("Total symbols found: %d", len(result.Symbols))
 	for _, sym := range result.Symbols {
-		t.Logf("Found: %s (type=%s, value=%s, line=%d)", sym.Name, sym.Type, sym.Value, sym.LineNumber)
+		t.Logf("Found: %s (type=%s, value=%s, line=%d)", sym.Name, sym.Type, sym.Value, sym.Line)
 		switch sym.Name {
 		case "DEFAULT_FLUSH_INTERVAL":
 			foundFlush = true

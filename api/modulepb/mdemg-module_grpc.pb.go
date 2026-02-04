@@ -653,3 +653,267 @@ var APEModule_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "mdemg-module.proto",
 }
+
+const (
+	CRUDModule_Create_FullMethodName = "/mdemg.module.v1.CRUDModule/Create"
+	CRUDModule_Read_FullMethodName   = "/mdemg.module.v1.CRUDModule/Read"
+	CRUDModule_Update_FullMethodName = "/mdemg.module.v1.CRUDModule/Update"
+	CRUDModule_Delete_FullMethodName = "/mdemg.module.v1.CRUDModule/Delete"
+	CRUDModule_List_FullMethodName   = "/mdemg.module.v1.CRUDModule/List"
+)
+
+// CRUDModuleClient is the client API for CRUDModule service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type CRUDModuleClient interface {
+	// Create a new entity in the external system.
+	Create(ctx context.Context, in *CRUDCreateRequest, opts ...grpc.CallOption) (*CRUDCreateResponse, error)
+	// Read a single entity by ID.
+	Read(ctx context.Context, in *CRUDReadRequest, opts ...grpc.CallOption) (*CRUDReadResponse, error)
+	// Update an existing entity (partial update via fields map).
+	Update(ctx context.Context, in *CRUDUpdateRequest, opts ...grpc.CallOption) (*CRUDUpdateResponse, error)
+	// Delete (or archive) an entity by ID.
+	Delete(ctx context.Context, in *CRUDDeleteRequest, opts ...grpc.CallOption) (*CRUDDeleteResponse, error)
+	// List entities with optional filtering.
+	List(ctx context.Context, in *CRUDListRequest, opts ...grpc.CallOption) (*CRUDListResponse, error)
+}
+
+type cRUDModuleClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewCRUDModuleClient(cc grpc.ClientConnInterface) CRUDModuleClient {
+	return &cRUDModuleClient{cc}
+}
+
+func (c *cRUDModuleClient) Create(ctx context.Context, in *CRUDCreateRequest, opts ...grpc.CallOption) (*CRUDCreateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CRUDCreateResponse)
+	err := c.cc.Invoke(ctx, CRUDModule_Create_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cRUDModuleClient) Read(ctx context.Context, in *CRUDReadRequest, opts ...grpc.CallOption) (*CRUDReadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CRUDReadResponse)
+	err := c.cc.Invoke(ctx, CRUDModule_Read_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cRUDModuleClient) Update(ctx context.Context, in *CRUDUpdateRequest, opts ...grpc.CallOption) (*CRUDUpdateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CRUDUpdateResponse)
+	err := c.cc.Invoke(ctx, CRUDModule_Update_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cRUDModuleClient) Delete(ctx context.Context, in *CRUDDeleteRequest, opts ...grpc.CallOption) (*CRUDDeleteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CRUDDeleteResponse)
+	err := c.cc.Invoke(ctx, CRUDModule_Delete_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cRUDModuleClient) List(ctx context.Context, in *CRUDListRequest, opts ...grpc.CallOption) (*CRUDListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CRUDListResponse)
+	err := c.cc.Invoke(ctx, CRUDModule_List_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CRUDModuleServer is the server API for CRUDModule service.
+// All implementations must embed UnimplementedCRUDModuleServer
+// for forward compatibility.
+type CRUDModuleServer interface {
+	// Create a new entity in the external system.
+	Create(context.Context, *CRUDCreateRequest) (*CRUDCreateResponse, error)
+	// Read a single entity by ID.
+	Read(context.Context, *CRUDReadRequest) (*CRUDReadResponse, error)
+	// Update an existing entity (partial update via fields map).
+	Update(context.Context, *CRUDUpdateRequest) (*CRUDUpdateResponse, error)
+	// Delete (or archive) an entity by ID.
+	Delete(context.Context, *CRUDDeleteRequest) (*CRUDDeleteResponse, error)
+	// List entities with optional filtering.
+	List(context.Context, *CRUDListRequest) (*CRUDListResponse, error)
+	mustEmbedUnimplementedCRUDModuleServer()
+}
+
+// UnimplementedCRUDModuleServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedCRUDModuleServer struct{}
+
+func (UnimplementedCRUDModuleServer) Create(context.Context, *CRUDCreateRequest) (*CRUDCreateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Create not implemented")
+}
+func (UnimplementedCRUDModuleServer) Read(context.Context, *CRUDReadRequest) (*CRUDReadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Read not implemented")
+}
+func (UnimplementedCRUDModuleServer) Update(context.Context, *CRUDUpdateRequest) (*CRUDUpdateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Update not implemented")
+}
+func (UnimplementedCRUDModuleServer) Delete(context.Context, *CRUDDeleteRequest) (*CRUDDeleteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Delete not implemented")
+}
+func (UnimplementedCRUDModuleServer) List(context.Context, *CRUDListRequest) (*CRUDListResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method List not implemented")
+}
+func (UnimplementedCRUDModuleServer) mustEmbedUnimplementedCRUDModuleServer() {}
+func (UnimplementedCRUDModuleServer) testEmbeddedByValue()                    {}
+
+// UnsafeCRUDModuleServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to CRUDModuleServer will
+// result in compilation errors.
+type UnsafeCRUDModuleServer interface {
+	mustEmbedUnimplementedCRUDModuleServer()
+}
+
+func RegisterCRUDModuleServer(s grpc.ServiceRegistrar, srv CRUDModuleServer) {
+	// If the following call panics, it indicates UnimplementedCRUDModuleServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&CRUDModule_ServiceDesc, srv)
+}
+
+func _CRUDModule_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CRUDCreateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CRUDModuleServer).Create(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CRUDModule_Create_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CRUDModuleServer).Create(ctx, req.(*CRUDCreateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CRUDModule_Read_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CRUDReadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CRUDModuleServer).Read(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CRUDModule_Read_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CRUDModuleServer).Read(ctx, req.(*CRUDReadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CRUDModule_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CRUDUpdateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CRUDModuleServer).Update(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CRUDModule_Update_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CRUDModuleServer).Update(ctx, req.(*CRUDUpdateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CRUDModule_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CRUDDeleteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CRUDModuleServer).Delete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CRUDModule_Delete_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CRUDModuleServer).Delete(ctx, req.(*CRUDDeleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CRUDModule_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CRUDListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CRUDModuleServer).List(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CRUDModule_List_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CRUDModuleServer).List(ctx, req.(*CRUDListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// CRUDModule_ServiceDesc is the grpc.ServiceDesc for CRUDModule service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var CRUDModule_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "mdemg.module.v1.CRUDModule",
+	HandlerType: (*CRUDModuleServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Create",
+			Handler:    _CRUDModule_Create_Handler,
+		},
+		{
+			MethodName: "Read",
+			Handler:    _CRUDModule_Read_Handler,
+		},
+		{
+			MethodName: "Update",
+			Handler:    _CRUDModule_Update_Handler,
+		},
+		{
+			MethodName: "Delete",
+			Handler:    _CRUDModule_Delete_Handler,
+		},
+		{
+			MethodName: "List",
+			Handler:    _CRUDModule_List_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "mdemg-module.proto",
+}

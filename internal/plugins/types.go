@@ -21,15 +21,16 @@ const (
 
 // Manifest represents the module manifest (manifest.json)
 type Manifest struct {
-	ID                   string            `json:"id"`
-	Name                 string            `json:"name"`
-	Version              string            `json:"version"`
-	Type                 string            `json:"type"` // INGESTION, REASONING, APE
-	Binary               string            `json:"binary"`
-	Capabilities         Capabilities      `json:"capabilities"`
-	HealthCheckIntervalMs int              `json:"health_check_interval_ms"`
-	StartupTimeoutMs     int               `json:"startup_timeout_ms"`
-	Config               map[string]string `json:"config,omitempty"`
+	ID                    string            `json:"id"`
+	Name                  string            `json:"name"`
+	Version               string            `json:"version"`
+	Type                  string            `json:"type"` // INGESTION, REASONING, APE
+	Binary                string            `json:"binary"`
+	Capabilities          Capabilities      `json:"capabilities"`
+	HealthCheckIntervalMs int               `json:"health_check_interval_ms"`
+	StartupTimeoutMs      int               `json:"startup_timeout_ms"`
+	Config                map[string]string `json:"config,omitempty"`
+	AdditionalServices    []string          `json:"additional_services,omitempty"` // e.g., ["CRUD"]
 }
 
 // Capabilities defines what a module can do
@@ -38,6 +39,7 @@ type Capabilities struct {
 	ContentTypes     []string `json:"content_types,omitempty"`     // File types this module can parse
 	PatternDetectors []string `json:"pattern_detectors,omitempty"` // For REASONING modules
 	EventTriggers    []string `json:"event_triggers,omitempty"`    // For APE modules
+	CRUDEntityTypes  []string `json:"crud_entity_types,omitempty"` // For CRUD-capable modules
 }
 
 // ModuleInfo represents runtime information about a loaded module
@@ -56,6 +58,7 @@ type ModuleInfo struct {
 	IngestionClient  pb.IngestionModuleClient
 	ReasoningClient  pb.ReasoningModuleClient
 	APEClient        pb.APEModuleClient
+	CRUDClient       pb.CRUDModuleClient
 }
 
 // ModuleStatus is the API response type for module status
@@ -83,6 +86,8 @@ func ToModuleType(t string) pb.ModuleType {
 		return pb.ModuleType_MODULE_TYPE_REASONING
 	case "APE":
 		return pb.ModuleType_MODULE_TYPE_APE
+	case "CRUD":
+		return pb.ModuleType_MODULE_TYPE_CRUD
 	default:
 		return pb.ModuleType_MODULE_TYPE_UNSPECIFIED
 	}
@@ -97,6 +102,8 @@ func FromModuleType(t pb.ModuleType) string {
 		return "REASONING"
 	case pb.ModuleType_MODULE_TYPE_APE:
 		return "APE"
+	case pb.ModuleType_MODULE_TYPE_CRUD:
+		return "CRUD"
 	default:
 		return "UNSPECIFIED"
 	}

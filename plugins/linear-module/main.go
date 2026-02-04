@@ -50,13 +50,21 @@ func main() {
 	// Create gRPC server
 	server := grpc.NewServer()
 
+	// Load workflow engine
+	wfEngine := NewWorkflowEngine()
+	if err := wfEngine.LoadFromFile("workflows.yaml"); err != nil {
+		log.Printf("WARNING: failed to load workflows.yaml: %v (workflow engine disabled)", err)
+	}
+
 	// Register services
 	module := &LinearModule{
-		startTime:  time.Now(),
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		startTime:      time.Now(),
+		httpClient:     &http.Client{Timeout: 30 * time.Second},
+		workflowEngine: wfEngine,
 	}
 	pb.RegisterModuleLifecycleServer(server, module)
 	pb.RegisterIngestionModuleServer(server, module)
+	pb.RegisterCRUDModuleServer(server, module)
 
 	log.Printf("Linear module listening on %s", *socketPath)
 
@@ -80,11 +88,13 @@ func main() {
 type LinearModule struct {
 	pb.UnimplementedModuleLifecycleServer
 	pb.UnimplementedIngestionModuleServer
+	pb.UnimplementedCRUDModuleServer
 
-	startTime  time.Time
-	httpClient *http.Client
-	apiKey     string
-	config     map[string]string
+	startTime      time.Time
+	httpClient     *http.Client
+	apiKey         string
+	config         map[string]string
+	workflowEngine *WorkflowEngine
 
 	mu          sync.RWMutex
 	lastSyncAt  time.Time
@@ -1124,6 +1134,427 @@ func (m *LinearModule) projectToObservation(project linearProject) *pb.Observati
 		Source:      "linear-module",
 		Metadata:    metadata,
 	}
+}
+
+// =============================================================================
+// CRUDModule Implementation
+// =============================================================================
+
+// Create implements CRUDModule — creates an entity in Linear.
+func (m *LinearModule) Create(ctx context.Context, req *pb.CRUDCreateRequest) (*pb.CRUDCreateResponse, error) {
+	atomic.AddUint64(&requestCounter, 1)
+
+	if m.apiKey == "" {
+		return &pb.CRUDCreateResponse{Success: false, Error: "LINEAR_API_KEY not configured"}, nil
+	}
+
+	var query map[string]interface{}
+	var err error
+	var entityType string
+
+	switch req.EntityType {
+	case "issue":
+		entityType = "issue"
+		query, err = buildIssueCreateMutation(req.Fields)
+	case "project":
+		entityType = "project"
+		query, err = buildProjectCreateMutation(req.Fields)
+	case "comment":
+		entityType = "comment"
+		query, err = buildCommentCreateMutation(req.Fields)
+	default:
+		return &pb.CRUDCreateResponse{
+			Success: false,
+			Error:   fmt.Sprintf("unknown entity type: %s (supported: issue, project, comment)", req.EntityType),
+		}, nil
+	}
+
+	if err != nil {
+		return &pb.CRUDCreateResponse{Success: false, Error: err.Error()}, nil
+	}
+
+	result, err := m.executeGraphQL(query)
+	if err != nil {
+		return &pb.CRUDCreateResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
+	}
+
+	entity, err := m.extractMutationResult(result, entityType, "Create")
+	if err != nil {
+		return &pb.CRUDCreateResponse{Success: false, Error: err.Error()}, nil
+	}
+
+	// Trigger workflows asynchronously
+	if m.workflowEngine != nil {
+		go m.workflowEngine.EvaluateEvent("on-create", req.EntityType, entity.Fields, nil, m)
+	}
+
+	return &pb.CRUDCreateResponse{Entity: entity, Success: true}, nil
+}
+
+// Read implements CRUDModule — reads a single entity from Linear.
+func (m *LinearModule) Read(ctx context.Context, req *pb.CRUDReadRequest) (*pb.CRUDReadResponse, error) {
+	atomic.AddUint64(&requestCounter, 1)
+
+	if m.apiKey == "" {
+		return &pb.CRUDReadResponse{Success: false, Error: "LINEAR_API_KEY not configured"}, nil
+	}
+
+	var query map[string]interface{}
+	var err error
+
+	switch req.EntityType {
+	case "issue":
+		query, err = buildIssueReadQuery(req.Id)
+	case "project":
+		query, err = buildProjectReadQuery(req.Id)
+	default:
+		return &pb.CRUDReadResponse{
+			Success: false,
+			Error:   fmt.Sprintf("unknown entity type for read: %s (supported: issue, project)", req.EntityType),
+		}, nil
+	}
+
+	if err != nil {
+		return &pb.CRUDReadResponse{Success: false, Error: err.Error()}, nil
+	}
+
+	result, err := m.executeGraphQL(query)
+	if err != nil {
+		return &pb.CRUDReadResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
+	}
+
+	entity, err := m.extractReadResult(result, req.EntityType)
+	if err != nil {
+		return &pb.CRUDReadResponse{Success: false, Error: err.Error()}, nil
+	}
+
+	return &pb.CRUDReadResponse{Entity: entity, Success: true}, nil
+}
+
+// Update implements CRUDModule — updates an entity in Linear.
+func (m *LinearModule) Update(ctx context.Context, req *pb.CRUDUpdateRequest) (*pb.CRUDUpdateResponse, error) {
+	atomic.AddUint64(&requestCounter, 1)
+
+	if m.apiKey == "" {
+		return &pb.CRUDUpdateResponse{Success: false, Error: "LINEAR_API_KEY not configured"}, nil
+	}
+
+	// Read previous state for workflow changed_to conditions
+	var previousFields map[string]string
+	if m.workflowEngine != nil && m.workflowEngine.HasChangedToConditions(req.EntityType) {
+		prevResp, _ := m.Read(ctx, &pb.CRUDReadRequest{EntityType: req.EntityType, Id: req.Id})
+		if prevResp != nil && prevResp.Entity != nil {
+			previousFields = prevResp.Entity.Fields
+		}
+	}
+
+	var query map[string]interface{}
+	var err error
+	var entityType string
+
+	switch req.EntityType {
+	case "issue":
+		entityType = "issue"
+		query, err = buildIssueUpdateMutation(req.Id, req.Fields)
+	case "project":
+		entityType = "project"
+		query, err = buildProjectUpdateMutation(req.Id, req.Fields)
+	default:
+		return &pb.CRUDUpdateResponse{
+			Success: false,
+			Error:   fmt.Sprintf("unknown entity type for update: %s (supported: issue, project)", req.EntityType),
+		}, nil
+	}
+
+	if err != nil {
+		return &pb.CRUDUpdateResponse{Success: false, Error: err.Error()}, nil
+	}
+
+	result, err := m.executeGraphQL(query)
+	if err != nil {
+		return &pb.CRUDUpdateResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
+	}
+
+	entity, err := m.extractMutationResult(result, entityType, "Update")
+	if err != nil {
+		return &pb.CRUDUpdateResponse{Success: false, Error: err.Error()}, nil
+	}
+
+	// Trigger workflows asynchronously
+	if m.workflowEngine != nil {
+		go m.workflowEngine.EvaluateEvent("on-update", req.EntityType, entity.Fields, previousFields, m)
+	}
+
+	return &pb.CRUDUpdateResponse{Entity: entity, Success: true}, nil
+}
+
+// Delete implements CRUDModule — archives/deletes an entity in Linear.
+func (m *LinearModule) Delete(ctx context.Context, req *pb.CRUDDeleteRequest) (*pb.CRUDDeleteResponse, error) {
+	atomic.AddUint64(&requestCounter, 1)
+
+	if m.apiKey == "" {
+		return &pb.CRUDDeleteResponse{Success: false, Error: "LINEAR_API_KEY not configured"}, nil
+	}
+
+	var query map[string]interface{}
+	var err error
+
+	switch req.EntityType {
+	case "issue":
+		query, err = buildIssueDeleteMutation(req.Id)
+	default:
+		return &pb.CRUDDeleteResponse{
+			Success: false,
+			Error:   fmt.Sprintf("unknown entity type for delete: %s (supported: issue)", req.EntityType),
+		}, nil
+	}
+
+	if err != nil {
+		return &pb.CRUDDeleteResponse{Success: false, Error: err.Error()}, nil
+	}
+
+	result, err := m.executeGraphQL(query)
+	if err != nil {
+		return &pb.CRUDDeleteResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
+	}
+
+	// Check success field
+	data, ok := result["data"].(map[string]interface{})
+	if !ok {
+		return &pb.CRUDDeleteResponse{Success: false, Error: "no data in response"}, nil
+	}
+
+	// Look for issueArchive or similar mutation result
+	for _, v := range data {
+		if mutResult, ok := v.(map[string]interface{}); ok {
+			if success, ok := mutResult["success"].(bool); ok && success {
+				// Trigger workflows asynchronously
+				if m.workflowEngine != nil {
+					go m.workflowEngine.EvaluateEvent("on-delete", req.EntityType, map[string]string{"id": req.Id}, nil, m)
+				}
+				return &pb.CRUDDeleteResponse{Success: true}, nil
+			}
+		}
+	}
+
+	return &pb.CRUDDeleteResponse{Success: false, Error: "delete operation did not return success"}, nil
+}
+
+// List implements CRUDModule — lists entities with optional filtering.
+func (m *LinearModule) List(ctx context.Context, req *pb.CRUDListRequest) (*pb.CRUDListResponse, error) {
+	atomic.AddUint64(&requestCounter, 1)
+
+	if m.apiKey == "" {
+		return &pb.CRUDListResponse{Success: false, Error: "LINEAR_API_KEY not configured"}, nil
+	}
+
+	limit := int(req.Limit)
+	if limit <= 0 {
+		limit = 50
+	}
+
+	switch req.EntityType {
+	case "issue":
+		query := buildIssueListQuery(req.Filters, limit, req.Cursor)
+		result, err := m.executeGraphQL(query)
+		if err != nil {
+			return &pb.CRUDListResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
+		}
+		return m.extractIssueListResult(result)
+
+	case "project":
+		query := buildProjectListQuery(limit, req.Cursor)
+		result, err := m.executeGraphQL(query)
+		if err != nil {
+			return &pb.CRUDListResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
+		}
+		return m.extractProjectListResult(result)
+
+	default:
+		return &pb.CRUDListResponse{
+			Success: false,
+			Error:   fmt.Sprintf("unknown entity type for list: %s (supported: issue, project)", req.EntityType),
+		}, nil
+	}
+}
+
+// extractMutationResult extracts the entity from a create/update mutation response.
+func (m *LinearModule) extractMutationResult(result map[string]interface{}, entityType, operation string) (*pb.CRUDEntity, error) {
+	data, ok := result["data"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("no data in response")
+	}
+
+	// Find the mutation result (e.g., issueCreate, issueUpdate, projectCreate, commentCreate)
+	var mutResult map[string]interface{}
+	for _, v := range data {
+		if mr, ok := v.(map[string]interface{}); ok {
+			mutResult = mr
+			break
+		}
+	}
+
+	if mutResult == nil {
+		return nil, fmt.Errorf("no mutation result in response")
+	}
+
+	// Check success
+	if success, ok := mutResult["success"].(bool); ok && !success {
+		return nil, fmt.Errorf("%s operation failed", operation)
+	}
+
+	// Extract the entity node
+	var entityNode map[string]interface{}
+	for key, v := range mutResult {
+		if key == "success" {
+			continue
+		}
+		if node, ok := v.(map[string]interface{}); ok {
+			entityNode = node
+			break
+		}
+	}
+
+	if entityNode == nil {
+		return nil, fmt.Errorf("no entity in mutation response")
+	}
+
+	// Parse fields based on entity type
+	var fields map[string]string
+	switch entityType {
+	case "issue":
+		fields = parseIssueFields(entityNode)
+	case "project":
+		fields = parseProjectFields(entityNode)
+	case "comment":
+		fields = parseCommentFields(entityNode)
+	}
+
+	return &pb.CRUDEntity{
+		Id:         fields["id"],
+		EntityType: entityType,
+		Fields:     fields,
+		CreatedAt:  fields["created_at"],
+		UpdatedAt:  fields["updated_at"],
+	}, nil
+}
+
+// extractReadResult extracts the entity from a read query response.
+func (m *LinearModule) extractReadResult(result map[string]interface{}, entityType string) (*pb.CRUDEntity, error) {
+	data, ok := result["data"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("no data in response")
+	}
+
+	// Find the entity node (e.g., data.issue or data.project)
+	entityNode, ok := data[entityType].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("entity not found")
+	}
+
+	var fields map[string]string
+	switch entityType {
+	case "issue":
+		fields = parseIssueFields(entityNode)
+	case "project":
+		fields = parseProjectFields(entityNode)
+	}
+
+	return &pb.CRUDEntity{
+		Id:         fields["id"],
+		EntityType: entityType,
+		Fields:     fields,
+		CreatedAt:  fields["created_at"],
+		UpdatedAt:  fields["updated_at"],
+	}, nil
+}
+
+// extractIssueListResult extracts a list of issues from a GraphQL response.
+func (m *LinearModule) extractIssueListResult(result map[string]interface{}) (*pb.CRUDListResponse, error) {
+	data, ok := result["data"].(map[string]interface{})
+	if !ok {
+		return &pb.CRUDListResponse{Success: false, Error: "no data in response"}, nil
+	}
+
+	issuesData, ok := data["issues"].(map[string]interface{})
+	if !ok {
+		return &pb.CRUDListResponse{Success: false, Error: "no issues in response"}, nil
+	}
+
+	pageInfo, _ := issuesData["pageInfo"].(map[string]interface{})
+	endCursor, _ := pageInfo["endCursor"].(string)
+
+	nodes, ok := issuesData["nodes"].([]interface{})
+	if !ok {
+		return &pb.CRUDListResponse{Success: true, Entities: nil}, nil
+	}
+
+	var entities []*pb.CRUDEntity
+	for _, node := range nodes {
+		nodeMap, ok := node.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		fields := parseIssueFields(nodeMap)
+		entities = append(entities, &pb.CRUDEntity{
+			Id:         fields["id"],
+			EntityType: "issue",
+			Fields:     fields,
+			CreatedAt:  fields["created_at"],
+			UpdatedAt:  fields["updated_at"],
+		})
+	}
+
+	return &pb.CRUDListResponse{
+		Entities:   entities,
+		NextCursor: endCursor,
+		TotalCount: int32(len(entities)),
+		Success:    true,
+	}, nil
+}
+
+// extractProjectListResult extracts a list of projects from a GraphQL response.
+func (m *LinearModule) extractProjectListResult(result map[string]interface{}) (*pb.CRUDListResponse, error) {
+	data, ok := result["data"].(map[string]interface{})
+	if !ok {
+		return &pb.CRUDListResponse{Success: false, Error: "no data in response"}, nil
+	}
+
+	projectsData, ok := data["projects"].(map[string]interface{})
+	if !ok {
+		return &pb.CRUDListResponse{Success: false, Error: "no projects in response"}, nil
+	}
+
+	pageInfo, _ := projectsData["pageInfo"].(map[string]interface{})
+	endCursor, _ := pageInfo["endCursor"].(string)
+
+	nodes, ok := projectsData["nodes"].([]interface{})
+	if !ok {
+		return &pb.CRUDListResponse{Success: true, Entities: nil}, nil
+	}
+
+	var entities []*pb.CRUDEntity
+	for _, node := range nodes {
+		nodeMap, ok := node.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		fields := parseProjectFields(nodeMap)
+		entities = append(entities, &pb.CRUDEntity{
+			Id:         fields["id"],
+			EntityType: "project",
+			Fields:     fields,
+			CreatedAt:  fields["created_at"],
+			UpdatedAt:  fields["updated_at"],
+		})
+	}
+
+	return &pb.CRUDListResponse{
+		Entities:   entities,
+		NextCursor: endCursor,
+		TotalCount: int32(len(entities)),
+		Success:    true,
+	}, nil
 }
 
 // JSON parsing for Parse endpoint

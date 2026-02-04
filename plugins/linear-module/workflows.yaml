@@ -1,0 +1,26 @@
+workflows:
+  - name: "auto-triage-urgent"
+    trigger:
+      event: "on-create"
+      entity_type: "issue"
+      conditions:
+        - field: "priority"
+          operator: "eq"
+          value: "1"
+    actions:
+      - type: "add-comment"
+        params:
+          body: "🚨 Urgent issue auto-triaged by MDEMG workflow engine."
+
+  - name: "comment-on-completion"
+    trigger:
+      event: "on-update"
+      entity_type: "issue"
+      conditions:
+        - field: "state_type"
+          operator: "changed_to"
+          value: "completed"
+    actions:
+      - type: "add-comment"
+        params:
+          body: "Issue {{identifier}} has been completed. Great work!"

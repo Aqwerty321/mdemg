@@ -261,6 +261,29 @@ func TestHandleIngestFiles_Validation(t *testing.T) {
 	}
 }
 
+func TestBuildIngestArgsFromConfig_QuietFlag(t *testing.T) {
+	// When quiet is set in config, --quiet should be passed
+	config := map[string]any{
+		"space_id": "test-space",
+		"path":     "/tmp/code",
+		"quiet":    true,
+	}
+
+	args := buildIngestArgsFromConfig(config, ":9999")
+	argStr := strings.Join(args, " ")
+
+	found := false
+	for _, a := range args {
+		if a == "--quiet" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected --quiet in args: %s", argStr)
+	}
+}
+
 func TestHandleIngestFiles_MethodNotAllowed(t *testing.T) {
 	srv := &Server{}
 

@@ -740,6 +740,17 @@ type RecallResult struct {
 	Metadata map[string]any `json:"metadata,omitempty"` // Additional metadata
 }
 
+// FreshnessResponse provides freshness/staleness info for a space's TapRoot.
+type FreshnessResponse struct {
+	SpaceID        string `json:"space_id"`
+	LastIngestAt   string `json:"last_ingest_at,omitempty"`
+	LastIngestType string `json:"last_ingest_type,omitempty"`
+	IngestCount    int    `json:"ingest_count"`
+	IsStale        bool   `json:"is_stale"`
+	StaleHours     int    `json:"stale_hours,omitempty"`
+	ThresholdHours int    `json:"threshold_hours"`
+}
+
 // ContextRetrieveRequest extends RetrieveRequest with conversation context options
 // Used internally when blending conversation knowledge into retrieval.
 type ContextRetrieveRequest struct {

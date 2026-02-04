@@ -1166,6 +1166,38 @@ Submit feedback for capability gap detection.
 
 ---
 
+## Space Freshness (Phase 9.2)
+
+### `GET /v1/memory/spaces/{space_id}/freshness`
+
+Returns freshness and staleness information for a space's TapRoot node.
+
+**Path Parameters**:
+- `space_id` - The space to check freshness for
+
+**Response** (`200 OK`):
+```json
+{
+  "space_id": "my-project",
+  "last_ingest_at": "2026-02-03T15:30:00Z",
+  "last_ingest_type": "codebase-ingest",
+  "ingest_count": 12,
+  "is_stale": false,
+  "stale_hours": 8,
+  "threshold_hours": 24
+}
+```
+
+**Fields**:
+- `last_ingest_at` - ISO8601 timestamp of last ingest (omitted if never ingested)
+- `last_ingest_type` - Type of last ingest (`codebase-ingest`, `file-ingest`)
+- `ingest_count` - Total number of ingestions for this space
+- `is_stale` - Whether the space is considered stale based on `SYNC_STALE_THRESHOLD_HOURS`
+- `stale_hours` - Hours since last ingest
+- `threshold_hours` - Configured staleness threshold in hours
+
+---
+
 ## Error Responses
 
 All endpoints return errors in a consistent format:

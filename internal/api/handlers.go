@@ -2187,6 +2187,10 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 			})
 			log.Printf("Ingestion job %s completed: total=%d ingested=%d errors=%d",
 				job.ID, evt.Total, evt.Ingested, evt.Errors)
+			// Update TapRoot freshness on successful completion
+			if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest"); err != nil {
+				log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
+			}
 		}
 	}
 
@@ -2210,6 +2214,10 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 			"message":  "completed without progress events",
 		})
 		log.Printf("Ingestion job %s completed (no progress events)", job.ID)
+		// Update TapRoot freshness on fallback completion
+		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest"); err != nil {
+			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
+		}
 	}
 }
 
@@ -2284,6 +2292,12 @@ func buildIngestArgsFromConfig(config map[string]any, listenAddr string) []strin
 	}
 	if v, ok := config["archive_deleted"].(bool); ok {
 		args = append(args, fmt.Sprintf("--archive-deleted=%t", v))
+	}
+	if v, ok := config["quiet"].(bool); ok && v {
+		args = append(args, "--quiet")
+	}
+	if v, ok := config["log_file"].(string); ok && v != "" {
+		args = append(args, "--log-file", v)
 	}
 
 	return args
@@ -2509,6 +2523,13 @@ func (s *Server) handleIngestFiles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Update TapRoot freshness after successful file ingest
+	if successCount > 0 {
+		if err := s.retriever.UpdateTapRootFreshness(r.Context(), req.SpaceID, "file-ingest"); err != nil {
+			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", req.SpaceID, err)
+		}
+	}
+
 	writeJSON(w, http.StatusOK, models.IngestFilesResponse{
 		SpaceID:      req.SpaceID,
 		TotalFiles:   len(req.Files),
@@ -2675,6 +2696,13 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 		"success_count": successCount,
 		"error_count":   errorCount,
 	})
+
+	// Update TapRoot freshness on successful file ingest job
+	if successCount > 0 {
+		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "file-ingest"); err != nil {
+			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
+		}
+	}
 
 	log.Printf("Ingest files job %s completed: %d/%d files ingested", job.ID, successCount, len(files))
 }

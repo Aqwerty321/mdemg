@@ -51,6 +51,8 @@ var (
 	incremental    = flag.Bool("incremental", false, "Only ingest files changed since last commit (uses git diff)")
 	sinceCommit    = flag.String("since", "HEAD~1", "Git commit to compare against for incremental mode (default: HEAD~1)")
 	archiveDeleted = flag.Bool("archive-deleted", true, "Archive nodes for deleted files in incremental mode")
+	quiet          = flag.Bool("quiet", false, "Suppress all non-error output")
+	logFile        = flag.String("log-file", "", "Write logs to file instead of stderr")
 
 	// LLM summary options
 	llmSummary         = flag.Bool("llm-summary", false, "Use LLM to generate semantic summaries (requires OPENAI_API_KEY)")
@@ -432,9 +434,19 @@ func matchesExcludePattern(filename string, patterns []string) bool {
 func main() {
 	flag.Parse()
 
-	// When --progress-json is set, ensure log output goes to stderr
-	// so stdout is reserved for structured JSON progress events.
-	if *progressJSON {
+	// Log output priority: --log-file > --quiet > --progress-json stderr redirect > default
+	if *logFile != "" {
+		f, err := os.OpenFile(*logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatalf("Failed to open log file %s: %v", *logFile, err)
+		}
+		defer f.Close()
+		log.SetOutput(f)
+	} else if *quiet {
+		log.SetOutput(io.Discard)
+	} else if *progressJSON {
+		// When --progress-json is set, ensure log output goes to stderr
+		// so stdout is reserved for structured JSON progress events.
 		log.SetOutput(os.Stderr)
 	}
 
@@ -1473,6 +1485,10 @@ func runConsolidation(client *http.Client) error {
 }
 
 func printSample(elements []CodeElement) {
+	if *quiet {
+		return
+	}
+
 	counts := make(map[string]int)
 	for _, e := range elements {
 		counts[e.Kind]++

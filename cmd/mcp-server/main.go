@@ -49,6 +49,9 @@ func main() {
 	registerMemoryIngestJobsTool(s)
 	registerMemoryIngestFilesTool(s)
 
+	// Freshness tracking (Phase 9.2)
+	registerMemorySpaceFreshnessTool(s)
+
 	// Linear CRUD tools (Phase 4)
 	registerLinearCreateIssueTool(s)
 	registerLinearListIssuesTool(s)
@@ -1364,4 +1367,68 @@ func callMDEMGGet(path string, params map[string]string) (map[string]any, error)
 	}
 
 	return result, nil
+}
+
+// memory_space_freshness - Check the freshness/staleness of a memory space
+func registerMemorySpaceFreshnessTool(s *server.MCPServer) {
+	tool := mcp.NewTool("memory_space_freshness",
+		mcp.WithDescription(`Check the freshness of a memory space's ingested data.
+Returns when the space was last ingested, how many ingestions have occurred,
+and whether the data is considered stale based on the configured threshold.
+Use this to determine if a re-ingestion is needed.`),
+		mcp.WithString("space_id",
+			mcp.Required(),
+			mcp.Description("The space ID to check freshness for")),
+	)
+
+	s.AddTool(tool, memorySpaceFreshnessHandler)
+}
+
+func memorySpaceFreshnessHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	spaceID, _ := args["space_id"].(string)
+	if spaceID == "" {
+		return newToolResultError("space_id is required"), nil
+	}
+
+	resp, err := callMDEMGGet("/v1/memory/spaces/"+spaceID+"/freshness", nil)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to check freshness: %v", err)), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("## Space Freshness: %s\n\n", spaceID))
+
+	if lastIngest, ok := resp["last_ingest_at"].(string); ok && lastIngest != "" {
+		sb.WriteString(fmt.Sprintf("**Last Ingest:** %s\n", lastIngest))
+	} else {
+		sb.WriteString("**Last Ingest:** Never\n")
+	}
+
+	if ingestType, ok := resp["last_ingest_type"].(string); ok && ingestType != "" {
+		sb.WriteString(fmt.Sprintf("**Ingest Type:** %s\n", ingestType))
+	}
+
+	if count, ok := resp["ingest_count"].(float64); ok {
+		sb.WriteString(fmt.Sprintf("**Total Ingestions:** %d\n", int(count)))
+	}
+
+	if isStale, ok := resp["is_stale"].(bool); ok {
+		if isStale {
+			sb.WriteString("**Status:** STALE\n")
+		} else {
+			sb.WriteString("**Status:** Fresh\n")
+		}
+	}
+
+	if staleHours, ok := resp["stale_hours"].(float64); ok && staleHours > 0 {
+		sb.WriteString(fmt.Sprintf("**Hours Since Ingest:** %d\n", int(staleHours)))
+	}
+
+	if threshold, ok := resp["threshold_hours"].(float64); ok {
+		sb.WriteString(fmt.Sprintf("**Stale Threshold:** %dh\n", int(threshold)))
+	}
+
+	return mcp.NewToolResultText(sb.String()), nil
 }

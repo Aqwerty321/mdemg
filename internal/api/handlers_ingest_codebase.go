@@ -277,6 +277,13 @@ func (s *Server) runIngestionJob(ctx context.Context, job *IngestJob, req *Inges
 
 	log.Printf("[ingest-codebase] Job %s completed: %d files, %d symbols, %d errors",
 		job.ID, job.Stats.FilesProcessed, job.Stats.SymbolsExtracted, job.Stats.Errors)
+
+	// Update TapRoot freshness on completion
+	freshnessCtx, freshnessCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer freshnessCancel()
+	if err := s.retriever.UpdateTapRootFreshness(freshnessCtx, job.SpaceID, "codebase-ingest"); err != nil {
+		log.Printf("[ingest-codebase] Warning: failed to update TapRoot freshness for %s: %v", job.SpaceID, err)
+	}
 }
 
 // buildIngestArgs constructs CLI arguments from the request

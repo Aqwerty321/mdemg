@@ -17,8 +17,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// handleIngestCodebaseRoute routes requests to the appropriate handler
+// handleIngestCodebaseRoute routes requests to the appropriate handler.
+// DEPRECATED: Use /v1/memory/ingest/trigger instead for new integrations.
 func (s *Server) handleIngestCodebaseRoute(w http.ResponseWriter, r *http.Request) {
+	// Signal deprecation on all responses from this endpoint
+	w.Header().Set("Deprecation", "true")
+	w.Header().Set("Link", `</v1/memory/ingest/trigger>; rel="successor-version"`)
+
 	path := strings.TrimPrefix(r.URL.Path, "/v1/memory/ingest-codebase")
 	path = strings.TrimPrefix(path, "/")
 

@@ -390,6 +390,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/ingest/status/", s.handleIngestStatus)
 	mux.HandleFunc("/v1/memory/ingest/cancel/", s.handleIngestCancel)
 	mux.HandleFunc("/v1/memory/ingest/jobs", s.handleIngestJobs)
+	mux.HandleFunc("/v1/memory/ingest/files", s.handleIngestFiles)
 
 	// Capability gap detection endpoints
 	mux.HandleFunc("/v1/system/capability-gaps", s.handleCapabilityGaps)

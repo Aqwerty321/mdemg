@@ -58,6 +58,9 @@ var (
 	llmSummaryBatch    = flag.Int("llm-summary-batch", 10, "Files per LLM API call for summaries")
 	llmSummaryProvider = flag.String("llm-summary-provider", "openai", "LLM provider for summaries (openai/ollama)")
 
+	// Progress reporting
+	progressJSON = flag.Bool("progress-json", false, "Emit structured JSON progress lines to stdout (logs go to stderr)")
+
 	// Info flags
 	listLanguages = flag.Bool("list-languages", false, "List supported languages and exit")
 
@@ -302,6 +305,27 @@ type IngestStats struct {
 	StartTime     time.Time
 }
 
+// progressEvent is a structured JSON progress line emitted to stdout when --progress-json is set.
+type progressEvent struct {
+	Event    string  `json:"event"`
+	Total    int     `json:"total,omitempty"`
+	Current  int     `json:"current,omitempty"`
+	Ingested int     `json:"ingested,omitempty"`
+	Errors   int     `json:"errors,omitempty"`
+	Symbols  int     `json:"symbols,omitempty"`
+	Rate     float64 `json:"rate,omitempty"`
+	Duration string  `json:"duration,omitempty"`
+}
+
+// emitProgress writes a JSON progress event to stdout if --progress-json is enabled.
+func emitProgress(evt progressEvent) {
+	if !*progressJSON {
+		return
+	}
+	data, _ := json.Marshal(evt)
+	fmt.Fprintln(os.Stdout, string(data))
+}
+
 // GitDiffResult contains files changed between commits
 type GitDiffResult struct {
 	Added    []string
@@ -407,6 +431,12 @@ func matchesExcludePattern(filename string, patterns []string) bool {
 
 func main() {
 	flag.Parse()
+
+	// When --progress-json is set, ensure log output goes to stderr
+	// so stdout is reserved for structured JSON progress events.
+	if *progressJSON {
+		log.SetOutput(os.Stderr)
+	}
 
 	// Handle --list-languages flag
 	if *listLanguages {
@@ -566,6 +596,7 @@ func main() {
 	}
 
 	log.Printf("Found %d code elements", len(elements))
+	emitProgress(progressEvent{Event: "discovery_complete", Total: len(elements)})
 
 	// Apply limit if specified
 	if *limitElements > 0 && len(elements) > *limitElements {
@@ -628,6 +659,13 @@ func main() {
 				log.Printf("[Worker %d] Progress: %d/%d (%.1f/s, %d errors)",
 					workerID, current, stats.TotalElements, rate, errCount)
 
+				emitProgress(progressEvent{
+					Event:   "batch_progress",
+					Current: int(current),
+					Total:   int(stats.TotalElements),
+					Rate:    rate,
+				})
+
 				time.Sleep(time.Duration(*delay) * time.Millisecond)
 			}
 		}(w)
@@ -665,8 +703,18 @@ func main() {
 		}
 	}
 
+	// Emit complete progress event
+	emitProgress(progressEvent{
+		Event:    "complete",
+		Total:    int(stats.TotalElements),
+		Ingested: int(stats.Ingested),
+		Errors:   int(stats.Errors),
+		Duration: elapsed.Round(time.Second).String(),
+	})
+
 	// Run consolidation
 	if *consolidate && stats.Ingested > 0 {
+		emitProgress(progressEvent{Event: "consolidation_start"})
 		log.Println("Running consolidation...")
 		if err := runConsolidation(client); err != nil {
 			log.Printf("Consolidation failed: %v", err)

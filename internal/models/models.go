@@ -592,6 +592,33 @@ type IngestProgress struct {
 	Rate       string  `json:"rate,omitempty"`  // e.g., "15.2 elements/sec"
 }
 
+// IngestFilesRequest - request for POST /v1/memory/ingest/files
+// Triggers re-ingestion of specific files.
+type IngestFilesRequest struct {
+	SpaceID        string   `json:"space_id" validate:"required,min=1,max=256"`
+	Files          []string `json:"files" validate:"required,min=1"`
+	ExtractSymbols *bool    `json:"extract_symbols,omitempty"` // default: true
+	Consolidate    *bool    `json:"consolidate,omitempty"`     // default: false
+}
+
+// IngestFilesResponse - response from POST /v1/memory/ingest/files
+type IngestFilesResponse struct {
+	SpaceID      string             `json:"space_id"`
+	TotalFiles   int                `json:"total_files"`
+	SuccessCount int                `json:"success_count"`
+	ErrorCount   int                `json:"error_count"`
+	Results      []IngestFileResult `json:"results"`
+	JobID        string             `json:"job_id,omitempty"` // Set when >50 files triggers background job
+}
+
+// IngestFileResult - result for a single file in file-level ingest
+type IngestFileResult struct {
+	File   string `json:"file"`
+	Status string `json:"status"` // "success" or "error"
+	NodeID string `json:"node_id,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
 // =============================================================================
 // PHASE 5: CONTEXT-AWARE RETRIEVAL AND SKILL INTEGRATION
 // =============================================================================

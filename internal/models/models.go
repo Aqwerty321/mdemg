@@ -19,6 +19,11 @@ type RetrieveRequest struct {
 	CodeOnly          bool     `json:"code_only,omitempty"`          // Shorthand: exclude common non-code files (md, txt, json, yaml, etc.)
 
 	PolicyContext map[string]any `json:"policy_context,omitempty"`
+
+	// Temporal override fields (Phase 1: Time-Aware Retrieval)
+	// When set, these override the parsed temporal intent with a hard-mode constraint.
+	TemporalAfter  string `json:"temporal_after,omitempty"`  // ISO8601: force hard filter after this time
+	TemporalBefore string `json:"temporal_before,omitempty"` // ISO8601: force hard filter before this time
 }
 
 type RetrieveResult struct {
@@ -669,6 +674,10 @@ type RecallRequest struct {
 
 	// Visibility filtering (CMS v2)
 	RequestingUserID string `json:"requesting_user_id,omitempty"` // Filter private observations to this user
+
+	// Temporal filtering (Phase 1: Time-Aware Retrieval)
+	TemporalAfter  string `json:"temporal_after,omitempty"`  // ISO8601: filter results after this time
+	TemporalBefore string `json:"temporal_before,omitempty"` // ISO8601: filter results before this time
 }
 
 // RecallResponse - response from POST /v1/conversation/recall

@@ -679,6 +679,10 @@ type RecallRequest struct {
 
 	// Visibility filtering (CMS v2)
 	RequestingUserID string `json:"requesting_user_id,omitempty"`
+
+	// Temporal filtering (Phase 1: Time-Aware Retrieval)
+	TemporalAfter  string `json:"temporal_after,omitempty"`  // ISO8601: filter results after this time
+	TemporalBefore string `json:"temporal_before,omitempty"` // ISO8601: filter results before this time
 }
 
 // RecallResponse is the response from conversation recall
@@ -777,6 +781,12 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 		Debug:   make(map[string]any),
 	}
 
+	// Build temporal filter for Cypher queries
+	temporalFilter, temporalParams := buildTemporalCypherFilter(req.TemporalAfter, req.TemporalBefore)
+	if temporalFilter != "" {
+		resp.Debug["temporal_filter"] = temporalFilter
+	}
+
 	// Get or generate query embedding
 	var embedding []float32
 	if len(req.QueryEmbedding) > 0 {
@@ -791,8 +801,8 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 		return nil, fmt.Errorf("no embedding provided and embedder not available")
 	}
 
-	// Step 1: Find similar conversation observations (with visibility filtering)
-	obsResults, err := s.findSimilarObservations(ctx, req.SpaceID, req.RequestingUserID, embedding, topK)
+	// Step 1: Find similar conversation observations (with visibility and temporal filtering)
+	obsResults, err := s.findSimilarObservations(ctx, req.SpaceID, req.RequestingUserID, embedding, topK, temporalFilter, temporalParams)
 	if err != nil {
 		return nil, fmt.Errorf("find similar observations: %w", err)
 	}
@@ -801,7 +811,7 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 
 	// Step 2: Find similar themes (if enabled)
 	if req.IncludeThemes {
-		themeResults, err := s.findSimilarThemes(ctx, req.SpaceID, embedding, topK)
+		themeResults, err := s.findSimilarThemes(ctx, req.SpaceID, embedding, topK, temporalFilter, temporalParams)
 		if err != nil {
 			log.Printf("WARNING: failed to find similar themes: %v", err)
 		} else {
@@ -812,7 +822,7 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 
 	// Step 3: Find similar emergent concepts (if enabled)
 	if req.IncludeConcepts {
-		conceptResults, err := s.findSimilarConcepts(ctx, req.SpaceID, embedding, topK)
+		conceptResults, err := s.findSimilarConcepts(ctx, req.SpaceID, embedding, topK, temporalFilter, temporalParams)
 		if err != nil {
 			log.Printf("WARNING: failed to find similar concepts: %v", err)
 		} else {
@@ -825,6 +835,37 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 	sortAndLimitRecallResults(&resp.Results, topK)
 
 	return resp, nil
+}
+
+// buildTemporalCypherFilter constructs a Cypher WHERE clause fragment and params
+// for temporal filtering on node.created_at.
+func buildTemporalCypherFilter(afterStr, beforeStr string) (string, map[string]any) {
+	params := make(map[string]any)
+	clauses := []string{}
+
+	if afterStr != "" {
+		t, err := time.Parse(time.RFC3339, afterStr)
+		if err != nil {
+			t, err = time.Parse("2006-01-02", afterStr)
+		}
+		if err == nil {
+			clauses = append(clauses, " AND node.created_at >= datetime($temporalAfter)")
+			params["temporalAfter"] = t.Format(time.RFC3339)
+		}
+	}
+
+	if beforeStr != "" {
+		t, err := time.Parse(time.RFC3339, beforeStr)
+		if err != nil {
+			t, err = time.Parse("2006-01-02", beforeStr)
+		}
+		if err == nil {
+			clauses = append(clauses, " AND node.created_at < datetime($temporalBefore)")
+			params["temporalBefore"] = t.Format(time.RFC3339)
+		}
+	}
+
+	return strings.Join(clauses, ""), params
 }
 
 // fetchRecentObservations retrieves recent conversation observations
@@ -1011,7 +1052,7 @@ LIMIT 10`
 }
 
 // findSimilarObservations finds observations similar to the query embedding
-func (s *Service) findSimilarObservations(ctx context.Context, spaceID, requestingUserID string, embedding []float32, topK int) ([]RecallResult, error) {
+func (s *Service) findSimilarObservations(ctx context.Context, spaceID, requestingUserID string, embedding []float32, topK int, temporalFilter string, temporalParams map[string]any) ([]RecallResult, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
@@ -1028,18 +1069,21 @@ YIELD node, score
 WHERE node.space_id = $spaceId
   AND node.role_type = 'conversation_observation'
   AND node.layer = 0
-  AND NOT coalesce(node.is_archived, false)%s
+  AND NOT coalesce(node.is_archived, false)%s%s
 RETURN node.node_id AS nodeId, node.content AS content, node.summary AS summary,
        node.obs_type AS obsType, node.surprise_score AS surpriseScore,
        node.session_id AS sessionId, score
 ORDER BY score DESC
-LIMIT $topK`, s.vectorIndexName, visibilityFilter)
+LIMIT $topK`, s.vectorIndexName, visibilityFilter, temporalFilter)
 
 	params := map[string]any{
 		"spaceId":          spaceID,
 		"requestingUserId": requestingUserID,
 		"embedding":        embedding,
 		"topK":             topK,
+	}
+	for k, v := range temporalParams {
+		params[k] = v
 	}
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -1078,7 +1122,7 @@ LIMIT $topK`, s.vectorIndexName, visibilityFilter)
 }
 
 // findSimilarThemes finds themes similar to the query embedding
-func (s *Service) findSimilarThemes(ctx context.Context, spaceID string, embedding []float32, topK int) ([]RecallResult, error) {
+func (s *Service) findSimilarThemes(ctx context.Context, spaceID string, embedding []float32, topK int, temporalFilter string, temporalParams map[string]any) ([]RecallResult, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
@@ -1089,17 +1133,20 @@ YIELD node, score
 WHERE node.space_id = $spaceId
   AND node.role_type = 'conversation_theme'
   AND node.layer = 1
-  AND NOT coalesce(node.is_archived, false)
+  AND NOT coalesce(node.is_archived, false)%s
 RETURN node.node_id AS nodeId, node.name AS name, node.summary AS summary,
        node.member_count AS memberCount, node.dominant_obs_type AS dominantObsType,
        node.avg_surprise_score AS avgSurpriseScore, score
 ORDER BY score DESC
-LIMIT $topK`, s.vectorIndexName)
+LIMIT $topK`, s.vectorIndexName, temporalFilter)
 
 	params := map[string]any{
 		"spaceId":   spaceID,
 		"embedding": embedding,
 		"topK":      topK,
+	}
+	for k, v := range temporalParams {
+		params[k] = v
 	}
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -1135,7 +1182,7 @@ LIMIT $topK`, s.vectorIndexName)
 }
 
 // findSimilarConcepts finds emergent concepts similar to the query embedding
-func (s *Service) findSimilarConcepts(ctx context.Context, spaceID string, embedding []float32, topK int) ([]RecallResult, error) {
+func (s *Service) findSimilarConcepts(ctx context.Context, spaceID string, embedding []float32, topK int, temporalFilter string, temporalParams map[string]any) ([]RecallResult, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
@@ -1146,17 +1193,20 @@ YIELD node, score
 WHERE node.space_id = $spaceId
   AND node.role_type = 'emergent_concept'
   AND node.layer >= 2
-  AND NOT coalesce(node.is_archived, false)
+  AND NOT coalesce(node.is_archived, false)%s
 RETURN node.node_id AS nodeId, node.name AS name, node.summary AS summary,
        node.layer AS layer, node.keywords AS keywords,
        node.session_count AS sessionCount, score
 ORDER BY score DESC
-LIMIT $topK`, s.vectorIndexName)
+LIMIT $topK`, s.vectorIndexName, temporalFilter)
 
 	params := map[string]any{
 		"spaceId":   spaceID,
 		"embedding": embedding,
 		"topK":      topK,
+	}
+	for k, v := range temporalParams {
+		params[k] = v
 	}
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {

@@ -182,8 +182,14 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 
 	// Compute query-type aware retrieval hints (V0011 - Query-Aware Retrieval)
 	hints := ComputeRetrievalHints(req.QueryText, s.cfg)
-	log.Printf("Query type detected: %s (seedN=%d, hopDepth=%d, vecW=%.2f, bm25W=%.2f)",
-		hints.QueryType, hints.SeedN, hints.HopDepth, hints.VectorWeight, hints.BM25Weight)
+
+	// Override temporal intent with explicit API fields if provided
+	if req.TemporalAfter != "" || req.TemporalBefore != "" {
+		hints.TemporalIntent = BuildExplicitTemporalIntent(req.TemporalAfter, req.TemporalBefore)
+	}
+
+	log.Printf("Query type detected: %s (seedN=%d, hopDepth=%d, vecW=%.2f, bm25W=%.2f, temporal=%s)",
+		hints.QueryType, hints.SeedN, hints.HopDepth, hints.VectorWeight, hints.BM25Weight, hints.TemporalIntent.Mode)
 
 	// Override hopDepth with hints if request didn't specify
 	if req.HopDepth <= 0 {
@@ -196,10 +202,11 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	cacheReq.TopK = topK
 	cacheReq.HopDepth = hopDepth
 
-	// Check query cache (skip for Jiminy-enabled requests which need fresh explanations)
+	// Check query cache (skip for Jiminy-enabled requests and temporal queries)
 	cacheKey := CacheKey(cacheReq)
-	log.Printf("Query cache check: enabled=%v, jiminy=%v, key=%s", s.cfg.QueryCacheEnabled, req.JiminyEnabled, cacheKey[:16])
-	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled && s.queryCache != nil {
+	log.Printf("Query cache check: enabled=%v, jiminy=%v, temporal=%v, key=%s", s.cfg.QueryCacheEnabled, req.JiminyEnabled, hints.TemporalIntent.Mode, cacheKey[:16])
+	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled &&
+		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil {
 		if cached, ok := s.queryCache.Get(cacheReq); ok {
 			// Ensure Debug map exists and set cache_hit flag
 			if cached.Debug == nil {
@@ -223,10 +230,15 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 
 	// 1b) Hybrid retrieval: BM25 search + RRF fusion (if enabled and query text provided)
 	// Uses query-type aware weights from retrieval hints (V0011)
+	// For temporal queries, clean temporal keywords from BM25 query to avoid pollution
+	bm25QueryText := req.QueryText
+	if hints.TemporalIntent.Mode != TemporalModeNone {
+		bm25QueryText = CleanTemporalKeywords(req.QueryText, hints.TemporalIntent.Keywords)
+	}
 	var cands []Candidate
 	bm25Count := 0
 	if s.cfg.HybridRetrievalEnabled && req.QueryText != "" {
-		bm25Results, bm25Err := s.BM25Search(ctx, req.SpaceID, req.QueryText, s.cfg.BM25TopK, filter)
+		bm25Results, bm25Err := s.BM25Search(ctx, req.SpaceID, bm25QueryText, s.cfg.BM25TopK, filter)
 		if bm25Err != nil {
 			// Log warning but continue with vector-only results
 			log.Printf("WARN: BM25 search failed, using vector-only: %v", bm25Err)
@@ -239,6 +251,15 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		}
 	} else {
 		cands = vectorCands
+	}
+
+	// Hard-mode temporal filter: keep only candidates within the time range
+	if s.cfg.TemporalEnabled && s.cfg.TemporalHardFilterEnabled &&
+		hints.TemporalIntent.Mode == TemporalModeHard {
+		preFilterCount := len(cands)
+		cands = FilterCandidatesByTime(cands, hints.TemporalIntent.Constraint)
+		log.Printf("Temporal hard filter: %d -> %d candidates (constraint: %s)",
+			preFilterCount, len(cands), hints.TemporalIntent.Constraint.Description)
 	}
 
 	if len(cands) == 0 {
@@ -366,13 +387,13 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	var scoredCands []ScoredCandidate
 	var results []models.RetrieveResult
 	if req.JiminyEnabled {
-		scoredCands = ScoreAndRankWithBreakdown(cands, act, edges, initialTopK, s.cfg, req.QueryText)
+		scoredCands = ScoreAndRankWithBreakdown(cands, act, edges, initialTopK, s.cfg, req.QueryText, hints)
 		results = make([]models.RetrieveResult, len(scoredCands))
 		for i, sc := range scoredCands {
 			results[i] = sc.RetrieveResult
 		}
 	} else {
-		results = ScoreAndRank(cands, act, edges, initialTopK, s.cfg, req.QueryText)
+		results = ScoreAndRank(cands, act, edges, initialTopK, s.cfg, req.QueryText, hints)
 	}
 
 	// 5) Reasoning Module Processing (if available and query text provided)
@@ -506,11 +527,20 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			"cache_hit":              false,
 			"edge_type_strategy":     s.cfg.EdgeTypeStrategy,
 			"hybrid_switch_hop":      s.cfg.HybridSwitchHop,
+			"temporal_mode":          string(hints.TemporalIntent.Mode),
+			"temporal_keywords":      hints.TemporalIntent.Keywords,
+			"temporal_confidence":    hints.TemporalIntent.Confidence,
 		},
 	}
 
-	// Store in query cache (skip for Jiminy-enabled requests)
-	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled && s.queryCache != nil {
+	// Add temporal constraint description to debug if present
+	if hints.TemporalIntent.Constraint != nil {
+		resp.Debug["temporal_constraint"] = hints.TemporalIntent.Constraint.Description
+	}
+
+	// Store in query cache (skip for Jiminy-enabled and temporal requests)
+	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled &&
+		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil {
 		s.queryCache.Put(cacheReq, resp)
 		log.Printf("Query cache PUT for space=%s query=%q (cache size: %d)", req.SpaceID, req.QueryText[:min(50, len(req.QueryText))], s.queryCache.Len())
 	}

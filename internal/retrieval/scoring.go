@@ -340,13 +340,14 @@ type QueryGates struct {
 // RetrievalHints provides query-type aware parameters for the retrieval layer.
 // Unlike QueryGates (which affects scoring), these affect what candidates are retrieved.
 type RetrievalHints struct {
-	SeedN            int      // Number of seeds for graph expansion (default: 50)
-	HopDepth         int      // How many hops to expand (default: 2)
-	VectorWeight     float64  // Weight for vector in RRF fusion (default: 0.7)
-	BM25Weight       float64  // Weight for BM25 in RRF fusion (default: 0.3)
-	EnableExpansion  bool     // Whether to do graph expansion (default: true)
-	EdgeTypeStrategy string   // Edge type strategy: "structural_first", "learned_only", "hybrid", "all"
-	QueryType        string   // Detected query type for logging
+	SeedN            int            // Number of seeds for graph expansion (default: 50)
+	HopDepth         int            // How many hops to expand (default: 2)
+	VectorWeight     float64        // Weight for vector in RRF fusion (default: 0.7)
+	BM25Weight       float64        // Weight for BM25 in RRF fusion (default: 0.3)
+	EnableExpansion  bool           // Whether to do graph expansion (default: true)
+	EdgeTypeStrategy string         // Edge type strategy: "structural_first", "learned_only", "hybrid", "all"
+	QueryType        string         // Detected query type for logging
+	TemporalIntent   TemporalIntent // Parsed temporal understanding
 }
 
 // ComputeRetrievalHints returns retrieval parameters based on query type.
@@ -361,6 +362,11 @@ func ComputeRetrievalHints(queryText string, cfg config.Config) RetrievalHints {
 		EnableExpansion:  true,
 		EdgeTypeStrategy: cfg.EdgeTypeStrategy,
 		QueryType:        "generic",
+	}
+
+	// Parse temporal intent if temporal reasoning is enabled
+	if cfg.TemporalEnabled {
+		hints.TemporalIntent = ParseTemporalIntent(queryText, time.Now())
 	}
 
 	// Symbol lookup: maximize vector precision, minimize graph noise
@@ -528,8 +534,9 @@ func pathMatchScore(nodePath string, hints []string) float64 {
 
 // ScoreAndRank computes the final score per candidate and returns topK results.
 // queryText is optional - when provided, enables path-based boosting for architecture queries.
-func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK int, cfg config.Config, queryText string) []models.RetrieveResult {
-	scored := ScoreAndRankWithBreakdown(cands, act, edges, topK, cfg, queryText)
+// hints provides query-type and temporal awareness for scoring adjustments.
+func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK int, cfg config.Config, queryText string, hints RetrievalHints) []models.RetrieveResult {
+	scored := ScoreAndRankWithBreakdown(cands, act, edges, topK, cfg, queryText, hints)
 	results := make([]models.RetrieveResult, len(scored))
 	for i, sc := range scored {
 		results[i] = sc.RetrieveResult
@@ -539,7 +546,8 @@ func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK 
 
 // ScoreAndRankWithBreakdown computes scores with detailed breakdowns for Jiminy.
 // Returns ScoredCandidate with both the result and the score breakdown.
-func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges []Edge, topK int, cfg config.Config, queryText string) []ScoredCandidate {
+// hints provides query-type and temporal awareness for scoring adjustments.
+func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges []Edge, topK int, cfg config.Config, queryText string, hints RetrievalHints) []ScoredCandidate {
 	if topK <= 0 {
 		topK = 20
 	}
@@ -632,7 +640,12 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 		// Calculate individual weighted components using gated weights
 		vecComponent := gates.VectorWeight * c.VectorSim
 		actComponent := gates.ActivationWeight * a
-		recComponent := gamma * r
+		// Temporal soft-mode: boost recency weight when temporal language detected
+		effectiveGamma := gamma
+		if hints.TemporalIntent.Mode == TemporalModeSoft {
+			effectiveGamma = gamma * cfg.TemporalSoftBoostMultiplier
+		}
+		recComponent := effectiveGamma * r
 		confComponent := delta * c.Confidence
 		hubPenComponent := phi * h
 		redPenComponent := kappa * d
@@ -665,6 +678,12 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			}
 		}
 
+		// Temporal boost: track the additional recency contribution from temporal soft-mode
+		temporalBoost := 0.0
+		if effectiveGamma > gamma {
+			temporalBoost = (effectiveGamma - gamma) * r
+		}
+
 		breakdown := ScoreBreakdown{
 			VectorSimilarity:  vecComponent,
 			Activation:        actComponent,
@@ -678,6 +697,7 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			RedundancyPenalty: -redPenComponent,
 			RerankDelta:       0, // Set later by reranker
 			LearningEdgeBoost: 0, // Set later if learning edges contributed
+			TemporalBoost:     temporalBoost,
 			FinalScore:        s,
 		}
 
@@ -784,6 +804,7 @@ type ScoreBreakdown struct {
 	RedundancyPenalty float64 `json:"redundancy_penalty"`  // -κ * redundancy factor
 	RerankDelta       float64 `json:"rerank_delta"`        // score change from LLM re-ranking
 	LearningEdgeBoost float64 `json:"learning_edge_boost"` // boost from CO_ACTIVATED_WITH traversal
+	TemporalBoost     float64 `json:"temporal_boost"`      // additional recency from temporal soft-mode
 	FinalScore        float64 `json:"final_score"`         // sum of all components
 }
 

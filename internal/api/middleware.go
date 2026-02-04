@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"compress/gzip"
 	"crypto/rand"
 	"encoding/hex"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"mdemg/internal/conversation"
 )
 
 // LogConfig holds configuration for request logging middleware.
@@ -277,4 +280,45 @@ func (fs FieldSelector) FilterFields(data map[string]any) map[string]any {
 	}
 
 	return result
+}
+
+// warningPaths are the endpoints that trigger a session-not-resumed warning.
+var warningPaths = map[string]bool{
+	"/v1/memory/retrieve":     true,
+	"/v1/conversation/recall": true,
+}
+
+// SessionResumeWarningMiddleware adds an X-MDEMG-Warning header when an agent
+// calls retrieve or recall without having called /resume first in the session.
+// This is non-breaking — requests are never blocked.
+func SessionResumeWarningMiddleware(next http.Handler, tracker *conversation.SessionTracker) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only check POST requests to warning paths
+		if tracker == nil || r.Method != http.MethodPost || !warningPaths[r.URL.Path] {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Read body to extract session_id, then restore it for downstream
+		body, err := io.ReadAll(r.Body)
+		r.Body.Close()
+		if err != nil {
+			// Can't read body — pass through without warning
+			r.Body = io.NopCloser(bytes.NewReader(nil))
+			next.ServeHTTP(w, r)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+
+		var partial struct {
+			SessionID string `json:"session_id"`
+		}
+		if json.Unmarshal(body, &partial) == nil && partial.SessionID != "" {
+			if !tracker.IsResumed(partial.SessionID) {
+				w.Header().Set("X-MDEMG-Warning", "session-not-resumed")
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

@@ -503,6 +503,9 @@ type ObserveRequest struct {
 	UserID     string `json:"user_id,omitempty"`                                                   // Owner of the observation
 	Visibility string `json:"visibility,omitempty" validate:"omitempty,oneof=private team global"` // Default: private
 
+	// Multi-Agent Identity (CMS v3)
+	AgentID string `json:"agent_id,omitempty"` // Persistent agent identity (survives across sessions)
+
 	// Cross-module linking (CMS v2)
 	RefersTo []string `json:"refers_to,omitempty"` // Node/symbol IDs this observation references
 }
@@ -528,6 +531,9 @@ type CorrectRequest struct {
 	// Identity & Visibility (CMS v2)
 	UserID     string `json:"user_id,omitempty"`                                                   // Owner of the correction
 	Visibility string `json:"visibility,omitempty" validate:"omitempty,oneof=private team global"` // Default: private
+
+	// Multi-Agent Identity (CMS v3)
+	AgentID string `json:"agent_id,omitempty"` // Persistent agent identity
 
 	// Cross-module linking (CMS v2)
 	RefersTo []string `json:"refers_to,omitempty"` // Node/symbol IDs this correction references
@@ -605,6 +611,9 @@ type ResumeRequest struct {
 
 	// Visibility filtering (CMS v2)
 	RequestingUserID string `json:"requesting_user_id,omitempty"` // Filter private observations to this user
+
+	// Multi-Agent Identity (CMS v3)
+	AgentID string `json:"agent_id,omitempty"` // Resume across sessions for this agent
 }
 
 // JiminyRationale explains WHY specific state was rehydrated during resume.
@@ -676,6 +685,9 @@ type RecallRequest struct {
 
 	// Visibility filtering (CMS v2)
 	RequestingUserID string `json:"requesting_user_id,omitempty"` // Filter private observations to this user
+
+	// Multi-Agent Identity (CMS v3)
+	AgentID string `json:"agent_id,omitempty"` // Filter to this agent's observations
 
 	// Temporal filtering (Phase 1: Time-Aware Retrieval)
 	TemporalAfter  string `json:"temporal_after,omitempty"`  // ISO8601: filter results after this time

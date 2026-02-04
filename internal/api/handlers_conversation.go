@@ -46,6 +46,7 @@ func (s *Server) handleObserve(w http.ResponseWriter, r *http.Request) {
 		Metadata:   req.Metadata,
 		UserID:     req.UserID,
 		Visibility: req.Visibility,
+		AgentID:    req.AgentID,
 		RefersTo:   req.RefersTo,
 	}
 
@@ -53,6 +54,11 @@ func (s *Server) handleObserve(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeInternalError(w, err, "observe")
 		return
+	}
+
+	// Track observation in session tracker (Phase 3A)
+	if s.sessionTracker != nil && req.SessionID != "" {
+		s.sessionTracker.RecordObserve(req.SessionID)
 	}
 
 	// Convert to API response type
@@ -101,6 +107,7 @@ func (s *Server) handleCorrect(w http.ResponseWriter, r *http.Request) {
 		Context:    req.Context,
 		UserID:     req.UserID,
 		Visibility: req.Visibility,
+		AgentID:    req.AgentID,
 		RefersTo:   req.RefersTo,
 	}
 
@@ -156,12 +163,22 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		IncludeLearnings: req.IncludeLearnings,
 		MaxObservations:  req.MaxObservations,
 		RequestingUserID: req.RequestingUserID,
+		AgentID:          req.AgentID,
 	}
 
 	resp, err := s.conversationSvc.Resume(r.Context(), internalReq)
 	if err != nil {
 		writeInternalError(w, err, "resume")
 		return
+	}
+
+	// Track resume in session tracker (Phase 3A)
+	if s.sessionTracker != nil {
+		sessionID := req.SessionID
+		if sessionID == "" {
+			sessionID = req.SpaceID // Fall back to space ID if no session
+		}
+		s.sessionTracker.RecordResume(sessionID, req.SpaceID)
 	}
 
 	// Convert to API response type
@@ -213,6 +230,7 @@ func (s *Server) handleRecall(w http.ResponseWriter, r *http.Request) {
 		IncludeThemes:    req.IncludeThemes,
 		IncludeConcepts:  req.IncludeConcepts,
 		RequestingUserID: req.RequestingUserID,
+		AgentID:          req.AgentID,
 		TemporalAfter:    req.TemporalAfter,
 		TemporalBefore:   req.TemporalBefore,
 	}
@@ -438,4 +456,57 @@ func (s *Server) handleProcessGraduations(w http.ResponseWriter, r *http.Request
 
 	summary.DecayApplied = decayed
 	writeJSON(w, http.StatusOK, summary)
+}
+
+// handleSessionHealth returns the CMS usage health for a session.
+// GET /v1/conversation/session/health?session_id=X
+func (s *Server) handleSessionHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	sessionID := r.URL.Query().Get("session_id")
+	if sessionID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "session_id query parameter is required"})
+		return
+	}
+
+	if s.sessionTracker == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "session tracker not available"})
+		return
+	}
+
+	state := s.sessionTracker.GetState(sessionID)
+	if state == nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"session_id":               sessionID,
+			"resumed":                  false,
+			"observations_since_resume": 0,
+			"health_score":             0.0,
+			"tracked":                  false,
+		})
+		return
+	}
+
+	resp := map[string]any{
+		"session_id":               state.SessionID,
+		"space_id":                 state.SpaceID,
+		"resumed":                  state.Resumed,
+		"observations_since_resume": state.ObservationsSinceResume,
+		"health_score":             state.HealthScore(),
+		"tracked":                  true,
+	}
+
+	if !state.LastResumeAt.IsZero() {
+		resp["last_resume_at"] = state.LastResumeAt.Format("2006-01-02T15:04:05Z")
+	}
+	if !state.LastObserveAt.IsZero() {
+		resp["last_observe_at"] = state.LastObserveAt.Format("2006-01-02T15:04:05Z")
+	}
+	if !state.LastActivityAt.IsZero() {
+		resp["last_activity_at"] = state.LastActivityAt.Format("2006-01-02T15:04:05Z")
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }

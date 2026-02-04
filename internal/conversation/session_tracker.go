@@ -1,0 +1,176 @@
+package conversation
+
+import (
+	"sync"
+	"time"
+)
+
+// SessionState tracks the CMS usage state for an agent session.
+type SessionState struct {
+	SessionID            string    `json:"session_id"`
+	SpaceID              string    `json:"space_id,omitempty"`
+	Resumed              bool      `json:"resumed"`
+	LastResumeAt         time.Time `json:"last_resume_at,omitempty"`
+	ObservationsSinceResume int    `json:"observations_since_resume"`
+	LastObserveAt        time.Time `json:"last_observe_at,omitempty"`
+	LastActivityAt       time.Time `json:"last_activity_at"`
+	CreatedAt            time.Time `json:"created_at"`
+}
+
+// HealthScore computes a session health score (0.0 - 1.0).
+// Penalizes: no resume, low observation count.
+// Rewards: resumed session, regular observations.
+func (s *SessionState) HealthScore() float64 {
+	score := 0.0
+
+	// Base: resumed (0.4)
+	if s.Resumed {
+		score += 0.4
+	}
+
+	// Observations: up to 0.4 (1+ = 0.1, 3+ = 0.2, 5+ = 0.3, 10+ = 0.4)
+	switch {
+	case s.ObservationsSinceResume >= 10:
+		score += 0.4
+	case s.ObservationsSinceResume >= 5:
+		score += 0.3
+	case s.ObservationsSinceResume >= 3:
+		score += 0.2
+	case s.ObservationsSinceResume >= 1:
+		score += 0.1
+	}
+
+	// Recency bonus: activity within last 10 minutes (0.2)
+	if !s.LastActivityAt.IsZero() && time.Since(s.LastActivityAt) < 10*time.Minute {
+		score += 0.2
+	}
+
+	if score > 1.0 {
+		score = 1.0
+	}
+	return score
+}
+
+// SessionTracker tracks per-session CMS usage via an in-memory sync.Map.
+// Sessions auto-expire after the configured TTL.
+type SessionTracker struct {
+	sessions sync.Map // map[string]*SessionState
+	ttl      time.Duration
+	stopCh   chan struct{}
+}
+
+// NewSessionTracker creates a tracker with TTL-based cleanup.
+// The cleanup goroutine runs every ttl/2.
+func NewSessionTracker(ttl time.Duration) *SessionTracker {
+	if ttl <= 0 {
+		ttl = 2 * time.Hour
+	}
+	st := &SessionTracker{
+		ttl:    ttl,
+		stopCh: make(chan struct{}),
+	}
+	go st.cleanupLoop()
+	return st
+}
+
+// RecordResume marks that a session has called /resume.
+func (st *SessionTracker) RecordResume(sessionID, spaceID string) {
+	now := time.Now().UTC()
+	val, loaded := st.sessions.LoadOrStore(sessionID, &SessionState{
+		SessionID:      sessionID,
+		SpaceID:        spaceID,
+		Resumed:        true,
+		LastResumeAt:   now,
+		LastActivityAt: now,
+		CreatedAt:      now,
+	})
+	if loaded {
+		state := val.(*SessionState)
+		state.Resumed = true
+		state.LastResumeAt = now
+		state.LastActivityAt = now
+		if spaceID != "" {
+			state.SpaceID = spaceID
+		}
+	}
+}
+
+// RecordObserve records that a session made an observation.
+func (st *SessionTracker) RecordObserve(sessionID string) {
+	now := time.Now().UTC()
+	val, loaded := st.sessions.LoadOrStore(sessionID, &SessionState{
+		SessionID:               sessionID,
+		ObservationsSinceResume: 1,
+		LastObserveAt:           now,
+		LastActivityAt:          now,
+		CreatedAt:               now,
+	})
+	if loaded {
+		state := val.(*SessionState)
+		state.ObservationsSinceResume++
+		state.LastObserveAt = now
+		state.LastActivityAt = now
+	}
+}
+
+// RecordActivity records generic activity for a session (keeps it alive for TTL).
+func (st *SessionTracker) RecordActivity(sessionID string) {
+	now := time.Now().UTC()
+	val, loaded := st.sessions.LoadOrStore(sessionID, &SessionState{
+		SessionID:      sessionID,
+		LastActivityAt: now,
+		CreatedAt:      now,
+	})
+	if loaded {
+		state := val.(*SessionState)
+		state.LastActivityAt = now
+	}
+}
+
+// GetState returns the current state for a session, or nil if not tracked.
+func (st *SessionTracker) GetState(sessionID string) *SessionState {
+	val, ok := st.sessions.Load(sessionID)
+	if !ok {
+		return nil
+	}
+	return val.(*SessionState)
+}
+
+// IsResumed returns whether the session has called /resume.
+func (st *SessionTracker) IsResumed(sessionID string) bool {
+	state := st.GetState(sessionID)
+	if state == nil {
+		return false
+	}
+	return state.Resumed
+}
+
+// Stop terminates the cleanup goroutine.
+func (st *SessionTracker) Stop() {
+	close(st.stopCh)
+}
+
+// cleanupLoop periodically removes expired sessions.
+func (st *SessionTracker) cleanupLoop() {
+	ticker := time.NewTicker(st.ttl / 2)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			st.cleanup()
+		case <-st.stopCh:
+			return
+		}
+	}
+}
+
+func (st *SessionTracker) cleanup() {
+	cutoff := time.Now().UTC().Add(-st.ttl)
+	st.sessions.Range(func(key, value any) bool {
+		state := value.(*SessionState)
+		if state.LastActivityAt.Before(cutoff) {
+			st.sessions.Delete(key)
+		}
+		return true
+	})
+}

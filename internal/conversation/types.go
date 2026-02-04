@@ -64,6 +64,9 @@ type Observation struct {
 	Visibility     Visibility // private|team|global (default: private)
 	Volatile       bool       // True for unreinforced short-term thoughts
 	StabilityScore float64    // 0..1, managed by Context Cooler
+
+	// Multi-Agent Identity (CMS v3)
+	AgentID string // Persistent agent identity (survives across sessions)
 }
 
 // SurpriseFactors breaks down the surprise score

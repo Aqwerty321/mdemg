@@ -194,7 +194,14 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | GET | `/v1/memory/ingest/status/{id}` | Check job progress |
 | POST | `/v1/memory/ingest/cancel/{id}` | Cancel running job |
 | GET | `/v1/memory/ingest/jobs` | List all ingestion jobs |
-| * | `/v1/memory/ingest-codebase` | Codebase ingestion route |
+| POST | `/v1/memory/ingest/files` | Ingest files with background job |
+| * | `/v1/memory/ingest-codebase` | Codebase ingestion route (deprecated) |
+
+### Freshness & Sync
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/memory/spaces/{id}/freshness` | Space freshness and staleness status |
 
 ### Learning & Hebbian Edges
 

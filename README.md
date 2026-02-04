@@ -139,6 +139,9 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Evidence-based retrieval**: Returns symbol-level citations (file:line references) with results
 - **Capability gap detection**: Identifies missing knowledge areas for targeted improvement
 - **Codebase ingestion API**: Background job processing for large codebase ingestion with consolidation
+- **Git commit hooks**: Automatic incremental ingestion on every commit via post-commit hook
+- **Freshness tracking**: TapRoot-level staleness detection with configurable thresholds
+- **Scheduled sync**: Periodic background sync to keep memory graphs up-to-date
 
 ## Architecture
 
@@ -198,10 +201,34 @@ go build -o bin/ingest-codebase ./cmd/ingest-codebase
 # Ingest a codebase
 ./bin/ingest-codebase --space-id=my-project --path=/path/to/repo
 
+# Incremental ingest (only changed files since last commit)
+./bin/ingest-codebase --space-id=my-project --path=/path/to/repo --incremental
+
+# Quiet mode (suppress non-error output, useful for hooks/CI)
+./bin/ingest-codebase --space-id=my-project --path=/path/to/repo --quiet
+
+# Log to file instead of stderr
+./bin/ingest-codebase --space-id=my-project --path=/path/to/repo --log-file /tmp/ingest.log
+
 # Run consolidation to create concept layers
 curl -X POST http://localhost:9999/v1/memory/consolidate \
   -H "Content-Type: application/json" \
   -d '{"space_id": "my-project"}'
+```
+
+### Git Commit Hook (Automatic Ingestion)
+
+Install the post-commit hook to automatically ingest changes on every commit:
+
+```bash
+# Install the hook
+./scripts/install-hook.sh /path/to/your/repo
+
+# The hook runs quietly by default. Configure via environment:
+# MDEMG_SPACE_ID - space to ingest into (default: repo directory name)
+# MDEMG_ENDPOINT - server URL (default: http://localhost:9999)
+# MDEMG_VERBOSE  - set to "true" for verbose output
+# MDEMG_LOG_FILE - redirect logs to a file
 ```
 
 ## API Endpoints
@@ -218,6 +245,8 @@ curl -X POST http://localhost:9999/v1/memory/consolidate \
 | `/v1/memory/stats` | GET | Per-space memory statistics |
 | `/v1/memory/ingest-codebase` | POST | Background codebase ingestion job |
 | `/v1/memory/symbols` | GET | Query extracted code symbols |
+| `/v1/memory/ingest/files` | POST | Ingest files with background job processing |
+| `/v1/memory/spaces/{id}/freshness` | GET | Space freshness and staleness status |
 
 ### Conversation Memory System (CMS)
 
@@ -324,6 +353,8 @@ mdemg/
 - [Graph Schema](docs/architecture/02_Graph_Schema.md) - Neo4j labels and relationships
 - [Retrieval & Scoring](docs/architecture/06_Retrieval_API_and_Scoring.md) - Scoring algorithm details
 - [Benchmarking Guide](docs/benchmarks/BENCHMARK_V4_README.md) - Running and validating benchmarks
+- [CI/CD Integration](docs/development/CI_CD_INTEGRATION.md) - Git hooks, GitHub Actions, and scheduled sync
+- [API Reference](docs/development/API_REFERENCE.md) - Full API endpoint documentation
 
 ## Contributing
 

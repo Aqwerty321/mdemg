@@ -64,6 +64,7 @@ enum ModuleType {
     MODULE_TYPE_INGESTION = 1;      // Perception - parses content into observations
     MODULE_TYPE_REASONING = 2;      // Cognition - processes/re-ranks retrieval results
     MODULE_TYPE_APE = 3;            // Active Participant - background maintenance tasks
+    MODULE_TYPE_CRUD = 4;           // CRUD - create/read/update/delete external entities
 }
 
 // =============================================================================
@@ -234,4 +235,95 @@ message Edge {
     string rel_type = 3;                   // Relationship type (e.g., "BLOCKS", "RELATED_TO")
     float weight = 4;                      // Edge weight (0.0-1.0)
     map<string, string> properties = 5;   // Additional edge properties
+}
+
+// =============================================================================
+// CRUD Module Service
+// Generic CRUD service for modules that manage external entities.
+// Designed for reuse: entity_type string dispatch + map<string,string> fields.
+// =============================================================================
+
+service CRUDModule {
+    // Create a new entity in the external system.
+    rpc Create(CRUDCreateRequest) returns (CRUDCreateResponse);
+
+    // Read a single entity by ID.
+    rpc Read(CRUDReadRequest) returns (CRUDReadResponse);
+
+    // Update an existing entity (partial update via fields map).
+    rpc Update(CRUDUpdateRequest) returns (CRUDUpdateResponse);
+
+    // Delete (or archive) an entity by ID.
+    rpc Delete(CRUDDeleteRequest) returns (CRUDDeleteResponse);
+
+    // List entities with optional filtering.
+    rpc List(CRUDListRequest) returns (CRUDListResponse);
+}
+
+// CRUDEntity represents a generic entity returned by CRUD operations.
+message CRUDEntity {
+    string id = 1;                         // Entity ID in the external system
+    string entity_type = 2;                // Type (e.g., "issue", "project", "comment")
+    map<string, string> fields = 3;        // Entity fields as key-value pairs
+    string created_at = 4;                 // ISO8601 creation timestamp
+    string updated_at = 5;                 // ISO8601 last update timestamp
+}
+
+message CRUDCreateRequest {
+    string entity_type = 1;                // Required: type of entity to create
+    map<string, string> fields = 2;        // Entity fields (e.g., "title", "description")
+}
+
+message CRUDCreateResponse {
+    CRUDEntity entity = 1;                 // The created entity
+    bool success = 2;                      // Whether creation succeeded
+    string error = 3;                      // Error message if failed
+}
+
+message CRUDReadRequest {
+    string entity_type = 1;                // Required: type of entity
+    string id = 2;                         // Required: entity ID
+}
+
+message CRUDReadResponse {
+    CRUDEntity entity = 1;                 // The requested entity
+    bool success = 2;
+    string error = 3;
+}
+
+message CRUDUpdateRequest {
+    string entity_type = 1;                // Required: type of entity
+    string id = 2;                         // Required: entity ID
+    map<string, string> fields = 3;        // Fields to update (partial update)
+}
+
+message CRUDUpdateResponse {
+    CRUDEntity entity = 1;                 // The updated entity
+    bool success = 2;
+    string error = 3;
+}
+
+message CRUDDeleteRequest {
+    string entity_type = 1;                // Required: type of entity
+    string id = 2;                         // Required: entity ID
+}
+
+message CRUDDeleteResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+message CRUDListRequest {
+    string entity_type = 1;                // Required: type of entity to list
+    map<string, string> filters = 2;       // Optional filters (e.g., "team": "ENG", "state": "in_progress")
+    int32 limit = 3;                       // Max results (default: 50)
+    string cursor = 4;                     // Pagination cursor
+}
+
+message CRUDListResponse {
+    repeated CRUDEntity entities = 1;      // List of entities
+    string next_cursor = 2;               // Cursor for next page (empty if no more)
+    int32 total_count = 3;                // Total matching entities (if available)
+    bool success = 4;
+    string error = 5;
 }

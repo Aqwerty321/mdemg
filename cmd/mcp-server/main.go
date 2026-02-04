@@ -48,6 +48,14 @@ func main() {
 	registerMemoryIngestCancelTool(s)
 	registerMemoryIngestJobsTool(s)
 
+	// Linear CRUD tools (Phase 4)
+	registerLinearCreateIssueTool(s)
+	registerLinearListIssuesTool(s)
+	registerLinearReadIssueTool(s)
+	registerLinearUpdateIssueTool(s)
+	registerLinearAddCommentTool(s)
+	registerLinearSearchTool(s)
+
 	// Start server (stdio mode for Cursor integration)
 	if err := server.ServeStdio(s); err != nil {
 		fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
@@ -750,6 +758,443 @@ func memoryIngestJobsHandler(ctx context.Context, request mcp.CallToolRequest) (
 	}
 
 	return mcp.NewToolResultText(sb.String()), nil
+}
+
+// =============================================================================
+// Linear CRUD Tools (Phase 4)
+// =============================================================================
+
+func registerLinearCreateIssueTool(s *server.MCPServer) {
+	tool := mcp.NewTool("linear_create_issue",
+		mcp.WithDescription(`Create a new issue in Linear. Requires title and team_id.
+Returns the created issue with its ID and identifier.`),
+		mcp.WithString("title",
+			mcp.Required(),
+			mcp.Description("Issue title")),
+		mcp.WithString("team_id",
+			mcp.Required(),
+			mcp.Description("Team ID to create the issue in")),
+		mcp.WithString("description",
+			mcp.Description("Issue description (markdown supported)")),
+		mcp.WithString("priority",
+			mcp.Description("Priority: 1=urgent, 2=high, 3=medium, 4=low")),
+		mcp.WithString("assignee_id",
+			mcp.Description("User ID to assign the issue to")),
+		mcp.WithString("project_id",
+			mcp.Description("Project ID to associate the issue with")),
+	)
+
+	s.AddTool(tool, linearCreateIssueHandler)
+}
+
+func linearCreateIssueHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	title, _ := args["title"].(string)
+	if title == "" {
+		return newToolResultError("title is required"), nil
+	}
+	teamID, _ := args["team_id"].(string)
+	if teamID == "" {
+		return newToolResultError("team_id is required"), nil
+	}
+
+	body := map[string]string{
+		"title":   title,
+		"team_id": teamID,
+	}
+	if v, ok := args["description"].(string); ok && v != "" {
+		body["description"] = v
+	}
+	if v, ok := args["priority"].(string); ok && v != "" {
+		body["priority"] = v
+	}
+	if v, ok := args["assignee_id"].(string); ok && v != "" {
+		body["assignee_id"] = v
+	}
+	if v, ok := args["project_id"].(string); ok && v != "" {
+		body["project_id"] = v
+	}
+
+	resp, err := callMDEMGWithMap("/v1/linear/issues", body)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to create issue: %v", err)), nil
+	}
+
+	entity, _ := resp["entity"].(map[string]any)
+	fields, _ := entity["fields"].(map[string]any)
+	identifier, _ := fields["identifier"].(string)
+	id, _ := entity["id"].(string)
+
+	result := fmt.Sprintf("Issue created successfully.\nID: %s\nIdentifier: %s\nTitle: %s", id, identifier, title)
+	return mcp.NewToolResultText(result), nil
+}
+
+func registerLinearListIssuesTool(s *server.MCPServer) {
+	tool := mcp.NewTool("linear_list_issues",
+		mcp.WithDescription(`List issues from Linear with optional filters.
+Returns issues with their ID, title, state, priority, and assignee.`),
+		mcp.WithString("team",
+			mcp.Description("Filter by team key (e.g., 'ENG')")),
+		mcp.WithString("state",
+			mcp.Description("Filter by state name (e.g., 'In Progress')")),
+		mcp.WithString("assignee",
+			mcp.Description("Filter by assignee name")),
+		mcp.WithNumber("limit",
+			mcp.Description("Max results to return (default: 20)")),
+	)
+
+	s.AddTool(tool, linearListIssuesHandler)
+}
+
+func linearListIssuesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	params := make(map[string]string)
+	if v, ok := args["team"].(string); ok && v != "" {
+		params["team"] = v
+	}
+	if v, ok := args["state"].(string); ok && v != "" {
+		params["state"] = v
+	}
+	if v, ok := args["assignee"].(string); ok && v != "" {
+		params["assignee"] = v
+	}
+
+	limit := "20"
+	if l, ok := args["limit"].(float64); ok && l > 0 {
+		limit = fmt.Sprintf("%d", int(l))
+	}
+	params["limit"] = limit
+
+	resp, err := callMDEMGGet("/v1/linear/issues", params)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to list issues: %v", err)), nil
+	}
+
+	entities, _ := resp["entities"].([]any)
+	if len(entities) == 0 {
+		return mcp.NewToolResultText("No issues found matching the filters."), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Found %d issues:\n\n", len(entities)))
+
+	for i, e := range entities {
+		entity, _ := e.(map[string]any)
+		fields, _ := entity["fields"].(map[string]any)
+
+		identifier, _ := fields["identifier"].(string)
+		title, _ := fields["title"].(string)
+		state, _ := fields["state"].(string)
+		priority, _ := fields["priority"].(string)
+		assignee, _ := fields["assignee_name"].(string)
+
+		sb.WriteString(fmt.Sprintf("%d. **%s** — %s\n", i+1, identifier, title))
+		sb.WriteString(fmt.Sprintf("   State: %s | Priority: %s", state, priority))
+		if assignee != "" {
+			sb.WriteString(fmt.Sprintf(" | Assignee: %s", assignee))
+		}
+		sb.WriteString("\n\n")
+	}
+
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
+func registerLinearReadIssueTool(s *server.MCPServer) {
+	tool := mcp.NewTool("linear_read_issue",
+		mcp.WithDescription(`Read a single issue from Linear by ID.
+Returns the full issue details including description, state, and comments.`),
+		mcp.WithString("issue_id",
+			mcp.Required(),
+			mcp.Description("The Linear issue ID")),
+	)
+
+	s.AddTool(tool, linearReadIssueHandler)
+}
+
+func linearReadIssueHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	issueID, _ := args["issue_id"].(string)
+	if issueID == "" {
+		return newToolResultError("issue_id is required"), nil
+	}
+
+	resp, err := callMDEMGGet("/v1/linear/issues/"+issueID, nil)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to read issue: %v", err)), nil
+	}
+
+	entity, _ := resp["entity"].(map[string]any)
+	fields, _ := entity["fields"].(map[string]any)
+
+	identifier, _ := fields["identifier"].(string)
+	title, _ := fields["title"].(string)
+	description, _ := fields["description"].(string)
+	state, _ := fields["state"].(string)
+	stateType, _ := fields["state_type"].(string)
+	priority, _ := fields["priority"].(string)
+	teamKey, _ := fields["team_key"].(string)
+	assignee, _ := fields["assignee_name"].(string)
+	project, _ := fields["project_name"].(string)
+	labels, _ := fields["labels"].(string)
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("# %s: %s\n\n", identifier, title))
+	if description != "" {
+		sb.WriteString(description)
+		sb.WriteString("\n\n")
+	}
+	sb.WriteString(fmt.Sprintf("**State:** %s (%s)\n", state, stateType))
+	sb.WriteString(fmt.Sprintf("**Priority:** %s\n", priority))
+	sb.WriteString(fmt.Sprintf("**Team:** %s\n", teamKey))
+	if assignee != "" {
+		sb.WriteString(fmt.Sprintf("**Assignee:** %s\n", assignee))
+	}
+	if project != "" {
+		sb.WriteString(fmt.Sprintf("**Project:** %s\n", project))
+	}
+	if labels != "" {
+		sb.WriteString(fmt.Sprintf("**Labels:** %s\n", labels))
+	}
+
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
+func registerLinearUpdateIssueTool(s *server.MCPServer) {
+	tool := mcp.NewTool("linear_update_issue",
+		mcp.WithDescription(`Update an existing issue in Linear. Provide only the fields you want to change.`),
+		mcp.WithString("issue_id",
+			mcp.Required(),
+			mcp.Description("The Linear issue ID")),
+		mcp.WithString("title",
+			mcp.Description("New issue title")),
+		mcp.WithString("description",
+			mcp.Description("New issue description")),
+		mcp.WithString("priority",
+			mcp.Description("New priority: 1=urgent, 2=high, 3=medium, 4=low")),
+		mcp.WithString("state_id",
+			mcp.Description("New state ID")),
+		mcp.WithString("assignee_id",
+			mcp.Description("New assignee user ID")),
+	)
+
+	s.AddTool(tool, linearUpdateIssueHandler)
+}
+
+func linearUpdateIssueHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	issueID, _ := args["issue_id"].(string)
+	if issueID == "" {
+		return newToolResultError("issue_id is required"), nil
+	}
+
+	body := make(map[string]string)
+	for _, key := range []string{"title", "description", "priority", "state_id", "assignee_id"} {
+		if v, ok := args[key].(string); ok && v != "" {
+			body[key] = v
+		}
+	}
+
+	if len(body) == 0 {
+		return newToolResultError("at least one field to update is required"), nil
+	}
+
+	resp, err := callMDEMGPut("/v1/linear/issues/"+issueID, body)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to update issue: %v", err)), nil
+	}
+
+	entity, _ := resp["entity"].(map[string]any)
+	fields, _ := entity["fields"].(map[string]any)
+	identifier, _ := fields["identifier"].(string)
+	title, _ := fields["title"].(string)
+
+	result := fmt.Sprintf("Issue updated successfully.\nIdentifier: %s\nTitle: %s", identifier, title)
+	return mcp.NewToolResultText(result), nil
+}
+
+func registerLinearAddCommentTool(s *server.MCPServer) {
+	tool := mcp.NewTool("linear_add_comment",
+		mcp.WithDescription(`Add a comment to a Linear issue.`),
+		mcp.WithString("issue_id",
+			mcp.Required(),
+			mcp.Description("The Linear issue ID to comment on")),
+		mcp.WithString("body",
+			mcp.Required(),
+			mcp.Description("The comment body (markdown supported)")),
+	)
+
+	s.AddTool(tool, linearAddCommentHandler)
+}
+
+func linearAddCommentHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	issueID, _ := args["issue_id"].(string)
+	if issueID == "" {
+		return newToolResultError("issue_id is required"), nil
+	}
+	body, _ := args["body"].(string)
+	if body == "" {
+		return newToolResultError("body is required"), nil
+	}
+
+	resp, err := callMDEMGWithMap("/v1/linear/comments", map[string]string{
+		"issue_id": issueID,
+		"body":     body,
+	})
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to add comment: %v", err)), nil
+	}
+
+	entity, _ := resp["entity"].(map[string]any)
+	commentID, _ := entity["id"].(string)
+
+	result := fmt.Sprintf("Comment added successfully.\nComment ID: %s", commentID)
+	return mcp.NewToolResultText(result), nil
+}
+
+func registerLinearSearchTool(s *server.MCPServer) {
+	tool := mcp.NewTool("linear_search",
+		mcp.WithDescription(`Search for issues in Linear using fulltext search.`),
+		mcp.WithString("query",
+			mcp.Required(),
+			mcp.Description("Search query")),
+		mcp.WithNumber("limit",
+			mcp.Description("Max results to return (default: 20)")),
+	)
+
+	s.AddTool(tool, linearSearchHandler)
+}
+
+func linearSearchHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	query, _ := args["query"].(string)
+	if query == "" {
+		return newToolResultError("query is required"), nil
+	}
+
+	limit := "20"
+	if l, ok := args["limit"].(float64); ok && l > 0 {
+		limit = fmt.Sprintf("%d", int(l))
+	}
+
+	params := map[string]string{
+		"query": query,
+		"limit": limit,
+	}
+
+	resp, err := callMDEMGGet("/v1/linear/issues", params)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to search issues: %v", err)), nil
+	}
+
+	entities, _ := resp["entities"].([]any)
+	if len(entities) == 0 {
+		return mcp.NewToolResultText("No issues found matching the search query."), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Found %d issues for query %q:\n\n", len(entities), query))
+
+	for i, e := range entities {
+		entity, _ := e.(map[string]any)
+		fields, _ := entity["fields"].(map[string]any)
+
+		identifier, _ := fields["identifier"].(string)
+		title, _ := fields["title"].(string)
+		state, _ := fields["state"].(string)
+
+		sb.WriteString(fmt.Sprintf("%d. **%s** — %s [%s]\n", i+1, identifier, title, state))
+	}
+
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
+// callMDEMGWithMap is a helper for POST requests with map[string]string body.
+func callMDEMGWithMap(path string, body map[string]string) (map[string]any, error) {
+	m := make(map[string]any, len(body))
+	for k, v := range body {
+		m[k] = v
+	}
+	return callMDEMG(path, m)
+}
+
+// callMDEMGPut sends a PUT request to the MDEMG API.
+func callMDEMGPut(path string, body map[string]string) (map[string]any, error) {
+	m := make(map[string]any, len(body))
+	for k, v := range body {
+		m[k] = v
+	}
+
+	jsonBody, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", mdemgEndpoint+path, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	if errMsg, ok := result["error"].(string); ok {
+		return nil, fmt.Errorf("MDEMG error: %s", errMsg)
+	}
+
+	return result, nil
+}
+
+// callMDEMGDelete sends a DELETE request to the MDEMG API.
+func callMDEMGDelete(path string) (map[string]any, error) {
+	req, err := http.NewRequest("DELETE", mdemgEndpoint+path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	if errMsg, ok := result["error"].(string); ok {
+		return nil, fmt.Errorf("MDEMG error: %s", errMsg)
+	}
+
+	return result, nil
 }
 
 // getArgs extracts the arguments map from a CallToolRequest.

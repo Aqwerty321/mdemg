@@ -13,6 +13,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Learning System](#learning-system)
 - [Conversation Memory](#conversation-memory)
 - [Capability Gaps](#capability-gaps)
+- [Linear Integration](#linear-integration)
 - [Plugins & Modules](#plugins--modules)
 - [System & Monitoring](#system--monitoring)
 
@@ -704,6 +705,160 @@ Skip an interview prompt.
 ```json
 {
   "reason": "Not relevant to this project"
+}
+```
+
+---
+
+## Linear Integration
+
+CRUD operations for Linear issues, projects, and comments. Requires the `linear-module` plugin to be running.
+
+### POST /v1/linear/issues
+
+Create a new Linear issue.
+
+**Request Body**:
+```json
+{
+  "title": "Fix login bug",
+  "team_id": "team-uuid",
+  "description": "Users cannot log in on mobile",
+  "priority": 2,
+  "assignee_id": "user-uuid",
+  "project_id": "project-uuid",
+  "label_ids": ["label-uuid-1", "label-uuid-2"]
+}
+```
+
+**Required fields**: `title`, `team_id`
+
+**Response**:
+```json
+{
+  "id": "issue-uuid",
+  "identifier": "ENG-213",
+  "title": "Fix login bug",
+  "state": "Triage",
+  "team_key": "ENG",
+  "priority": "2",
+  "created_at": "2026-02-03T10:00:00Z"
+}
+```
+
+### GET /v1/linear/issues
+
+List Linear issues with optional filters.
+
+**Query Parameters**:
+| Param | Type | Description |
+|-------|------|-------------|
+| `team` | string | Filter by team key (e.g., "ENG") |
+| `state` | string | Filter by state name (e.g., "In Progress") |
+| `assignee` | string | Filter by assignee name |
+| `label` | string | Filter by label name |
+| `limit` | int | Max results (default: 50) |
+| `cursor` | string | Pagination cursor |
+
+**Response**:
+```json
+{
+  "issues": [
+    {
+      "id": "issue-uuid",
+      "identifier": "ENG-213",
+      "title": "Fix login bug",
+      "state": "In Progress",
+      "priority": "2"
+    }
+  ],
+  "next_cursor": "cursor-string",
+  "has_more": true
+}
+```
+
+### GET /v1/linear/issues/{id}
+
+Read a single issue by ID.
+
+**Response**: Same shape as individual issue in list response, with all fields populated.
+
+### PUT /v1/linear/issues/{id}
+
+Update an existing issue. Only provided fields are modified.
+
+**Request Body**:
+```json
+{
+  "title": "Updated title",
+  "priority": 1,
+  "state_id": "state-uuid",
+  "assignee_id": "user-uuid"
+}
+```
+
+**Response**: Updated issue fields.
+
+### DELETE /v1/linear/issues/{id}
+
+Archive (soft-delete) an issue.
+
+**Response**:
+```json
+{
+  "success": true
+}
+```
+
+### POST /v1/linear/projects
+
+Create a new Linear project.
+
+**Request Body**:
+```json
+{
+  "name": "Q1 Sprint",
+  "description": "First quarter deliverables"
+}
+```
+
+**Required fields**: `name`
+
+### GET /v1/linear/projects
+
+List Linear projects.
+
+**Query Parameters**: `limit`, `cursor`
+
+### GET /v1/linear/projects/{id}
+
+Read a single project by ID.
+
+### PUT /v1/linear/projects/{id}
+
+Update an existing project.
+
+### POST /v1/linear/comments
+
+Add a comment to an issue.
+
+**Request Body**:
+```json
+{
+  "issue_id": "issue-uuid",
+  "body": "This needs attention."
+}
+```
+
+**Required fields**: `issue_id`, `body`
+
+**Response**:
+```json
+{
+  "id": "comment-uuid",
+  "body": "This needs attention.",
+  "issue_id": "issue-uuid",
+  "created_at": "2026-02-03T10:05:00Z"
 }
 ```
 

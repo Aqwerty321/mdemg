@@ -207,6 +207,25 @@ func (m *Manager) GetAPEModules() []*ModuleInfo {
 	return result
 }
 
+// GetCRUDModules returns all modules that support CRUD operations.
+// This includes modules with type "CRUD" and modules that declare "CRUD"
+// in their additional_services (e.g., an INGESTION module with CRUD capability).
+func (m *Manager) GetCRUDModules() []*ModuleInfo {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*ModuleInfo
+	for _, inst := range m.modules {
+		if inst.info.State != StateReady {
+			continue
+		}
+		if inst.info.CRUDClient != nil {
+			result = append(result, inst.info)
+		}
+	}
+	return result
+}
+
 // loadModule loads a single module from its directory
 func (m *Manager) loadModule(moduleDir string) error {
 	// Read manifest
@@ -322,6 +341,18 @@ func (m *Manager) startModuleInstance(inst *moduleInstance, binaryPath string) e
 		info.ReasoningClient = pb.NewReasoningModuleClient(conn)
 	case "APE":
 		info.APEClient = pb.NewAPEModuleClient(conn)
+	case "CRUD":
+		info.CRUDClient = pb.NewCRUDModuleClient(conn)
+	}
+
+	// Wire additional services declared in manifest
+	for _, svc := range info.Manifest.AdditionalServices {
+		switch svc {
+		case "CRUD":
+			if info.CRUDClient == nil {
+				info.CRUDClient = pb.NewCRUDModuleClient(conn)
+			}
+		}
 	}
 
 	// Perform handshake

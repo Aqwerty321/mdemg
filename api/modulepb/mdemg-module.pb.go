@@ -29,6 +29,7 @@ const (
 	ModuleType_MODULE_TYPE_INGESTION   ModuleType = 1 // Perception - parses content into observations
 	ModuleType_MODULE_TYPE_REASONING   ModuleType = 2 // Cognition - processes/re-ranks retrieval results
 	ModuleType_MODULE_TYPE_APE         ModuleType = 3 // Active Participant - background maintenance tasks
+	ModuleType_MODULE_TYPE_CRUD        ModuleType = 4 // CRUD - create/read/update/delete external entities
 )
 
 // Enum value maps for ModuleType.
@@ -38,12 +39,14 @@ var (
 		1: "MODULE_TYPE_INGESTION",
 		2: "MODULE_TYPE_REASONING",
 		3: "MODULE_TYPE_APE",
+		4: "MODULE_TYPE_CRUD",
 	}
 	ModuleType_value = map[string]int32{
 		"MODULE_TYPE_UNSPECIFIED": 0,
 		"MODULE_TYPE_INGESTION":   1,
 		"MODULE_TYPE_REASONING":   2,
 		"MODULE_TYPE_APE":         3,
+		"MODULE_TYPE_CRUD":        4,
 	}
 )
 
@@ -1590,6 +1593,675 @@ func (x *Edge) GetProperties() map[string]string {
 	return nil
 }
 
+// CRUDEntity represents a generic entity returned by CRUD operations.
+type CRUDEntity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                                                                   // Entity ID in the external system
+	EntityType    string                 `protobuf:"bytes,2,opt,name=entity_type,json=entityType,proto3" json:"entity_type,omitempty"`                                                 // Type (e.g., "issue", "project", "comment")
+	Fields        map[string]string      `protobuf:"bytes,3,rep,name=fields,proto3" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Entity fields as key-value pairs
+	CreatedAt     string                 `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`                                                    // ISO8601 creation timestamp
+	UpdatedAt     string                 `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`                                                    // ISO8601 last update timestamp
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CRUDEntity) Reset() {
+	*x = CRUDEntity{}
+	mi := &file_mdemg_module_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CRUDEntity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CRUDEntity) ProtoMessage() {}
+
+func (x *CRUDEntity) ProtoReflect() protoreflect.Message {
+	mi := &file_mdemg_module_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CRUDEntity.ProtoReflect.Descriptor instead.
+func (*CRUDEntity) Descriptor() ([]byte, []int) {
+	return file_mdemg_module_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *CRUDEntity) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CRUDEntity) GetEntityType() string {
+	if x != nil {
+		return x.EntityType
+	}
+	return ""
+}
+
+func (x *CRUDEntity) GetFields() map[string]string {
+	if x != nil {
+		return x.Fields
+	}
+	return nil
+}
+
+func (x *CRUDEntity) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *CRUDEntity) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type CRUDCreateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EntityType    string                 `protobuf:"bytes,1,opt,name=entity_type,json=entityType,proto3" json:"entity_type,omitempty"`                                                 // Required: type of entity to create
+	Fields        map[string]string      `protobuf:"bytes,2,rep,name=fields,proto3" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Entity fields (e.g., "title", "description")
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CRUDCreateRequest) Reset() {
+	*x = CRUDCreateRequest{}
+	mi := &file_mdemg_module_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CRUDCreateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CRUDCreateRequest) ProtoMessage() {}
+
+func (x *CRUDCreateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mdemg_module_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CRUDCreateRequest.ProtoReflect.Descriptor instead.
+func (*CRUDCreateRequest) Descriptor() ([]byte, []int) {
+	return file_mdemg_module_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *CRUDCreateRequest) GetEntityType() string {
+	if x != nil {
+		return x.EntityType
+	}
+	return ""
+}
+
+func (x *CRUDCreateRequest) GetFields() map[string]string {
+	if x != nil {
+		return x.Fields
+	}
+	return nil
+}
+
+type CRUDCreateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entity        *CRUDEntity            `protobuf:"bytes,1,opt,name=entity,proto3" json:"entity,omitempty"`    // The created entity
+	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"` // Whether creation succeeded
+	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`      // Error message if failed
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CRUDCreateResponse) Reset() {
+	*x = CRUDCreateResponse{}
+	mi := &file_mdemg_module_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CRUDCreateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CRUDCreateResponse) ProtoMessage() {}
+
+func (x *CRUDCreateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mdemg_module_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CRUDCreateResponse.ProtoReflect.Descriptor instead.
+func (*CRUDCreateResponse) Descriptor() ([]byte, []int) {
+	return file_mdemg_module_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *CRUDCreateResponse) GetEntity() *CRUDEntity {
+	if x != nil {
+		return x.Entity
+	}
+	return nil
+}
+
+func (x *CRUDCreateResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *CRUDCreateResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type CRUDReadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EntityType    string                 `protobuf:"bytes,1,opt,name=entity_type,json=entityType,proto3" json:"entity_type,omitempty"` // Required: type of entity
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`                                   // Required: entity ID
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CRUDReadRequest) Reset() {
+	*x = CRUDReadRequest{}
+	mi := &file_mdemg_module_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CRUDReadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CRUDReadRequest) ProtoMessage() {}
+
+func (x *CRUDReadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mdemg_module_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CRUDReadRequest.ProtoReflect.Descriptor instead.
+func (*CRUDReadRequest) Descriptor() ([]byte, []int) {
+	return file_mdemg_module_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *CRUDReadRequest) GetEntityType() string {
+	if x != nil {
+		return x.EntityType
+	}
+	return ""
+}
+
+func (x *CRUDReadRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type CRUDReadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entity        *CRUDEntity            `protobuf:"bytes,1,opt,name=entity,proto3" json:"entity,omitempty"` // The requested entity
+	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CRUDReadResponse) Reset() {
+	*x = CRUDReadResponse{}
+	mi := &file_mdemg_module_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CRUDReadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CRUDReadResponse) ProtoMessage() {}
+
+func (x *CRUDReadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mdemg_module_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CRUDReadResponse.ProtoReflect.Descriptor instead.
+func (*CRUDReadResponse) Descriptor() ([]byte, []int) {
+	return file_mdemg_module_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *CRUDReadResponse) GetEntity() *CRUDEntity {
+	if x != nil {
+		return x.Entity
+	}
+	return nil
+}
+
+func (x *CRUDReadResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *CRUDReadResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type CRUDUpdateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EntityType    string                 `protobuf:"bytes,1,opt,name=entity_type,json=entityType,proto3" json:"entity_type,omitempty"`                                                 // Required: type of entity
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`                                                                                   // Required: entity ID
+	Fields        map[string]string      `protobuf:"bytes,3,rep,name=fields,proto3" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Fields to update (partial update)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CRUDUpdateRequest) Reset() {
+	*x = CRUDUpdateRequest{}
+	mi := &file_mdemg_module_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CRUDUpdateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CRUDUpdateRequest) ProtoMessage() {}
+
+func (x *CRUDUpdateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mdemg_module_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CRUDUpdateRequest.ProtoReflect.Descriptor instead.
+func (*CRUDUpdateRequest) Descriptor() ([]byte, []int) {
+	return file_mdemg_module_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *CRUDUpdateRequest) GetEntityType() string {
+	if x != nil {
+		return x.EntityType
+	}
+	return ""
+}
+
+func (x *CRUDUpdateRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CRUDUpdateRequest) GetFields() map[string]string {
+	if x != nil {
+		return x.Fields
+	}
+	return nil
+}
+
+type CRUDUpdateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entity        *CRUDEntity            `protobuf:"bytes,1,opt,name=entity,proto3" json:"entity,omitempty"` // The updated entity
+	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CRUDUpdateResponse) Reset() {
+	*x = CRUDUpdateResponse{}
+	mi := &file_mdemg_module_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CRUDUpdateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CRUDUpdateResponse) ProtoMessage() {}
+
+func (x *CRUDUpdateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mdemg_module_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CRUDUpdateResponse.ProtoReflect.Descriptor instead.
+func (*CRUDUpdateResponse) Descriptor() ([]byte, []int) {
+	return file_mdemg_module_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *CRUDUpdateResponse) GetEntity() *CRUDEntity {
+	if x != nil {
+		return x.Entity
+	}
+	return nil
+}
+
+func (x *CRUDUpdateResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *CRUDUpdateResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type CRUDDeleteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EntityType    string                 `protobuf:"bytes,1,opt,name=entity_type,json=entityType,proto3" json:"entity_type,omitempty"` // Required: type of entity
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`                                   // Required: entity ID
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CRUDDeleteRequest) Reset() {
+	*x = CRUDDeleteRequest{}
+	mi := &file_mdemg_module_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CRUDDeleteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CRUDDeleteRequest) ProtoMessage() {}
+
+func (x *CRUDDeleteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mdemg_module_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CRUDDeleteRequest.ProtoReflect.Descriptor instead.
+func (*CRUDDeleteRequest) Descriptor() ([]byte, []int) {
+	return file_mdemg_module_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *CRUDDeleteRequest) GetEntityType() string {
+	if x != nil {
+		return x.EntityType
+	}
+	return ""
+}
+
+func (x *CRUDDeleteRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type CRUDDeleteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CRUDDeleteResponse) Reset() {
+	*x = CRUDDeleteResponse{}
+	mi := &file_mdemg_module_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CRUDDeleteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CRUDDeleteResponse) ProtoMessage() {}
+
+func (x *CRUDDeleteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mdemg_module_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CRUDDeleteResponse.ProtoReflect.Descriptor instead.
+func (*CRUDDeleteResponse) Descriptor() ([]byte, []int) {
+	return file_mdemg_module_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *CRUDDeleteResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *CRUDDeleteResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type CRUDListRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EntityType    string                 `protobuf:"bytes,1,opt,name=entity_type,json=entityType,proto3" json:"entity_type,omitempty"`                                                   // Required: type of entity to list
+	Filters       map[string]string      `protobuf:"bytes,2,rep,name=filters,proto3" json:"filters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Optional filters (e.g., "team": "ENG", "state": "in_progress")
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`                                                                              // Max results (default: 50)
+	Cursor        string                 `protobuf:"bytes,4,opt,name=cursor,proto3" json:"cursor,omitempty"`                                                                             // Pagination cursor
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CRUDListRequest) Reset() {
+	*x = CRUDListRequest{}
+	mi := &file_mdemg_module_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CRUDListRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CRUDListRequest) ProtoMessage() {}
+
+func (x *CRUDListRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mdemg_module_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CRUDListRequest.ProtoReflect.Descriptor instead.
+func (*CRUDListRequest) Descriptor() ([]byte, []int) {
+	return file_mdemg_module_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *CRUDListRequest) GetEntityType() string {
+	if x != nil {
+		return x.EntityType
+	}
+	return ""
+}
+
+func (x *CRUDListRequest) GetFilters() map[string]string {
+	if x != nil {
+		return x.Filters
+	}
+	return nil
+}
+
+func (x *CRUDListRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *CRUDListRequest) GetCursor() string {
+	if x != nil {
+		return x.Cursor
+	}
+	return ""
+}
+
+type CRUDListResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entities      []*CRUDEntity          `protobuf:"bytes,1,rep,name=entities,proto3" json:"entities,omitempty"`                        // List of entities
+	NextCursor    string                 `protobuf:"bytes,2,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`  // Cursor for next page (empty if no more)
+	TotalCount    int32                  `protobuf:"varint,3,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"` // Total matching entities (if available)
+	Success       bool                   `protobuf:"varint,4,opt,name=success,proto3" json:"success,omitempty"`
+	Error         string                 `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CRUDListResponse) Reset() {
+	*x = CRUDListResponse{}
+	mi := &file_mdemg_module_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CRUDListResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CRUDListResponse) ProtoMessage() {}
+
+func (x *CRUDListResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mdemg_module_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CRUDListResponse.ProtoReflect.Descriptor instead.
+func (*CRUDListResponse) Descriptor() ([]byte, []int) {
+	return file_mdemg_module_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *CRUDListResponse) GetEntities() []*CRUDEntity {
+	if x != nil {
+		return x.Entities
+	}
+	return nil
+}
+
+func (x *CRUDListResponse) GetNextCursor() string {
+	if x != nil {
+		return x.NextCursor
+	}
+	return ""
+}
+
+func (x *CRUDListResponse) GetTotalCount() int32 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+func (x *CRUDListResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *CRUDListResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 var File_mdemg_module_proto protoreflect.FileDescriptor
 
 const file_mdemg_module_proto_rawDesc = "" +
@@ -1757,13 +2429,82 @@ const file_mdemg_module_proto_rawDesc = "" +
 	"properties\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*t\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf7\x01\n" +
+	"\n" +
+	"CRUDEntity\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\ventity_type\x18\x02 \x01(\tR\n" +
+	"entityType\x12?\n" +
+	"\x06fields\x18\x03 \x03(\v2'.mdemg.module.v1.CRUDEntity.FieldsEntryR\x06fields\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x04 \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x05 \x01(\tR\tupdatedAt\x1a9\n" +
+	"\vFieldsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb7\x01\n" +
+	"\x11CRUDCreateRequest\x12\x1f\n" +
+	"\ventity_type\x18\x01 \x01(\tR\n" +
+	"entityType\x12F\n" +
+	"\x06fields\x18\x02 \x03(\v2..mdemg.module.v1.CRUDCreateRequest.FieldsEntryR\x06fields\x1a9\n" +
+	"\vFieldsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"y\n" +
+	"\x12CRUDCreateResponse\x123\n" +
+	"\x06entity\x18\x01 \x01(\v2\x1b.mdemg.module.v1.CRUDEntityR\x06entity\x12\x18\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"B\n" +
+	"\x0fCRUDReadRequest\x12\x1f\n" +
+	"\ventity_type\x18\x01 \x01(\tR\n" +
+	"entityType\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\"w\n" +
+	"\x10CRUDReadResponse\x123\n" +
+	"\x06entity\x18\x01 \x01(\v2\x1b.mdemg.module.v1.CRUDEntityR\x06entity\x12\x18\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\xc7\x01\n" +
+	"\x11CRUDUpdateRequest\x12\x1f\n" +
+	"\ventity_type\x18\x01 \x01(\tR\n" +
+	"entityType\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\x12F\n" +
+	"\x06fields\x18\x03 \x03(\v2..mdemg.module.v1.CRUDUpdateRequest.FieldsEntryR\x06fields\x1a9\n" +
+	"\vFieldsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"y\n" +
+	"\x12CRUDUpdateResponse\x123\n" +
+	"\x06entity\x18\x01 \x01(\v2\x1b.mdemg.module.v1.CRUDEntityR\x06entity\x12\x18\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"D\n" +
+	"\x11CRUDDeleteRequest\x12\x1f\n" +
+	"\ventity_type\x18\x01 \x01(\tR\n" +
+	"entityType\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\"D\n" +
+	"\x12CRUDDeleteResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\xe5\x01\n" +
+	"\x0fCRUDListRequest\x12\x1f\n" +
+	"\ventity_type\x18\x01 \x01(\tR\n" +
+	"entityType\x12G\n" +
+	"\afilters\x18\x02 \x03(\v2-.mdemg.module.v1.CRUDListRequest.FiltersEntryR\afilters\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06cursor\x18\x04 \x01(\tR\x06cursor\x1a:\n" +
+	"\fFiltersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xbd\x01\n" +
+	"\x10CRUDListResponse\x127\n" +
+	"\bentities\x18\x01 \x03(\v2\x1b.mdemg.module.v1.CRUDEntityR\bentities\x12\x1f\n" +
+	"\vnext_cursor\x18\x02 \x01(\tR\n" +
+	"nextCursor\x12\x1f\n" +
+	"\vtotal_count\x18\x03 \x01(\x05R\n" +
+	"totalCount\x12\x18\n" +
+	"\asuccess\x18\x04 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x05 \x01(\tR\x05error*\x8a\x01\n" +
 	"\n" +
 	"ModuleType\x12\x1b\n" +
 	"\x17MODULE_TYPE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15MODULE_TYPE_INGESTION\x10\x01\x12\x19\n" +
 	"\x15MODULE_TYPE_REASONING\x10\x02\x12\x13\n" +
-	"\x0fMODULE_TYPE_APE\x10\x032\x90\x02\n" +
+	"\x0fMODULE_TYPE_APE\x10\x03\x12\x14\n" +
+	"\x10MODULE_TYPE_CRUD\x10\x042\x90\x02\n" +
 	"\x0fModuleLifecycle\x12R\n" +
 	"\tHandshake\x12!.mdemg.module.v1.HandshakeRequest\x1a\".mdemg.module.v1.HandshakeResponse\x12X\n" +
 	"\vHealthCheck\x12#.mdemg.module.v1.HealthCheckRequest\x1a$.mdemg.module.v1.HealthCheckResponse\x12O\n" +
@@ -1776,7 +2517,14 @@ const file_mdemg_module_proto_rawDesc = "" +
 	"\aProcess\x12\x1f.mdemg.module.v1.ProcessRequest\x1a .mdemg.module.v1.ProcessResponse2\xb3\x01\n" +
 	"\tAPEModule\x12L\n" +
 	"\aExecute\x12\x1f.mdemg.module.v1.ExecuteRequest\x1a .mdemg.module.v1.ExecuteResponse\x12X\n" +
-	"\vGetSchedule\x12#.mdemg.module.v1.GetScheduleRequest\x1a$.mdemg.module.v1.GetScheduleResponseB\x14Z\x12mdemg/api/modulepbb\x06proto3"
+	"\vGetSchedule\x12#.mdemg.module.v1.GetScheduleRequest\x1a$.mdemg.module.v1.GetScheduleResponse2\x9f\x03\n" +
+	"\n" +
+	"CRUDModule\x12Q\n" +
+	"\x06Create\x12\".mdemg.module.v1.CRUDCreateRequest\x1a#.mdemg.module.v1.CRUDCreateResponse\x12K\n" +
+	"\x04Read\x12 .mdemg.module.v1.CRUDReadRequest\x1a!.mdemg.module.v1.CRUDReadResponse\x12Q\n" +
+	"\x06Update\x12\".mdemg.module.v1.CRUDUpdateRequest\x1a#.mdemg.module.v1.CRUDUpdateResponse\x12Q\n" +
+	"\x06Delete\x12\".mdemg.module.v1.CRUDDeleteRequest\x1a#.mdemg.module.v1.CRUDDeleteResponse\x12K\n" +
+	"\x04List\x12 .mdemg.module.v1.CRUDListRequest\x1a!.mdemg.module.v1.CRUDListResponseB\x14Z\x12mdemg/api/modulepbb\x06proto3"
 
 var (
 	file_mdemg_module_proto_rawDescOnce sync.Once
@@ -1791,7 +2539,7 @@ func file_mdemg_module_proto_rawDescGZIP() []byte {
 }
 
 var file_mdemg_module_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_mdemg_module_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_mdemg_module_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
 var file_mdemg_module_proto_goTypes = []any{
 	(ModuleType)(0),             // 0: mdemg.module.v1.ModuleType
 	(*HandshakeRequest)(nil),    // 1: mdemg.module.v1.HandshakeRequest
@@ -1817,64 +2565,97 @@ var file_mdemg_module_proto_goTypes = []any{
 	(*GetScheduleResponse)(nil), // 21: mdemg.module.v1.GetScheduleResponse
 	(*Observation)(nil),         // 22: mdemg.module.v1.Observation
 	(*Edge)(nil),                // 23: mdemg.module.v1.Edge
-	nil,                         // 24: mdemg.module.v1.HandshakeRequest.ConfigEntry
-	nil,                         // 25: mdemg.module.v1.HealthCheckResponse.MetricsEntry
-	nil,                         // 26: mdemg.module.v1.MatchRequest.MetadataEntry
-	nil,                         // 27: mdemg.module.v1.ParseRequest.MetadataEntry
-	nil,                         // 28: mdemg.module.v1.ParseResponse.MetadataEntry
-	nil,                         // 29: mdemg.module.v1.SyncRequest.ConfigEntry
-	nil,                         // 30: mdemg.module.v1.ProcessRequest.ContextEntry
-	nil,                         // 31: mdemg.module.v1.ProcessResponse.MetadataEntry
-	nil,                         // 32: mdemg.module.v1.RetrievalCandidate.MetadataEntry
-	nil,                         // 33: mdemg.module.v1.ExecuteRequest.ContextEntry
-	nil,                         // 34: mdemg.module.v1.Observation.MetadataEntry
-	nil,                         // 35: mdemg.module.v1.Edge.PropertiesEntry
+	(*CRUDEntity)(nil),          // 24: mdemg.module.v1.CRUDEntity
+	(*CRUDCreateRequest)(nil),   // 25: mdemg.module.v1.CRUDCreateRequest
+	(*CRUDCreateResponse)(nil),  // 26: mdemg.module.v1.CRUDCreateResponse
+	(*CRUDReadRequest)(nil),     // 27: mdemg.module.v1.CRUDReadRequest
+	(*CRUDReadResponse)(nil),    // 28: mdemg.module.v1.CRUDReadResponse
+	(*CRUDUpdateRequest)(nil),   // 29: mdemg.module.v1.CRUDUpdateRequest
+	(*CRUDUpdateResponse)(nil),  // 30: mdemg.module.v1.CRUDUpdateResponse
+	(*CRUDDeleteRequest)(nil),   // 31: mdemg.module.v1.CRUDDeleteRequest
+	(*CRUDDeleteResponse)(nil),  // 32: mdemg.module.v1.CRUDDeleteResponse
+	(*CRUDListRequest)(nil),     // 33: mdemg.module.v1.CRUDListRequest
+	(*CRUDListResponse)(nil),    // 34: mdemg.module.v1.CRUDListResponse
+	nil,                         // 35: mdemg.module.v1.HandshakeRequest.ConfigEntry
+	nil,                         // 36: mdemg.module.v1.HealthCheckResponse.MetricsEntry
+	nil,                         // 37: mdemg.module.v1.MatchRequest.MetadataEntry
+	nil,                         // 38: mdemg.module.v1.ParseRequest.MetadataEntry
+	nil,                         // 39: mdemg.module.v1.ParseResponse.MetadataEntry
+	nil,                         // 40: mdemg.module.v1.SyncRequest.ConfigEntry
+	nil,                         // 41: mdemg.module.v1.ProcessRequest.ContextEntry
+	nil,                         // 42: mdemg.module.v1.ProcessResponse.MetadataEntry
+	nil,                         // 43: mdemg.module.v1.RetrievalCandidate.MetadataEntry
+	nil,                         // 44: mdemg.module.v1.ExecuteRequest.ContextEntry
+	nil,                         // 45: mdemg.module.v1.Observation.MetadataEntry
+	nil,                         // 46: mdemg.module.v1.Edge.PropertiesEntry
+	nil,                         // 47: mdemg.module.v1.CRUDEntity.FieldsEntry
+	nil,                         // 48: mdemg.module.v1.CRUDCreateRequest.FieldsEntry
+	nil,                         // 49: mdemg.module.v1.CRUDUpdateRequest.FieldsEntry
+	nil,                         // 50: mdemg.module.v1.CRUDListRequest.FiltersEntry
 }
 var file_mdemg_module_proto_depIdxs = []int32{
-	24, // 0: mdemg.module.v1.HandshakeRequest.config:type_name -> mdemg.module.v1.HandshakeRequest.ConfigEntry
+	35, // 0: mdemg.module.v1.HandshakeRequest.config:type_name -> mdemg.module.v1.HandshakeRequest.ConfigEntry
 	0,  // 1: mdemg.module.v1.HandshakeResponse.module_type:type_name -> mdemg.module.v1.ModuleType
-	25, // 2: mdemg.module.v1.HealthCheckResponse.metrics:type_name -> mdemg.module.v1.HealthCheckResponse.MetricsEntry
-	26, // 3: mdemg.module.v1.MatchRequest.metadata:type_name -> mdemg.module.v1.MatchRequest.MetadataEntry
-	27, // 4: mdemg.module.v1.ParseRequest.metadata:type_name -> mdemg.module.v1.ParseRequest.MetadataEntry
+	36, // 2: mdemg.module.v1.HealthCheckResponse.metrics:type_name -> mdemg.module.v1.HealthCheckResponse.MetricsEntry
+	37, // 3: mdemg.module.v1.MatchRequest.metadata:type_name -> mdemg.module.v1.MatchRequest.MetadataEntry
+	38, // 4: mdemg.module.v1.ParseRequest.metadata:type_name -> mdemg.module.v1.ParseRequest.MetadataEntry
 	22, // 5: mdemg.module.v1.ParseResponse.observations:type_name -> mdemg.module.v1.Observation
 	23, // 6: mdemg.module.v1.ParseResponse.edges:type_name -> mdemg.module.v1.Edge
-	28, // 7: mdemg.module.v1.ParseResponse.metadata:type_name -> mdemg.module.v1.ParseResponse.MetadataEntry
-	29, // 8: mdemg.module.v1.SyncRequest.config:type_name -> mdemg.module.v1.SyncRequest.ConfigEntry
+	39, // 7: mdemg.module.v1.ParseResponse.metadata:type_name -> mdemg.module.v1.ParseResponse.MetadataEntry
+	40, // 8: mdemg.module.v1.SyncRequest.config:type_name -> mdemg.module.v1.SyncRequest.ConfigEntry
 	22, // 9: mdemg.module.v1.SyncResponse.observations:type_name -> mdemg.module.v1.Observation
 	23, // 10: mdemg.module.v1.SyncResponse.edges:type_name -> mdemg.module.v1.Edge
 	13, // 11: mdemg.module.v1.SyncResponse.stats:type_name -> mdemg.module.v1.SyncStats
 	16, // 12: mdemg.module.v1.ProcessRequest.candidates:type_name -> mdemg.module.v1.RetrievalCandidate
-	30, // 13: mdemg.module.v1.ProcessRequest.context:type_name -> mdemg.module.v1.ProcessRequest.ContextEntry
+	41, // 13: mdemg.module.v1.ProcessRequest.context:type_name -> mdemg.module.v1.ProcessRequest.ContextEntry
 	16, // 14: mdemg.module.v1.ProcessResponse.results:type_name -> mdemg.module.v1.RetrievalCandidate
-	31, // 15: mdemg.module.v1.ProcessResponse.metadata:type_name -> mdemg.module.v1.ProcessResponse.MetadataEntry
-	32, // 16: mdemg.module.v1.RetrievalCandidate.metadata:type_name -> mdemg.module.v1.RetrievalCandidate.MetadataEntry
-	33, // 17: mdemg.module.v1.ExecuteRequest.context:type_name -> mdemg.module.v1.ExecuteRequest.ContextEntry
+	42, // 15: mdemg.module.v1.ProcessResponse.metadata:type_name -> mdemg.module.v1.ProcessResponse.MetadataEntry
+	43, // 16: mdemg.module.v1.RetrievalCandidate.metadata:type_name -> mdemg.module.v1.RetrievalCandidate.MetadataEntry
+	44, // 17: mdemg.module.v1.ExecuteRequest.context:type_name -> mdemg.module.v1.ExecuteRequest.ContextEntry
 	19, // 18: mdemg.module.v1.ExecuteResponse.stats:type_name -> mdemg.module.v1.ExecuteStats
-	34, // 19: mdemg.module.v1.Observation.metadata:type_name -> mdemg.module.v1.Observation.MetadataEntry
-	35, // 20: mdemg.module.v1.Edge.properties:type_name -> mdemg.module.v1.Edge.PropertiesEntry
-	1,  // 21: mdemg.module.v1.ModuleLifecycle.Handshake:input_type -> mdemg.module.v1.HandshakeRequest
-	3,  // 22: mdemg.module.v1.ModuleLifecycle.HealthCheck:input_type -> mdemg.module.v1.HealthCheckRequest
-	5,  // 23: mdemg.module.v1.ModuleLifecycle.Shutdown:input_type -> mdemg.module.v1.ShutdownRequest
-	7,  // 24: mdemg.module.v1.IngestionModule.Matches:input_type -> mdemg.module.v1.MatchRequest
-	9,  // 25: mdemg.module.v1.IngestionModule.Parse:input_type -> mdemg.module.v1.ParseRequest
-	11, // 26: mdemg.module.v1.IngestionModule.Sync:input_type -> mdemg.module.v1.SyncRequest
-	14, // 27: mdemg.module.v1.ReasoningModule.Process:input_type -> mdemg.module.v1.ProcessRequest
-	17, // 28: mdemg.module.v1.APEModule.Execute:input_type -> mdemg.module.v1.ExecuteRequest
-	20, // 29: mdemg.module.v1.APEModule.GetSchedule:input_type -> mdemg.module.v1.GetScheduleRequest
-	2,  // 30: mdemg.module.v1.ModuleLifecycle.Handshake:output_type -> mdemg.module.v1.HandshakeResponse
-	4,  // 31: mdemg.module.v1.ModuleLifecycle.HealthCheck:output_type -> mdemg.module.v1.HealthCheckResponse
-	6,  // 32: mdemg.module.v1.ModuleLifecycle.Shutdown:output_type -> mdemg.module.v1.ShutdownResponse
-	8,  // 33: mdemg.module.v1.IngestionModule.Matches:output_type -> mdemg.module.v1.MatchResponse
-	10, // 34: mdemg.module.v1.IngestionModule.Parse:output_type -> mdemg.module.v1.ParseResponse
-	12, // 35: mdemg.module.v1.IngestionModule.Sync:output_type -> mdemg.module.v1.SyncResponse
-	15, // 36: mdemg.module.v1.ReasoningModule.Process:output_type -> mdemg.module.v1.ProcessResponse
-	18, // 37: mdemg.module.v1.APEModule.Execute:output_type -> mdemg.module.v1.ExecuteResponse
-	21, // 38: mdemg.module.v1.APEModule.GetSchedule:output_type -> mdemg.module.v1.GetScheduleResponse
-	30, // [30:39] is the sub-list for method output_type
-	21, // [21:30] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	45, // 19: mdemg.module.v1.Observation.metadata:type_name -> mdemg.module.v1.Observation.MetadataEntry
+	46, // 20: mdemg.module.v1.Edge.properties:type_name -> mdemg.module.v1.Edge.PropertiesEntry
+	47, // 21: mdemg.module.v1.CRUDEntity.fields:type_name -> mdemg.module.v1.CRUDEntity.FieldsEntry
+	48, // 22: mdemg.module.v1.CRUDCreateRequest.fields:type_name -> mdemg.module.v1.CRUDCreateRequest.FieldsEntry
+	24, // 23: mdemg.module.v1.CRUDCreateResponse.entity:type_name -> mdemg.module.v1.CRUDEntity
+	24, // 24: mdemg.module.v1.CRUDReadResponse.entity:type_name -> mdemg.module.v1.CRUDEntity
+	49, // 25: mdemg.module.v1.CRUDUpdateRequest.fields:type_name -> mdemg.module.v1.CRUDUpdateRequest.FieldsEntry
+	24, // 26: mdemg.module.v1.CRUDUpdateResponse.entity:type_name -> mdemg.module.v1.CRUDEntity
+	50, // 27: mdemg.module.v1.CRUDListRequest.filters:type_name -> mdemg.module.v1.CRUDListRequest.FiltersEntry
+	24, // 28: mdemg.module.v1.CRUDListResponse.entities:type_name -> mdemg.module.v1.CRUDEntity
+	1,  // 29: mdemg.module.v1.ModuleLifecycle.Handshake:input_type -> mdemg.module.v1.HandshakeRequest
+	3,  // 30: mdemg.module.v1.ModuleLifecycle.HealthCheck:input_type -> mdemg.module.v1.HealthCheckRequest
+	5,  // 31: mdemg.module.v1.ModuleLifecycle.Shutdown:input_type -> mdemg.module.v1.ShutdownRequest
+	7,  // 32: mdemg.module.v1.IngestionModule.Matches:input_type -> mdemg.module.v1.MatchRequest
+	9,  // 33: mdemg.module.v1.IngestionModule.Parse:input_type -> mdemg.module.v1.ParseRequest
+	11, // 34: mdemg.module.v1.IngestionModule.Sync:input_type -> mdemg.module.v1.SyncRequest
+	14, // 35: mdemg.module.v1.ReasoningModule.Process:input_type -> mdemg.module.v1.ProcessRequest
+	17, // 36: mdemg.module.v1.APEModule.Execute:input_type -> mdemg.module.v1.ExecuteRequest
+	20, // 37: mdemg.module.v1.APEModule.GetSchedule:input_type -> mdemg.module.v1.GetScheduleRequest
+	25, // 38: mdemg.module.v1.CRUDModule.Create:input_type -> mdemg.module.v1.CRUDCreateRequest
+	27, // 39: mdemg.module.v1.CRUDModule.Read:input_type -> mdemg.module.v1.CRUDReadRequest
+	29, // 40: mdemg.module.v1.CRUDModule.Update:input_type -> mdemg.module.v1.CRUDUpdateRequest
+	31, // 41: mdemg.module.v1.CRUDModule.Delete:input_type -> mdemg.module.v1.CRUDDeleteRequest
+	33, // 42: mdemg.module.v1.CRUDModule.List:input_type -> mdemg.module.v1.CRUDListRequest
+	2,  // 43: mdemg.module.v1.ModuleLifecycle.Handshake:output_type -> mdemg.module.v1.HandshakeResponse
+	4,  // 44: mdemg.module.v1.ModuleLifecycle.HealthCheck:output_type -> mdemg.module.v1.HealthCheckResponse
+	6,  // 45: mdemg.module.v1.ModuleLifecycle.Shutdown:output_type -> mdemg.module.v1.ShutdownResponse
+	8,  // 46: mdemg.module.v1.IngestionModule.Matches:output_type -> mdemg.module.v1.MatchResponse
+	10, // 47: mdemg.module.v1.IngestionModule.Parse:output_type -> mdemg.module.v1.ParseResponse
+	12, // 48: mdemg.module.v1.IngestionModule.Sync:output_type -> mdemg.module.v1.SyncResponse
+	15, // 49: mdemg.module.v1.ReasoningModule.Process:output_type -> mdemg.module.v1.ProcessResponse
+	18, // 50: mdemg.module.v1.APEModule.Execute:output_type -> mdemg.module.v1.ExecuteResponse
+	21, // 51: mdemg.module.v1.APEModule.GetSchedule:output_type -> mdemg.module.v1.GetScheduleResponse
+	26, // 52: mdemg.module.v1.CRUDModule.Create:output_type -> mdemg.module.v1.CRUDCreateResponse
+	28, // 53: mdemg.module.v1.CRUDModule.Read:output_type -> mdemg.module.v1.CRUDReadResponse
+	30, // 54: mdemg.module.v1.CRUDModule.Update:output_type -> mdemg.module.v1.CRUDUpdateResponse
+	32, // 55: mdemg.module.v1.CRUDModule.Delete:output_type -> mdemg.module.v1.CRUDDeleteResponse
+	34, // 56: mdemg.module.v1.CRUDModule.List:output_type -> mdemg.module.v1.CRUDListResponse
+	43, // [43:57] is the sub-list for method output_type
+	29, // [29:43] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_mdemg_module_proto_init() }
@@ -1888,9 +2669,9 @@ func file_mdemg_module_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mdemg_module_proto_rawDesc), len(file_mdemg_module_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   35,
+			NumMessages:   50,
 			NumExtensions: 0,
-			NumServices:   4,
+			NumServices:   5,
 		},
 		GoTypes:           file_mdemg_module_proto_goTypes,
 		DependencyIndexes: file_mdemg_module_proto_depIdxs,

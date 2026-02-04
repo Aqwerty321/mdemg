@@ -413,6 +413,13 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversation/graduate", s.handleProcessGraduations)
 	mux.HandleFunc("/v1/conversation/session/health", s.handleSessionHealth)
 
+	// Linear CRUD endpoints (Phase 4)
+	mux.HandleFunc("/v1/linear/issues", s.handleLinearIssues)
+	mux.HandleFunc("/v1/linear/issues/", s.handleLinearIssues)
+	mux.HandleFunc("/v1/linear/projects", s.handleLinearProjects)
+	mux.HandleFunc("/v1/linear/projects/", s.handleLinearProjects)
+	mux.HandleFunc("/v1/linear/comments", s.handleLinearComments)
+
 	// Codebase ingestion endpoint
 	mux.HandleFunc("/v1/memory/ingest-codebase", s.handleIngestCodebaseRoute)
 	mux.HandleFunc("/v1/memory/ingest-codebase/", s.handleIngestCodebaseRoute)

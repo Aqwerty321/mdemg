@@ -6,7 +6,7 @@ The Linear module syncs teams, projects, and issues from Linear into MDEMG's mem
 
 1. **Get a Linear API key:**
    - Go to Linear → Settings → Account → Security & Access
-   - Create a new API key with "Read" scope
+   - Create a new API key with "Read" scope (for sync only) or "Read & Write" scope (for CRUD operations)
 
 2. **Add to .env:**
    ```
@@ -96,6 +96,161 @@ Metadata:    linear_id, identifier, team_key, state, state_type, priority,
              project_id, project_name, assignee, created_at, updated_at
 ```
 
+## CRUD Operations
+
+The Linear module supports full Create/Read/Update/Delete operations via the REST API. These operations call Linear's GraphQL API through the CRUDModule gRPC service.
+
+### Creating Issues
+
+```bash
+curl -X POST http://localhost:9999/v1/linear/issues \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Fix login bug",
+    "team_id": "team-uuid",
+    "description": "Users cannot log in on mobile",
+    "priority": 2
+  }'
+```
+
+Required fields: `title`, `team_id`. Optional: `description`, `priority` (1=urgent, 4=low), `assignee_id`, `state_id`, `project_id`, `label_ids` (comma-separated).
+
+### Listing Issues
+
+```bash
+# List all issues (default limit: 50)
+curl "http://localhost:9999/v1/linear/issues"
+
+# Filter by team
+curl "http://localhost:9999/v1/linear/issues?team=ENG&limit=10"
+
+# Filter by state
+curl "http://localhost:9999/v1/linear/issues?state=In%20Progress"
+
+# Paginate
+curl "http://localhost:9999/v1/linear/issues?cursor=abc123&limit=25"
+```
+
+### Reading a Single Issue
+
+```bash
+curl "http://localhost:9999/v1/linear/issues/issue-uuid"
+```
+
+### Updating Issues
+
+```bash
+curl -X PUT http://localhost:9999/v1/linear/issues/issue-uuid \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Updated title", "priority": 1}'
+```
+
+Only provided fields are updated. Supports: `title`, `description`, `priority`, `state_id`, `assignee_id`, `project_id`, `label_ids`.
+
+### Deleting (Archiving) Issues
+
+```bash
+curl -X DELETE "http://localhost:9999/v1/linear/issues/issue-uuid"
+```
+
+Issues are archived (soft-deleted) in Linear, not permanently removed.
+
+### Projects
+
+```bash
+# Create
+curl -X POST http://localhost:9999/v1/linear/projects \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Q1 Sprint", "description": "First quarter work"}'
+
+# List
+curl "http://localhost:9999/v1/linear/projects"
+
+# Read
+curl "http://localhost:9999/v1/linear/projects/project-uuid"
+
+# Update
+curl -X PUT http://localhost:9999/v1/linear/projects/project-uuid \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Q1 Sprint - Updated"}'
+```
+
+### Comments
+
+```bash
+# Add a comment to an issue
+curl -X POST http://localhost:9999/v1/linear/comments \
+  -H "Content-Type: application/json" \
+  -d '{"issue_id": "issue-uuid", "body": "This needs attention."}'
+```
+
+## MCP Tools
+
+The following MCP tools are available for IDE/agent integration:
+
+| Tool | Description | Required Params |
+|------|-------------|-----------------|
+| `linear_create_issue` | Create a new issue | `title`, `team_id` |
+| `linear_list_issues` | List issues with filters | — |
+| `linear_read_issue` | Read a single issue | `issue_id` |
+| `linear_update_issue` | Update an issue | `issue_id` |
+| `linear_add_comment` | Add a comment | `issue_id`, `body` |
+| `linear_search` | Full-text search issues | `query` |
+
+## Workflow Engine
+
+The workflow engine provides config-driven automation triggered by CRUD events.
+
+### Configuration
+
+Workflows are defined in `plugins/linear-module/workflows.yaml`:
+
+```yaml
+workflows:
+  - name: "auto-triage-urgent"
+    trigger:
+      event: "on-create"        # on-create, on-update, on-delete
+      entity_type: "issue"      # issue, project, comment
+      conditions:
+        - field: "priority"
+          operator: "eq"        # eq, neq, contains, changed_to, exists
+          value: "1"
+    actions:
+      - type: "add-comment"     # add-comment, auto-assign, auto-label, auto-transition, set-field
+        params:
+          body: "Urgent issue auto-triaged by workflow engine."
+```
+
+### Supported Conditions
+
+| Operator | Description | Requires Previous State |
+|----------|-------------|------------------------|
+| `eq` | Field equals value | No |
+| `neq` | Field does not equal value | No |
+| `contains` | Field contains substring | No |
+| `changed_to` | Field changed to value (from different value) | Yes |
+| `exists` | Field is present and non-empty | No |
+
+### Supported Actions
+
+| Action | Description | Params |
+|--------|-------------|--------|
+| `add-comment` | Add a comment to the entity | `body` (supports `{{field}}` templates) |
+| `auto-assign` | Assign to a user | `assignee_id` |
+| `auto-label` | Add labels | `label_ids` (comma-separated) |
+| `auto-transition` | Change state | `state_id` |
+| `set-field` | Set any field value | `field`, `value` |
+
+### Template Interpolation
+
+Action params support `{{field_name}}` placeholders:
+
+```yaml
+- type: "add-comment"
+  params:
+    body: "Issue {{identifier}} ({{title}}) has been completed."
+```
+
 ## Querying Linear Data
 
 ```bash
@@ -127,6 +282,8 @@ Response includes:
 | Variable | Description |
 |----------|-------------|
 | `LINEAR_API_KEY` | Linear API key (required) |
+| `LINEAR_TEAM_ID` | Default team key for issue creation (optional) |
+| `LINEAR_WORKSPACE_ID` | Workspace identifier (optional) |
 
 ## Incremental Sync
 

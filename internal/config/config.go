@@ -168,10 +168,14 @@ type Config struct {
 	LLMSummaryCacheSize int    // Max cached summaries (default: 5000)
 
 	// Plugin system settings (V0006)
-	PluginsEnabled bool   // Feature toggle for plugin system (default: true)
-	PluginsDir     string // Path to plugins directory (default: ./plugins)
+	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
+	PluginsDir      string // Path to plugins directory (default: ./plugins)
 	PluginSocketDir string // Path to Unix socket directory (default: /tmp/mdemg-plugins)
-	MdemgVersion   string // MDEMG version string for handshake
+	MdemgVersion    string // MDEMG version string for handshake
+
+	// Linear integration settings (Phase 4)
+	LinearTeamID      string // Default team ID for issue creation
+	LinearWorkspaceID string // Workspace identifier
 
 	// Capability gap detection settings (Task #23)
 	GapLowScoreThreshold   float64 // Queries below this avg score are considered poor (default: 0.5)
@@ -854,6 +858,10 @@ func FromEnv() (Config, error) {
 	pluginSocketDir := get("PLUGIN_SOCKET_DIR", "/tmp/mdemg-plugins")
 	mdemgVersion := get("MDEMG_VERSION", "0.6.0")
 
+	// Linear integration settings (Phase 4)
+	linearTeamID := get("LINEAR_TEAM_ID", "")
+	linearWorkspaceID := get("LINEAR_WORKSPACE_ID", "")
+
 	// LLM Summary settings (semantic summaries for ingest)
 	llmSummaryEnabled := getBool("LLM_SUMMARY_ENABLED", false)
 	llmSummaryProvider := get("LLM_SUMMARY_PROVIDER", "openai")
@@ -1084,6 +1092,8 @@ func FromEnv() (Config, error) {
 		PluginsDir:                pluginsDir,
 		PluginSocketDir:           pluginSocketDir,
 		MdemgVersion:              mdemgVersion,
+		LinearTeamID:              linearTeamID,
+		LinearWorkspaceID:         linearWorkspaceID,
 		LLMSummaryEnabled:         llmSummaryEnabled,
 		LLMSummaryProvider:        llmSummaryProvider,
 		LLMSummaryModel:           llmSummaryModel,

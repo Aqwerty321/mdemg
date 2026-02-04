@@ -150,6 +150,86 @@ func (s *Service) InvalidateSpaceCache(spaceID string) int {
 	return s.queryCache.InvalidateSpace(spaceID)
 }
 
+// UpdateTapRootFreshness updates the TapRoot node for a space with the latest
+// ingest timestamp and type. Creates the TapRoot if it doesn't exist.
+func (s *Service) UpdateTapRootFreshness(ctx context.Context, spaceID, ingestType string) error {
+	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(ctx)
+
+	_, err := session.Run(ctx, `
+		MERGE (t:TapRoot {space_id: $spaceId})
+		ON CREATE SET t.name = 'tap_root', t.created_at = datetime()
+		SET t.last_ingest_at = datetime(),
+		    t.last_ingest_type = $ingestType,
+		    t.ingest_count = coalesce(t.ingest_count, 0) + 1
+	`, map[string]any{
+		"spaceId":    spaceID,
+		"ingestType": ingestType,
+	})
+	if err != nil {
+		return fmt.Errorf("update TapRoot freshness: %w", err)
+	}
+	return nil
+}
+
+// GetTapRootFreshness returns freshness properties for a space's TapRoot node.
+// Returns nil map if the TapRoot doesn't exist.
+func (s *Service) GetTapRootFreshness(ctx context.Context, spaceID string) (map[string]any, error) {
+	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer session.Close(ctx)
+
+	result, err := session.Run(ctx, `
+		MATCH (t:TapRoot {space_id: $spaceId})
+		RETURN t.last_ingest_at AS last_ingest_at,
+		       t.last_ingest_type AS last_ingest_type,
+		       t.ingest_count AS ingest_count,
+		       t.created_at AS created_at
+	`, map[string]any{"spaceId": spaceID})
+	if err != nil {
+		return nil, fmt.Errorf("get TapRoot freshness: %w", err)
+	}
+
+	if result.Next(ctx) {
+		record := result.Record()
+		props := make(map[string]any)
+		for _, key := range record.Keys {
+			val, _ := record.Get(key)
+			props[key] = val
+		}
+		return props, nil
+	}
+	return nil, nil // TapRoot doesn't exist
+}
+
+// GetAllTapRootFreshness returns freshness data for all TapRoot nodes.
+func (s *Service) GetAllTapRootFreshness(ctx context.Context) ([]map[string]any, error) {
+	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer session.Close(ctx)
+
+	result, err := session.Run(ctx, `
+		MATCH (t:TapRoot)
+		RETURN t.space_id AS space_id,
+		       t.last_ingest_at AS last_ingest_at,
+		       t.last_ingest_type AS last_ingest_type,
+		       t.ingest_count AS ingest_count
+	`, nil)
+	if err != nil {
+		return nil, fmt.Errorf("get all TapRoot freshness: %w", err)
+	}
+
+	var results []map[string]any
+	for result.Next(ctx) {
+		record := result.Record()
+		props := make(map[string]any)
+		for _, key := range record.Keys {
+			val, _ := record.Get(key)
+			props[key] = val
+		}
+		results = append(results, props)
+	}
+	return results, nil
+}
+
 // Retrieve performs:
 // 1) vector recall (top candidateK)
 // 2) bounded neighborhood expansion (<= hopDepth, degree caps)

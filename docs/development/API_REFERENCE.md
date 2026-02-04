@@ -108,6 +108,128 @@ Store multiple observations in a single request.
 }
 ```
 
+### POST /v1/memory/ingest/trigger
+
+Trigger a background codebase re-ingestion job. Returns immediately with a job ID.
+
+**Request Body**:
+```json
+{
+  "space_id": "my-project",
+  "path": "/path/to/codebase",
+  "batch_size": 100,
+  "workers": 4,
+  "extract_symbols": true,
+  "consolidate": true,
+  "incremental": false,
+  "exclude_dirs": ["vendor", "node_modules"]
+}
+```
+
+**Response** (202 Accepted):
+```json
+{
+  "job_id": "ingest-abc12345",
+  "space_id": "my-project",
+  "status": "pending",
+  "message": "Ingestion job created. Use GET /v1/memory/ingest/status/ingest-abc12345 to check progress.",
+  "created_at": "2026-02-04T10:00:00Z"
+}
+```
+
+### GET /v1/memory/ingest/status/{job_id}
+
+Check the status and progress of an ingestion job.
+
+**Response**:
+```json
+{
+  "job_id": "ingest-abc12345",
+  "space_id": "my-project",
+  "status": "running",
+  "progress": {
+    "total": 4522,
+    "current": 1200,
+    "percentage": 26.5,
+    "phase": "ingestion",
+    "rate": "15.2 elements/sec"
+  },
+  "started_at": "2026-02-04T10:00:01Z",
+  "created_at": "2026-02-04T10:00:00Z"
+}
+```
+
+### POST /v1/memory/ingest/cancel/{job_id}
+
+Cancel a running or pending ingestion job.
+
+**Response**:
+```json
+{
+  "job_id": "ingest-abc12345",
+  "status": "cancelled",
+  "message": "Job cancellation requested"
+}
+```
+
+### GET /v1/memory/ingest/jobs
+
+List all ingestion jobs with their current status.
+
+**Response**:
+```json
+{
+  "jobs": [
+    {
+      "job_id": "ingest-abc12345",
+      "status": "completed",
+      "space_id": "my-project",
+      "progress": {"total": 4522, "current": 4522, "percentage": 100},
+      "created_at": "2026-02-04T10:00:00Z",
+      "completed_at": "2026-02-04T10:05:06Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+### POST /v1/memory/ingest/files
+
+Re-ingest specific files into memory. Synchronous for ≤50 files; returns a background job ID for >50.
+
+**Request Body**:
+```json
+{
+  "space_id": "my-project",
+  "files": ["/path/to/file1.go", "/path/to/file2.ts"],
+  "extract_symbols": true,
+  "consolidate": false
+}
+```
+
+**Response** (synchronous):
+```json
+{
+  "space_id": "my-project",
+  "total_files": 2,
+  "success_count": 2,
+  "error_count": 0,
+  "results": [
+    {"file": "/path/to/file1.go", "status": "success", "node_id": "mem-abc123"},
+    {"file": "/path/to/file2.ts", "status": "success", "node_id": "mem-def456"}
+  ]
+}
+```
+
+**Response** (>50 files, 202 Accepted):
+```json
+{
+  "space_id": "my-project",
+  "total_files": 75,
+  "job_id": "ingest-files-abc12345"
+}
+```
+
 ### POST /v1/memory/nodes/{node_id}/archive
 
 Soft-delete a memory node (sets `is_archived=true`).
@@ -1041,6 +1163,38 @@ Submit feedback for capability gap detection.
   "comment": "Results were not relevant"
 }
 ```
+
+---
+
+## Space Freshness (Phase 9.2)
+
+### `GET /v1/memory/spaces/{space_id}/freshness`
+
+Returns freshness and staleness information for a space's TapRoot node.
+
+**Path Parameters**:
+- `space_id` - The space to check freshness for
+
+**Response** (`200 OK`):
+```json
+{
+  "space_id": "my-project",
+  "last_ingest_at": "2026-02-03T15:30:00Z",
+  "last_ingest_type": "codebase-ingest",
+  "ingest_count": 12,
+  "is_stale": false,
+  "stale_hours": 8,
+  "threshold_hours": 24
+}
+```
+
+**Fields**:
+- `last_ingest_at` - ISO8601 timestamp of last ingest (omitted if never ingested)
+- `last_ingest_type` - Type of last ingest (`codebase-ingest`, `file-ingest`)
+- `ingest_count` - Total number of ingestions for this space
+- `is_stale` - Whether the space is considered stale based on `SYNC_STALE_THRESHOLD_HOURS`
+- `stale_hours` - Hours since last ingest
+- `threshold_hours` - Configured staleness threshold in hours
 
 ---
 

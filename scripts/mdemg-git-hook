@@ -71,9 +71,17 @@ ARGS=(
     --exclude "$SKIP_PATTERNS"
 )
 
+# Add --quiet unless verbose mode is enabled
 if [ "$VERBOSE" = "true" ]; then
     ARGS+=(--verbose)
     echo "mdemg-git-hook: Ingesting changes from commit $COMMIT_SHA: $COMMIT_MSG"
+else
+    ARGS+=(--quiet)
+fi
+
+# Add --log-file if MDEMG_LOG_FILE is set
+if [ -n "$MDEMG_LOG_FILE" ]; then
+    ARGS+=(--log-file "$MDEMG_LOG_FILE")
 fi
 
 # Run incremental ingestion (in background to not block commit)

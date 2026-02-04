@@ -1,10 +1,15 @@
 package api
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -2103,40 +2108,199 @@ func (s *Server) handleIngestTrigger(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// runIngestJob executes the ingestion job in the background.
-// This is a simplified version that delegates to the ingest-codebase logic.
+// ingestProgressEvent represents a structured JSON progress line from the CLI.
+type ingestProgressEvent struct {
+	Event    string  `json:"event"`
+	Total    int     `json:"total,omitempty"`
+	Current  int     `json:"current,omitempty"`
+	Ingested int     `json:"ingested,omitempty"`
+	Errors   int     `json:"errors,omitempty"`
+	Symbols  int     `json:"symbols,omitempty"`
+	Rate     float64 `json:"rate,omitempty"`
+	Duration string  `json:"duration,omitempty"`
+}
+
+// runIngestJob executes the ingestion job in the background by delegating to the
+// ingest-codebase CLI binary with --progress-json for streaming progress updates.
 func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 	queue := jobs.GetQueue()
 	queue.StartJob(job.ID)
 
-	// For now, this is a stub that shows the job lifecycle.
-	// Full implementation would call the ingest-codebase logic.
-
 	job.UpdateProgress(0, "initializing")
-
-	// Simulate job progress (replace with actual ingest logic)
-	// In a full implementation, this would:
-	// 1. Walk the codebase
-	// 2. Parse files and extract elements
-	// 3. Batch ingest via s.retriever.BatchIngestObservations
-	// 4. Run consolidation if enabled
 
 	spaceID, _ := job.Config["space_id"].(string)
 	path, _ := job.Config["path"].(string)
 
 	log.Printf("Ingestion job %s started for space=%s path=%s", job.ID, spaceID, path)
 
-	// Mark as completed with stub result
-	job.Complete(map[string]any{
-		"space_id":     spaceID,
-		"path":         path,
-		"status":       "stub",
-		"message":      "Job infrastructure ready. Full implementation pending.",
-		"elements":     0,
-		"consolidated": false,
-	})
+	// Build CLI arguments from job config
+	args := buildIngestArgsFromConfig(job.Config, s.cfg.ListenAddr)
 
-	log.Printf("Ingestion job %s completed (stub)", job.ID)
+	cmd := exec.CommandContext(ctx, "./bin/ingest-codebase", args...)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		job.Fail(fmt.Errorf("failed to create stdout pipe: %w", err))
+		log.Printf("Ingestion job %s failed: %v", job.ID, err)
+		return
+	}
+
+	// Capture stderr for error reporting
+	cmd.Stderr = nil // Let stderr go to parent process stderr
+
+	if err := cmd.Start(); err != nil {
+		job.Fail(fmt.Errorf("failed to start ingest-codebase: %w", err))
+		log.Printf("Ingestion job %s failed to start: %v", job.ID, err)
+		return
+	}
+
+	// Scan stdout for JSON progress events
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		line := scanner.Text()
+		var evt ingestProgressEvent
+		if err := json.Unmarshal([]byte(line), &evt); err != nil {
+			continue // Skip non-JSON lines
+		}
+
+		switch evt.Event {
+		case "discovery_complete":
+			job.SetTotal(evt.Total)
+			job.UpdateProgress(0, "discovery")
+		case "batch_progress":
+			job.UpdateProgress(evt.Current, "ingestion")
+			if evt.Rate > 0 {
+				job.SetRate(fmt.Sprintf("%.1f elements/sec", evt.Rate))
+			}
+		case "consolidation_start":
+			snap := job.GetSnapshot()
+			job.UpdateProgress(snap.Progress.Current, "consolidation")
+		case "complete":
+			job.Complete(map[string]any{
+				"space_id": spaceID,
+				"path":     path,
+				"total":    evt.Total,
+				"ingested": evt.Ingested,
+				"errors":   evt.Errors,
+				"symbols":  evt.Symbols,
+				"duration": evt.Duration,
+			})
+			log.Printf("Ingestion job %s completed: total=%d ingested=%d errors=%d",
+				job.ID, evt.Total, evt.Ingested, evt.Errors)
+			// Update TapRoot freshness on successful completion
+			if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest"); err != nil {
+				log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
+			}
+		}
+	}
+
+	// Wait for the process to exit
+	if err := cmd.Wait(); err != nil {
+		// Only fail if the job wasn't already completed by a "complete" event
+		snap := job.GetSnapshot()
+		if snap.Status != jobs.StatusCompleted {
+			job.Fail(fmt.Errorf("ingest-codebase exited with error: %w", err))
+			log.Printf("Ingestion job %s failed: %v", job.ID, err)
+		}
+		return
+	}
+
+	// If we never got a "complete" event, mark as completed with minimal info
+	snap := job.GetSnapshot()
+	if snap.Status != jobs.StatusCompleted {
+		job.Complete(map[string]any{
+			"space_id": spaceID,
+			"path":     path,
+			"message":  "completed without progress events",
+		})
+		log.Printf("Ingestion job %s completed (no progress events)", job.ID)
+		// Update TapRoot freshness on fallback completion
+		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest"); err != nil {
+			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
+		}
+	}
+}
+
+// buildIngestArgsFromConfig constructs CLI arguments for ingest-codebase from a job config map.
+func buildIngestArgsFromConfig(config map[string]any, listenAddr string) []string {
+	// Resolve endpoint
+	endpoint := listenAddr
+	if endpoint == "" {
+		endpoint = "http://localhost:9999"
+	} else if !strings.HasPrefix(endpoint, "http") {
+		if strings.HasPrefix(endpoint, ":") {
+			endpoint = "http://localhost" + endpoint
+		} else {
+			endpoint = "http://" + endpoint
+		}
+	}
+
+	path, _ := config["path"].(string)
+	spaceID, _ := config["space_id"].(string)
+
+	args := []string{
+		"--path", path,
+		"--space-id", spaceID,
+		"--endpoint", endpoint,
+		"--progress-json",
+	}
+
+	if v, ok := config["batch_size"].(int); ok && v > 0 {
+		args = append(args, fmt.Sprintf("--batch=%d", v))
+	}
+	if v, ok := config["workers"].(int); ok && v > 0 {
+		args = append(args, fmt.Sprintf("--workers=%d", v))
+	}
+	if v, ok := config["timeout_seconds"].(int); ok && v > 0 {
+		args = append(args, fmt.Sprintf("--timeout=%d", v))
+	}
+	if v, ok := config["extract_symbols"].(bool); ok {
+		args = append(args, fmt.Sprintf("--extract-symbols=%t", v))
+	}
+	if v, ok := config["consolidate"].(bool); ok {
+		args = append(args, fmt.Sprintf("--consolidate=%t", v))
+	}
+	if v, ok := config["include_tests"].(bool); ok && v {
+		args = append(args, "--include-tests")
+	}
+	if v, ok := config["incremental"].(bool); ok && v {
+		args = append(args, "--incremental")
+	}
+	if v, ok := config["dry_run"].(bool); ok && v {
+		args = append(args, "--dry-run")
+	}
+	if v, ok := config["since_commit"].(string); ok && v != "" {
+		args = append(args, "--since", v)
+	}
+	if v, ok := config["exclude_dirs"].([]string); ok && len(v) > 0 {
+		args = append(args, "--exclude", strings.Join(v, ","))
+	}
+	// Handle exclude_dirs stored as []any (from JSON deserialization)
+	if v, ok := config["exclude_dirs"].([]any); ok && len(v) > 0 {
+		dirs := make([]string, 0, len(v))
+		for _, d := range v {
+			if s, ok := d.(string); ok {
+				dirs = append(dirs, s)
+			}
+		}
+		if len(dirs) > 0 {
+			args = append(args, "--exclude", strings.Join(dirs, ","))
+		}
+	}
+	if v, ok := config["limit"].(int); ok && v > 0 {
+		args = append(args, fmt.Sprintf("--limit=%d", v))
+	}
+	if v, ok := config["archive_deleted"].(bool); ok {
+		args = append(args, fmt.Sprintf("--archive-deleted=%t", v))
+	}
+	if v, ok := config["quiet"].(bool); ok && v {
+		args = append(args, "--quiet")
+	}
+	if v, ok := config["log_file"].(string); ok && v != "" {
+		args = append(args, "--log-file", v)
+	}
+
+	return args
 }
 
 // handleIngestStatus handles GET /v1/memory/ingest/status/{job_id}
@@ -2270,6 +2434,319 @@ func (s *Server) handleIngestJobs(w http.ResponseWriter, r *http.Request) {
 		"jobs":  respJobs,
 		"count": len(respJobs),
 	})
+}
+
+// handleIngestFiles handles POST /v1/memory/ingest/files
+// Re-ingests specific files into memory. Synchronous for ≤50 files, background job for >50.
+func (s *Server) handleIngestFiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req models.IngestFilesRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if !validateRequest(w, &req) {
+		return
+	}
+
+	// Validate all file paths exist before processing
+	var missing []string
+	for _, f := range req.Files {
+		if _, err := os.Stat(f); os.IsNotExist(err) {
+			missing = append(missing, f)
+		}
+	}
+	if len(missing) > 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error":         "one or more files do not exist",
+			"missing_files": missing,
+		})
+		return
+	}
+
+	// Default extract_symbols to true
+	extractSymbols := true
+	if req.ExtractSymbols != nil {
+		extractSymbols = *req.ExtractSymbols
+	}
+
+	// Default consolidate to false
+	consolidate := false
+	if req.Consolidate != nil {
+		consolidate = *req.Consolidate
+	}
+
+	// For >50 files, run as a background job
+	if len(req.Files) > 50 {
+		jobID := "ingest-files-" + uuid.New().String()[:8]
+		config := map[string]any{
+			"space_id":        req.SpaceID,
+			"files":           req.Files,
+			"extract_symbols": extractSymbols,
+			"consolidate":     consolidate,
+		}
+		queue := jobs.GetQueue()
+		job, ctx := queue.CreateJob(jobID, "ingest-files", config)
+		go s.runIngestFilesJob(ctx, job)
+
+		writeJSON(w, http.StatusAccepted, models.IngestFilesResponse{
+			SpaceID:    req.SpaceID,
+			TotalFiles: len(req.Files),
+			JobID:      jobID,
+		})
+		return
+	}
+
+	// Synchronous processing for ≤50 files
+	results := s.ingestFiles(r.Context(), req.SpaceID, req.Files, extractSymbols)
+
+	successCount := 0
+	errorCount := 0
+	for _, res := range results {
+		if res.Status == "success" {
+			successCount++
+		} else {
+			errorCount++
+		}
+	}
+
+	// Optionally trigger consolidation
+	if consolidate && successCount > 0 && s.hiddenLayer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		_, err := s.hiddenLayer.RunFullConversationConsolidation(ctx, req.SpaceID)
+		cancel()
+		if err != nil {
+			log.Printf("Post-ingest consolidation failed: %v", err)
+		}
+	}
+
+	// Update TapRoot freshness after successful file ingest
+	if successCount > 0 {
+		if err := s.retriever.UpdateTapRootFreshness(r.Context(), req.SpaceID, "file-ingest"); err != nil {
+			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", req.SpaceID, err)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, models.IngestFilesResponse{
+		SpaceID:      req.SpaceID,
+		TotalFiles:   len(req.Files),
+		SuccessCount: successCount,
+		ErrorCount:   errorCount,
+		Results:      results,
+	})
+}
+
+// ingestFiles processes a list of files and returns per-file results.
+// Callers must validate file existence before calling this function.
+func (s *Server) ingestFiles(ctx context.Context, spaceID string, files []string, extractSymbols bool) []models.IngestFileResult {
+	results := make([]models.IngestFileResult, 0, len(files))
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+
+	for _, filePath := range files {
+		result := models.IngestFileResult{File: filePath}
+
+		// Read file content
+		content, err := readFileContent(filePath)
+		if err != nil {
+			log.Printf("ingestFiles: failed to read %s: %v", filePath, err)
+			result.Status = "error"
+			result.Error = "failed to read file"
+			results = append(results, result)
+			continue
+		}
+
+		// Detect language from extension
+		lang := detectLanguage(filePath)
+
+		// Build tags
+		tags := []string{"codebase-ingest", "file-ingest"}
+		if lang != "" {
+			tags = append(tags, lang)
+		}
+
+		// Ingest via retrieval service
+		ingestReq := models.IngestRequest{
+			SpaceID:   spaceID,
+			Timestamp: timestamp,
+			Source:    "file-ingest",
+			Content:   content,
+			Name:      filepath.Base(filePath),
+			Path:      filePath,
+			Tags:      tags,
+		}
+
+		resp, err := s.retriever.IngestObservation(ctx, ingestReq)
+		if err != nil {
+			log.Printf("ingestFiles: ingest failed for %s: %v", filePath, err)
+			result.Status = "error"
+			result.Error = "internal error during ingestion"
+			results = append(results, result)
+			continue
+		}
+
+		result.Status = "success"
+		result.NodeID = resp.NodeID
+		results = append(results, result)
+	}
+
+	return results
+}
+
+// runIngestFilesJob processes file ingestion as a background job (for >50 files).
+func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
+	queue := jobs.GetQueue()
+	queue.StartJob(job.ID)
+
+	spaceID, _ := job.Config["space_id"].(string)
+	extractSymbols, _ := job.Config["extract_symbols"].(bool)
+	consolidate, _ := job.Config["consolidate"].(bool)
+
+	// Extract files from config
+	var files []string
+	if v, ok := job.Config["files"].([]string); ok {
+		files = v
+	} else if v, ok := job.Config["files"].([]any); ok {
+		for _, f := range v {
+			if s, ok := f.(string); ok {
+				files = append(files, s)
+			}
+		}
+	}
+
+	job.SetTotal(len(files))
+	job.UpdateProgress(0, "ingesting")
+
+	results := make([]models.IngestFileResult, 0, len(files))
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+	successCount := 0
+	errorCount := 0
+
+	for i, filePath := range files {
+		// Check for cancellation
+		select {
+		case <-ctx.Done():
+			job.Fail(fmt.Errorf("job cancelled"))
+			return
+		default:
+		}
+
+		result := models.IngestFileResult{File: filePath}
+
+		content, err := readFileContent(filePath)
+		if err != nil {
+			log.Printf("ingestFilesJob %s: failed to read %s: %v", job.ID, filePath, err)
+			result.Status = "error"
+			result.Error = "failed to read file"
+			errorCount++
+			results = append(results, result)
+			job.UpdateProgress(i+1, "ingesting")
+			continue
+		}
+
+		lang := detectLanguage(filePath)
+		tags := []string{"codebase-ingest", "file-ingest"}
+		if lang != "" {
+			tags = append(tags, lang)
+		}
+		_ = extractSymbols // symbols handled by the retrieval service
+
+		ingestReq := models.IngestRequest{
+			SpaceID:   spaceID,
+			Timestamp: timestamp,
+			Source:    "file-ingest",
+			Content:   content,
+			Name:      filepath.Base(filePath),
+			Path:      filePath,
+			Tags:      tags,
+		}
+
+		resp, err := s.retriever.IngestObservation(ctx, ingestReq)
+		if err != nil {
+			log.Printf("ingestFilesJob %s: ingest failed for %s: %v", job.ID, filePath, err)
+			result.Status = "error"
+			result.Error = "internal error during ingestion"
+			errorCount++
+		} else {
+			result.Status = "success"
+			result.NodeID = resp.NodeID
+			successCount++
+		}
+
+		results = append(results, result)
+		job.UpdateProgress(i+1, "ingesting")
+	}
+
+	// Optionally trigger consolidation
+	if consolidate && successCount > 0 && s.hiddenLayer != nil {
+		job.UpdateProgress(len(files), "consolidation")
+		consolidateCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		_, err := s.hiddenLayer.RunFullConversationConsolidation(consolidateCtx, spaceID)
+		cancel()
+		if err != nil {
+			log.Printf("Post-ingest consolidation failed for job %s: %v", job.ID, err)
+		}
+	}
+
+	job.Complete(map[string]any{
+		"space_id":      spaceID,
+		"total_files":   len(files),
+		"success_count": successCount,
+		"error_count":   errorCount,
+	})
+
+	// Update TapRoot freshness on successful file ingest job
+	if successCount > 0 {
+		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "file-ingest"); err != nil {
+			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
+		}
+	}
+
+	log.Printf("Ingest files job %s completed: %d/%d files ingested", job.ID, successCount, len(files))
+}
+
+// readFileContent reads the content of a file, returning it as a string.
+func readFileContent(filePath string) (string, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// detectLanguage returns a language tag based on file extension.
+func detectLanguage(filePath string) string {
+	ext := strings.ToLower(filepath.Ext(filePath))
+	switch ext {
+	case ".go":
+		return "go"
+	case ".py":
+		return "python"
+	case ".ts", ".tsx":
+		return "typescript"
+	case ".js", ".jsx":
+		return "javascript"
+	case ".java":
+		return "java"
+	case ".rs":
+		return "rust"
+	case ".c", ".h":
+		return "c"
+	case ".cpp", ".hpp", ".cc":
+		return "cpp"
+	case ".md":
+		return "markdown"
+	case ".sql":
+		return "sql"
+	case ".json":
+		return "json"
+	case ".yaml", ".yml":
+		return "yaml"
+	default:
+		return ""
+	}
 }
 
 // handlePoolMetrics handles GET /v1/system/pool-metrics

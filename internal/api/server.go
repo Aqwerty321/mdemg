@@ -17,6 +17,7 @@ import (
 	"mdemg/internal/embeddings"
 	"mdemg/internal/gaps"
 	"mdemg/internal/hidden"
+	"mdemg/internal/jobs"
 	"mdemg/internal/learning"
 	"mdemg/internal/plugins"
 	"mdemg/internal/retrieval"
@@ -42,9 +43,10 @@ type Server struct {
 	contextCooler   *conversation.ContextCooler
 	sessionTracker  *conversation.SessionTracker
 	hiddenSvc       *hidden.Service // alias for handleConversationConsolidate
-	stopConsolidate chan struct{}
-	stopCooler      chan struct{}
-	stopInterviewer chan struct{}
+	stopConsolidate    chan struct{}
+	stopCooler         chan struct{}
+	stopInterviewer    chan struct{}
+	stopScheduledSync  chan struct{}
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -183,6 +185,7 @@ func (s *Server) Shutdown() {
 	s.StopPeriodicConsolidation()
 	s.StopContextCoolerProcessing()
 	s.StopWeeklyGapInterviews()
+	s.StopScheduledSync()
 }
 
 // StartPeriodicConsolidation starts a background goroutine that consolidates conversation memory
@@ -347,6 +350,120 @@ func (s *Server) StopWeeklyGapInterviews() {
 	}
 }
 
+// StartScheduledSync starts a background goroutine that periodically checks for
+// stale spaces and triggers incremental re-ingestion for those with configured repo paths.
+func (s *Server) StartScheduledSync(interval time.Duration) {
+	if interval <= 0 {
+		log.Println("scheduled sync disabled (interval <= 0)")
+		return
+	}
+
+	s.stopScheduledSync = make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		log.Printf("scheduled sync started (interval=%v, threshold=%dh)", interval, s.cfg.SyncStaleThresholdHours)
+
+		for {
+			select {
+			case <-ticker.C:
+				s.runScheduledSyncCheck()
+			case <-s.stopScheduledSync:
+				log.Println("scheduled sync stopped")
+				return
+			}
+		}
+	}()
+}
+
+// StopScheduledSync stops the background scheduled sync goroutine
+func (s *Server) StopScheduledSync() {
+	if s.stopScheduledSync != nil {
+		close(s.stopScheduledSync)
+		s.stopScheduledSync = nil
+	}
+}
+
+// runScheduledSyncCheck queries all TapRoot nodes for staleness and triggers
+// incremental re-ingestion for stale spaces with configured repo paths.
+func (s *Server) runScheduledSyncCheck() {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	allFreshness, err := s.retriever.GetAllTapRootFreshness(ctx)
+	if err != nil {
+		log.Printf("scheduled sync: failed to query TapRoot freshness: %v", err)
+		return
+	}
+
+	threshold := time.Duration(s.cfg.SyncStaleThresholdHours) * time.Hour
+	filterSpaces := make(map[string]bool)
+	for _, sid := range s.cfg.SyncSpaceIDs {
+		filterSpaces[sid] = true
+	}
+
+	for _, props := range allFreshness {
+		spaceID, _ := props["space_id"].(string)
+		if spaceID == "" {
+			continue
+		}
+
+		// Filter to configured space IDs if set
+		if len(filterSpaces) > 0 && !filterSpaces[spaceID] {
+			continue
+		}
+
+		// Check if stale
+		isStale := true
+		if lastIngest, ok := props["last_ingest_at"]; ok {
+			var lastTime time.Time
+			switch v := lastIngest.(type) {
+			case time.Time:
+				lastTime = v
+			case string:
+				if parsed, parseErr := time.Parse(time.RFC3339, v); parseErr == nil {
+					lastTime = parsed
+				}
+			}
+			if !lastTime.IsZero() {
+				isStale = time.Since(lastTime) >= threshold
+			}
+		}
+
+		if !isStale {
+			continue
+		}
+
+		// Check if we have a repo path configured for this space
+		repoPath, hasPath := s.cfg.SyncRepoPathMap[spaceID]
+		if !hasPath {
+			log.Printf("scheduled sync: space %s is stale but no repo path configured", spaceID)
+			continue
+		}
+
+		log.Printf("scheduled sync: triggering incremental re-ingest for stale space %s (path=%s)", spaceID, repoPath)
+		s.triggerScheduledIngest(spaceID, repoPath)
+	}
+}
+
+// triggerScheduledIngest creates a background ingest job for a stale space.
+func (s *Server) triggerScheduledIngest(spaceID, repoPath string) {
+	queue := jobs.GetQueue()
+	jobID := "sync-" + spaceID + "-" + time.Now().Format("20060102150405")
+	config := map[string]any{
+		"space_id":    spaceID,
+		"path":        repoPath,
+		"incremental": true,
+		"since":       "HEAD~1",
+	}
+
+	job, ctx := queue.CreateJob(jobID, "scheduled-sync", config)
+	go s.runIngestJob(ctx, job)
+
+	log.Printf("scheduled sync: created job %s for space %s", jobID, spaceID)
+}
+
 // TriggerAPEEvent triggers APE modules subscribed to the given event
 func (s *Server) TriggerAPEEvent(event string) {
 	if s.apeScheduler != nil {
@@ -390,6 +507,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/ingest/status/", s.handleIngestStatus)
 	mux.HandleFunc("/v1/memory/ingest/cancel/", s.handleIngestCancel)
 	mux.HandleFunc("/v1/memory/ingest/jobs", s.handleIngestJobs)
+	mux.HandleFunc("/v1/memory/ingest/files", s.handleIngestFiles)
 
 	// Capability gap detection endpoints
 	mux.HandleFunc("/v1/system/capability-gaps", s.handleCapabilityGaps)
@@ -420,6 +538,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/linear/projects/", s.handleLinearProjects)
 	mux.HandleFunc("/v1/linear/comments", s.handleLinearComments)
 
+	// Space freshness endpoint (Phase 9.2)
+	mux.HandleFunc("/v1/memory/spaces/", s.handleSpacesRoute)
+
 	// Codebase ingestion endpoint
 	mux.HandleFunc("/v1/memory/ingest-codebase", s.handleIngestCodebaseRoute)
 	mux.HandleFunc("/v1/memory/ingest-codebase/", s.handleIngestCodebaseRoute)
@@ -442,6 +563,15 @@ func (s *Server) Routes() http.Handler {
 	}
 
 	return handler
+}
+
+// handleSpacesRoute routes requests under /v1/memory/spaces/{space_id}/... to the appropriate handler
+func (s *Server) handleSpacesRoute(w http.ResponseWriter, r *http.Request) {
+	if strings.HasSuffix(r.URL.Path, "/freshness") {
+		s.handleSpaceFreshness(w, r)
+		return
+	}
+	writeJSON(w, http.StatusNotFound, map[string]any{"error": "not found"})
 }
 
 // handleNodeOperation routes requests under /v1/memory/nodes/{node_id}/... to the appropriate handler

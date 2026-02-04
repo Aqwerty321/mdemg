@@ -17,8 +17,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// handleIngestCodebaseRoute routes requests to the appropriate handler
+// handleIngestCodebaseRoute routes requests to the appropriate handler.
+// DEPRECATED: Use /v1/memory/ingest/trigger instead for new integrations.
 func (s *Server) handleIngestCodebaseRoute(w http.ResponseWriter, r *http.Request) {
+	// Signal deprecation on all responses from this endpoint
+	w.Header().Set("Deprecation", "true")
+	w.Header().Set("Link", `</v1/memory/ingest/trigger>; rel="successor-version"`)
+
 	path := strings.TrimPrefix(r.URL.Path, "/v1/memory/ingest-codebase")
 	path = strings.TrimPrefix(path, "/")
 
@@ -272,6 +277,13 @@ func (s *Server) runIngestionJob(ctx context.Context, job *IngestJob, req *Inges
 
 	log.Printf("[ingest-codebase] Job %s completed: %d files, %d symbols, %d errors",
 		job.ID, job.Stats.FilesProcessed, job.Stats.SymbolsExtracted, job.Stats.Errors)
+
+	// Update TapRoot freshness on completion
+	freshnessCtx, freshnessCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer freshnessCancel()
+	if err := s.retriever.UpdateTapRootFreshness(freshnessCtx, job.SpaceID, "codebase-ingest"); err != nil {
+		log.Printf("[ingest-codebase] Warning: failed to update TapRoot freshness for %s: %v", job.SpaceID, err)
+	}
 }
 
 // buildIngestArgs constructs CLI arguments from the request

@@ -199,6 +199,12 @@ type Config struct {
 	PortRangeStart int    // Start of fallback port range (default: derived from ListenAddr port)
 	PortRangeEnd   int    // End of fallback port range (default: PortRangeStart + 100)
 	PortFilePath   string // Path to write allocated port for client discovery (default: .mdemg.port)
+
+	// Scheduled sync settings (Phase 9.2)
+	SyncIntervalMinutes     int               // Check interval for scheduled sync (default: 0 = disabled)
+	SyncSpaceIDs            []string          // Comma-separated space IDs to monitor (empty = all)
+	SyncStaleThresholdHours int               // Hours before a space is considered stale (default: 24)
+	SyncRepoPathMap         map[string]string // space_id -> repo_path mapping for auto-ingest
 }
 
 func FromEnv() (Config, error) {
@@ -980,6 +986,40 @@ func FromEnv() (Config, error) {
 	}
 	portFilePath := get("PORT_FILE_PATH", ".mdemg.port")
 
+	// Scheduled sync settings (Phase 9.2)
+	syncIntervalMinutes, err := atoi("SYNC_INTERVAL_MINUTES", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	if syncIntervalMinutes < 0 {
+		return Config{}, errors.New("SYNC_INTERVAL_MINUTES must be >= 0")
+	}
+	syncStaleThresholdHours, err := atoi("SYNC_STALE_THRESHOLD_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+	if syncStaleThresholdHours < 1 {
+		return Config{}, errors.New("SYNC_STALE_THRESHOLD_HOURS must be >= 1")
+	}
+	var syncSpaceIDs []string
+	if v := get("SYNC_SPACE_IDS", ""); v != "" {
+		for _, s := range strings.Split(v, ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				syncSpaceIDs = append(syncSpaceIDs, s)
+			}
+		}
+	}
+	syncRepoPathMap := make(map[string]string)
+	if v := get("SYNC_REPO_PATHS", ""); v != "" {
+		for _, pair := range strings.Split(v, ",") {
+			kv := strings.SplitN(strings.TrimSpace(pair), "=", 2)
+			if len(kv) == 2 {
+				syncRepoPathMap[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+			}
+		}
+	}
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -1116,6 +1156,10 @@ func FromEnv() (Config, error) {
 		PortRangeStart:            portRangeStart,
 		PortRangeEnd:              portRangeEnd,
 		PortFilePath:              portFilePath,
+		SyncIntervalMinutes:       syncIntervalMinutes,
+		SyncSpaceIDs:              syncSpaceIDs,
+		SyncStaleThresholdHours:   syncStaleThresholdHours,
+		SyncRepoPathMap:           syncRepoPathMap,
 	}, nil
 }
 

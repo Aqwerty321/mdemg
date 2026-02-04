@@ -57,6 +57,11 @@ func main() {
 	// Start periodic conversation memory consolidation (every 5 minutes)
 	srv.StartPeriodicConsolidation("mdemg-dev", 5*time.Minute)
 
+	// Start scheduled sync if configured (Phase 9.2)
+	if cfg.SyncIntervalMinutes > 0 {
+		srv.StartScheduledSync(time.Duration(cfg.SyncIntervalMinutes) * time.Minute)
+	}
+
 	h := &http.Server{
 		Handler:           srv.Routes(),
 		ReadHeaderTimeout: 5 * time.Second,

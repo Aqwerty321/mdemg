@@ -47,6 +47,10 @@ func main() {
 	registerMemoryIngestStatusTool(s)
 	registerMemoryIngestCancelTool(s)
 	registerMemoryIngestJobsTool(s)
+	registerMemoryIngestFilesTool(s)
+
+	// Freshness tracking (Phase 9.2)
+	registerMemorySpaceFreshnessTool(s)
 
 	// Linear CRUD tools (Phase 4)
 	registerLinearCreateIssueTool(s)
@@ -578,15 +582,13 @@ func registerMemoryIngestTriggerTool(s *server.MCPServer) {
 		mcp.WithDescription(`Trigger a background ingestion job to import code from a directory.
 The job runs asynchronously. Use memory_ingest_status to check progress.
 Use this when you want to import or re-import a codebase into memory.`),
-		mcp.WithString("source_path",
+		mcp.WithString("path",
 			mcp.Required(),
 			mcp.Description("Path to the source directory to ingest")),
 		mcp.WithString("mode",
 			mcp.Description("Ingestion mode: 'full' (re-ingest everything) or 'incremental' (only changed files). Default: 'full'")),
-		mcp.WithString("include_pattern",
-			mcp.Description("Glob pattern for files to include (e.g., '**/*.go')")),
-		mcp.WithString("exclude_pattern",
-			mcp.Description("Glob pattern for files to exclude (e.g., '**/vendor/**')")),
+		mcp.WithString("exclude_dirs",
+			mcp.Description("Comma-separated directories to exclude (e.g., 'vendor,node_modules')")),
 	)
 
 	s.AddTool(tool, memoryIngestTriggerHandler)
@@ -595,9 +597,9 @@ Use this when you want to import or re-import a codebase into memory.`),
 func memoryIngestTriggerHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(request)
 
-	sourcePath, _ := args["source_path"].(string)
-	if sourcePath == "" {
-		return newToolResultError("source_path is required"), nil
+	path, _ := args["path"].(string)
+	if path == "" {
+		return newToolResultError("path is required"), nil
 	}
 
 	mode, _ := args["mode"].(string)
@@ -606,16 +608,25 @@ func memoryIngestTriggerHandler(ctx context.Context, request mcp.CallToolRequest
 	}
 
 	ingestReq := map[string]any{
-		"space_id":    defaultSpaceID,
-		"source_path": sourcePath,
-		"mode":        mode,
+		"space_id": defaultSpaceID,
+		"path":     path,
 	}
 
-	if include, ok := args["include_pattern"].(string); ok && include != "" {
-		ingestReq["include_pattern"] = include
+	// Map mode to incremental boolean
+	if mode == "incremental" {
+		ingestReq["incremental"] = true
 	}
-	if exclude, ok := args["exclude_pattern"].(string); ok && exclude != "" {
-		ingestReq["exclude_pattern"] = exclude
+
+	// Map exclude_dirs comma-separated string to []string
+	if excludeDirs, ok := args["exclude_dirs"].(string); ok && excludeDirs != "" {
+		dirs := strings.Split(excludeDirs, ",")
+		trimmed := make([]string, 0, len(dirs))
+		for _, d := range dirs {
+			if s := strings.TrimSpace(d); s != "" {
+				trimmed = append(trimmed, s)
+			}
+		}
+		ingestReq["exclude_dirs"] = trimmed
 	}
 
 	resp, err := callMDEMG("/v1/memory/ingest/trigger", ingestReq)
@@ -758,6 +769,73 @@ func memoryIngestJobsHandler(ctx context.Context, request mcp.CallToolRequest) (
 	}
 
 	return mcp.NewToolResultText(sb.String()), nil
+}
+
+// memory_ingest_files - Re-ingest specific files into memory
+func registerMemoryIngestFilesTool(s *server.MCPServer) {
+	tool := mcp.NewTool("memory_ingest_files",
+		mcp.WithDescription(`Re-ingest specific files into memory.
+Use this when you want to update memory for specific files that have changed.
+More targeted than a full codebase re-ingestion.`),
+		mcp.WithString("files",
+			mcp.Required(),
+			mcp.Description("Comma-separated list of file paths to re-ingest")),
+		mcp.WithString("space_id",
+			mcp.Description("Space ID (default: ide-agent)")),
+	)
+
+	s.AddTool(tool, memoryIngestFilesHandler)
+}
+
+func memoryIngestFilesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	filesStr, _ := args["files"].(string)
+	if filesStr == "" {
+		return newToolResultError("files is required"), nil
+	}
+
+	// Parse comma-separated file paths
+	rawFiles := strings.Split(filesStr, ",")
+	files := make([]string, 0, len(rawFiles))
+	for _, f := range rawFiles {
+		if s := strings.TrimSpace(f); s != "" {
+			files = append(files, s)
+		}
+	}
+	if len(files) == 0 {
+		return newToolResultError("at least one file path is required"), nil
+	}
+
+	spaceID, _ := args["space_id"].(string)
+	if spaceID == "" {
+		spaceID = defaultSpaceID
+	}
+
+	ingestReq := map[string]any{
+		"space_id": spaceID,
+		"files":    files,
+	}
+
+	resp, err := callMDEMG("/v1/memory/ingest/files", ingestReq)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to ingest files: %v", err)), nil
+	}
+
+	totalFiles, _ := resp["total_files"].(float64)
+	successCount, _ := resp["success_count"].(float64)
+	errorCount, _ := resp["error_count"].(float64)
+	jobID, _ := resp["job_id"].(string)
+
+	if jobID != "" {
+		result := fmt.Sprintf("File ingestion job started (too many files for synchronous processing).\nJob ID: %s\nTotal files: %d\n\nUse memory_ingest_status with job_id '%s' to check progress.",
+			jobID, int(totalFiles), jobID)
+		return mcp.NewToolResultText(result), nil
+	}
+
+	result := fmt.Sprintf("File ingestion complete.\nTotal: %d\nSuccess: %d\nErrors: %d",
+		int(totalFiles), int(successCount), int(errorCount))
+	return mcp.NewToolResultText(result), nil
 }
 
 // =============================================================================
@@ -1289,4 +1367,68 @@ func callMDEMGGet(path string, params map[string]string) (map[string]any, error)
 	}
 
 	return result, nil
+}
+
+// memory_space_freshness - Check the freshness/staleness of a memory space
+func registerMemorySpaceFreshnessTool(s *server.MCPServer) {
+	tool := mcp.NewTool("memory_space_freshness",
+		mcp.WithDescription(`Check the freshness of a memory space's ingested data.
+Returns when the space was last ingested, how many ingestions have occurred,
+and whether the data is considered stale based on the configured threshold.
+Use this to determine if a re-ingestion is needed.`),
+		mcp.WithString("space_id",
+			mcp.Required(),
+			mcp.Description("The space ID to check freshness for")),
+	)
+
+	s.AddTool(tool, memorySpaceFreshnessHandler)
+}
+
+func memorySpaceFreshnessHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	spaceID, _ := args["space_id"].(string)
+	if spaceID == "" {
+		return newToolResultError("space_id is required"), nil
+	}
+
+	resp, err := callMDEMGGet("/v1/memory/spaces/"+spaceID+"/freshness", nil)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to check freshness: %v", err)), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("## Space Freshness: %s\n\n", spaceID))
+
+	if lastIngest, ok := resp["last_ingest_at"].(string); ok && lastIngest != "" {
+		sb.WriteString(fmt.Sprintf("**Last Ingest:** %s\n", lastIngest))
+	} else {
+		sb.WriteString("**Last Ingest:** Never\n")
+	}
+
+	if ingestType, ok := resp["last_ingest_type"].(string); ok && ingestType != "" {
+		sb.WriteString(fmt.Sprintf("**Ingest Type:** %s\n", ingestType))
+	}
+
+	if count, ok := resp["ingest_count"].(float64); ok {
+		sb.WriteString(fmt.Sprintf("**Total Ingestions:** %d\n", int(count)))
+	}
+
+	if isStale, ok := resp["is_stale"].(bool); ok {
+		if isStale {
+			sb.WriteString("**Status:** STALE\n")
+		} else {
+			sb.WriteString("**Status:** Fresh\n")
+		}
+	}
+
+	if staleHours, ok := resp["stale_hours"].(float64); ok && staleHours > 0 {
+		sb.WriteString(fmt.Sprintf("**Hours Since Ingest:** %d\n", int(staleHours)))
+	}
+
+	if threshold, ok := resp["threshold_hours"].(float64); ok {
+		sb.WriteString(fmt.Sprintf("**Stale Threshold:** %dh\n", int(threshold)))
+	}
+
+	return mcp.NewToolResultText(sb.String()), nil
 }

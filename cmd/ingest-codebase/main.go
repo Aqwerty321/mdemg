@@ -51,12 +51,17 @@ var (
 	incremental    = flag.Bool("incremental", false, "Only ingest files changed since last commit (uses git diff)")
 	sinceCommit    = flag.String("since", "HEAD~1", "Git commit to compare against for incremental mode (default: HEAD~1)")
 	archiveDeleted = flag.Bool("archive-deleted", true, "Archive nodes for deleted files in incremental mode")
+	quiet          = flag.Bool("quiet", false, "Suppress all non-error output")
+	logFile        = flag.String("log-file", "", "Write logs to file instead of stderr")
 
 	// LLM summary options
 	llmSummary         = flag.Bool("llm-summary", false, "Use LLM to generate semantic summaries (requires OPENAI_API_KEY)")
 	llmSummaryModel    = flag.String("llm-summary-model", "gpt-4o-mini", "Model for LLM summaries")
 	llmSummaryBatch    = flag.Int("llm-summary-batch", 10, "Files per LLM API call for summaries")
 	llmSummaryProvider = flag.String("llm-summary-provider", "openai", "LLM provider for summaries (openai/ollama)")
+
+	// Progress reporting
+	progressJSON = flag.Bool("progress-json", false, "Emit structured JSON progress lines to stdout (logs go to stderr)")
 
 	// Info flags
 	listLanguages = flag.Bool("list-languages", false, "List supported languages and exit")
@@ -302,6 +307,27 @@ type IngestStats struct {
 	StartTime     time.Time
 }
 
+// progressEvent is a structured JSON progress line emitted to stdout when --progress-json is set.
+type progressEvent struct {
+	Event    string  `json:"event"`
+	Total    int     `json:"total,omitempty"`
+	Current  int     `json:"current,omitempty"`
+	Ingested int     `json:"ingested,omitempty"`
+	Errors   int     `json:"errors,omitempty"`
+	Symbols  int     `json:"symbols,omitempty"`
+	Rate     float64 `json:"rate,omitempty"`
+	Duration string  `json:"duration,omitempty"`
+}
+
+// emitProgress writes a JSON progress event to stdout if --progress-json is enabled.
+func emitProgress(evt progressEvent) {
+	if !*progressJSON {
+		return
+	}
+	data, _ := json.Marshal(evt)
+	fmt.Fprintln(os.Stdout, string(data))
+}
+
 // GitDiffResult contains files changed between commits
 type GitDiffResult struct {
 	Added    []string
@@ -407,6 +433,22 @@ func matchesExcludePattern(filename string, patterns []string) bool {
 
 func main() {
 	flag.Parse()
+
+	// Log output priority: --log-file > --quiet > --progress-json stderr redirect > default
+	if *logFile != "" {
+		f, err := os.OpenFile(*logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatalf("Failed to open log file %s: %v", *logFile, err)
+		}
+		defer f.Close()
+		log.SetOutput(f)
+	} else if *quiet {
+		log.SetOutput(io.Discard)
+	} else if *progressJSON {
+		// When --progress-json is set, ensure log output goes to stderr
+		// so stdout is reserved for structured JSON progress events.
+		log.SetOutput(os.Stderr)
+	}
 
 	// Handle --list-languages flag
 	if *listLanguages {
@@ -566,6 +608,7 @@ func main() {
 	}
 
 	log.Printf("Found %d code elements", len(elements))
+	emitProgress(progressEvent{Event: "discovery_complete", Total: len(elements)})
 
 	// Apply limit if specified
 	if *limitElements > 0 && len(elements) > *limitElements {
@@ -628,6 +671,13 @@ func main() {
 				log.Printf("[Worker %d] Progress: %d/%d (%.1f/s, %d errors)",
 					workerID, current, stats.TotalElements, rate, errCount)
 
+				emitProgress(progressEvent{
+					Event:   "batch_progress",
+					Current: int(current),
+					Total:   int(stats.TotalElements),
+					Rate:    rate,
+				})
+
 				time.Sleep(time.Duration(*delay) * time.Millisecond)
 			}
 		}(w)
@@ -665,8 +715,18 @@ func main() {
 		}
 	}
 
+	// Emit complete progress event
+	emitProgress(progressEvent{
+		Event:    "complete",
+		Total:    int(stats.TotalElements),
+		Ingested: int(stats.Ingested),
+		Errors:   int(stats.Errors),
+		Duration: elapsed.Round(time.Second).String(),
+	})
+
 	// Run consolidation
 	if *consolidate && stats.Ingested > 0 {
+		emitProgress(progressEvent{Event: "consolidation_start"})
 		log.Println("Running consolidation...")
 		if err := runConsolidation(client); err != nil {
 			log.Printf("Consolidation failed: %v", err)
@@ -1425,6 +1485,10 @@ func runConsolidation(client *http.Client) error {
 }
 
 func printSample(elements []CodeElement) {
+	if *quiet {
+		return
+	}
+
 	counts := make(map[string]int)
 	for _, e := range elements {
 		counts[e.Kind]++

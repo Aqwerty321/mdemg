@@ -173,6 +173,37 @@ func getLayerDecayRate(layer int, cfg config.Config) float64 {
 	}
 }
 
+// getDecayRate returns the appropriate decay rate (rho) with tag-awareness.
+// For L1+ nodes, always uses layer-specific rates.
+// For L0 nodes, checks source-type tags when TemporalSourceTypeDecayEnabled is true.
+func getDecayRate(layer int, tags []string, cfg config.Config) float64 {
+	// L1+ nodes: always use layer-specific rates
+	if layer > 0 {
+		if layer == 1 {
+			return cfg.ScoringRhoL1
+		}
+		return cfg.ScoringRhoL2
+	}
+
+	// L0 nodes: check for source-type overrides (if enabled)
+	if cfg.TemporalSourceTypeDecayEnabled {
+		if hasTag(tags, "documentation") || hasTag(tags, "markdown") {
+			return cfg.ScoringRhoDocumentation
+		}
+		if hasTag(tags, "config") || hasTag(tags, "configuration") {
+			return cfg.ScoringRhoConfig
+		}
+		if hasTag(tags, "conversation") || hasTag(tags, "conversation_observation") {
+			return cfg.ScoringRhoConversation
+		}
+		if hasTag(tags, "changelog") {
+			return cfg.ScoringRhoChangelog
+		}
+	}
+
+	return cfg.ScoringRhoL0
+}
+
 // isCodeQuery returns true if the query appears to be asking about code elements
 // rather than documentation or configuration.
 func isCodeQuery(query string) bool {
@@ -340,13 +371,14 @@ type QueryGates struct {
 // RetrievalHints provides query-type aware parameters for the retrieval layer.
 // Unlike QueryGates (which affects scoring), these affect what candidates are retrieved.
 type RetrievalHints struct {
-	SeedN            int      // Number of seeds for graph expansion (default: 50)
-	HopDepth         int      // How many hops to expand (default: 2)
-	VectorWeight     float64  // Weight for vector in RRF fusion (default: 0.7)
-	BM25Weight       float64  // Weight for BM25 in RRF fusion (default: 0.3)
-	EnableExpansion  bool     // Whether to do graph expansion (default: true)
-	EdgeTypeStrategy string   // Edge type strategy: "structural_first", "learned_only", "hybrid", "all"
-	QueryType        string   // Detected query type for logging
+	SeedN            int            // Number of seeds for graph expansion (default: 50)
+	HopDepth         int            // How many hops to expand (default: 2)
+	VectorWeight     float64        // Weight for vector in RRF fusion (default: 0.7)
+	BM25Weight       float64        // Weight for BM25 in RRF fusion (default: 0.3)
+	EnableExpansion  bool           // Whether to do graph expansion (default: true)
+	EdgeTypeStrategy string         // Edge type strategy: "structural_first", "learned_only", "hybrid", "all"
+	QueryType        string         // Detected query type for logging
+	TemporalIntent   TemporalIntent // Parsed temporal understanding
 }
 
 // ComputeRetrievalHints returns retrieval parameters based on query type.
@@ -361,6 +393,11 @@ func ComputeRetrievalHints(queryText string, cfg config.Config) RetrievalHints {
 		EnableExpansion:  true,
 		EdgeTypeStrategy: cfg.EdgeTypeStrategy,
 		QueryType:        "generic",
+	}
+
+	// Parse temporal intent if temporal reasoning is enabled
+	if cfg.TemporalEnabled {
+		hints.TemporalIntent = ParseTemporalIntent(queryText, time.Now())
 	}
 
 	// Symbol lookup: maximize vector precision, minimize graph noise
@@ -528,8 +565,9 @@ func pathMatchScore(nodePath string, hints []string) float64 {
 
 // ScoreAndRank computes the final score per candidate and returns topK results.
 // queryText is optional - when provided, enables path-based boosting for architecture queries.
-func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK int, cfg config.Config, queryText string) []models.RetrieveResult {
-	scored := ScoreAndRankWithBreakdown(cands, act, edges, topK, cfg, queryText)
+// hints provides query-type and temporal awareness for scoring adjustments.
+func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK int, cfg config.Config, queryText string, hints RetrievalHints) []models.RetrieveResult {
+	scored := ScoreAndRankWithBreakdown(cands, act, edges, topK, cfg, queryText, hints)
 	results := make([]models.RetrieveResult, len(scored))
 	for i, sc := range scored {
 		results[i] = sc.RetrieveResult
@@ -539,7 +577,8 @@ func ScoreAndRank(cands []Candidate, act map[string]float64, edges []Edge, topK 
 
 // ScoreAndRankWithBreakdown computes scores with detailed breakdowns for Jiminy.
 // Returns ScoredCandidate with both the result and the score breakdown.
-func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges []Edge, topK int, cfg config.Config, queryText string) []ScoredCandidate {
+// hints provides query-type and temporal awareness for scoring adjustments.
+func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges []Edge, topK int, cfg config.Config, queryText string, hints RetrievalHints) []ScoredCandidate {
 	if topK <= 0 {
 		topK = 20
 	}
@@ -597,11 +636,22 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 		log.Printf("[DEBUG Scoring] Processing %d candidates, query='%s', codeQueryDetected=%v", len(cands), queryText, codeQueryDetected)
 	}
 
+	// Stale reference penalties (Phase 2 Temporal)
+	stalePenalties := map[string]float64{}
+	if cfg.TemporalEnabled && cfg.TemporalStaleRefDays > 0 {
+		stalePenalties = StaleReferencePenalty(cands, edges, float64(cfg.TemporalStaleRefDays), cfg.TemporalStaleRefMaxPen)
+	}
+
 	for _, c := range cands {
 		a := act[c.NodeID]
-		ageDays := now.Sub(c.UpdatedAt).Hours() / 24.0
-		// Layer-specific decay: L0 files decay faster, L1/L2+ concepts decay slower
-		rho := getLayerDecayRate(c.Layer, cfg)
+		// Use canonical_time for age (content-relevant time), fallback to UpdatedAt
+		ageRef := c.UpdatedAt
+		if !c.CanonicalTime.IsZero() {
+			ageRef = c.CanonicalTime
+		}
+		ageDays := now.Sub(ageRef).Hours() / 24.0
+		// Source-type-aware decay: checks tags when enabled, else layer-specific
+		rho := getDecayRate(c.Layer, c.Tags, cfg)
 		r := math.Exp(-rho * ageDays)
 		if r < 0 {
 			r = 0
@@ -632,7 +682,12 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 		// Calculate individual weighted components using gated weights
 		vecComponent := gates.VectorWeight * c.VectorSim
 		actComponent := gates.ActivationWeight * a
-		recComponent := gamma * r
+		// Temporal soft-mode: boost recency weight when temporal language detected
+		effectiveGamma := gamma
+		if hints.TemporalIntent.Mode == TemporalModeSoft {
+			effectiveGamma = gamma * cfg.TemporalSoftBoostMultiplier
+		}
+		recComponent := effectiveGamma * r
 		confComponent := delta * c.Confidence
 		hubPenComponent := phi * h
 		redPenComponent := kappa * d
@@ -644,7 +699,10 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			l1BoostEffect = (gates.L1Boost - 1.0) * (vecComponent + actComponent)
 		}
 
-		s := vecComponent + actComponent + recComponent + confComponent + pb + cb + l1BoostEffect - hubPenComponent - redPenComponent
+		// Stale reference penalty (Phase 2 Temporal)
+		stalePenalty := stalePenalties[c.NodeID]
+
+		s := vecComponent + actComponent + recComponent + confComponent + pb + cb + l1BoostEffect - hubPenComponent - redPenComponent - stalePenalty
 
 		// Apply code type boost/penalty
 		// For code queries: config/doc files get penalized, code files unchanged
@@ -665,6 +723,12 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			}
 		}
 
+		// Temporal boost: track the additional recency contribution from temporal soft-mode
+		temporalBoost := 0.0
+		if effectiveGamma > gamma {
+			temporalBoost = (effectiveGamma - gamma) * r
+		}
+
 		breakdown := ScoreBreakdown{
 			VectorSimilarity:  vecComponent,
 			Activation:        actComponent,
@@ -678,6 +742,8 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			RedundancyPenalty: -redPenComponent,
 			RerankDelta:       0, // Set later by reranker
 			LearningEdgeBoost: 0, // Set later if learning edges contributed
+			TemporalBoost:     temporalBoost,
+			StaleRefPenalty:   -stalePenalty,
 			FinalScore:        s,
 		}
 
@@ -784,6 +850,8 @@ type ScoreBreakdown struct {
 	RedundancyPenalty float64 `json:"redundancy_penalty"`  // -κ * redundancy factor
 	RerankDelta       float64 `json:"rerank_delta"`        // score change from LLM re-ranking
 	LearningEdgeBoost float64 `json:"learning_edge_boost"` // boost from CO_ACTIVATED_WITH traversal
+	TemporalBoost     float64 `json:"temporal_boost"`      // additional recency from temporal soft-mode
+	StaleRefPenalty   float64 `json:"stale_ref_penalty"`   // penalty for referencing superseded content (Phase 2)
 	FinalScore        float64 `json:"final_score"`         // sum of all components
 }
 

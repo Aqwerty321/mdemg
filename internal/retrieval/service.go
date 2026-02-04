@@ -182,8 +182,14 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 
 	// Compute query-type aware retrieval hints (V0011 - Query-Aware Retrieval)
 	hints := ComputeRetrievalHints(req.QueryText, s.cfg)
-	log.Printf("Query type detected: %s (seedN=%d, hopDepth=%d, vecW=%.2f, bm25W=%.2f)",
-		hints.QueryType, hints.SeedN, hints.HopDepth, hints.VectorWeight, hints.BM25Weight)
+
+	// Override temporal intent with explicit API fields if provided
+	if req.TemporalAfter != "" || req.TemporalBefore != "" {
+		hints.TemporalIntent = BuildExplicitTemporalIntent(req.TemporalAfter, req.TemporalBefore)
+	}
+
+	log.Printf("Query type detected: %s (seedN=%d, hopDepth=%d, vecW=%.2f, bm25W=%.2f, temporal=%s)",
+		hints.QueryType, hints.SeedN, hints.HopDepth, hints.VectorWeight, hints.BM25Weight, hints.TemporalIntent.Mode)
 
 	// Override hopDepth with hints if request didn't specify
 	if req.HopDepth <= 0 {
@@ -196,10 +202,11 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	cacheReq.TopK = topK
 	cacheReq.HopDepth = hopDepth
 
-	// Check query cache (skip for Jiminy-enabled requests which need fresh explanations)
+	// Check query cache (skip for Jiminy-enabled requests and temporal queries)
 	cacheKey := CacheKey(cacheReq)
-	log.Printf("Query cache check: enabled=%v, jiminy=%v, key=%s", s.cfg.QueryCacheEnabled, req.JiminyEnabled, cacheKey[:16])
-	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled && s.queryCache != nil {
+	log.Printf("Query cache check: enabled=%v, jiminy=%v, temporal=%v, key=%s", s.cfg.QueryCacheEnabled, req.JiminyEnabled, hints.TemporalIntent.Mode, cacheKey[:16])
+	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled &&
+		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil {
 		if cached, ok := s.queryCache.Get(cacheReq); ok {
 			// Ensure Debug map exists and set cache_hit flag
 			if cached.Debug == nil {
@@ -223,10 +230,15 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 
 	// 1b) Hybrid retrieval: BM25 search + RRF fusion (if enabled and query text provided)
 	// Uses query-type aware weights from retrieval hints (V0011)
+	// For temporal queries, clean temporal keywords from BM25 query to avoid pollution
+	bm25QueryText := req.QueryText
+	if hints.TemporalIntent.Mode != TemporalModeNone {
+		bm25QueryText = CleanTemporalKeywords(req.QueryText, hints.TemporalIntent.Keywords)
+	}
 	var cands []Candidate
 	bm25Count := 0
 	if s.cfg.HybridRetrievalEnabled && req.QueryText != "" {
-		bm25Results, bm25Err := s.BM25Search(ctx, req.SpaceID, req.QueryText, s.cfg.BM25TopK, filter)
+		bm25Results, bm25Err := s.BM25Search(ctx, req.SpaceID, bm25QueryText, s.cfg.BM25TopK, filter)
 		if bm25Err != nil {
 			// Log warning but continue with vector-only results
 			log.Printf("WARN: BM25 search failed, using vector-only: %v", bm25Err)
@@ -239,6 +251,15 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		}
 	} else {
 		cands = vectorCands
+	}
+
+	// Hard-mode temporal filter: keep only candidates within the time range
+	if s.cfg.TemporalEnabled && s.cfg.TemporalHardFilterEnabled &&
+		hints.TemporalIntent.Mode == TemporalModeHard {
+		preFilterCount := len(cands)
+		cands = FilterCandidatesByTime(cands, hints.TemporalIntent.Constraint)
+		log.Printf("Temporal hard filter: %d -> %d candidates (constraint: %s)",
+			preFilterCount, len(cands), hints.TemporalIntent.Constraint.Description)
 	}
 
 	if len(cands) == 0 {
@@ -366,13 +387,13 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	var scoredCands []ScoredCandidate
 	var results []models.RetrieveResult
 	if req.JiminyEnabled {
-		scoredCands = ScoreAndRankWithBreakdown(cands, act, edges, initialTopK, s.cfg, req.QueryText)
+		scoredCands = ScoreAndRankWithBreakdown(cands, act, edges, initialTopK, s.cfg, req.QueryText, hints)
 		results = make([]models.RetrieveResult, len(scoredCands))
 		for i, sc := range scoredCands {
 			results[i] = sc.RetrieveResult
 		}
 	} else {
-		results = ScoreAndRank(cands, act, edges, initialTopK, s.cfg, req.QueryText)
+		results = ScoreAndRank(cands, act, edges, initialTopK, s.cfg, req.QueryText, hints)
 	}
 
 	// 5) Reasoning Module Processing (if available and query text provided)
@@ -506,11 +527,22 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			"cache_hit":              false,
 			"edge_type_strategy":     s.cfg.EdgeTypeStrategy,
 			"hybrid_switch_hop":      s.cfg.HybridSwitchHop,
+			"temporal_mode":              string(hints.TemporalIntent.Mode),
+			"temporal_keywords":          hints.TemporalIntent.Keywords,
+			"temporal_confidence":        hints.TemporalIntent.Confidence,
+			"temporal_source_type_decay": s.cfg.TemporalSourceTypeDecayEnabled,
+			"temporal_stale_ref_days":    s.cfg.TemporalStaleRefDays,
 		},
 	}
 
-	// Store in query cache (skip for Jiminy-enabled requests)
-	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled && s.queryCache != nil {
+	// Add temporal constraint description to debug if present
+	if hints.TemporalIntent.Constraint != nil {
+		resp.Debug["temporal_constraint"] = hints.TemporalIntent.Constraint.Description
+	}
+
+	// Store in query cache (skip for Jiminy-enabled and temporal requests)
+	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled &&
+		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil {
 		s.queryCache.Put(cacheReq, resp)
 		log.Printf("Query cache PUT for space=%s query=%q (cache size: %d)", req.SpaceID, req.QueryText[:min(50, len(req.QueryText))], s.queryCache.Len())
 	}
@@ -519,15 +551,16 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 }
 
 type Candidate struct {
-	NodeID     string
-	Path       string
-	Name       string
-	Summary    string
-	UpdatedAt  time.Time
-	Confidence float64
-	VectorSim  float64
-	Layer      int      // 0=base, 1=hidden/concern, 2+=concept
-	Tags       []string // Tags for scoring boosts (e.g., "config")
+	NodeID        string
+	Path          string
+	Name          string
+	Summary       string
+	UpdatedAt     time.Time
+	CanonicalTime time.Time // Phase 2: content-relevant time (zero = use UpdatedAt)
+	Confidence    float64
+	VectorSim     float64
+	Layer         int      // 0=base, 1=hidden/concern, 2+=concept
+	Tags          []string // Tags for scoring boosts (e.g., "config")
 }
 
 // SimilarNode represents a node returned from vector similarity search
@@ -569,6 +602,7 @@ RETURN node.node_id AS node_id,
        coalesce(node.summary,'') AS summary,
        coalesce(node.confidence,0.6) AS confidence,
        coalesce(node.updated_at, datetime()) AS updated_at,
+       coalesce(node.canonical_time, node.updated_at, datetime()) AS canonical_time,
        coalesce(node.layer, 0) AS layer,
        coalesce(node.tags, []) AS tags,
        score AS score
@@ -589,6 +623,7 @@ ORDER BY score DESC`
 			sum, _ := rec.Get("summary")
 			conf, _ := rec.Get("confidence")
 			upd, _ := rec.Get("updated_at")
+			canonicalAny, _ := rec.Get("canonical_time")
 			layer, _ := rec.Get("layer")
 			tagsAny, _ := rec.Get("tags")
 			sc, _ := rec.Get("score")
@@ -609,6 +644,13 @@ ORDER BY score DESC`
 				ct.UpdatedAt = v
 			default:
 				ct.UpdatedAt = time.Now()
+			}
+			// Parse canonical_time (Phase 2 Temporal)
+			switch v := canonicalAny.(type) {
+			case time.Time:
+				ct.CanonicalTime = v
+			default:
+				ct.CanonicalTime = ct.UpdatedAt // fallback
 			}
 			cands = append(cands, ct)
 		}
@@ -1012,20 +1054,31 @@ func (s *Service) IngestObservation(ctx context.Context, req models.IngestReques
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
+	// Auto-extract canonical_time if not explicitly provided (Phase 2 Temporal)
+	canonicalTimeStr := req.CanonicalTime
+	if canonicalTimeStr == "" {
+		if contentStr, ok := req.Content.(string); ok && contentStr != "" {
+			if extracted := ExtractCanonicalTime(contentStr, req.Tags); !extracted.IsZero() {
+				canonicalTimeStr = extracted.Format(time.RFC3339)
+			}
+		}
+	}
+
 	params := map[string]any{
-		"spaceId":     req.SpaceID,
-		"nodeId":      nodeID,
-		"path":        req.Path,
-		"name":        req.Name,
-		"summary":     req.Summary,
-		"obsId":       obsID,
-		"timestamp":   req.Timestamp,
-		"source":      req.Source,
-		"content":     req.Content,
-		"tags":        req.Tags,
-		"sensitivity": req.Sensitivity,
-		"confidence":  req.Confidence,
-		"embedding":   req.Embedding, // May be nil/empty
+		"spaceId":       req.SpaceID,
+		"nodeId":        nodeID,
+		"path":          req.Path,
+		"name":          req.Name,
+		"summary":       req.Summary,
+		"obsId":         obsID,
+		"timestamp":     req.Timestamp,
+		"source":        req.Source,
+		"content":       req.Content,
+		"tags":          req.Tags,
+		"sensitivity":   req.Sensitivity,
+		"confidence":    req.Confidence,
+		"embedding":     req.Embedding, // May be nil/empty
+		"canonicalTime": canonicalTimeStr,
 	}
 
 	// Determine merge key: prefer path if provided, else use node_id
@@ -1060,6 +1113,7 @@ ON CREATE SET n.node_id=$nodeId,
               n.status='active',
               n.created_at=datetime(),
               n.updated_at=datetime(),
+              n.canonical_time = CASE WHEN $canonicalTime <> '' THEN datetime($canonicalTime) ELSE datetime() END,
               n.update_count=0,
               n.summary=coalesce($summary,''),
               n.description='',
@@ -1077,6 +1131,7 @@ CREATE (o:Observation {
 })
 MERGE (n)-[:HAS_OBSERVATION {space_id:$spaceId, created_at:datetime()}]->(o)
 SET n.updated_at=datetime(),
+    n.canonical_time = CASE WHEN $canonicalTime <> '' THEN datetime($canonicalTime) ELSE n.canonical_time END,
     n.update_count = coalesce(n.update_count,0) + 1,
     n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END` + embeddingClause + `
 RETURN n.node_id AS node_id`
@@ -1094,13 +1149,14 @@ ON CREATE SET n.path=coalesce($path, $mergeValue),
               n.status='active',
               n.created_at=datetime(),
               n.updated_at=datetime(),
+              n.canonical_time = CASE WHEN $canonicalTime <> '' THEN datetime($canonicalTime) ELSE datetime() END,
               n.update_count=0,
               n.summary=coalesce($summary,''),
               n.description='',
               n.confidence=coalesce($confidence, 0.6),
               n.sensitivity=coalesce($sensitivity,'internal'),
               n.tags=coalesce($tags,[])
-WITH n
+With n
 CREATE (o:Observation {
   space_id:$spaceId,
   obs_id:$obsId,
@@ -1111,6 +1167,7 @@ CREATE (o:Observation {
 })
 MERGE (n)-[:HAS_OBSERVATION {space_id:$spaceId, created_at:datetime()}]->(o)
 SET n.updated_at=datetime(),
+    n.canonical_time = CASE WHEN $canonicalTime <> '' THEN datetime($canonicalTime) ELSE n.canonical_time END,
     n.update_count = coalesce(n.update_count,0) + 1,
     n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END` + embeddingClause + `
 RETURN n.node_id AS node_id`
@@ -1168,18 +1225,19 @@ func (s *Service) BatchIngestObservations(ctx context.Context, req models.BatchI
 	for i, obs := range req.Observations {
 		// Convert BatchIngestItem to IngestRequest
 		ingestReq := models.IngestRequest{
-			SpaceID:     req.SpaceID,
-			Timestamp:   obs.Timestamp,
-			Source:      obs.Source,
-			Content:     obs.Content,
-			Tags:        obs.Tags,
-			NodeID:      obs.NodeID,
-			Path:        obs.Path,
-			Name:        obs.Name,
-			Summary:     obs.Summary,
-			Sensitivity: obs.Sensitivity,
-			Confidence:  obs.Confidence,
-			Embedding:   obs.Embedding,
+			SpaceID:       req.SpaceID,
+			Timestamp:     obs.Timestamp,
+			Source:        obs.Source,
+			Content:       obs.Content,
+			Tags:          obs.Tags,
+			NodeID:        obs.NodeID,
+			Path:          obs.Path,
+			Name:          obs.Name,
+			Summary:       obs.Summary,
+			Sensitivity:   obs.Sensitivity,
+			Confidence:    obs.Confidence,
+			Embedding:     obs.Embedding,
+			CanonicalTime: obs.CanonicalTime,
 		}
 
 		// Validate required fields

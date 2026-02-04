@@ -70,6 +70,9 @@ type ObserveRequest struct {
 	UserID     string `json:"user_id,omitempty"`
 	Visibility string `json:"visibility,omitempty"` // private|team|global
 
+	// Multi-Agent Identity (CMS v3)
+	AgentID string `json:"agent_id,omitempty"` // Persistent agent identity
+
 	// Cross-module linking (CMS v2)
 	RefersTo []string `json:"refers_to,omitempty"` // Node/symbol IDs this observation references
 }
@@ -94,6 +97,9 @@ type CorrectRequest struct {
 	// Identity & Visibility (CMS v2)
 	UserID     string `json:"user_id,omitempty"`
 	Visibility string `json:"visibility,omitempty"` // private|team|global
+
+	// Multi-Agent Identity (CMS v3)
+	AgentID string `json:"agent_id,omitempty"` // Persistent agent identity
 
 	// Cross-module linking (CMS v2)
 	RefersTo []string `json:"refers_to,omitempty"` // Node/symbol IDs this correction references
@@ -146,6 +152,32 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 		}
 	}
 
+	// Deduplication check: skip if near-duplicate exists in same session
+	if len(embedding) > 0 {
+		dedupResult, dedupErr := CheckDuplicate(ctx, s.driver, req.SpaceID, req.SessionID, embedding, DedupThreshold)
+		if dedupErr != nil {
+			log.Printf("WARNING: dedup check failed: %v", dedupErr)
+			// Continue without dedup
+		} else if dedupResult.IsDuplicate {
+			log.Printf("Skipping duplicate observation (similarity=%.3f to node=%s)",
+				dedupResult.Similarity, dedupResult.DuplicateOfID)
+			// Merge: increment duplicate_count on existing node
+			_ = MergeDuplicateObservation(ctx, s.driver, dedupResult.DuplicateOfID)
+			return &ObserveResponse{
+				ObsID:         dedupResult.DuplicateOfID,
+				NodeID:        dedupResult.DuplicateOfID,
+				SurpriseScore: 0.0,
+				SurpriseFactors: map[string]float64{
+					"term_novelty":        0.0,
+					"contradiction_score": 0.0,
+					"correction_score":    0.0,
+					"embedding_novelty":   0.0,
+				},
+				Summary: "duplicate observation (merged with existing)",
+			}, nil
+		}
+	}
+
 	// Determine visibility (default to private)
 	visibility := Visibility(req.Visibility)
 	if visibility == "" {
@@ -168,6 +200,7 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 		Visibility:     visibility,
 		Volatile:       true, // New observations are volatile until reinforced
 		StabilityScore: DefaultStabilityScore,
+		AgentID:        req.AgentID,
 	}
 
 	// Generate summary (first 200 chars)
@@ -299,6 +332,7 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 				tags: $tags,
 				layer: 0,
 				user_id: $userId,
+				agent_id: $agentId,
 				visibility: $visibility,
 				volatile: $volatile,
 				stability_score: $stabilityScore,
@@ -332,6 +366,7 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 			"surpriseScore":  obs.SurpriseScore,
 			"tags":           tags,
 			"userId":         obs.UserID,
+			"agentId":        obs.AgentID,
 			"visibility":     string(visibility),
 			"volatile":       obs.Volatile,
 			"stabilityScore": stabilityScore,
@@ -610,6 +645,9 @@ type ResumeRequest struct {
 
 	// Visibility filtering (CMS v2)
 	RequestingUserID string `json:"requesting_user_id,omitempty"`
+
+	// Multi-Agent Identity (CMS v3)
+	AgentID string `json:"agent_id,omitempty"` // Resume across sessions for this agent
 }
 
 // JiminyRationale explains WHY specific state was rehydrated during resume.
@@ -680,6 +718,9 @@ type RecallRequest struct {
 	// Visibility filtering (CMS v2)
 	RequestingUserID string `json:"requesting_user_id,omitempty"`
 
+	// Multi-Agent Identity (CMS v3)
+	AgentID string `json:"agent_id,omitempty"` // Filter to this agent's observations
+
 	// Temporal filtering (Phase 1: Time-Aware Retrieval)
 	TemporalAfter  string `json:"temporal_after,omitempty"`  // ISO8601: filter results after this time
 	TemporalBefore string `json:"temporal_before,omitempty"` // ISO8601: filter results before this time
@@ -724,8 +765,8 @@ func (s *Service) Resume(ctx context.Context, req ResumeRequest) (*ResumeRespons
 		Debug:            make(map[string]any),
 	}
 
-	// Step 1: Fetch recent observations (with visibility filtering)
-	observations, err := s.fetchRecentObservations(ctx, req.SpaceID, req.SessionID, req.RequestingUserID, maxObs, req.IncludeTasks, req.IncludeDecisions, req.IncludeLearnings)
+	// Step 1: Fetch recent observations (with visibility and agent filtering)
+	observations, err := s.fetchRecentObservations(ctx, req.SpaceID, req.SessionID, req.RequestingUserID, req.AgentID, maxObs, req.IncludeTasks, req.IncludeDecisions, req.IncludeLearnings)
 	if err != nil {
 		return nil, fmt.Errorf("fetch recent observations: %w", err)
 	}
@@ -801,8 +842,8 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 		return nil, fmt.Errorf("no embedding provided and embedder not available")
 	}
 
-	// Step 1: Find similar conversation observations (with visibility and temporal filtering)
-	obsResults, err := s.findSimilarObservations(ctx, req.SpaceID, req.RequestingUserID, embedding, topK, temporalFilter, temporalParams)
+	// Step 1: Find similar conversation observations (with visibility, agent, and temporal filtering)
+	obsResults, err := s.findSimilarObservations(ctx, req.SpaceID, req.RequestingUserID, req.AgentID, embedding, topK, temporalFilter, temporalParams)
 	if err != nil {
 		return nil, fmt.Errorf("find similar observations: %w", err)
 	}
@@ -870,7 +911,7 @@ func buildTemporalCypherFilter(afterStr, beforeStr string) (string, map[string]a
 
 // fetchRecentObservations retrieves recent conversation observations
 // If requestingUserID is set, applies visibility filtering (private observations only visible to owner)
-func (s *Service) fetchRecentObservations(ctx context.Context, spaceID, sessionID, requestingUserID string, limit int, includeTasks, includeDecisions, includeLearnings bool) ([]ObservationResult, error) {
+func (s *Service) fetchRecentObservations(ctx context.Context, spaceID, sessionID, requestingUserID, agentID string, limit int, includeTasks, includeDecisions, includeLearnings bool) ([]ObservationResult, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
@@ -892,31 +933,74 @@ func (s *Service) fetchRecentObservations(ctx context.Context, spaceID, sessionI
 	}
 
 	// Build session filter
+	// When agentID is set, skip session filter to enable cross-session resume
 	sessionFilter := ""
-	if sessionID != "" {
+	if sessionID != "" && agentID == "" {
 		sessionFilter = " AND o.session_id = $sessionId"
 	}
 
+	// Build agent filter (CMS v3: multi-agent identity)
+	agentFilter := ""
+	if agentID != "" {
+		agentFilter = " AND o.agent_id = $agentId"
+	}
+
 	// Build visibility filter - private observations only visible to owner
-	// If requestingUserID is empty, no visibility filter (backward compatible)
+	// When agentID is set, use agent_id for ownership check instead of user_id
 	visibilityFilter := ""
-	if requestingUserID != "" {
+	if agentID != "" {
+		visibilityFilter = " AND (coalesce(o.visibility, 'global') <> 'private' OR o.agent_id = $agentId)"
+	} else if requestingUserID != "" {
 		visibilityFilter = " AND (coalesce(o.visibility, 'global') <> 'private' OR o.user_id = $requestingUserId)"
 	}
 
+	// Relevance-weighted query: scores observations by recency, surprise, type priority,
+	// and co-activation strength rather than pure recency ordering.
 	cypher := fmt.Sprintf(`
 MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})
-WHERE o.layer = 0%s%s%s
+WHERE o.layer = 0%s%s%s%s
+OPTIONAL MATCH (o)-[coact:CO_ACTIVATED_WITH]-()
+WITH o,
+     // Recency: exponential decay over hours (half-life ~24h)
+     CASE WHEN o.created_at IS NOT NULL
+          THEN exp(-0.029 * duration.between(o.created_at, datetime()).hours)
+          ELSE 0.5 END AS recencyScore,
+     // Surprise score (0-1, already stored)
+     coalesce(o.surprise_score, 0.0) AS surpriseScore,
+     // Observation type priority
+     CASE o.obs_type
+          WHEN 'correction' THEN 1.0
+          WHEN 'decision'   THEN 0.9
+          WHEN 'error'      THEN 0.8
+          WHEN 'blocker'    THEN 0.8
+          WHEN 'preference' THEN 0.7
+          WHEN 'learning'   THEN 0.6
+          WHEN 'insight'    THEN 0.6
+          WHEN 'task'       THEN 0.5
+          WHEN 'technical_note' THEN 0.4
+          WHEN 'progress'   THEN 0.3
+          WHEN 'context'    THEN 0.2
+          ELSE 0.3 END AS typePriority,
+     // Co-activation strength: count of learning edges
+     count(coact) AS coactCount
+WITH o, recencyScore, surpriseScore, typePriority, coactCount,
+     // Normalize co-activation (diminishing returns via log)
+     CASE WHEN coactCount > 0 THEN (log(toFloat(coactCount) + 1.0) / log(11.0))
+          ELSE 0.0 END AS coactScore
+WITH o, recencyScore, surpriseScore, typePriority, coactScore,
+     // Composite score: recency(0.40) + surprise(0.25) + type(0.20) + coactivation(0.15)
+     (0.40 * recencyScore + 0.25 * surpriseScore + 0.20 * typePriority + 0.15 * coactScore) AS relevanceScore
 RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
        o.summary AS summary, o.session_id AS sessionId, o.surprise_score AS surpriseScore,
-       o.tags AS tags, toString(o.created_at) AS createdAt
-ORDER BY o.created_at DESC
-LIMIT $limit`, sessionFilter, typeFilter, visibilityFilter)
+       o.tags AS tags, toString(o.created_at) AS createdAt, relevanceScore AS score
+ORDER BY relevanceScore DESC
+LIMIT $limit`, sessionFilter, typeFilter, visibilityFilter, agentFilter)
 
 	params := map[string]any{
 		"spaceId":          spaceID,
 		"sessionId":        sessionID,
 		"requestingUserId": requestingUserID,
+		"agentId":          agentID,
 		"limit":            limit,
 	}
 
@@ -936,6 +1020,7 @@ LIMIT $limit`, sessionFilter, typeFilter, visibilityFilter)
 				Summary:       asString(rec, "summary"),
 				SessionID:     asString(rec, "sessionId"),
 				SurpriseScore: asFloat64(rec, "surpriseScore"),
+				Score:         asFloat64(rec, "score"),
 				Tags:          asStringSlice(rec, "tags"),
 				CreatedAt:     asString(rec, "createdAt"),
 			})
@@ -947,6 +1032,33 @@ LIMIT $limit`, sessionFilter, typeFilter, visibilityFilter)
 		return nil, err
 	}
 	return result.([]ObservationResult), nil
+}
+
+// resumeObsTypePriority returns a priority weight for each observation type.
+// Used for resume context ranking (higher = more important for context restoration).
+func resumeObsTypePriority(obsType ObservationType) float64 {
+	switch obsType {
+	case ObsTypeCorrection:
+		return 1.0
+	case ObsTypeDecision:
+		return 0.9
+	case ObsTypeError, ObsTypeBlocker:
+		return 0.8
+	case ObsTypePreference:
+		return 0.7
+	case ObsTypeLearning, ObsTypeInsight:
+		return 0.6
+	case ObsTypeTask:
+		return 0.5
+	case ObsTypeTechnicalNote:
+		return 0.4
+	case ObsTypeProgress:
+		return 0.3
+	case ObsTypeContext:
+		return 0.2
+	default:
+		return 0.3
+	}
 }
 
 // fetchRelatedThemes retrieves themes related to recent observations
@@ -1052,14 +1164,23 @@ LIMIT 10`
 }
 
 // findSimilarObservations finds observations similar to the query embedding
-func (s *Service) findSimilarObservations(ctx context.Context, spaceID, requestingUserID string, embedding []float32, topK int, temporalFilter string, temporalParams map[string]any) ([]RecallResult, error) {
+func (s *Service) findSimilarObservations(ctx context.Context, spaceID, requestingUserID, agentID string, embedding []float32, topK int, temporalFilter string, temporalParams map[string]any) ([]RecallResult, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
 	// Build visibility filter - private observations only visible to owner
+	// When agentID is set, use agent_id for ownership check
 	visibilityFilter := ""
-	if requestingUserID != "" {
+	if agentID != "" {
+		visibilityFilter = " AND (coalesce(node.visibility, 'global') <> 'private' OR node.agent_id = $agentId)"
+	} else if requestingUserID != "" {
 		visibilityFilter = " AND (coalesce(node.visibility, 'global') <> 'private' OR node.user_id = $requestingUserId)"
+	}
+
+	// Build agent filter (CMS v3: multi-agent identity)
+	agentFilter := ""
+	if agentID != "" {
+		agentFilter = " AND node.agent_id = $agentId"
 	}
 
 	// Use vector similarity search on conversation_observation nodes
@@ -1069,16 +1190,17 @@ YIELD node, score
 WHERE node.space_id = $spaceId
   AND node.role_type = 'conversation_observation'
   AND node.layer = 0
-  AND NOT coalesce(node.is_archived, false)%s%s
+  AND NOT coalesce(node.is_archived, false)%s%s%s
 RETURN node.node_id AS nodeId, node.content AS content, node.summary AS summary,
        node.obs_type AS obsType, node.surprise_score AS surpriseScore,
        node.session_id AS sessionId, score
 ORDER BY score DESC
-LIMIT $topK`, s.vectorIndexName, visibilityFilter, temporalFilter)
+LIMIT $topK`, s.vectorIndexName, visibilityFilter, agentFilter, temporalFilter)
 
 	params := map[string]any{
 		"spaceId":          spaceID,
 		"requestingUserId": requestingUserID,
+		"agentId":          agentID,
 		"embedding":        embedding,
 		"topK":             topK,
 	}

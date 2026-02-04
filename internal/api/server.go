@@ -40,6 +40,7 @@ type Server struct {
 	gapInterviewer  *gaps.GapInterviewer
 	conversationSvc *conversation.Service
 	contextCooler   *conversation.ContextCooler
+	sessionTracker  *conversation.SessionTracker
 	hiddenSvc       *hidden.Service // alias for handleConversationConsolidate
 	stopConsolidate chan struct{}
 	stopCooler      chan struct{}
@@ -164,13 +165,20 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		}
 	}
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, hiddenSvc: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, gapInterviewer: gapInt, conversationSvc: convSvc, contextCooler: ctxCooler}
+	// Initialize session tracker (CMS enforcement — Phase 3A)
+	sessTracker := conversation.NewSessionTracker(2 * time.Hour)
+	log.Printf("Session tracker initialized (TTL: 2h)")
+
+	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, hiddenSvc: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, gapInterviewer: gapInt, conversationSvc: convSvc, contextCooler: ctxCooler, sessionTracker: sessTracker}
 }
 
 // Shutdown gracefully stops background services
 func (s *Server) Shutdown() {
 	if s.apeScheduler != nil {
 		s.apeScheduler.Stop()
+	}
+	if s.sessionTracker != nil {
+		s.sessionTracker.Stop()
 	}
 	s.StopPeriodicConsolidation()
 	s.StopContextCoolerProcessing()
@@ -403,6 +411,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversation/consolidate", s.handleConversationConsolidate)
 	mux.HandleFunc("/v1/conversation/volatile/stats", s.handleVolatileStats)
 	mux.HandleFunc("/v1/conversation/graduate", s.handleProcessGraduations)
+	mux.HandleFunc("/v1/conversation/session/health", s.handleSessionHealth)
 
 	// Codebase ingestion endpoint
 	mux.HandleFunc("/v1/memory/ingest-codebase", s.handleIngestCodebaseRoute)
@@ -416,6 +425,9 @@ func (s *Server) Routes() http.Handler {
 	}
 
 	handler := LoggingMiddleware(mux, logCfg)
+
+	// Session-not-resumed warning middleware (Phase 3A: CMS enforcement)
+	handler = SessionResumeWarningMiddleware(handler, s.sessionTracker)
 
 	// Enable gzip compression for responses > 1KB when CompressionEnabled
 	if s.cfg.CompressionEnabled {

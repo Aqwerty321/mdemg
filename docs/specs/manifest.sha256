@@ -1,0 +1,13 @@
+# MDEMG Spec File Manifest
+# Format: <sha256>  <filepath>  (standard sha256sum format)
+# This file is verified by scripts/verify-manifest.sh and CI pipeline.
+# Add new entries as spec files are completed.
+#
+# Usage:
+#   scripts/verify-manifest.sh          # verify all entries
+#   sha256sum <filepath> >> docs/specs/manifest.sha256  # add new entry
+5b4bcafef89d0fee020689f65fdf129e72ab808e7ddd189303ba235ca78fc3a1  docs/specs/phase1-space-cleanup.md
+958a7adedefd7bc0634caca9785d5dc9f5de8a87d1d804bd15215b03bc1f8483  docs/specs/phase2-self-ingest.md
+de624a499dc0cb09bc787599b28335ee20f840c23eb175f088c8e8ad85ef12ad  docs/specs/phase3a-cms-enforcement.md
+77fcb92a25c04a859febdefadbcf106d7adc1cee4d2aeaed063da00fe3a47b1a  docs/specs/phase3b-cms-quality.md
+5b4e43b0f22825bbde2f50f1747e32b76d016cbb2198c2793058eca51cb99e76  docs/specs/phase3c-multi-agent.md

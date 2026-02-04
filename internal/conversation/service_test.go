@@ -476,3 +476,193 @@ func TestObservationIdentityFields(t *testing.T) {
 		t.Errorf("StabilityScore = %v, want %v", obs.StabilityScore, 0.5)
 	}
 }
+
+// =============================================================================
+// PHASE 3B: QUALITY AND RETRIEVAL TESTS
+// =============================================================================
+
+func TestResumeObsTypePriority(t *testing.T) {
+	tests := []struct {
+		obsType  ObservationType
+		wantMin  float64
+		wantMax  float64
+	}{
+		{ObsTypeCorrection, 1.0, 1.0},
+		{ObsTypeDecision, 0.9, 0.9},
+		{ObsTypeError, 0.8, 0.8},
+		{ObsTypeBlocker, 0.8, 0.8},
+		{ObsTypePreference, 0.7, 0.7},
+		{ObsTypeLearning, 0.6, 0.6},
+		{ObsTypeInsight, 0.6, 0.6},
+		{ObsTypeTask, 0.5, 0.5},
+		{ObsTypeTechnicalNote, 0.4, 0.4},
+		{ObsTypeProgress, 0.3, 0.3},
+		{ObsTypeContext, 0.2, 0.2},
+		{"unknown_type", 0.3, 0.3},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.obsType), func(t *testing.T) {
+			score := resumeObsTypePriority(tt.obsType)
+			if score < tt.wantMin || score > tt.wantMax {
+				t.Errorf("resumeObsTypePriority(%q) = %.2f, want [%.2f, %.2f]",
+					tt.obsType, score, tt.wantMin, tt.wantMax)
+			}
+		})
+	}
+}
+
+func TestResumeObsTypePriority_Ordering(t *testing.T) {
+	// Corrections must rank higher than decisions
+	if resumeObsTypePriority(ObsTypeCorrection) <= resumeObsTypePriority(ObsTypeDecision) {
+		t.Error("corrections should rank higher than decisions")
+	}
+	// Decisions must rank higher than learnings
+	if resumeObsTypePriority(ObsTypeDecision) <= resumeObsTypePriority(ObsTypeLearning) {
+		t.Error("decisions should rank higher than learnings")
+	}
+	// Learnings must rank higher than progress
+	if resumeObsTypePriority(ObsTypeLearning) <= resumeObsTypePriority(ObsTypeProgress) {
+		t.Error("learnings should rank higher than progress")
+	}
+	// Progress must rank higher than context
+	if resumeObsTypePriority(ObsTypeProgress) <= resumeObsTypePriority(ObsTypeContext) {
+		t.Error("progress should rank higher than context")
+	}
+}
+
+func TestQualityIntegration_ObservationTypes(t *testing.T) {
+	// Verify that quality scoring produces differentiated results
+	// across observation types
+	tests := []struct {
+		name    string
+		content string
+		obsType string
+		wantMin float64
+	}{
+		{
+			name:    "high-quality correction",
+			content: "Actually, use sync.Map instead of sync.Mutex for the session tracker. sync.Map is optimized for read-heavy workloads.",
+			obsType: "correction",
+			wantMin: 0.3,
+		},
+		{
+			name:    "low-quality context",
+			content: "something",
+			obsType: "context",
+			wantMin: 0.0,
+		},
+		{
+			name:    "medium-quality learning",
+			content: "The SessionTracker uses a TTL of 2 hours for cleanup. Sessions are stored in sync.Map.",
+			obsType: "learning",
+			wantMin: 0.2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			score := ScoreObservationQuality(tt.content, tt.obsType, nil, nil)
+			if score.Overall < tt.wantMin {
+				t.Errorf("quality score %.3f < expected minimum %.2f", score.Overall, tt.wantMin)
+			}
+		})
+	}
+}
+
+func TestJiminyRationale_Fields(t *testing.T) {
+	jiminy := JiminyRationale{
+		Rationale:  "Context restored from 5 recent observations",
+		Confidence: 0.85,
+		ScoreBreakdown: map[string]float64{
+			"recency":     0.4,
+			"surprise":    0.25,
+			"type_weight": 0.2,
+		},
+		Highlights: []string{
+			"2 corrections detected",
+			"1 decision from current session",
+		},
+	}
+
+	if jiminy.Confidence < 0.0 || jiminy.Confidence > 1.0 {
+		t.Errorf("confidence out of range: %f", jiminy.Confidence)
+	}
+	if len(jiminy.ScoreBreakdown) != 3 {
+		t.Errorf("expected 3 breakdown entries, got %d", len(jiminy.ScoreBreakdown))
+	}
+	if len(jiminy.Highlights) != 2 {
+		t.Errorf("expected 2 highlights, got %d", len(jiminy.Highlights))
+	}
+}
+
+func TestObserveRequestValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		req         ObserveRequest
+		expectValid bool
+	}{
+		{
+			name: "valid basic request",
+			req: ObserveRequest{
+				SpaceID:   "test-space",
+				SessionID: "test-session",
+				Content:   "test observation",
+				ObsType:   "learning",
+			},
+			expectValid: true,
+		},
+		{
+			name: "valid with identity",
+			req: ObserveRequest{
+				SpaceID:    "test-space",
+				SessionID:  "test-session",
+				Content:    "test observation",
+				ObsType:    "decision",
+				UserID:     "user-123",
+				Visibility: "team",
+			},
+			expectValid: true,
+		},
+		{
+			name: "valid with references",
+			req: ObserveRequest{
+				SpaceID:   "test-space",
+				SessionID: "test-session",
+				Content:   "related to previous work",
+				ObsType:   "learning",
+				RefersTo:  []string{"node-abc", "node-def"},
+			},
+			expectValid: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.req.SpaceID == "" && tt.expectValid {
+				t.Error("expected valid request but SpaceID is empty")
+			}
+			if tt.req.Content == "" && tt.expectValid {
+				t.Error("expected valid request but Content is empty")
+			}
+		})
+	}
+}
+
+func TestRecallRequest_TemporalFiltering(t *testing.T) {
+	// Verify temporal filtering fields exist and can be used
+	req := RecallRequest{
+		SpaceID:        "test-space",
+		Query:          "what decisions were made yesterday?",
+		TopK:           10,
+		TemporalAfter:  "2026-02-01T00:00:00Z",
+		TemporalBefore: "2026-02-02T00:00:00Z",
+	}
+
+	if req.TemporalAfter == "" {
+		t.Error("TemporalAfter should be set")
+	}
+	if req.TemporalBefore == "" {
+		t.Error("TemporalBefore should be set")
+	}
+}

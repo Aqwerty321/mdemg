@@ -83,7 +83,7 @@ The memory system will automatically generate embeddings and link related concep
 }
 
 func memoryStoreHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.Params.Arguments
+	args := getArgs(request)
 
 	content, _ := args["content"].(string)
 	if content == "" {
@@ -163,7 +163,7 @@ Returns memories ranked by relevance, with semantic similarity and activation sc
 }
 
 func memoryRecallHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.Params.Arguments
+	args := getArgs(request)
 
 	query, _ := args["query"].(string)
 	if query == "" {
@@ -241,7 +241,7 @@ applies to a particular domain).`),
 }
 
 func memoryAssociateHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.Params.Arguments
+	args := getArgs(request)
 
 	sourceQuery, _ := args["source_query"].(string)
 	targetQuery, _ := args["target_query"].(string)
@@ -333,7 +333,7 @@ and potentially identifying patterns or abstractions. Use this for:
 }
 
 func memoryReflectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.Params.Arguments
+	args := getArgs(request)
 
 	topic, _ := args["topic"].(string)
 	if topic == "" {
@@ -493,7 +493,7 @@ Returns symbols with their file locations, types, and metadata.`),
 }
 
 func memorySymbolsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.Params.Arguments
+	args := getArgs(request)
 
 	// Build query parameters
 	params := make(map[string]string)
@@ -585,7 +585,7 @@ Use this when you want to import or re-import a codebase into memory.`),
 }
 
 func memoryIngestTriggerHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.Params.Arguments
+	args := getArgs(request)
 
 	sourcePath, _ := args["source_path"].(string)
 	if sourcePath == "" {
@@ -636,7 +636,7 @@ Returns the current status, progress percentage, and any errors.`),
 }
 
 func memoryIngestStatusHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.Params.Arguments
+	args := getArgs(request)
 
 	jobID, _ := args["job_id"].(string)
 	if jobID == "" {
@@ -689,7 +689,7 @@ func registerMemoryIngestCancelTool(s *server.MCPServer) {
 }
 
 func memoryIngestCancelHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.Params.Arguments
+	args := getArgs(request)
 
 	jobID, _ := args["job_id"].(string)
 	if jobID == "" {
@@ -750,6 +750,16 @@ func memoryIngestJobsHandler(ctx context.Context, request mcp.CallToolRequest) (
 	}
 
 	return mcp.NewToolResultText(sb.String()), nil
+}
+
+// getArgs extracts the arguments map from a CallToolRequest.
+// mcp-go v0.43+ changed Arguments from map[string]any to any.
+func getArgs(request mcp.CallToolRequest) map[string]any {
+	args, _ := request.Params.Arguments.(map[string]any)
+	if args == nil {
+		args = make(map[string]any)
+	}
+	return args
 }
 
 // Helper function to create error result

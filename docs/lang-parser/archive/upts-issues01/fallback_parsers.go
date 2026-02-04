@@ -1,3 +1,5 @@
+//go:build ignore
+
 // fallback_parsers.go
 // Fallback to config parsers when tree-sitter grammar is unavailable
 //

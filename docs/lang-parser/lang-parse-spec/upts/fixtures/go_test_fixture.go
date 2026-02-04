@@ -1,3 +1,5 @@
+//go:build ignore
+
 // Go Parser Test Fixture
 // Tests all symbol extraction capabilities following canonical patterns
 

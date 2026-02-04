@@ -17,7 +17,7 @@ linters-settings:
 issues:
   exclude-dirs:
     - docs
-    - archeive
+    - archive
   exclude-rules:
     # Exclude linters from running on test files
     - path: _test\.go

@@ -1,0 +1,4298 @@
+{
+  "aggregate": {
+    "total_questions": 142,
+    "mean": 0.457,
+    "std": 0.344,
+    "cv_pct": 75.3,
+    "median": 0.302,
+    "min": 0.0,
+    "max": 1.0,
+    "p10": 0.019,
+    "p25": 0.289,
+    "p75": 0.855,
+    "p90": 1.0,
+    "high_score_rate": 0.282,
+    "evidence_rate": 0.345,
+    "evidence_accuracy_rate": 0.232,
+    "correct_file_rate": 0.359,
+    "by_difficulty": {
+      "easy": {
+        "count": 10,
+        "mean": 0.961,
+        "std": 0.063
+      },
+      "medium": {
+        "count": 7,
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "hard": {
+        "count": 125,
+        "mean": 0.387,
+        "std": 0.303
+      }
+    },
+    "by_category": {
+      "calibration": {
+        "count": 10,
+        "mean": 0.961,
+        "std": 0.063
+      },
+      "architecture_structure": {
+        "count": 25,
+        "mean": 0.881,
+        "std": 0.19
+      },
+      "data_flow_integration": {
+        "count": 25,
+        "mean": 0.366,
+        "std": 0.18
+      },
+      "negative_control": {
+        "count": 7,
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "business_logic_constraints": {
+        "count": 25,
+        "mean": 0.287,
+        "std": 0.056
+      },
+      "cross_cutting_concerns": {
+        "count": 25,
+        "mean": 0.167,
+        "std": 0.139
+      },
+      "service_relationships": {
+        "count": 25,
+        "mean": 0.232,
+        "std": 0.212
+      }
+    }
+  },
+  "per_question": [
+    {
+      "id": "1",
+      "category": "calibration",
+      "difficulty": "easy",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 0.875,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/_tensor.py:110"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_tensor.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.842,
+        "bigram": 0.613,
+        "trigram": 0.462,
+        "concept": 0.875,
+        "idf_weighted": 1.0
+      }
+    },
+    {
+      "id": "2",
+      "category": "calibration",
+      "difficulty": "easy",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 0.812,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/optim/adam.py:34"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/optim/adam.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.788,
+        "bigram": 0.617,
+        "trigram": 0.315,
+        "concept": 0.812,
+        "idf_weighted": 0.901
+      }
+    },
+    {
+      "id": "3",
+      "category": "calibration",
+      "difficulty": "easy",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 0.79,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/nn/modules/linear.py:53"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/modules/linear.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.767,
+        "bigram": 0.558,
+        "trigram": 0.453,
+        "concept": 0.79,
+        "idf_weighted": 0.833
+      }
+    },
+    {
+      "id": "4",
+      "category": "calibration",
+      "difficulty": "easy",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 1.0,
+        "concept": 0.98,
+        "citation_bonus": 0.1,
+        "final": 0.887
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "torch/utils/data/dataloader.py:47"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/utils/data/dataloader.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.98,
+        "bigram": 0.857,
+        "trigram": 0.709,
+        "concept": 0.98,
+        "idf_weighted": 1.0
+      }
+    },
+    {
+      "id": "5",
+      "category": "calibration",
+      "difficulty": "easy",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 1.0,
+        "concept": 0.767,
+        "citation_bonus": 0.1,
+        "final": 0.855
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "torch/nn/modules/module.py:30"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/modules/module.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.716,
+        "bigram": 0.635,
+        "trigram": 0.53,
+        "concept": 0.767,
+        "idf_weighted": 0.748
+      }
+    },
+    {
+      "id": "6",
+      "category": "calibration",
+      "difficulty": "easy",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 0.964,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/nn/functional.py:1712"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/functional.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.964,
+        "bigram": 0.851,
+        "trigram": 0.731,
+        "concept": 0.964,
+        "idf_weighted": 1.0
+      }
+    },
+    {
+      "id": "7",
+      "category": "calibration",
+      "difficulty": "easy",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 0.84,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/nn/modules/loss.py:1194"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/modules/loss.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.898,
+        "bigram": 0.651,
+        "trigram": 0.627,
+        "concept": 0.84,
+        "idf_weighted": 0.932
+      }
+    },
+    {
+      "id": "8",
+      "category": "calibration",
+      "difficulty": "easy",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 0.755,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/optim/sgd.py:28"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/optim/sgd.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.731,
+        "bigram": 0.675,
+        "trigram": 0.6,
+        "concept": 0.755,
+        "idf_weighted": 0.804
+      }
+    },
+    {
+      "id": "9",
+      "category": "calibration",
+      "difficulty": "easy",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 0.718,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/nn/modules/conv.py:378"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/modules/conv.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.804,
+        "bigram": 0.651,
+        "trigram": 0.627,
+        "concept": 0.718,
+        "idf_weighted": 0.865
+      }
+    },
+    {
+      "id": "10",
+      "category": "calibration",
+      "difficulty": "easy",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 1.0,
+        "concept": 0.875,
+        "citation_bonus": 0.1,
+        "final": 0.871
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "torch/serialization.py:943",
+          "torch/serialization.py:1314"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/serialization.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.882,
+        "bigram": 0.487,
+        "trigram": 0.259,
+        "concept": 0.875,
+        "idf_weighted": 0.885
+      }
+    },
+    {
+      "id": "11",
+      "category": "negative_control",
+      "difficulty": "medium",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 1.0,
+        "citation_bonus": 0.0,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [],
+        "expected_files": [],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "12",
+      "category": "negative_control",
+      "difficulty": "medium",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 1.0,
+        "citation_bonus": 0.0,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [],
+        "expected_files": [],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "13",
+      "category": "negative_control",
+      "difficulty": "medium",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 1.0,
+        "citation_bonus": 0.0,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [],
+        "expected_files": [],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "14",
+      "category": "negative_control",
+      "difficulty": "medium",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 1.0,
+        "citation_bonus": 0.0,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [],
+        "expected_files": [],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "15",
+      "category": "negative_control",
+      "difficulty": "medium",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 1.0,
+        "citation_bonus": 0.0,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [],
+        "expected_files": [],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "16",
+      "category": "negative_control",
+      "difficulty": "medium",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 1.0,
+        "citation_bonus": 0.0,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [],
+        "expected_files": [],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "17",
+      "category": "negative_control",
+      "difficulty": "medium",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 1.0,
+        "citation_bonus": 0.0,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [],
+        "expected_files": [],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "18",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 0.8,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "c10/core/TensorImpl.h:2923",
+          "c10/core/impl/SizesAndStrides.h:12"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/TensorImpl.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.783,
+        "bigram": 0.595,
+        "trigram": 0.476,
+        "concept": 0.8,
+        "idf_weighted": 1.0
+      }
+    },
+    {
+      "id": "19",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.983,
+        "concept": 0.705,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/csrc/autograd/engine.h:37"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.724,
+        "bigram": 0.508,
+        "trigram": 0.397,
+        "concept": 0.705,
+        "idf_weighted": 0.87
+      }
+    },
+    {
+      "id": "20",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.421,
+        "concept": 0.378,
+        "citation_bonus": 0.1,
+        "final": 0.71
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "c10/core/DispatchKey.h:567",
+          "c10/core/DispatchKeySet.h:36"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/DispatchKey.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.34,
+        "bigram": 0.144,
+        "trigram": 0.024,
+        "concept": 0.378,
+        "idf_weighted": 0.42
+      }
+    },
+    {
+      "id": "21",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.982,
+        "concept": 0.719,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "c10/core/TensorImpl.h:949"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/TensorImpl.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.699,
+        "bigram": 0.477,
+        "trigram": 0.359,
+        "concept": 0.719,
+        "idf_weighted": 0.926
+      }
+    },
+    {
+      "id": "22",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.866,
+        "concept": 0.676,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/csrc/autograd/edge.h:35",
+          "torch/csrc/autograd/edge.h:38"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/edge.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.659,
+        "bigram": 0.373,
+        "trigram": 0.251,
+        "concept": 0.676,
+        "idf_weighted": 0.817
+      }
+    },
+    {
+      "id": "23",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.448,
+        "concept": 0.383,
+        "citation_bonus": 0.1,
+        "final": 0.925
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "c10/core/impl/DeviceGuardImplInterface.h:43"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/impl/DeviceGuardImplInterface.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.374,
+        "bigram": 0.134,
+        "trigram": 0.039,
+        "concept": 0.383,
+        "idf_weighted": 0.475
+      }
+    },
+    {
+      "id": "24",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.68,
+        "concept": 0.588,
+        "citation_bonus": 0.1,
+        "final": 0.78
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "c10/core/StorageImpl.h:62",
+          "c10/core/StorageImpl.h:67"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/StorageImpl.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.596,
+        "bigram": 0.185,
+        "trigram": 0.045,
+        "concept": 0.588,
+        "idf_weighted": 0.722
+      }
+    },
+    {
+      "id": "25",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.861,
+        "concept": 0.631,
+        "citation_bonus": 0.1,
+        "final": 0.814
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "c10/core/DispatchKey.h:57",
+          "c10/core/DispatchKey.h:585"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/DispatchKey.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.601,
+        "bigram": 0.454,
+        "trigram": 0.383,
+        "concept": 0.631,
+        "idf_weighted": 0.732
+      }
+    },
+    {
+      "id": "26",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 0.834,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:360",
+          "torch/csrc/autograd/function.h:631"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/function.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.814,
+        "bigram": 0.738,
+        "trigram": 0.677,
+        "concept": 0.834,
+        "idf_weighted": 0.937
+      }
+    },
+    {
+      "id": "27",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.278,
+        "concept": 0.226,
+        "citation_bonus": 0.1,
+        "final": 0.666
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "aten/src/ATen/core/dispatch/OperatorEntry.h:63",
+          "aten/src/ATen/core/dispatch/OperatorEntry.h:117"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/aten/src/ATen/core/dispatch/OperatorEntry.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.233,
+        "bigram": 0.112,
+        "trigram": 0.062,
+        "concept": 0.226,
+        "idf_weighted": 0.254
+      }
+    },
+    {
+      "id": "28",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.72,
+        "concept": 0.487,
+        "citation_bonus": 0.1,
+        "final": 0.981
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "c10/core/TensorImpl.h:2895"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/TensorImpl.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.502,
+        "bigram": 0.417,
+        "trigram": 0.375,
+        "concept": 0.487,
+        "idf_weighted": 0.593
+      }
+    },
+    {
+      "id": "29",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.771,
+        "concept": 0.627,
+        "citation_bonus": 0.1,
+        "final": 0.8
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "c10/core/Device.h:26",
+          "c10/core/Device.h:31"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/Device.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.608,
+        "bigram": 0.315,
+        "trigram": 0.13,
+        "concept": 0.627,
+        "idf_weighted": 0.76
+      }
+    },
+    {
+      "id": "30",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.787,
+        "concept": 0.63,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/csrc/autograd/graph_task.h:36",
+          "torch/csrc/autograd/graph_task.h:117"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/graph_task.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.594,
+        "bigram": 0.367,
+        "trigram": 0.234,
+        "concept": 0.63,
+        "idf_weighted": 0.691
+      }
+    },
+    {
+      "id": "31",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.473,
+        "concept": 0.364,
+        "citation_bonus": 0.1,
+        "final": 0.926
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "c10/core/TensorImpl.h:2977"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/TensorImpl.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.346,
+        "bigram": 0.201,
+        "trigram": 0.109,
+        "concept": 0.364,
+        "idf_weighted": 0.488
+      }
+    },
+    {
+      "id": "32",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 1.0,
+        "concept": 0.801,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:334",
+          "torch/csrc/autograd/function.h:628"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/function.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.79,
+        "bigram": 0.665,
+        "trigram": 0.566,
+        "concept": 0.801,
+        "idf_weighted": 0.86
+      }
+    },
+    {
+      "id": "33",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.493,
+        "concept": 0.384,
+        "citation_bonus": 0.1,
+        "final": 0.932
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "aten/src/ATen/core/dispatch/OperatorEntry.h:182"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/aten/src/ATen/core/dispatch/OperatorEntry.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.405,
+        "bigram": 0.205,
+        "trigram": 0.156,
+        "concept": 0.384,
+        "idf_weighted": 0.44
+      }
+    },
+    {
+      "id": "34",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.772,
+        "concept": 0.611,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "c10/core/DispatchKey.h:269"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/DispatchKey.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.603,
+        "bigram": 0.342,
+        "trigram": 0.255,
+        "concept": 0.611,
+        "idf_weighted": 0.672
+      }
+    },
+    {
+      "id": "35",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.2,
+        "semantic": 0.344,
+        "concept": 0.329,
+        "citation_bonus": 0.1,
+        "final": 0.341
+      },
+      "evidence_details": {
+        "tier": "minimal",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/TensorImpl.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.329,
+        "bigram": 0.025,
+        "trigram": 0.0,
+        "concept": 0.329,
+        "idf_weighted": 0.381
+      }
+    },
+    {
+      "id": "36",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.545,
+        "concept": 0.49,
+        "citation_bonus": 0.1,
+        "final": 0.955
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/csrc/autograd/engine.h:86"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.451,
+        "bigram": 0.114,
+        "trigram": 0.038,
+        "concept": 0.49,
+        "idf_weighted": 0.6
+      }
+    },
+    {
+      "id": "37",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.87,
+        "concept": 0.664,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "c10/core/DispatchKey.h:445",
+          "c10/core/DispatchKey.h:527"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/DispatchKey.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.633,
+        "bigram": 0.434,
+        "trigram": 0.308,
+        "concept": 0.664,
+        "idf_weighted": 0.763
+      }
+    },
+    {
+      "id": "38",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.517,
+        "concept": 0.388,
+        "citation_bonus": 0.1,
+        "final": 0.936
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:641"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/function.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.408,
+        "bigram": 0.217,
+        "trigram": 0.156,
+        "concept": 0.388,
+        "idf_weighted": 0.501
+      }
+    },
+    {
+      "id": "39",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.891,
+        "concept": 0.592,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "c10/core/DispatchKey.h:36"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/DispatchKey.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.554,
+        "bigram": 0.541,
+        "trigram": 0.533,
+        "concept": 0.592,
+        "idf_weighted": 0.725
+      }
+    },
+    {
+      "id": "40",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.191,
+        "concept": 0.172,
+        "citation_bonus": 0.0,
+        "final": 0.334
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/StorageImpl.h:143"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/TensorImpl.h"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.177,
+        "bigram": 0.037,
+        "trigram": 0.0,
+        "concept": 0.172,
+        "idf_weighted": 0.21
+      }
+    },
+    {
+      "id": "41",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.412,
+        "concept": 0.346,
+        "citation_bonus": 0.1,
+        "final": 0.914
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "aten/src/ATen/core/dispatch/OperatorEntry.h:164"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/aten/src/ATen/core/dispatch/OperatorEntry.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.341,
+        "bigram": 0.153,
+        "trigram": 0.097,
+        "concept": 0.346,
+        "idf_weighted": 0.373
+      }
+    },
+    {
+      "id": "42",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.815,
+        "concept": 0.607,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:689"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/function.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.59,
+        "bigram": 0.434,
+        "trigram": 0.367,
+        "concept": 0.607,
+        "idf_weighted": 0.656
+      }
+    },
+    {
+      "id": "43",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.2,
+        "concept": 0.196,
+        "citation_bonus": 0.1,
+        "final": 0.649
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "torch/csrc/autograd/input_buffer.h:17"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/input_buffer.cpp",
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/input_buffer.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.19,
+        "bigram": 0.024,
+        "trigram": 0.0,
+        "concept": 0.196,
+        "idf_weighted": 0.207
+      }
+    },
+    {
+      "id": "44",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.066,
+        "concept": 0.041,
+        "citation_bonus": 0.0,
+        "final": 0.296
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:518"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/input_buffer.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.088,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.041,
+        "idf_weighted": 0.092
+      }
+    },
+    {
+      "id": "45",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.077,
+        "concept": 0.088,
+        "citation_bonus": 0.0,
+        "final": 0.305
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "aten/src/ATen/core/dispatch/OperatorEntry.h:67"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.089,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.088,
+        "idf_weighted": 0.058
+      }
+    },
+    {
+      "id": "46",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.074,
+        "concept": 0.09,
+        "citation_bonus": 0.0,
+        "final": 0.305
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/functions/accumulate_grad.h:61",
+          "torch/csrc/autograd/functions/accumulate_grad.h:172"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.077,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.09,
+        "idf_weighted": 0.054
+      }
+    },
+    {
+      "id": "47",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.042,
+        "concept": 0.02,
+        "citation_bonus": 0.0,
+        "final": 0.289
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:177",
+          "torch/csrc/autograd/engine.cpp:708"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.064,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.02,
+        "idf_weighted": 0.061
+      }
+    },
+    {
+      "id": "48",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.039,
+        "concept": 0.041,
+        "citation_bonus": 0.0,
+        "final": 0.012
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp",
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.h"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.055,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.041,
+        "idf_weighted": 0.027
+      }
+    },
+    {
+      "id": "49",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.066,
+        "concept": 0.07,
+        "citation_bonus": 0.0,
+        "final": 0.3
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/graph_task.h:30"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/functions/accumulate_grad.h",
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/functions/accumulate_grad.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.081,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.07,
+        "idf_weighted": 0.056
+      }
+    },
+    {
+      "id": "50",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.058,
+        "concept": 0.058,
+        "citation_bonus": 0.1,
+        "final": 0.607
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:800"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.056,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.058,
+        "idf_weighted": 0.062
+      }
+    },
+    {
+      "id": "51",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.065,
+        "concept": 0.078,
+        "citation_bonus": 0.0,
+        "final": 0.301
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:147",
+          "torch/csrc/autograd/engine.cpp:618"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.069,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.078,
+        "idf_weighted": 0.049
+      }
+    },
+    {
+      "id": "52",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.069,
+        "concept": 0.08,
+        "citation_bonus": 0.1,
+        "final": 0.612
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:917"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.075,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.08,
+        "idf_weighted": 0.054
+      }
+    },
+    {
+      "id": "53",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.026,
+        "concept": 0.033,
+        "citation_bonus": 0.0,
+        "final": 0.289
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "aten/src/ATen/core/dispatch/OperatorEntry.h:182"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.028,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.033,
+        "idf_weighted": 0.016
+      }
+    },
+    {
+      "id": "54",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.061,
+        "concept": 0.069,
+        "citation_bonus": 0.0,
+        "final": 0.299
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:704"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp",
+          "/tmp/pytorch-benchmark/torch/_dynamo/compiled_autograd.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.067,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.069,
+        "idf_weighted": 0.049
+      }
+    },
+    {
+      "id": "55",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.091,
+        "concept": 0.096,
+        "citation_bonus": 0.0,
+        "final": 0.308
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/functions/accumulate_grad.h:153"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.105,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.096,
+        "idf_weighted": 0.082
+      }
+    },
+    {
+      "id": "56",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.096,
+        "concept": 0.108,
+        "citation_bonus": 0.0,
+        "final": 0.311
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/graph_task.h:47"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.096,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.108,
+        "idf_weighted": 0.087
+      }
+    },
+    {
+      "id": "57",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.078,
+        "concept": 0.084,
+        "citation_bonus": 0.0,
+        "final": 0.304
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/TensorImpl.h:2895"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.082,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.084,
+        "idf_weighted": 0.073
+      }
+    },
+    {
+      "id": "58",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.019,
+        "concept": 0.021,
+        "citation_bonus": 0.0,
+        "final": 0.006
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/input_buffer.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.018,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.021,
+        "idf_weighted": 0.02
+      }
+    },
+    {
+      "id": "59",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.073,
+        "concept": 0.085,
+        "citation_bonus": 0.0,
+        "final": 0.304
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/StorageImpl.h:62"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.08,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.085,
+        "idf_weighted": 0.054
+      }
+    },
+    {
+      "id": "60",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.065,
+        "concept": 0.079,
+        "citation_bonus": 0.1,
+        "final": 0.612
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:98"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.07,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.079,
+        "idf_weighted": 0.046
+      }
+    },
+    {
+      "id": "61",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.027,
+        "concept": 0.032,
+        "citation_bonus": 0.1,
+        "final": 0.599
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "torch/csrc/autograd/graph_task.h:183",
+          "torch/csrc/autograd/engine.cpp:681"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp",
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/graph_task.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.031,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.032,
+        "idf_weighted": 0.018
+      }
+    },
+    {
+      "id": "62",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.036,
+        "concept": 0.041,
+        "citation_bonus": 0.0,
+        "final": 0.292
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:535",
+          "c10/core/DispatchKey.h:585"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/__init__.py",
+          "/tmp/pytorch-benchmark/torch/autograd/graph.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.041,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.041,
+        "idf_weighted": 0.026
+      }
+    },
+    {
+      "id": "63",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.035,
+        "concept": 0.042,
+        "citation_bonus": 0.0,
+        "final": 0.292
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:833"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.039,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.042,
+        "idf_weighted": 0.025
+      }
+    },
+    {
+      "id": "64",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.099,
+        "concept": 0.112,
+        "citation_bonus": 0.1,
+        "final": 0.622
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:687",
+          "torch/csrc/autograd/engine.cpp:786"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.111,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.112,
+        "idf_weighted": 0.078
+      }
+    },
+    {
+      "id": "65",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.116,
+        "concept": 0.132,
+        "citation_bonus": 0.0,
+        "final": 0.317
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/graph_task.h:24",
+          "torch/csrc/autograd/graph_task.h:150"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/functions/accumulate_grad.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.12,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.132,
+        "idf_weighted": 0.099
+      }
+    },
+    {
+      "id": "66",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.028,
+        "concept": 0.038,
+        "citation_bonus": 0.0,
+        "final": 0.29
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "aten/src/ATen/core/dispatch/OperatorEntry.h:37"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.032,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.038,
+        "idf_weighted": 0.013
+      }
+    },
+    {
+      "id": "67",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.129,
+        "concept": 0.147,
+        "citation_bonus": 0.1,
+        "final": 0.631
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:125"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.141,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.147,
+        "idf_weighted": 0.106
+      }
+    },
+    {
+      "id": "68",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.154,
+        "concept": 0.156,
+        "citation_bonus": 0.0,
+        "final": 0.326
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/utils/checkpoint.py:228"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/parallel/_functions.py",
+          "/tmp/pytorch-benchmark/torch/autograd/function.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.155,
+        "bigram": 0.014,
+        "trigram": 0.0,
+        "concept": 0.156,
+        "idf_weighted": 0.148
+      }
+    },
+    {
+      "id": "69",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.125,
+        "concept": 0.126,
+        "citation_bonus": 0.0,
+        "final": 0.318
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/jit/_script.py:1272"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/parameter.py",
+          "/tmp/pytorch-benchmark/torch/autograd/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.14,
+        "bigram": 0.014,
+        "trigram": 0.0,
+        "concept": 0.126,
+        "idf_weighted": 0.108
+      }
+    },
+    {
+      "id": "70",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.298,
+        "concept": 0.254,
+        "citation_bonus": 0.1,
+        "final": 0.883
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "torch/autograd/__init__.py:253"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/__init__.py",
+          "/tmp/pytorch-benchmark/torch/autograd/graph.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": true
+      },
+      "semantic_details": {
+        "unigram": 0.242,
+        "bigram": 0.071,
+        "trigram": 0.017,
+        "concept": 0.254,
+        "idf_weighted": 0.346
+      }
+    },
+    {
+      "id": "71",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.116,
+        "concept": 0.138,
+        "citation_bonus": 0.0,
+        "final": 0.038
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/TensorImpl.h",
+          "/tmp/pytorch-benchmark/c10/core/Storage.h"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.125,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.138,
+        "idf_weighted": 0.087
+      }
+    },
+    {
+      "id": "72",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.038,
+        "concept": 0.044,
+        "citation_bonus": 0.0,
+        "final": 0.292
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/autograd/__init__.py:23"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/aten/src/ATen/core/TensorBase.h",
+          "/tmp/pytorch-benchmark/c10/core/TensorImpl.h"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.039,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.044,
+        "idf_weighted": 0.031
+      }
+    },
+    {
+      "id": "73",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.068,
+        "concept": 0.074,
+        "citation_bonus": 0.0,
+        "final": 0.021
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/parallel/distributed.py",
+          "/tmp/pytorch-benchmark/torch/autograd/function.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.072,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.074,
+        "idf_weighted": 0.061
+      }
+    },
+    {
+      "id": "74",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.118,
+        "concept": 0.122,
+        "citation_bonus": 0.0,
+        "final": 0.316
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:488"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/optim/sgd.py",
+          "/tmp/pytorch-benchmark/torch/autograd/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.107,
+        "bigram": 0.014,
+        "trigram": 0.0,
+        "concept": 0.122,
+        "idf_weighted": 0.115
+      }
+    },
+    {
+      "id": "75",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.141,
+        "concept": 0.158,
+        "citation_bonus": 0.0,
+        "final": 0.325
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:75"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/distributed/nn/functional.py",
+          "/tmp/pytorch-benchmark/torch/autograd/function.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.152,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.158,
+        "idf_weighted": 0.12
+      }
+    },
+    {
+      "id": "76",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.079,
+        "concept": 0.097,
+        "citation_bonus": 0.0,
+        "final": 0.306
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/utils/checkpoint.py:237"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/distributed/optim/zero_redundancy_optimizer.py",
+          "/tmp/pytorch-benchmark/torch/nn/parallel/distributed.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.088,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.097,
+        "idf_weighted": 0.052
+      }
+    },
+    {
+      "id": "77",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.073,
+        "concept": 0.087,
+        "citation_bonus": 0.0,
+        "final": 0.024
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/function.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.083,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.087,
+        "idf_weighted": 0.049
+      }
+    },
+    {
+      "id": "78",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.138,
+        "concept": 0.155,
+        "citation_bonus": 0.0,
+        "final": 0.324
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/_tensor.py:110"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/modules/module.py",
+          "/tmp/pytorch-benchmark/torch/autograd/graph.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.148,
+        "bigram": 0.017,
+        "trigram": 0.0,
+        "concept": 0.155,
+        "idf_weighted": 0.098
+      }
+    },
+    {
+      "id": "79",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.113,
+        "concept": 0.129,
+        "citation_bonus": 0.0,
+        "final": 0.036
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/ScalarType.h"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.104,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.129,
+        "idf_weighted": 0.105
+      }
+    },
+    {
+      "id": "80",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.053,
+        "concept": 0.06,
+        "citation_bonus": 0.0,
+        "final": 0.297
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/autograd/__init__.py:21"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/distributed/distributed_c10d.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.06,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.06,
+        "idf_weighted": 0.04
+      }
+    },
+    {
+      "id": "81",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.078,
+        "concept": 0.084,
+        "citation_bonus": 0.0,
+        "final": 0.304
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:701",
+          "torch/csrc/autograd/function.h:523"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/DispatchKey.h"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.093,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.084,
+        "idf_weighted": 0.064
+      }
+    },
+    {
+      "id": "82",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.077,
+        "concept": 0.085,
+        "citation_bonus": 0.0,
+        "final": 0.024
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/optim/adam.py",
+          "/tmp/pytorch-benchmark/torch/optim/optimizer.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.088,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.085,
+        "idf_weighted": 0.065
+      }
+    },
+    {
+      "id": "83",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.193,
+        "concept": 0.21,
+        "citation_bonus": 0.0,
+        "final": 0.34
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/TensorImpl.h:2914"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/function.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.222,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.21,
+        "idf_weighted": 0.161
+      }
+    },
+    {
+      "id": "84",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.7,
+        "semantic": 0.101,
+        "concept": 0.124,
+        "citation_bonus": 0.1,
+        "final": 0.624
+      },
+      "evidence_details": {
+        "tier": "moderate",
+        "citations_found": [
+          "c10/core/TensorImpl.h:3009"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/c10/core/TensorImpl.h"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.098,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.124,
+        "idf_weighted": 0.078
+      }
+    },
+    {
+      "id": "85",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.2,
+        "semantic": 0.07,
+        "concept": 0.077,
+        "citation_bonus": 0.1,
+        "final": 0.262
+      },
+      "evidence_details": {
+        "tier": "minimal",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/modules/module.py",
+          "/tmp/pytorch-benchmark/torch/nn/parameter.py"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.072,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.077,
+        "idf_weighted": 0.065
+      }
+    },
+    {
+      "id": "86",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.105,
+        "concept": 0.121,
+        "citation_bonus": 0.0,
+        "final": 0.314
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/jit/_script.py:68"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/distributed/nn/functional.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.117,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.121,
+        "idf_weighted": 0.082
+      }
+    },
+    {
+      "id": "87",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.141,
+        "concept": 0.149,
+        "citation_bonus": 0.0,
+        "final": 0.043
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/parallel/distributed.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.144,
+        "bigram": 0.028,
+        "trigram": 0.0,
+        "concept": 0.149,
+        "idf_weighted": 0.109
+      }
+    },
+    {
+      "id": "88",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.064,
+        "concept": 0.079,
+        "citation_bonus": 0.0,
+        "final": 0.301
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/autograd/__init__.py:28"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/optim/optimizer.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.077,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.079,
+        "idf_weighted": 0.037
+      }
+    },
+    {
+      "id": "89",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.051,
+        "concept": 0.063,
+        "citation_bonus": 0.0,
+        "final": 0.017
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.061,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.063,
+        "idf_weighted": 0.028
+      }
+    },
+    {
+      "id": "90",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.017,
+        "concept": 0.02,
+        "citation_bonus": 0.0,
+        "final": 0.006
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/nn/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.018,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.02,
+        "idf_weighted": 0.011
+      }
+    },
+    {
+      "id": "91",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.065,
+        "concept": 0.063,
+        "citation_bonus": 0.0,
+        "final": 0.019
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/distributed/optim/zero_redundancy_optimizer.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.062,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.063,
+        "idf_weighted": 0.075
+      }
+    },
+    {
+      "id": "92",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.154,
+        "concept": 0.175,
+        "citation_bonus": 0.0,
+        "final": 0.049
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/__init__.py",
+          "/tmp/pytorch-benchmark/torch/autograd/graph.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.174,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.175,
+        "idf_weighted": 0.12
+      }
+    },
+    {
+      "id": "93",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.125,
+        "concept": 0.101,
+        "citation_bonus": 0.0,
+        "final": 0.034
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/memory.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.133,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.101,
+        "idf_weighted": 0.163
+      }
+    },
+    {
+      "id": "94",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.144,
+        "concept": 0.17,
+        "citation_bonus": 0.0,
+        "final": 0.047
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/memory.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.17,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.17,
+        "idf_weighted": 0.097
+      }
+    },
+    {
+      "id": "95",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.0,
+        "concept": 0.0,
+        "citation_bonus": 0.0,
+        "final": 0.28
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/cuda/__init__.py:38"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/serialization.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "96",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.0,
+        "concept": 0.0,
+        "citation_bonus": 0.0,
+        "final": 0.0
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/serialization.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "97",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.038,
+        "concept": 0.043,
+        "citation_bonus": 0.0,
+        "final": 0.292
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/autograd/__init__.py:16"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_weights_only_unpickler.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.046,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.043,
+        "idf_weighted": 0.028
+      }
+    },
+    {
+      "id": "98",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.034,
+        "concept": 0.032,
+        "citation_bonus": 0.0,
+        "final": 0.29
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:233"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/profiler.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.044,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.032,
+        "idf_weighted": 0.034
+      }
+    },
+    {
+      "id": "99",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.026,
+        "concept": 0.027,
+        "citation_bonus": 0.0,
+        "final": 0.288
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/nn/parallel/distributed.py:51"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_subclasses/fake_tensor.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.027,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.027,
+        "idf_weighted": 0.027
+      }
+    },
+    {
+      "id": "100",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.027,
+        "concept": 0.03,
+        "citation_bonus": 0.0,
+        "final": 0.009
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.033,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.03,
+        "idf_weighted": 0.021
+      }
+    },
+    {
+      "id": "101",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.046,
+        "concept": 0.032,
+        "citation_bonus": 0.0,
+        "final": 0.292
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:52",
+          "c10/core/Device.h:150"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/memory.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.061,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.032,
+        "idf_weighted": 0.06
+      }
+    },
+    {
+      "id": "102",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.027,
+        "concept": 0.029,
+        "citation_bonus": 0.0,
+        "final": 0.008
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/utils/data/_utils/pin_memory.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.031,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.029,
+        "idf_weighted": 0.022
+      }
+    },
+    {
+      "id": "103",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.02,
+        "concept": 0.024,
+        "citation_bonus": 0.0,
+        "final": 0.287
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "aten/src/ATen/core/dispatch/OperatorEntry.h:48"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/memory.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.024,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.024,
+        "idf_weighted": 0.013
+      }
+    },
+    {
+      "id": "104",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.0,
+        "concept": 0.0,
+        "citation_bonus": 0.0,
+        "final": 0.28
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:235"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/serialization.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "105",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.038,
+        "concept": 0.036,
+        "citation_bonus": 0.0,
+        "final": 0.011
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/memory.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.035,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.036,
+        "idf_weighted": 0.046
+      }
+    },
+    {
+      "id": "106",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.02,
+        "concept": 0.024,
+        "citation_bonus": 0.0,
+        "final": 0.287
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:49"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/memory.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.023,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.024,
+        "idf_weighted": 0.013
+      }
+    },
+    {
+      "id": "107",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.028,
+        "concept": 0.031,
+        "citation_bonus": 0.0,
+        "final": 0.009
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/profiler/profiler.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.033,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.031,
+        "idf_weighted": 0.021
+      }
+    },
+    {
+      "id": "108",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.059,
+        "concept": 0.063,
+        "citation_bonus": 0.0,
+        "final": 0.298
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:46"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/serialization.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.06,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.063,
+        "idf_weighted": 0.057
+      }
+    },
+    {
+      "id": "109",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.052,
+        "concept": 0.055,
+        "citation_bonus": 0.0,
+        "final": 0.296
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:59"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.057,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.055,
+        "idf_weighted": 0.049
+      }
+    },
+    {
+      "id": "110",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.0,
+        "concept": 0.0,
+        "citation_bonus": 0.0,
+        "final": 0.28
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:62"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/profiler/_memory_profiler.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "111",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.024,
+        "concept": 0.03,
+        "citation_bonus": 0.0,
+        "final": 0.288
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:59"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/serialization.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.028,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.03,
+        "idf_weighted": 0.016
+      }
+    },
+    {
+      "id": "112",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.0,
+        "concept": 0.0,
+        "citation_bonus": 0.0,
+        "final": 0.0
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_export/error.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "113",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.052,
+        "concept": 0.061,
+        "citation_bonus": 0.0,
+        "final": 0.017
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/serialization.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.061,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.061,
+        "idf_weighted": 0.036
+      }
+    },
+    {
+      "id": "114",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.0,
+        "concept": 0.0,
+        "citation_bonus": 0.0,
+        "final": 0.0
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/serialization.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "115",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.061,
+        "concept": 0.057,
+        "citation_bonus": 0.0,
+        "final": 0.018
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/memory.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.076,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.057,
+        "idf_weighted": 0.059
+      }
+    },
+    {
+      "id": "116",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.049,
+        "concept": 0.058,
+        "citation_bonus": 0.0,
+        "final": 0.296
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/serialization.py:943",
+          "torch/serialization.py:1314"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/memory.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.056,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.058,
+        "idf_weighted": 0.036
+      }
+    },
+    {
+      "id": "117",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.0,
+        "concept": 0.0,
+        "citation_bonus": 0.0,
+        "final": 0.28
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/autograd/__init__.py:7"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/profiler.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "118",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.035,
+        "concept": 0.044,
+        "citation_bonus": 0.0,
+        "final": 0.292
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:267"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_prims_common/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.04,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.044,
+        "idf_weighted": 0.022
+      }
+    },
+    {
+      "id": "119",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.055,
+        "concept": 0.075,
+        "citation_bonus": 0.0,
+        "final": 0.299
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:264"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_prims_common/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.055,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.075,
+        "idf_weighted": 0.031
+      }
+    },
+    {
+      "id": "120",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.075,
+        "concept": 0.084,
+        "citation_bonus": 0.0,
+        "final": 0.304
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:229"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_tensor_docs.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.078,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.084,
+        "idf_weighted": 0.066
+      }
+    },
+    {
+      "id": "121",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.056,
+        "concept": 0.062,
+        "citation_bonus": 0.0,
+        "final": 0.298
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:269"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_tensor_docs.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.061,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.062,
+        "idf_weighted": 0.048
+      }
+    },
+    {
+      "id": "122",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.085,
+        "concept": 0.097,
+        "citation_bonus": 0.0,
+        "final": 0.307
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:227"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_tensor_docs.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.086,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.097,
+        "idf_weighted": 0.073
+      }
+    },
+    {
+      "id": "123",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.056,
+        "concept": 0.061,
+        "citation_bonus": 0.0,
+        "final": 0.298
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:270"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_tensor_docs.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.057,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.061,
+        "idf_weighted": 0.053
+      }
+    },
+    {
+      "id": "124",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.054,
+        "concept": 0.061,
+        "citation_bonus": 0.0,
+        "final": 0.297
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/DispatchKey.h:443"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_refs/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.059,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.061,
+        "idf_weighted": 0.044
+      }
+    },
+    {
+      "id": "125",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.067,
+        "concept": 0.072,
+        "citation_bonus": 0.0,
+        "final": 0.301
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:108"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_refs/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.066,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.072,
+        "idf_weighted": 0.067
+      }
+    },
+    {
+      "id": "126",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.053,
+        "concept": 0.065,
+        "citation_bonus": 0.0,
+        "final": 0.298
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:75",
+          "torch/csrc/autograd/function.h:591"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.062,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.065,
+        "idf_weighted": 0.034
+      }
+    },
+    {
+      "id": "127",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.045,
+        "concept": 0.053,
+        "citation_bonus": 0.0,
+        "final": 0.295
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/TensorImpl.h:3038"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.051,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.053,
+        "idf_weighted": 0.03
+      }
+    },
+    {
+      "id": "128",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.044,
+        "concept": 0.052,
+        "citation_bonus": 0.0,
+        "final": 0.294
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/engine.cpp:291"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.048,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.052,
+        "idf_weighted": 0.033
+      }
+    },
+    {
+      "id": "129",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.055,
+        "concept": 0.062,
+        "citation_bonus": 0.0,
+        "final": 0.018
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/autograd/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.06,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.062,
+        "idf_weighted": 0.046
+      }
+    },
+    {
+      "id": "130",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.042,
+        "concept": 0.047,
+        "citation_bonus": 0.0,
+        "final": 0.293
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:472",
+          "torch/csrc/autograd/function.h:686"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_refs/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.039,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.047,
+        "idf_weighted": 0.04
+      }
+    },
+    {
+      "id": "131",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.068,
+        "concept": 0.074,
+        "citation_bonus": 0.0,
+        "final": 0.301
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:707"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_refs/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.073,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.074,
+        "idf_weighted": 0.058
+      }
+    },
+    {
+      "id": "132",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.058,
+        "concept": 0.062,
+        "citation_bonus": 0.0,
+        "final": 0.298
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/TensorImpl.h:3009"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/streams.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.064,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.062,
+        "idf_weighted": 0.052
+      }
+    },
+    {
+      "id": "133",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.115,
+        "concept": 0.118,
+        "citation_bonus": 0.0,
+        "final": 0.315
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/TensorImpl.h:3026"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/streams.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.105,
+        "bigram": 0.014,
+        "trigram": 0.0,
+        "concept": 0.118,
+        "idf_weighted": 0.114
+      }
+    },
+    {
+      "id": "134",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.073,
+        "concept": 0.073,
+        "citation_bonus": 0.0,
+        "final": 0.302
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/TensorImpl.h:3046"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/streams.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.069,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.073,
+        "idf_weighted": 0.083
+      }
+    },
+    {
+      "id": "135",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.065,
+        "concept": 0.077,
+        "citation_bonus": 0.0,
+        "final": 0.301
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:719"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_torch_docs.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.076,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.077,
+        "idf_weighted": 0.045
+      }
+    },
+    {
+      "id": "136",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.047,
+        "concept": 0.057,
+        "citation_bonus": 0.0,
+        "final": 0.296
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:429"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_torch_docs.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.054,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.057,
+        "idf_weighted": 0.028
+      }
+    },
+    {
+      "id": "137",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.066,
+        "concept": 0.06,
+        "citation_bonus": 0.0,
+        "final": 0.299
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "c10/core/TensorImpl.h:3007"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_prims_common/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.05,
+        "bigram": 0.02,
+        "trigram": 0.0,
+        "concept": 0.06,
+        "idf_weighted": 0.072
+      }
+    },
+    {
+      "id": "138",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.059,
+        "concept": 0.07,
+        "citation_bonus": 0.0,
+        "final": 0.299
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/graph_task.h:129"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_prims_common/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.054,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.07,
+        "idf_weighted": 0.052
+      }
+    },
+    {
+      "id": "139",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.056,
+        "concept": 0.067,
+        "citation_bonus": 0.0,
+        "final": 0.298
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/graph_task.h:136"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_prims_common/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.065,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.067,
+        "idf_weighted": 0.038
+      }
+    },
+    {
+      "id": "140",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.0,
+        "concept": 0.0,
+        "citation_bonus": 0.0,
+        "final": 0.28
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:591"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/_prims_common/__init__.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.0,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.0,
+        "idf_weighted": 0.0
+      }
+    },
+    {
+      "id": "141",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.031,
+        "concept": 0.037,
+        "citation_bonus": 0.0,
+        "final": 0.29
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:602"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/graphs.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.037,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.037,
+        "idf_weighted": 0.02
+      }
+    },
+    {
+      "id": "142",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.4,
+        "semantic": 0.073,
+        "concept": 0.079,
+        "citation_bonus": 0.0,
+        "final": 0.303
+      },
+      "evidence_details": {
+        "tier": "weak",
+        "citations_found": [
+          "torch/csrc/autograd/function.h:612"
+        ],
+        "expected_files": [
+          "/tmp/pytorch-benchmark/torch/cuda/graphs.py"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.078,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.079,
+        "idf_weighted": 0.066
+      }
+    }
+  ]
+}

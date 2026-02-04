@@ -1,0 +1,274 @@
+{
+  "category": "data_flow_integration",
+  "version": "1.0.0",
+  "codebase": "/tmp/pytorch-benchmark",
+  "space_id": "pytorch-benchmark-v4",
+  "generated_at": "2026-01-29",
+  "questions": [
+    {
+      "id": 1,
+      "question": "In the autograd engine, what is the exact mechanism by which gradients are accumulated when multiple upstream nodes produce outputs for the same downstream node? Identify the specific data structure and method responsible for accumulation.",
+      "expected_answer": "Gradients are accumulated using the InputBuffer class defined in input_buffer.h/cpp. The InputBuffer::add() method at line 192 in input_buffer.cpp handles accumulation. When the first producer adds a gradient, it's moved directly into the buffer. For subsequent producers (Nth producer case starting at line 288), the accumulate() helper function at line 94 is called which performs buffer[pos] = old_var + var or in-place addition depending on tensor properties.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/input_buffer.cpp", "torch/csrc/autograd/input_buffer.h"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/input_buffer.cpp", "line_start": 192, "line_end": 202, "snippet": "void InputBuffer::add(\n    size_t pos,\n    Variable&& var,\n    const std::optional<c10::Stream>& opt_producer_stream_,\n    const std::optional<c10::Stream>& opt_consumer_stream_,\n    Node* fn) {"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/input_buffer.cpp", "line_start": 94, "line_end": 134, "snippet": "static void accumulate(\n    std::vector<Variable>& buffer,\n    const size_t pos,\n    Variable&& var) {\n  TORCH_INTERNAL_ASSERT(pos < buffer.size());\n  auto& old_var = buffer[pos];"}
+      ]
+    },
+    {
+      "id": 2,
+      "question": "What determines whether a gradient can be accumulated in-place during backward pass, and what are the specific conditions checked in the can_accumulate_inplace function?",
+      "expected_answer": "The can_accumulate_inplace() function at line 80-91 in input_buffer.cpp checks: 1) The tensor is not a subclass-like tensor, not a zero tensor, and not nested; 2) The tensor has a favorable memory layout (is_non_overlapping_and_dense()); 3) We hold the last reference (is_tensor_stealable with use_count check accounting for caching); 4) The tensor has storage with use_count of 1.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/input_buffer.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/input_buffer.cpp", "line_start": 80, "line_end": 91, "snippet": "bool can_accumulate_inplace(const Variable& v) {\n  return (\n      // `v` is a \"vanilla\" Tensor\n      !(at::isTensorSubclassLike(v) || v._is_zerotensor() || v.is_nested()) &&\n\n      // with a favorable memory layout\n      v.is_non_overlapping_and_dense() &&\n\n      // and we hold the last reference\n      impl::is_tensor_stealable(v, 1 + at::caching::is_cached_tensor(v)) &&\n      v.has_storage() && v.storage().use_count() == 1);"}
+      ]
+    },
+    {
+      "id": 3,
+      "question": "In the Engine::evaluate_function method, how are stream synchronization events used to ensure producer-consumer correctness for CUDA gradients, and what happens when the producer stream differs from the consumer stream?",
+      "expected_answer": "In evaluate_function() at line 1063, for each input position, the code checks if the input is on an accelerator device (line 1078). If the parent stream (consumer) differs from the ready stream (producer), it waits on the ready_event using opt_parent_stream->wait(opt_ready_event.value()) at line 1087. This ensures gradient data is fully produced before consumption.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/engine.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 1063, "line_end": 1090, "snippet": "void Engine::evaluate_function(\n    std::shared_ptr<GraphTask>& graph_task,\n    Node* func,\n    InputBuffer& inputs,\n    const std::shared_ptr<ReadyQueue>& cpu_ready_queue) {\n  // Locally set the current stream to func's associated stream\n  auto opt_parent_stream = (*func).stream();"}
+      ]
+    },
+    {
+      "id": 4,
+      "question": "How does the DDP Reducer's autograd_hook function interact with the bucket readiness mechanism, and what triggers the all_reduce operation for a bucket?",
+      "expected_answer": "The autograd_hook() at line 647 in reducer.cpp is called after gradient accumulation. It marks the local_used_map for the variable (line 667), then calls mark_variable_ready() (line 730). In mark_variable_ready() at line 874, when bucket.pending becomes 0 (line 909), mark_bucket_ready() is called which iterates through ready buckets and calls all_reduce_bucket() at line 1045.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/distributed/c10d/reducer.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 644, "line_end": 678, "snippet": "// The function `autograd_hook` is called after the gradient for a\n// model parameter has been accumulated into its gradient tensor.\n// This function is only to be called from the autograd thread.\nvoid Reducer::autograd_hook(size_t index) {"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 908, "line_end": 911, "snippet": "  // Check if this was the final gradient for this bucket.\n  if (--bucket.pending == 0) {\n    mark_bucket_ready(bucket_index.bucket_index);\n  }"}
+      ]
+    },
+    {
+      "id": 5,
+      "question": "What is the complete data flow from when a parameter's gradient is ready in DDP until the gradient is synchronized across all ranks? Trace through the bucket system.",
+      "expected_answer": "1) autograd_hook() is triggered when gradient is accumulated. 2) mark_variable_ready_dense() at line 353 copies gradient to bucket_view. 3) When bucket.pending reaches 0, mark_bucket_ready() is called. 4) mark_bucket_ready() at line 1025 iterates and calls all_reduce_bucket() at line 1045. 5) all_reduce_bucket() at line 952 creates a GradBucket and calls run_comm_hook() which invokes process_group_->allreduce(). 6) finalize_backward() at line 1703 waits for all futures and unflatten results.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/distributed/c10d/reducer.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 952, "line_end": 974, "snippet": "void Reducer::all_reduce_bucket(Bucket& bucket) {\n  auto variables_for_bucket = get_variables_for_bucket(next_bucket_, bucket);"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 1703, "line_end": 1728, "snippet": "void Reducer::finalize_backward() {\n  // No longer expect autograd hooks to fire after this function returns."}
+      ]
+    },
+    {
+      "id": 6,
+      "question": "In the autograd engine, how does the ReadyQueue manage task prioritization, and what determines the execution order of backward functions?",
+      "expected_answer": "The ReadyQueue uses a priority queue (heap_) implemented as std::priority_queue with NodeTask comparison based on reentrant_depth (line 209-218). Tasks are popped in order of priority. The push() method at line 232 adds tasks and increments outstanding_tasks_. The pop() method at line 260 blocks until tasks are available using condition variable not_empty_.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/engine.cpp", "torch/csrc/autograd/engine.h"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 232, "line_end": 244, "snippet": "auto ReadyQueue::push(NodeTask item, bool incrementOutstandingTasks) -> void {\n  {\n    // Lock mutex for writing to heap_\n    std::lock_guard<std::mutex> lock(mutex_);"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 260, "line_end": 267, "snippet": "auto ReadyQueue::pop() -> NodeTask {\n  // Lock mutex for accesses to heap_\n  std::unique_lock<std::mutex> lock(mutex_);\n  not_empty_.wait(lock, [this] { return !heap_.empty(); });"}
+      ]
+    },
+    {
+      "id": 7,
+      "question": "How does AccumulateGrad handle the 'Gradient Layout Contract' when accumulating gradients, and what are the different cases for gradient storage?",
+      "expected_answer": "AccumulateGrad::accumulateGrad() template at line 173 in accumulate_grad.h handles multiple cases: Case 1.1 (stealable dense): detach and use directly if obeys layout contract. Case 1.2 (stealable sparse): create new sparse tensor with indices/values. Case 1.5: clone_obey_contract() for non-stealable. Case 2.3 (existing grad, no grad mode): in-place variable_grad += new_grad. Case 3: out-of-place addition variable_grad + new_grad with update_grad().",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/functions/accumulate_grad.h", "torch/csrc/autograd/functions/accumulate_grad.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/functions/accumulate_grad.h", "line_start": 172, "line_end": 227, "snippet": "  template <typename T>\n  static void accumulateGrad(\n      const Variable& variable,\n      at::Tensor& variable_grad,\n      const at::Tensor& new_grad,\n      size_t num_expected_refs,\n      const T& update_grad) {"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/functions/accumulate_grad.h", "line_start": 239, "line_end": 256, "snippet": "      } else {\n        // Case 2.3: In-place addition\n        variable_grad += new_grad;\n        CHECK_RESULT(variable_grad, variable);"}
+      ]
+    },
+    {
+      "id": 8,
+      "question": "What is the mechanism for handling reentrant backward calls in the autograd engine, and how does thread_pool_shared_ coordinate worker threads?",
+      "expected_answer": "Reentrant backward calls are handled via add_thread_pool_task() at line 1622 which pushes the GraphTask to thread_pool_shared_->graphtasks_queue_. When max_recursion_depth_ is exceeded (line 1453), a new thread is spawned or existing pool thread is woken via work_.notify_one(). The reentrant_thread_init() at line 618 runs thread_main() for the queued graph tasks.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/engine.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 1622, "line_end": 1642, "snippet": "void Engine::add_thread_pool_task(const std::weak_ptr<GraphTask>& graph_task) {\n  std::unique_lock<std::mutex> lck(thread_pool_shared_->mutex_);"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 618, "line_end": 644, "snippet": "void Engine::reentrant_thread_init() {\n  c10::set_terminate_handler();\n  at::init_num_threads();"}
+      ]
+    },
+    {
+      "id": 9,
+      "question": "In DDP, how does the local_used_map mechanism work to detect and handle unused parameters during backward pass?",
+      "expected_answer": "local_used_map_ is initialized in initialize_local_used_map() at line 293. During backward, autograd_hook() sets local_used_map_[index] = 1 for used parameters (line 667). The all_reduce_local_used_map() at line 734 copies to device tensor and performs allreduce to synchronize across ranks. In finalize_backward() at line 1785, unused parameters are detected by checking which indices remain 0, and local_used_map_ is reset.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/distributed/c10d/reducer.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 734, "line_end": 793, "snippet": "void Reducer::all_reduce_local_used_map() {\n  // See Note [Skip allreducing local_used_map_dev]\n  // H2D from local_used_map_ to local_used_map_dev_"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 293, "line_end": 310, "snippet": "void Reducer::initialize_local_used_map() {\n  const auto variable_count = params_.size();\n  at::TensorOptions options;\n  options = options.dtype(at::kInt);"}
+      ]
+    },
+    {
+      "id": 10,
+      "question": "How does the GraphTask::init_to_execute method compute which nodes need to be executed during selective backward (when outputs are specified)?",
+      "expected_answer": "init_to_execute() at line 1664 uses iterative DFS to populate exec_info_. For each output edge, it marks exec_info_[output].needed_ = true or creates captures_. It then traverses the graph using a Frame stack (line 1718), checking child nodes via get_next_fn(). When a child should execute (nodeShouldExecute returns true), the parent's needed_ flag is set (line 1753). Nodes with topological_nr < min_topo_nr are skipped.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/engine.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 1664, "line_end": 1716, "snippet": "void GraphTask::init_to_execute(\n    Node& graph_root,\n    const edge_list& outputs,\n    bool accumulate_grad,\n    uint64_t min_topo_nr) {"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 1745, "line_end": 1774, "snippet": "  while (!stack.empty()) {\n    auto& frame = stack.back();\n    const auto fn = frame.fn_;"}
+      ]
+    },
+    {
+      "id": 11,
+      "question": "What is the exact sequence of operations in Engine::execute() from receiving root edges to returning gradient values?",
+      "expected_answer": "Engine::execute() at line 1286: 1) validate_outputs() checks inputs. 2) init_local_ready_queue() initializes thread-local queue. 3) Creates GraphTask with keep_graph, grad_mode settings. 4) Creates GraphRoot or uses existing node. 5) compute_dependencies() builds dependency graph. 6) init_to_execute() if outputs specified. 7) Queue root to ready queue via execute_with_graph_task(). 8) thread_main() processes nodes. 9) Wait on future_result_ and return gradient vector.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/engine.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 1286, "line_end": 1393, "snippet": "auto Engine::execute(\n    const edge_list& root_edges,\n    const variable_list& inputs,\n    bool keep_graph,\n    bool create_graph,\n    bool accumulate_grad,\n    const edge_list& outputs) -> variable_list {"}
+      ]
+    },
+    {
+      "id": 12,
+      "question": "How does compiled autograd (torch.compile for backward) intercept and transform the autograd graph? What is the role of AutogradCompilerInstance?",
+      "expected_answer": "Compiled autograd is enabled via Engine::set_compiled_autograd() which stores a callback function. In Engine::execute() at line 1307, if compiled_autograd is set, it calls (*compiled_autograd)(graph_root, *graph_task, accumulate_grad, outputs) instead of normal execution. AutogradCompilerInstance in compiled_autograd.py creates an FX tracer (PythonKeyTracer), ProxyTorchDispatchMode, and FakeTensorMode to trace backward operations into an optimizable graph.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/engine.cpp", "torch/_dynamo/compiled_autograd.py"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 1352, "line_end": 1364, "snippet": "  if (compiled_autograd != nullptr) {\n    TORCH_CHECK_NOT_IMPLEMENTED(\n        num_threads_in_compiled_autograd.load() == 0,"},
+        {"file": "/tmp/pytorch-benchmark/torch/_dynamo/compiled_autograd.py", "line_start": 285, "line_end": 300, "snippet": "class AutogradCompilerInstance:\n    def __init__(self, compiler_fn: Callable[..., Any]) -> None:\n        self.compiler_fn = compiler_fn\n        self.stack = contextlib.ExitStack()\n        self.close = self.stack.close\n        self.shape_env = ShapeEnv()"}
+      ]
+    },
+    {
+      "id": 13,
+      "question": "In the DDP Reducer, how is the division factor for gradient averaging determined, and how does it handle dynamic world size (join mode)?",
+      "expected_answer": "set_divide_factor() at line 540 determines div_factor_. By default it's set to process_group_->getSize(). For join mode with dynamic world size, if forwardPassWorkHandle_ is set and useStaticWorldSize is false, it waits on the work handle and extracts the division factor from the result tensor at line 555. The div_factor_ is reset to kUnsetDivFactor (-1) in finalize_backward() at line 1757.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/distributed/c10d/reducer.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 540, "line_end": 558, "snippet": "void Reducer::set_divide_factor() {\n  // If it was scheduled, wait on allreduce in forward pass that tells us\n  // division factor based on no. of currently participating processes.\n  if (div_factor_ == kUnsetDivFactor) {\n    div_factor_ = process_group_->getSize();"}
+      ]
+    },
+    {
+      "id": 14,
+      "question": "How does the call_function helper in engine.cpp orchestrate pre-hooks, tensor pre-hooks, the actual backward function, and post-hooks during node execution?",
+      "expected_answer": "call_function() at line 1015 orchestrates: 1) CheckpointValidGuard for gradient checkpointing. 2) call_tensor_pre_hooks() at line 1022 processes tensor-level pre-hooks. 3) call_pre_hooks() at line 1023 processes node pre-hooks. 4) fn.will_release_variables() if not keeping graph. 5) fn(inputs) calls the actual backward function at line 1048/1050. 6) validate_outputs() checks gradient validity. 7) call_post_hooks() at line 1060 processes post-hooks with inputs/outputs.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/engine.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 1015, "line_end": 1061, "snippet": "static variable_list call_function(\n    std::shared_ptr<GraphTask>& graph_task,\n    Node* func,\n    InputBuffer& inputBuffer) {\n  CheckpointValidGuard cpvguard(graph_task);"}
+      ]
+    },
+    {
+      "id": 15,
+      "question": "What happens when a bucket gradient is marked ready but subsequent buckets are not yet ready? How does the Reducer handle out-of-order gradient completion?",
+      "expected_answer": "mark_bucket_ready() at line 1025 first checks if bucket_index >= next_bucket_. If bucket_index > next_bucket_, it returns early (line 1030-1031) since buckets must be reduced in sequence. Otherwise, it enters a for loop (line 1037) that continues while next_bucket_ < buckets_.size() AND buckets_[next_bucket_].pending == 0, only reducing consecutive ready buckets.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/distributed/c10d/reducer.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 1024, "line_end": 1049, "snippet": "// Called when the bucket at the specified index is ready to be reduced.\nvoid Reducer::mark_bucket_ready(size_t bucket_index) {\n  TORCH_INTERNAL_ASSERT(bucket_index >= next_bucket_);\n\n  // Buckets are reduced in sequence. Ignore this bucket if\n  // it's not its turn to be reduced.\n  if (bucket_index > next_bucket_) {\n    return;\n  }"}
+      ]
+    },
+    {
+      "id": 16,
+      "question": "How does the autograd engine handle multi-stream synchronization when gradients are produced on different CUDA streams than they are consumed?",
+      "expected_answer": "The InputBuffer::add() method handles stream sync. For first producer (line 253-286): determines accumulation stream based on device matching (Case A: consumer stream, Case B: producer stream, Case C: current device stream), records event if streams differ. For Nth producer (line 288-318): waits on producer stream if different from accum stream, waits on ready_event if accum differs from ready stream, performs accumulation under stream guard.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/input_buffer.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/input_buffer.cpp", "line_start": 252, "line_end": 319, "snippet": "  // See Note: [Autograd Producer-Consumer Stream Syncs]\n  if (!opt_accum_streams[pos].has_value()) {\n    // [ First producer ]\n    TORCH_INTERNAL_ASSERT(!buffer[pos].defined());"}
+      ]
+    },
+    {
+      "id": 17,
+      "question": "In DDP, what is the 'Gradient Layout Contract' and how does mark_variable_ready_dense enforce it when copying gradients to bucket views?",
+      "expected_answer": "The Gradient Layout Contract (Note at line 1211-1246) states: if variable.is_non_overlapping_and_dense(), grad strides should match variable; otherwise grad should be rowmajor contiguous. In mark_variable_ready_dense() at line 353, check_grad_layout() at line 366 verifies dtype/device/numel match. When copying, if comm_hook is null, at::mul_out() or copy_ with division is used (line 376-406). gradient_as_bucket_view_ mode makes grad point to bucket_view directly.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/distributed/c10d/reducer.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 353, "line_end": 439, "snippet": "void Reducer::mark_variable_ready_dense(size_t variable_index) {\n  const auto& bucket_index = variable_locators_[variable_index];\n  auto& bucket = buckets_[bucket_index.bucket_index];"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 1211, "line_end": 1246, "snippet": "      // Note:  \"Gradient Layout Contract\"\n      //\n      // Here, create views into the `gradients` tensor for each variable's\n      // grad."}
+      ]
+    },
+    {
+      "id": 18,
+      "question": "How does the GraphTask::exec_post_processing method handle leaf stream synchronization and final callback execution?",
+      "expected_answer": "exec_post_processing() at line 708 first checks not_ready_ is empty. For leaf stream sync (line 727-753), it iterates through leaf_streams and for each stream different from caller_current_stream, records an event and makes caller stream wait. Final callbacks (line 755-780) run under MultiStreamGuard with caller_current_streams_filtered, within ThreadLocalStateGuard, iterating through final_callbacks_ and executing each.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/engine.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 708, "line_end": 781, "snippet": "void GraphTask::exec_post_processing() {\n  TORCH_CHECK(\n      not_ready_.empty(), \"could not compute gradients for some functions\");"}
+      ]
+    },
+    {
+      "id": 19,
+      "question": "What is the role of the dependencies_ map in GraphTask, and how is it computed in Engine::compute_dependencies?",
+      "expected_answer": "dependencies_ maps each Node* to its dependency count (number of incoming edges). compute_dependencies() at line 1248 starts with root node in queue. For each node, it iterates through next_edges() (line 1268). For each valid edge, it increments dependencies[next_ptr] (line 1270) and adds to queue if newly inserted in nodes_in_graph_ (line 1271-1273). This builds a count of how many predecessors must complete before a node can execute.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/engine.cpp", "torch/csrc/autograd/graph_task.h"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 1248, "line_end": 1284, "snippet": "auto Engine::compute_dependencies(\n    Node* root,\n    GraphTask& task,\n    uint64_t min_topo_nr) -> void {\n  // Computes the number of dependencies for each function which requires grad\n  std::vector<Node*> queue{root};"}
+      ]
+    },
+    {
+      "id": 20,
+      "question": "How does the torch.autograd.backward function flow from Python to the C++ engine, and what role does _engine_run_backward play?",
+      "expected_answer": "backward() in autograd/__init__.py at line 253 validates inputs, creates grad_tensors via _make_grads() (line 374), and calls _engine_run_backward() at line 381. _engine_run_backward is imported from graph.py and wraps the C++ Variable._execution_engine.run_backward() call. This bridges Python to the C++ Engine::execute() method which orchestrates the actual backward computation.",
+      "difficulty": "hard",
+      "requires_files": ["torch/autograd/__init__.py", "torch/autograd/graph.py"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/autograd/__init__.py", "line_start": 253, "line_end": 389, "snippet": "def backward(\n    tensors: _TensorOrTensorsOrGradEdge,\n    grad_tensors: Optional[_TensorOrOptionalTensors] = None,"},
+        {"file": "/tmp/pytorch-benchmark/torch/autograd/__init__.py", "line_start": 381, "line_end": 389, "snippet": "    _engine_run_backward(\n        tensors,\n        grad_tensors_,\n        retain_graph,\n        create_graph,\n        inputs_tuple,\n        allow_unreachable=True,\n        accumulate_grad=True,\n    )"}
+      ]
+    },
+    {
+      "id": 21,
+      "question": "In DDP, how does the comm_hook mechanism allow custom gradient communication, and what is the default allreduce behavior?",
+      "expected_answer": "run_comm_hook() at line 937 checks if comm_hook_ is null. If null, calls run_allreduce_hook() which creates _AllReduceBySumCommHook and calls runHook(). If comm_hook_ is set (via register_comm_hook), it calls comm_hook_->runHook(grad_bucket). The hook receives a GradBucket with gradient tensor, offsets, lengths, and returns a Future. Note at line 255 explains the hook completely overrides communication.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/distributed/c10d/reducer.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 937, "line_end": 950, "snippet": "c10::intrusive_ptr<c10::ivalue::Future> Reducer::run_comm_hook(\n    GradBucket& grad_bucket) {\n  if (comm_hook_ == nullptr) {\n    return run_allreduce_hook(grad_bucket);\n  } else {\n    return comm_hook_->runHook(grad_bucket);\n  }\n}"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 255, "line_end": 270, "snippet": "// Note [DDP Communication Hook]\n// ~~~~~~~~~~~~~~~~~~~~~~~~~~\n// If DDP communication hook is not registered, the reducer reduces the buckets\n// by just calling allreduce."}
+      ]
+    },
+    {
+      "id": 22,
+      "question": "How does the autograd engine handle the case where a node produces outputs for edges that don't exist (invalid edges)?",
+      "expected_answer": "In evaluate_function() at line 1164, after calling the backward function, the code iterates through outputs. At line 1168, it checks if (!next.is_valid()) and continues to the next iteration if the edge is invalid. This skips any processing for outputs that don't have valid downstream consumers. The validate_outputs() function at line 1001 also handles undefined gradients by continuing past them.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/engine.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 1164, "line_end": 1182, "snippet": "  for (const auto i : c10::irange(num_outputs)) {\n    auto& output = outputs[i];\n    const auto& next = fn.next_edge(i);\n\n    if (!next.is_valid())\n      continue;"}
+      ]
+    },
+    {
+      "id": 23,
+      "question": "What mechanism ensures thread safety when multiple threads access AccumulateGrad for the same parameter?",
+      "expected_answer": "AccumulateGrad has a mutex_ member. In AccumulateGrad::apply() at line 96, AccumulateGrad_apply_impl() is called with &mutex_ as the last parameter. Inside AccumulateGrad_apply_impl() at line 21, if mutex is not null, a std::lock_guard<std::mutex> is created (line 44-46) to protect the gradient accumulation. This ensures thread-safe updates to variable.grad() when autograd hooks fire concurrently.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/functions/accumulate_grad.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/functions/accumulate_grad.cpp", "line_start": 96, "line_end": 126, "snippet": "auto AccumulateGrad::apply(variable_list&& grads) -> variable_list {\n  if (variable.grad_fn()) {\n    throw std::logic_error(\n        \"leaf variable has been moved into the graph interior\");"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/functions/accumulate_grad.cpp", "line_start": 38, "line_end": 51, "snippet": "  // Acquire lock to here protect thread safety on variable, this ensures\n  // AccumulateGrad does not race to shared variable from different threads\n  // when updating the gradients.\n  std::optional<std::lock_guard<std::mutex>> lock;\n  if (mutex != nullptr) {\n    lock.emplace(*mutex);\n  }"}
+      ]
+    },
+    {
+      "id": 24,
+      "question": "How does the DDP Reducer handle sparse gradients differently from dense gradients in the bucket system?",
+      "expected_answer": "Sparse gradients require their own bucket (line 1103-1115 in initialize_buckets). mark_variable_ready_sparse() at line 441 handles sparse grads: it coalesces the gradient (line 456), handles sparse_metadata_ if set (line 455-470), and directly assigns to bucket.gradients (line 478) rather than copying to a view. The sparse bucket's offsets and lengths are empty since sparse tensors can't be flattened with other tensors.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/distributed/c10d/reducer.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 441, "line_end": 487, "snippet": "void Reducer::mark_variable_ready_sparse(size_t variable_index) {\n  const auto& bucket_index = variable_locators_[variable_index];\n  auto& bucket = buckets_[bucket_index.bucket_index];"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/distributed/c10d/reducer.cpp", "line_start": 1103, "line_end": 1115, "snippet": "    // Variables that expect sparse gradients must have their own bucket.\n    if (bucket_indices[bucket_index].size() == 1) {\n      const auto variable_index = bucket_indices[bucket_index].front();\n      bucket.expect_sparse_gradient = expect_sparse_gradients_[variable_index];"}
+      ]
+    },
+    {
+      "id": 25,
+      "question": "What is the complete flow of stash_current_streams() and its role in maintaining CUDA stream semantics during backward pass?",
+      "expected_answer": "stash_current_streams() at line 1646 captures the current streams on all accelerator devices with active contexts. It gets the accelerator type, creates a VirtualGuardImpl, queries deviceCount(), and for each device with hasPrimaryContext(), stores the current stream in caller_current_streams_. This is called from compute_dependencies() when will_use_accelerator is true (line 1278-1283). The stored streams are used in exec_post_processing() to sync leaf streams with user-facing streams.",
+      "difficulty": "hard",
+      "requires_files": ["torch/csrc/autograd/engine.cpp"],
+      "evidence": [
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 1646, "line_end": 1662, "snippet": "void GraphTask::stash_current_streams() {\n  // NOLINTNEXTLINE(bugprone-unchecked-optional-access)\n  const auto accelerator = at::getAccelerator(true).value();\n  const auto guard = c10::impl::VirtualGuardImpl{accelerator};"},
+        {"file": "/tmp/pytorch-benchmark/torch/csrc/autograd/engine.cpp", "line_start": 1278, "line_end": 1284, "snippet": "  if (will_use_accelerator) {\n    // Collects current streams for devices where this process has a\n    // context, so GraphTask::exec_post_processing can sync them with\n    // leaf_streams.\n    task.stash_current_streams();\n  }"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Resume Session",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "resume",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Resume Session endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "bd4e457a4aab0c6535767cbad33d8809f12f487a295c6cc7138defed65de58ef"
+  },
+  "variables": {
+    "test_space": "uats-resume-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/resume",
+    "body": {
+      "space_id": "{{test_space}}",
+      "session_id": "uats-session",
+      "max_observations": 10
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.observations",
+        "type": "array"
+      },
+      {
+        "path": "$.themes",
+        "type": "array"
+      },
+      {
+        "path": "$.emergent_concepts",
+        "type": "array"
+      },
+      {
+        "path": "$.summary",
+        "type": "string"
+      }
+    ]
+  }
+}

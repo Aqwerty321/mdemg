@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/config"
 )
 
 // TestConfig holds configuration for integration tests.
@@ -35,11 +36,17 @@ func getEnv(key, defaultVal string) string {
 
 // GetTestConfig loads test configuration from environment variables with sensible defaults.
 func GetTestConfig() TestConfig {
+	// For MDEMG endpoint: explicit test env var takes priority, then dynamic resolution
+	endpoint := getEnv("TEST_MDEMG_ENDPOINT", "")
+	if endpoint == "" {
+		endpoint = config.ResolveEndpoint("http://localhost:9999")
+	}
+
 	return TestConfig{
 		Neo4jURI:      getEnv("TEST_NEO4J_URI", "bolt://localhost:7687"),
 		Neo4jUser:     getEnv("TEST_NEO4J_USER", "neo4j"),
 		Neo4jPass:     getEnv("TEST_NEO4J_PASS", "testpassword"),
-		MDEMGEndpoint: getEnv("TEST_MDEMG_ENDPOINT", "http://localhost:8082"),
+		MDEMGEndpoint: endpoint,
 	}
 }
 

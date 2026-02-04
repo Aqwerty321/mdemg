@@ -1,0 +1,52 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Learning Freeze Status",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "learning",
+      "freeze",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Learning Freeze Status endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "f7e223da89afa7ccdfa7e9363bef41ae10982fbd93d748a5eb8cc637f4d9e96a"
+  },
+  "variables": {
+    "test_space": "uats-freeze-status-test"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/learning/freeze/status",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.state",
+        "type": "object"
+      },
+      {
+        "path": "$.state.frozen",
+        "type": "boolean"
+      }
+    ]
+  }
+}

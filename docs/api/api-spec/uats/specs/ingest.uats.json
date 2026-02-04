@@ -1,0 +1,108 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Ingest Memory",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "ingest",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Ingest Memory endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "614760dbcce6774372445309ec45f75c10a11a2a38e3c5bb6973c8018b523398"
+  },
+  "variables": {
+    "unique_id": {
+      "generator": "timestamp_ms"
+    },
+    "test_space": "uats-ingest"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/ingest",
+    "body": {
+      "space_id": "{{test_space}}-{{unique_id}}",
+      "timestamp": "2026-01-29T00:00:00Z",
+      "source": "uats-runner",
+      "content": "Test content for UATS validation"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.node_id",
+        "type": "string"
+      },
+      {
+        "path": "$.space_id",
+        "type": "string",
+        "contains": "uats-ingest"
+      },
+      {
+        "path": "$.obs_id",
+        "type": "string"
+      },
+      {
+        "path": "$.embedding_dims",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_content",
+      "description": "Test validation error when content is missing",
+      "request": {
+        "body": {
+          "space_id": "{{test_space}}",
+          "source": "test",
+          "content": null
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_source",
+      "description": "Test validation error when source is missing",
+      "request": {
+        "body": {
+          "space_id": "{{test_space}}",
+          "content": "test",
+          "source": null
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

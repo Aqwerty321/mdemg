@@ -1,0 +1,63 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Consolidate Memory",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "consolidate",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Consolidate Memory endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "2b3c1bd78c87d669d88615e2d14e33d767494cc660f2f22948fe5a95f5f739c1"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/consolidate",
+    "body": {
+      "space_id": "{{test_space}}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.data.hidden_nodes_created",
+        "type": "integer"
+      },
+      {
+        "path": "$.data.hidden_nodes_updated",
+        "type": "integer"
+      },
+      {
+        "path": "$.data.duration_ms",
+        "type": "integer"
+      },
+      {
+        "path": "$.data.enabled",
+        "type": "boolean"
+      }
+    ]
+  }
+}

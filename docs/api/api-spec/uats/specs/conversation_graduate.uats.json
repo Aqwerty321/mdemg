@@ -1,0 +1,63 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Graduate Observations",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "graduate",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Graduate Observations endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "5f108fa713b5293657aabf04714cd96b1203a8d7ab4f1213fbcedb0acd48c90a"
+  },
+  "variables": {
+    "test_space": "uats-graduate-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/graduate",
+    "body": {
+      "space_id": "{{test_space}}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.graduated",
+        "type": "integer"
+      },
+      {
+        "path": "$.tombstoned",
+        "type": "integer"
+      },
+      {
+        "path": "$.remaining_volatile",
+        "type": "integer"
+      },
+      {
+        "path": "$.decay_applied",
+        "type": "integer"
+      }
+    ]
+  }
+}

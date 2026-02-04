@@ -1,0 +1,207 @@
+{
+  "category": "cross_cutting_concerns",
+  "version": "1.0.0",
+  "generated": "2026-01-29",
+  "questions": [
+    {
+      "id": 1,
+      "question": "What context manager in torch.cuda.memory provides mutex locking for thread-safe memory operations, and what C functions does it call?",
+      "expected_answer": "The _free_mutex context manager provides mutex locking. It calls torch._C._cuda_lock_mutex() on entry and torch._C._cuda_unlock_mutex() in the finally block.",
+      "difficulty": "hard",
+      "requires_files": ["torch/cuda/memory.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/cuda/memory.py", "line_start": 101, "line_end": 108, "snippet": "@contextlib.contextmanager\ndef _free_mutex():\n    torch._C._cuda_lock_mutex()\n    try:\n        yield\n    finally:\n        torch._C._cuda_unlock_mutex()"}]
+    },
+    {
+      "id": 2,
+      "question": "What is the threshold size (in bytes) that determines whether an allocation goes to the small pool or large pool in PyTorch's CUDA caching allocator?",
+      "expected_answer": "The threshold is 1MB (1 megabyte). Allocations >= 1MB go to large_pool, while allocations < 1MB go to small_pool.",
+      "difficulty": "hard",
+      "requires_files": ["torch/cuda/memory.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/cuda/memory.py", "line_start": 257, "line_end": 260, "snippet": "    - ``large_pool``: statistics for the large allocation pool\n      (as of June 2025, for size >= 1MB allocations).\n    - ``small_pool``: statistics for the small allocation pool\n      (as of June 2025, for size < 1MB allocations)."}]
+    },
+    {
+      "id": 3,
+      "question": "In torch.serialization, what is the DEFAULT_PROTOCOL value used for pickling, and what constants define the magic number and protocol version for PyTorch checkpoints?",
+      "expected_answer": "DEFAULT_PROTOCOL is 2. The magic number is MAGIC_NUMBER = 0x1950A86A20F9469CFC6C and PROTOCOL_VERSION = 1001.",
+      "difficulty": "hard",
+      "requires_files": ["torch/serialization.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/serialization.py", "line_start": 59, "line_end": 67, "snippet": "DEFAULT_PROTOCOL = 2\n\nLONG_SIZE = struct.Struct(\"=l\").size\nINT_SIZE = struct.Struct(\"=i\").size\nSHORT_SIZE = struct.Struct(\"=h\").size\n\nMAGIC_NUMBER = 0x1950A86A20F9469CFC6C\nPROTOCOL_VERSION = 1001\nSTORAGE_KEY_SEPARATOR = \",\""}]
+    },
+    {
+      "id": 4,
+      "question": "What is the name of the thread-local class used in torch.serialization to store map_location, skip_data, and materialize_fake_tensors state during serialization?",
+      "expected_answer": "The class is _SerializationLocal, which inherits from threading.local. An instance is stored in _serialization_tls.",
+      "difficulty": "hard",
+      "requires_files": ["torch/serialization.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/serialization.py", "line_start": 99, "line_end": 107, "snippet": "class _SerializationLocal(threading.local):\n    def __init__(self):\n        super().__init__()\n        self.map_location: MAP_LOCATION | None = None\n        self.skip_data: bool = False\n        self.materialize_fake_tensors: bool = False\n\n\n_serialization_tls = _SerializationLocal()"}]
+    },
+    {
+      "id": 5,
+      "question": "What module-level list in torch._weights_only_unpickler contains the blocklisted modules that are never allowed even if the user attempts to allowlist them?",
+      "expected_answer": "The _blocklisted_modules list contains ['sys', 'os', 'posix', 'nt'] - these system modules are blocked for security.",
+      "difficulty": "hard",
+      "requires_files": ["torch/_weights_only_unpickler.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/_weights_only_unpickler.py", "line_start": 78, "line_end": 85, "snippet": "# modules in this list are never allowed, even if the user attempts to allowlist\n# functions/classes from them\n_blocklisted_modules = [\n    \"sys\",\n    \"os\",\n    \"posix\",\n    \"nt\",\n]"}]
+    },
+    {
+      "id": 6,
+      "question": "In the record_function profiler context manager, what operator is called on __enter__ and what operator on __exit__ to mark profiling boundaries?",
+      "expected_answer": "__enter__ calls torch.ops.profiler._record_function_enter_new(self.name, self.args), and __exit__ calls torch.ops.profiler._record_function_exit._RecordFunction(record) (with DisableTorchFunctionSubclass context when not scripting).",
+      "difficulty": "hard",
+      "requires_files": ["torch/autograd/profiler.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/autograd/profiler.py", "line_start": 800, "line_end": 821, "snippet": "    def __enter__(self):\n        self.record = torch.ops.profiler._record_function_enter_new(\n            self.name, self.args\n        )\n        return self\n\n    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any):\n        if not self.run_callbacks_on_exit:\n            return\n...\n        if not torch.jit.is_scripting():\n            with torch._C.DisableTorchFunctionSubclass():\n                torch.ops.profiler._record_function_exit._RecordFunction(record)"}]
+    },
+    {
+      "id": 7,
+      "question": "What exception classes are defined in torch._subclasses.fake_tensor for handling unsupported operations, and what are their purposes?",
+      "expected_answer": "The exception classes are: UnsupportedFakeTensorException (unsupported fake tensor operations), DynamicOutputShapeException (dynamic output shapes), DataDependentOutputException (data-dependent outputs), UnsupportedOperatorException (unsupported operators), UnsupportedMutationAliasingException (mutation aliasing issues), and MetadataMismatchError (metadata mismatches).",
+      "difficulty": "hard",
+      "requires_files": ["torch/_subclasses/fake_tensor.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/_subclasses/fake_tensor.py", "line_start": 113, "line_end": 139, "snippet": "@dataclass\nclass UnsupportedFakeTensorException(RuntimeError):\n    reason: str\n\n@dataclass\nclass DynamicOutputShapeException(RuntimeError):\n    func: OpOverload\n\n@dataclass\nclass DataDependentOutputException(RuntimeError):\n    func: OpOverload\n\n@dataclass\nclass UnsupportedOperatorException(RuntimeError):\n    func: OpOverload\n\n@dataclass\nclass UnsupportedMutationAliasingException(RuntimeError):\n    reason: str\n\n@dataclass\nclass MetadataMismatchError(RuntimeError):\n    reason: str"}]
+    },
+    {
+      "id": 8,
+      "question": "What does the _lazy_call function in torch.cuda.__init__ do when CUDA is not yet initialized, and where does it store pending calls?",
+      "expected_answer": "_lazy_call appends the callable and its traceback to the global _queued_calls list when CUDA is not initialized. Special handling exists for seed_all and seed operations via _lazy_seed_tracker.",
+      "difficulty": "hard",
+      "requires_files": ["torch/cuda/__init__.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/cuda/__init__.py", "line_start": 409, "line_end": 424, "snippet": "def _lazy_call(callable, **kwargs):\n    with _initialization_lock:\n        if is_initialized():\n            callable()\n        else:\n            global _lazy_seed_tracker\n            if kwargs.get(\"seed_all\", False):\n                _lazy_seed_tracker.queue_seed_all(callable, traceback.format_stack())\n            elif kwargs.get(\"seed\", False):\n                _lazy_seed_tracker.queue_seed(callable, traceback.format_stack())\n            else:\n                # Don't store the actual traceback to avoid memory cycle\n                _queued_calls.append((callable, traceback.format_stack()))"}]
+    },
+    {
+      "id": 9,
+      "question": "What are the two memory statistics related to allocation failures tracked by the CUDA memory allocator, as returned by memory_stats()?",
+      "expected_answer": "The two statistics are 'num_alloc_retries' (number of failed cudaMalloc calls that result in a cache flush and retry) and 'num_ooms' (number of out-of-memory errors thrown).",
+      "difficulty": "hard",
+      "requires_files": ["torch/cuda/memory.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/cuda/memory.py", "line_start": 272, "line_end": 275, "snippet": "    - ``\"num_alloc_retries\"``: number of failed ``cudaMalloc`` calls that\n      result in a cache flush and retry.\n    - ``\"num_ooms\"``: number of out-of-memory errors thrown.\n    - ``\"num_sync_all_streams\"``: number of ``synchronize_and_free_events`` calls."}]
+    },
+    {
+      "id": 10,
+      "question": "In torch.utils.data._utils.pin_memory, what does the _pin_memory_loop function set for thread configuration, and why?",
+      "expected_answer": "It calls torch.set_num_threads(1) to prevent the copy in pin_memory from consuming all CPU cores. It also sets the thread name to 'pt_data_pin' via torch.multiprocessing._set_thread_name().",
+      "difficulty": "hard",
+      "requires_files": ["torch/utils/data/_utils/pin_memory.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/utils/data/_utils/pin_memory.py", "line_start": 18, "line_end": 24, "snippet": "def _pin_memory_loop(in_queue, out_queue, device_id, done_event, device) -> None:\n    # This setting is thread local, and prevents the copy in pin_memory from\n    # consuming all CPU cores.\n    torch.set_num_threads(1)\n\n    torch.multiprocessing._set_thread_name(\"pt_data_pin\")\n    torch.accelerator.set_device_index(device_id)"}]
+    },
+    {
+      "id": 11,
+      "question": "What are the valid action types that can be skipped when recording memory history via _record_memory_history's skip_actions parameter?",
+      "expected_answer": "The valid action types are: 'alloc' (memory allocation events), 'free_requested' (free requests), 'free_completed' (completed free operations), 'segment_alloc' (segment allocation from cudaMalloc), 'segment_free' (segment freed back to CUDA), 'oom' (out-of-memory exceptions), and 'snapshot' (memory snapshot generation events).",
+      "difficulty": "hard",
+      "requires_files": ["torch/cuda/memory.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/cuda/memory.py", "line_start": 928, "line_end": 941, "snippet": "        skip_actions (list[str], optional): List of action types to skip when recording\n            memory history. This can be used to reduce memory overhead by excluding\n            certain types of events from being recorded. Valid action types are:\n\n            - `\"alloc\"`: Memory allocation events\n            - `\"free_requested\"`: Free requests (memory marked for freeing)\n            - `\"free_completed\"`: Completed free operations (memory actually freed)\n            - `\"segment_alloc\"`: Segment allocation from cudaMalloc\n            - `\"segment_free\"`: Segment freed back to CUDA via cudaFree\n            - `\"oom\"`: Out-of-memory exceptions\n            - `\"snapshot\"`: Memory snapshot generation events"}]
+    },
+    {
+      "id": 12,
+      "question": "What is the priority order of device deserializers registered via register_package for different device types in torch.serialization?",
+      "expected_answer": "The priority order is: CPU (10), CUDA (20), MPS (21), meta (22), privateuse1 (23), HPU (24), XPU (25), MTIA (26). Lower numbers have higher priority.",
+      "difficulty": "hard",
+      "requires_files": ["torch/serialization.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/serialization.py", "line_start": 669, "line_end": 696, "snippet": "register_package(10, _cpu_tag, _cpu_deserialize)\nregister_package(\n    20,\n    functools.partial(_backend_tag, \"cuda\"),\n    functools.partial(_deserialize, \"cuda\"),\n)\nregister_package(21, _mps_tag, _mps_deserialize)\nregister_package(22, _meta_tag, _meta_deserialize)\nregister_package(\n    23,\n    functools.partial(_backend_tag, \"privateuse1\"),\n    functools.partial(_deserialize, \"privateuse1\"),\n)\nregister_package(\n    24,\n    functools.partial(_backend_tag, \"hpu\"),\n    functools.partial(_deserialize, \"hpu\"),\n)\nregister_package(\n    25,\n    functools.partial(_backend_tag, \"xpu\"),\n    functools.partial(_deserialize, \"xpu\"),\n)\nregister_package(\n    26,\n    functools.partial(_backend_tag, \"mtia\"),\n    functools.partial(_deserialize, \"mtia\"),\n)"}]
+    },
+    {
+      "id": 13,
+      "question": "What environment variable controls the CUDA allocator backend, and what are the two available backends mentioned in get_allocator_backend()?",
+      "expected_answer": "The environment variable is PYTORCH_ALLOC_CONF. The two available backends are 'native' (PyTorch's native caching allocator) and 'cudaMallocAsync' (CUDA's built-in asynchronous allocator).",
+      "difficulty": "hard",
+      "requires_files": ["torch/cuda/memory.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/cuda/memory.py", "line_start": 1146, "line_end": 1155, "snippet": "def get_allocator_backend() -> str:\n    r\"\"\"Return a string describing the active allocator backend as set by\n    ``PYTORCH_ALLOC_CONF``. Currently available backends are\n    ``native`` (PyTorch's native caching allocator) and `cudaMallocAsync``\n    (CUDA's built-in asynchronous allocator).\n\n    .. note::\n        See :ref:`cuda-memory-management` for details on choosing the allocator backend.\n    \"\"\"\n    return torch._C._cuda_getAllocatorBackend()"}]
+    },
+    {
+      "id": 14,
+      "question": "What are the constructor parameters for the MemPool class in torch.cuda.memory, and what does the no_split parameter control?",
+      "expected_answer": "MemPool takes allocator (_cuda_CUDAAllocator or None), use_on_oom (bool, use as last resort for OOM), and no_split (bool, whether the pool should not split a segment). no_split controls whether memory segments in this pool can be split for smaller allocations.",
+      "difficulty": "hard",
+      "requires_files": ["torch/cuda/memory.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/cuda/memory.py", "line_start": 1225, "line_end": 1250, "snippet": "class MemPool(_MemPool):\n    r\"\"\"MemPool represents a pool of memory in a caching allocator. Currently,\n    it's just the ID of the pool object maintained in the CUDACachingAllocator.\n\n    Args:\n        allocator(torch._C._cuda_CUDAAllocator, optional): a\n            torch._C._cuda_CUDAAllocator object that can be used to\n            define how memory gets allocated in the pool. If :attr:`allocator`\n            is ``None`` (default), memory allocation follows the default/\n            current configuration of the CUDACachingAllocator.\n        use_on_oom(bool): a bool that indicates if this pool can be used\n            as a last resort if a memory allocation outside of the pool fails due\n            to Out Of Memory. This is False by default.\n        no_split(bool): a bool that indicates if this pool should not split a segment.\n            This is False by default.\n    \"\"\"\n\n    def __init__(\n        self,\n        allocator: _cuda_CUDAAllocator | None = None,\n        use_on_oom: bool = False,\n        no_split: bool = False,\n    ):\n        super().__init__(allocator, True, use_on_oom, no_split)"}]
+    },
+    {
+      "id": 15,
+      "question": "In torch.profiler.profiler, what is the purpose of the PROFILER_STEP_NAME constant, and how is it used with KinetoStepTracker?",
+      "expected_answer": "PROFILER_STEP_NAME is set to 'ProfilerStep' and is used to initialize and track step counts with Kineto via prof.KinetoStepTracker.init_step_count(PROFILER_STEP_NAME) at profiler init and prof.KinetoStepTracker.erase_step_count(PROFILER_STEP_NAME) at exit.",
+      "difficulty": "hard",
+      "requires_files": ["torch/profiler/profiler.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/profiler/profiler.py", "line_start": 39, "line_end": 39, "snippet": "PROFILER_STEP_NAME = \"ProfilerStep\""}, {"file": "/tmp/pytorch-benchmark/torch/profiler/profiler.py", "line_start": 847, "line_end": 847, "snippet": "        prof.KinetoStepTracker.init_step_count(PROFILER_STEP_NAME)"}, {"file": "/tmp/pytorch-benchmark/torch/profiler/profiler.py", "line_start": 855, "line_end": 855, "snippet": "        prof.KinetoStepTracker.erase_step_count(PROFILER_STEP_NAME)"}]
+    },
+    {
+      "id": 16,
+      "question": "What message does PyTorch display when weights_only=True fails during torch.load, and what does the UNSAFE_MESSAGE constant warn about?",
+      "expected_answer": "UNSAFE_MESSAGE warns that in PyTorch 2.6, the default value of weights_only changed from False to True. Re-running with weights_only=False will likely succeed but can result in arbitrary code execution. Only do it if you got the file from a trusted source.",
+      "difficulty": "hard",
+      "requires_files": ["torch/serialization.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/serialization.py", "line_start": 76, "line_end": 81, "snippet": "UNSAFE_MESSAGE = (\n    \"In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` \"\n    \"from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, \"\n    \"but it can result in arbitrary code execution. Do it only if you got the file from a \"\n    \"trusted source.\"\n)"}]
+    },
+    {
+      "id": 17,
+      "question": "What exception is raised when attempting to re-initialize CUDA in a forked subprocess, and where is this check performed?",
+      "expected_answer": "A RuntimeError with message 'Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the spawn start method' is raised in _lazy_init() when _is_in_bad_fork() returns True.",
+      "difficulty": "hard",
+      "requires_files": ["torch/cuda/__init__.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/cuda/__init__.py", "line_start": 468, "line_end": 472, "snippet": "        if _is_in_bad_fork():\n            raise RuntimeError(\n                \"Cannot re-initialize CUDA in forked subprocess. To use CUDA with \"\n                \"multiprocessing, you must use the 'spawn' start method\"\n            )"}]
+    },
+    {
+      "id": 18,
+      "question": "What are the Category enum values defined in torch.profiler._memory_profiler for classifying memory allocations?",
+      "expected_answer": "The Category enum values are: INPUT, TEMPORARY, ACTIVATION, GRADIENT, AUTOGRAD_DETAIL, PARAMETER, and OPTIMIZER_STATE.",
+      "difficulty": "hard",
+      "requires_files": ["torch/profiler/_memory_profiler.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/profiler/_memory_profiler.py", "line_start": 31, "line_end": 38, "snippet": "class Category(enum.Enum):\n    INPUT = enum.auto()\n    TEMPORARY = enum.auto()\n    ACTIVATION = enum.auto()\n    GRADIENT = enum.auto()\n    AUTOGRAD_DETAIL = enum.auto()\n    PARAMETER = enum.auto()\n    OPTIMIZER_STATE = enum.auto()"}]
+    },
+    {
+      "id": 19,
+      "question": "What function in torch.serialization checks if a file is a valid PyTorch zip checkpoint by examining the magic number bytes?",
+      "expected_answer": "The _is_zipfile function checks for the ZIP local header magic number b'PK\\x03\\x04' at the start of the file. It's stricter than zipfile.is_zipfile() as it only checks the start bytes.",
+      "difficulty": "hard",
+      "requires_files": ["torch/serialization.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/serialization.py", "line_start": 428, "line_end": 441, "snippet": "def _is_zipfile(f) -> bool:\n    # This is a stricter implementation than zipfile.is_zipfile().\n    # zipfile.is_zipfile() is True if the magic number appears anywhere in the\n    # binary. Since we expect the files here to be generated by torch.save or\n    # torch.jit.save, it's safe to only check the start bytes and avoid\n    # collisions and assume the zip has only 1 file.\n    # See bugs.python.org/issue28494.\n\n    start = f.tell()\n    # Read the first few bytes and match against the ZIP file signature\n    local_header_magic_number = b\"PK\\x03\\x04\"\n    read_bytes = f.read(len(local_header_magic_number))\n    f.seek(start)\n    return read_bytes == local_header_magic_number"}]
+    },
+    {
+      "id": 20,
+      "question": "In torch._export.error, what are the six ExportErrorType enum values, and what does each represent?",
+      "expected_answer": "The six values are: INVALID_INPUT_TYPE (1, invalid inputs to tracer/APIs), INVALID_OUTPUT_TYPE (2, unsupported return values), VIOLATION_OF_SPEC (3, IR doesn't conform to Export IR Specification), NOT_SUPPORTED (4, unsupported types/functionalities), MISSING_PROPERTY (5, necessary details not provided for tracing), UNINITIALIZED (6, API used without proper initialization).",
+      "difficulty": "hard",
+      "requires_files": ["torch/_export/error.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/_export/error.py", "line_start": 4, "line_end": 22, "snippet": "class ExportErrorType(Enum):\n    # User providing invalid inputs to either tracer, or other public facing APIs\n    INVALID_INPUT_TYPE = 1\n\n    # User returning values from their models that we don't support.\n    INVALID_OUTPUT_TYPE = 2\n\n    # Generated IR does not conform to Export IR Specification.\n    VIOLATION_OF_SPEC = 3\n\n    # User's code contains types and functionalities we don't support.\n    NOT_SUPPORTED = 4\n\n    # User's code didn't provide necessary details for us to successfully trace and export.\n    MISSING_PROPERTY = 5\n\n    # User is using an API without proper initialization step.\n    UNINITIALIZED = 6"}]
+    },
+    {
+      "id": 21,
+      "question": "What does the skip_data context manager in torch.serialization do, and what is the materialize_fake_tensors parameter for?",
+      "expected_answer": "skip_data skips writing/reading storage bytes for torch.save/torch.load calls. For save, storages are saved but their byte space is empty. For load, tensors are loaded but storages are not populated with data. The materialize_fake_tensors parameter controls whether to materialize FakeTensors during save (no-op for load path).",
+      "difficulty": "hard",
+      "requires_files": ["torch/serialization.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/serialization.py", "line_start": 385, "line_end": 425, "snippet": "class skip_data:\n    \"\"\"\n    Context-manager that skips writing/reading storage bytes for ``torch.save`` / ``torch.load`` calls.\n\n    For the save path, storages will still be saved, but the space that their bytes would usually be written to\n    will be empty space. The storage bytes can then be populated in a separate pass.\n\n    For the load path, tensors will be loaded per the checkpoint but their storages will not be populated with data.\n\n    .. warning::\n        The ``skip_data`` context manager is an early prototype and is subject to change.\n\n    Args:\n        materialize_fake_tensors: Whether to materialize FakeTensors during save. This is a no-op for the load path."}]
+    },
+    {
+      "id": 22,
+      "question": "What does the _validate_device function in torch.serialization check for, and what error does it raise when device validation fails?",
+      "expected_answer": "_validate_device checks if a device module is registered, if the device is available (is_available()), and if the device index is valid (within device_count()). It raises RuntimeError with appropriate messages for each failure case.",
+      "difficulty": "hard",
+      "requires_files": ["torch/serialization.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/serialization.py", "line_start": 601, "line_end": 650, "snippet": "def _validate_device(location, backend_name):\n    ...\n    if not hasattr(torch, backend_name):\n        raise RuntimeError(\n            f\"The {backend_name.upper()} device module is not registered. \"\n            \"If you are running on a CPU-only machine, \"\n            \"please use torch.load with map_location=torch.device('cpu') \"\n            \"to map your storages to the CPU.\"\n        )\n    ...\n    if hasattr(device_module, \"is_available\") and not device_module.is_available():\n        raise RuntimeError(\n            f\"Attempting to deserialize object on a {backend_name.upper()} \"\n            f\"device but torch.{backend_name}.is_available() is False.\"\n        )\n    if hasattr(device_module, \"device_count\"):\n        device_count = device_module.device_count()\n        if device_index >= device_count:\n            raise RuntimeError(\n                f\"Attempting to deserialize object on {backend_name.upper()} device \"\n                f\"{device_index} but torch.{backend_name}.device_count() is {device_count}.\"\n            )"}]
+    },
+    {
+      "id": 23,
+      "question": "What is the use_mem_pool context manager's limitation regarding thread safety, as documented in its docstring?",
+      "expected_answer": "The use_mem_pool context manager only makes the current thread's allocations route to the given pool. If a new thread is spawned inside the context manager (e.g., by calling backward), allocations in that thread will not route to the given pool.",
+      "difficulty": "hard",
+      "requires_files": ["torch/cuda/memory.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/cuda/memory.py", "line_start": 1280, "line_end": 1296, "snippet": "@contextlib.contextmanager\ndef use_mem_pool(pool: MemPool, device: \"Device\" = None):\n    r\"\"\"A context manager that routes allocations to a given pool.\n\n    Args:\n        pool(torch.cuda.MemPool): a MemPool object to be made active so that\n            allocations route to this pool.\n        device (torch.device or int, optional): selected device. Uses MemPool on\n            the current device, given by :func:`~torch.cuda.current_device`,\n            if :attr:`device` is ``None`` (default).\n\n    .. note::\n        This context manager makes only current thread's allocations route to\n        the given pool. If a new thread is spawned inside the context manager\n        (e.g. by calling backward) the allocations in that thread will not\n        route to the given pool.\n    \"\"\""}]
+    },
+    {
+      "id": 24,
+      "question": "What are the state values for blocks in a CUDA memory snapshot, and what does 'active_awaiting_free' mean?",
+      "expected_answer": "The block states are: 'active_allocated' (used by a tensor), 'active_awaiting_free' (waiting for another stream to finish using this, then it will become free), and 'inactive' (free for reuse).",
+      "difficulty": "hard",
+      "requires_files": ["torch/cuda/memory.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/cuda/memory.py", "line_start": 1012, "line_end": 1018, "snippet": "            state: Literal[\n                \"active_allocated\",  # used by a tensor\n                \"active_awaiting_free\",  # waiting for another stream to finish using\n                # this, then it will become free\n                \"inactive\",\n            ]  # free for reuse"}]
+    },
+    {
+      "id": 25,
+      "question": "In torch.autograd.profiler, what dataclass tracks profiler timing stats, and what specific duration fields does it contain?",
+      "expected_answer": "The _ProfilerStats dataclass tracks profiler timing. It contains: profiling_window_duration_sec, number_of_events, profiler_prepare_call_duration_us, profiler_enable_call_duration_us, profiler_disable_call_duration_us, parse_kineto_call_duration_us, and function_events_build_tree_call_duration_us.",
+      "difficulty": "hard",
+      "requires_files": ["torch/autograd/profiler.py"],
+      "evidence": [{"file": "/tmp/pytorch-benchmark/torch/autograd/profiler.py", "line_start": 95, "line_end": 106, "snippet": "@dataclass\nclass _ProfilerStats:\n    \"Profiler timing and stats used by developers to catch issues/regressions\"\n\n    profiling_window_duration_sec: float = 0\n    number_of_events: int = 0\n    profiler_prepare_call_duration_us: int = 0\n    profiler_enable_call_duration_us: int = 0\n    profiler_disable_call_duration_us: int = 0\n    parse_kineto_call_duration_us: int = 0\n    function_events_build_tree_call_duration_us: int = 0"}]
+    }
+  ]
+}

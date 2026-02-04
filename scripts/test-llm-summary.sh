@@ -120,10 +120,18 @@ check_prerequisites() {
         fi
     fi
 
-    # Check if MDEMG server is running
-    MDEMG_ENDPOINT="${LISTEN_ADDR:-:8090}"
-    if [[ "$MDEMG_ENDPOINT" == :* ]]; then
-        MDEMG_ENDPOINT="http://localhost$MDEMG_ENDPOINT"
+    # Check if MDEMG server is running (dynamic port discovery)
+    if [ -n "$MDEMG_ENDPOINT" ]; then
+        true  # already set
+    elif [ -f .mdemg.port ]; then
+        MDEMG_ENDPOINT="http://localhost:$(cat .mdemg.port)"
+    elif [ -n "$LISTEN_ADDR" ]; then
+        MDEMG_ENDPOINT="${LISTEN_ADDR}"
+        if [[ "$MDEMG_ENDPOINT" == :* ]]; then
+            MDEMG_ENDPOINT="http://localhost$MDEMG_ENDPOINT"
+        fi
+    else
+        MDEMG_ENDPOINT="http://localhost:9999"
     fi
 
     if ! curl -s "$MDEMG_ENDPOINT/health" > /dev/null 2>&1; then
@@ -270,9 +278,18 @@ validate_summaries() {
         return 0
     fi
 
-    MDEMG_ENDPOINT="${LISTEN_ADDR:-:8090}"
-    if [[ "$MDEMG_ENDPOINT" == :* ]]; then
-        MDEMG_ENDPOINT="http://localhost$MDEMG_ENDPOINT"
+    # Dynamic port discovery for validation queries
+    if [ -z "$MDEMG_ENDPOINT" ]; then
+        if [ -f .mdemg.port ]; then
+            MDEMG_ENDPOINT="http://localhost:$(cat .mdemg.port)"
+        elif [ -n "$LISTEN_ADDR" ]; then
+            MDEMG_ENDPOINT="${LISTEN_ADDR}"
+            if [[ "$MDEMG_ENDPOINT" == :* ]]; then
+                MDEMG_ENDPOINT="http://localhost$MDEMG_ENDPOINT"
+            fi
+        else
+            MDEMG_ENDPOINT="http://localhost:9999"
+        fi
     fi
 
     # Query for nodes with summaries

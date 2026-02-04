@@ -4,7 +4,7 @@
 #
 # Prerequisites:
 #   - Neo4j running (docker compose up -d)
-#   - MDEMG service running on port 8082
+#   - MDEMG service running on port 9999
 #
 # Usage:
 #   ./e2e_archive_test.sh
@@ -12,7 +12,7 @@
 set -e
 
 # Configuration
-BASE_URL="${BASE_URL:-http://localhost:8082}"
+BASE_URL="${BASE_URL:-http://localhost:9999}"
 SPACE_ID="e2e-archive-test"
 TEST_NODE_ID=""
 PASS_COUNT=0

@@ -1093,11 +1093,13 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 	if !req.SkipClustering {
 		maxLayers := 5
 		for targetLayer := 2; targetLayer <= maxLayers; targetLayer++ {
-			conceptCreated, err := s.hiddenLayer.CreateConceptNodes(r.Context(), req.SpaceID, targetLayer)
+			conceptCreated, conceptMerged, err := s.hiddenLayer.CreateConceptNodes(r.Context(), req.SpaceID, targetLayer)
 			if err != nil {
 				writeInternalError(w, err, fmt.Sprintf("concept node creation layer %d", targetLayer))
 				return
 			}
+			// Track merged concepts
+			resp.ConceptNodesMerged += conceptMerged
 			// Don't break on zero - upper layers may still form clusters
 			if conceptCreated > 0 {
 				resp.ConceptNodesCreated += conceptCreated

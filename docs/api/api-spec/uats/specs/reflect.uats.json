@@ -1,0 +1,62 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Reflect on Memory",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "reflect",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Reflect on Memory endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "08461c5536c869e5701618bfebc25d18ac0e47e0e622881e8c01215ff29125e6"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/reflect",
+    "body": {
+      "space_id": "{{test_space}}",
+      "topic": "system patterns",
+      "max_depth": 3,
+      "max_nodes": 50
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.topic",
+        "type": "string"
+      },
+      {
+        "path": "$.core_memories",
+        "type": "array"
+      },
+      {
+        "path": "$.related_concepts",
+        "type": "array"
+      },
+      {
+        "path": "$.graph_context",
+        "type": "object"
+      }
+    ]
+  }
+}

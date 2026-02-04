@@ -1,0 +1,59 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Trigger Ingest Job",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "ingest",
+      "jobs",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Trigger Ingest Job endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "34672c265e8486f9c2c61c6642e9ebf7b755052dfda6b8308027394a4e0fd8aa"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/ingest/trigger",
+    "body": {
+      "space_id": "uats-ingest-{{$timestamp}}",
+      "path": "/tmp"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": [
+      200,
+      202
+    ],
+    "body_assertions": [
+      {
+        "path": "$.job_id",
+        "type": "string"
+      },
+      {
+        "path": "$.status",
+        "type": "string"
+      },
+      {
+        "path": "$.message",
+        "type": "string"
+      }
+    ]
+  }
+}

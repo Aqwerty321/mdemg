@@ -1,0 +1,50 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Ingest Job Status",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "ingest",
+      "jobs",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Get status of an ingest job",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "a220aaa9c16bedff716a2174c21a86ea7e148a67f6b2ffce2e22cadb1cf7deb8"
+  },
+  "variables": {
+    "job_id": "nonexistent-job-id"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/ingest/status/{{job_id}}"
+  },
+  "expected": {
+    "status": [
+      200,
+      404
+    ],
+    "body_assertions": [
+      {
+        "path": "$.job_id",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "path": "$.status",
+        "type": "string",
+        "optional": true
+      }
+    ]
+  }
+}

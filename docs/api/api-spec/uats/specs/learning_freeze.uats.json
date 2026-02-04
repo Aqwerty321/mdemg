@@ -1,0 +1,62 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Freeze Learning",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "learning",
+      "freeze",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Freeze Learning endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "7b76792975f83f5425da02efeec5f561a26eabd358b76fc8f82ddbfe824640b0"
+  },
+  "variables": {
+    "test_space": "uats-freeze-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/learning/freeze",
+    "body": {
+      "space_id": "{{test_space}}",
+      "reason": "UATS test freeze",
+      "frozen_by": "uats-runner"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.status",
+        "type": "string",
+        "value": "frozen"
+      },
+      {
+        "path": "$.state",
+        "type": "object"
+      },
+      {
+        "path": "$.message",
+        "type": "string"
+      }
+    ]
+  }
+}

@@ -107,6 +107,30 @@ curl -s -X POST http://localhost:9999/v1/learning/unfreeze -H "Content-Type: app
 
 ---
 
+## Git Workflow
+
+### Development Branch: `mdemg-dev01`
+- **All development work happens on `mdemg-dev01`** — never commit directly to `main`
+- `main` is branch-protected; changes reach it only via PR
+- On push to `mdemg-dev01`, a GitHub Actions workflow (`.github/workflows/auto-pr.yml`) automatically creates a PR to `main` if one doesn't already exist
+- Subsequent pushes update the existing PR automatically
+- Always verify you are on `mdemg-dev01` before starting work: `git branch --show-current`
+
+### Commit & Push Flow
+```bash
+# 1. Ensure you're on the dev branch
+git checkout mdemg-dev01
+
+# 2. Make changes, stage, commit (conventional commits)
+git add <files>
+git commit -m "feat: description"
+
+# 3. Push — auto-PR is created/updated on GitHub
+git push -u origin mdemg-dev01
+```
+
+---
+
 ## Orchestration Protocol
 
 When working on this project, follow these mandatory guidelines:
@@ -147,15 +171,24 @@ A persistent memory system for LLMs providing:
 - `internal/api/` - HTTP API handlers
 - `docs/tests/` - Benchmark tests and results
 
-### Current Issues (as of 2026-01-23)
-- Benchmark scores dropped from 0.710 to 0.522 (-26.5%)
-- Layer 1 (hidden) nodes showing 0.00/10 in results
-- Investigation needed for hidden layer retrieval
+### Current Status (as of 2026-02-02)
+
+**Benchmark Performance:**
+- MDEMG + Edge Attention: 0.898 mean score (whk-wms 120q)
+- Baseline: 0.854 mean score
+- Delta: +5.2% improvement over baseline
+
+**Key Features Implemented:**
+- Edge-Type Attention for query-aware activation spreading
+- Query-type detection (symbol_lookup, data_flow, architecture, generic)
+- RetrievalHints for fine-grained control
+- Layer-specific temporal decay (L0: 0.05/day, L1: 0.02/day, L2: 0.01/day)
 
 ## Testing
-- Benchmark tests in `docs/tests/whk-wms/`
-- Run V11 test: `python3 docs/tests/whk-wms/run_mdemg_test_v11_alltracks.py`
-- Question file: `test_questions_v4_selected.json` (100 questions, seed 42)
+- Canonical benchmark: `docs/benchmarks/whk-wms/benchmark_run_20260130/`
+- Question set: `test_questions_120.json` (120 questions)
+- Run V4 benchmark: `python docs/benchmarks/run_benchmark_v4.py`
+- Grader: `python docs/benchmarks/grader_v4.py`
 
 ---
 
@@ -184,16 +217,15 @@ BEFORE ANY DECISION:
 ```
 
 ### Destructive Action Blocklist
-The `pre-bash-check.py` hook automatically blocks these. If you hit a block,
-you MUST ask the user for explicit confirmation before retrying.
-```
-BLOCKED WITHOUT EXPLICIT USER CONFIRMATION:
-- reset-db, clear-space, DELETE nodes
-- rm -rf, rm -fr
-- git reset --hard, git push --force, git clean -f, git branch -D
-- DROP TABLE, TRUNCATE, DELETE FROM, DETACH DELETE
-- Any MATCH (n) DETACH DELETE n pattern
-```
+The `pre-bash-check.py` hook automatically blocks dangerous operations.
+Blocked categories include:
+- **Database destruction**: reset/clear operations, table/schema drops, truncation, bulk deletes
+- **File system destruction**: recursive forced deletion operations
+- **Git history rewrites**: hard resets, force pushes, forced branch deletes, forced cleans
+- **Graph database destruction**: node deletion patterns (Neo4j/Cypher)
+
+See `.claude/hooks/pre-bash-check.py` for the complete pattern list.
+If you hit a block, you MUST ask the user for explicit confirmation before retrying.
 
 ### Communication Protocol
 ```

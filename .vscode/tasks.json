@@ -54,13 +54,13 @@
     {
       "label": "Test Health Endpoint",
       "type": "shell",
-      "command": "curl -s http://localhost:8082/healthz | jq",
+      "command": "PORT=$(cat .mdemg.port 2>/dev/null || echo 9999); curl -s http://localhost:$PORT/healthz | jq",
       "problemMatcher": []
     },
     {
       "label": "Test Readiness Endpoint",
       "type": "shell",
-      "command": "curl -s http://localhost:8082/readyz | jq",
+      "command": "PORT=$(cat .mdemg.port 2>/dev/null || echo 9999); curl -s http://localhost:$PORT/readyz | jq",
       "problemMatcher": []
     },
     {

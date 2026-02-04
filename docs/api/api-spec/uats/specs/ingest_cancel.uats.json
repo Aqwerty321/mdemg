@@ -1,0 +1,39 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Cancel Ingest Job",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "ingest",
+      "jobs",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Cancel a running ingest job",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "24084d89aeec20938dd00d646f9e0d30788070e236ba6020b29cf203e3c017b9"
+  },
+  "variables": {
+    "job_id": "nonexistent-job-id"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/ingest/cancel/{{job_id}}"
+  },
+  "expected": {
+    "status": [
+      200,
+      404
+    ],
+    "body_assertions": []
+  }
+}

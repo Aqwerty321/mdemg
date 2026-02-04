@@ -1,0 +1,50 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Pool Metrics",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "pool",
+      "metrics",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Pool Metrics endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "dfffce52f2d1ea5c7b47e5b43b0d878ccd510829fe1838e5da11eaf6d9246833"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/system/pool-metrics"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.connection_pool",
+        "type": "object"
+      },
+      {
+        "path": "$.runtime",
+        "type": "object"
+      },
+      {
+        "path": "$.runtime.goroutines",
+        "type": "integer"
+      }
+    ]
+  }
+}

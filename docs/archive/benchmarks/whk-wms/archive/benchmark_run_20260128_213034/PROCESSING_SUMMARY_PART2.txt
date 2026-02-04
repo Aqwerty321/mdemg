@@ -1,0 +1,67 @@
+================================================================================
+BASELINE LLM ANSWERS - PART 2 PROCESSING SUMMARY
+Questions 20-39 from batch_baseline_run1.json
+================================================================================
+
+OUTPUT FILE:
+  /Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/answers_baseline_llm_run1_part2.jsonl
+
+PROCESSING DETAILS:
+  Total questions processed: 20 (Q20-Q39)
+  Format: JSONL (1 JSON object per line)
+  Validation: PASSED
+
+QUESTIONS PROCESSED:
+  Q374: How does the consecutive empty batch detection prevent infinite loops?
+  Q436: How does the FeatureFlagsService handle graceful shutdown and event flushing?
+  Q220: What business rules govern EnumReconciliationType and when is each type created?
+  Q98:  How does the DeviceSyncLogModule support mobile device troubleshooting?
+  Q404: How do role guards interact with resolvers to enforce access control?
+  Q466: How does the application handle long-running GraphQL mutations?
+  Q60:  How does the frontend components/bulk-operations architecture support multi-step wizards?
+  Q481: How does the resolution system ensure idempotency for resolution operations?
+  Q448: How does the audit service handle high-volume logging without impacting application performance?
+  Q188: What is the role of BarrelEventService.extractRelevantLocation in location string parsing?
+  Q265: How does the changelog system track application changes?
+  Q454: How does the audit correlation ID enable request tracing across services?
+  Q249: How does the sample type result type affect sample processing?
+  Q66:  How does the backend handle WebSocket connections for GraphQL subscriptions?
+  Q353: What is the data flow when a location is already occupied during entry event processing?
+  Q263: How does the trust mode configuration affect validation?
+  Q206: What database constraints ensure data integrity for barrel-location relationships?
+  Q211: How does the Android sync inbox handle duplicate records?
+  Q383: Trace the data flow for resolving canonical lot from a lot variation serial number.
+  Q173: How does the CachedStorageLocationService integrate with AndroidSyncProcessor?
+
+CONFIDENCE DISTRIBUTION:
+  HIGH:   5 questions (25%)
+  MEDIUM: 15 questions (75%)
+  LOW:    0 questions (0%)
+
+CODE REFERENCES:
+  Total file-line references: 85
+  Average per question: 4.25 references
+  Range: 1-5 references per question
+
+ANSWER QUALITY METRICS:
+  All answers include:
+    - Clear technical explanation based on code context
+    - File-line references pointing to relevant code
+    - List of consulted files
+    - Confidence level assessment
+
+HIGH CONFIDENCE ANSWERS (5):
+  - Q374: Consecutive empty batch detection (5 refs)
+  - Q404: Role guards and resolvers (5 refs)
+  - Q454: Audit correlation ID tracing (3 refs)
+  - Q66:  WebSocket GraphQL subscriptions (5 refs)
+  - Q206: Database constraints for integrity (5 refs)
+
+VALIDATION RESULTS:
+  ✓ All 20 lines are valid JSONL
+  ✓ All required fields present (id, question, answer, file_line_refs, files_consulted, confidence)
+  ✓ All field types correct
+  ✓ All confidence values valid (HIGH|MEDIUM|LOW)
+  ✓ File paths include absolute paths with line numbers
+
+TIMESTAMP: 2026-01-28

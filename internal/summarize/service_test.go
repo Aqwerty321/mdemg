@@ -123,7 +123,7 @@ func TestBuildPrompt(t *testing.T) {
 	if !strings.Contains(prompt, "JSON array") {
 		t.Error("Prompt should mention JSON array format")
 	}
-	if !strings.Contains(prompt, "WHAT the code does") {
+	if !strings.Contains(prompt, "PRIMARY PURPOSE") {
 		t.Error("Prompt should emphasize describing behavior")
 	}
 }

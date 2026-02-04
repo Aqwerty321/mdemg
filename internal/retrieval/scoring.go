@@ -158,6 +158,21 @@ func comparisonMatchScore(name, summary string, tags []string, comparisonTargets
 	return 0.1 + 0.1*matchRatio
 }
 
+// getLayerDecayRate returns the appropriate decay rate (rho) based on node layer.
+// Layer 0 (files): decays faster (default 0.05/day) - recent file edits are more relevant
+// Layer 1 (hidden/concepts): decays slower (default 0.02/day) - concepts persist longer
+// Layer 2+ (abstractions): decays slowest (default 0.01/day) - high-level patterns are stable
+func getLayerDecayRate(layer int, cfg config.Config) float64 {
+	switch {
+	case layer == 0:
+		return cfg.ScoringRhoL0
+	case layer == 1:
+		return cfg.ScoringRhoL1
+	default:
+		return cfg.ScoringRhoL2
+	}
+}
+
 // isCodeQuery returns true if the query appears to be asking about code elements
 // rather than documentation or configuration.
 func isCodeQuery(query string) bool {
@@ -166,8 +181,8 @@ func isCodeQuery(query string) bool {
 	}
 	queryLower := strings.ToLower(query)
 
-	// Code-related keywords that suggest the user wants code, not config
-	// Use word boundaries via space, start-of-string, or end-of-string
+	// Code-related keywords that suggest the user wants specific code elements
+	// IMPORTANT: Avoid overly general phrases like "how does" which appear in many non-code queries
 	codeKeywords := []string{
 		" class", "class ",  // "X class" or "class X"
 		" function", "function ",
@@ -175,10 +190,10 @@ func isCodeQuery(query string) bool {
 		" struct", "struct ",
 		" interface", "interface ",
 		" def ", "def ",
-		"implement", "defined", "definition",
-		"where is", "how does", "what does",
-		" code", "code ",
-		" source", "source ",
+		"implementation of", "defined in", "definition of",
+		"where is .* defined", "where is .* located",
+		" source code",
+		"signature", "parameters", "return type",
 	}
 
 	for _, kw := range codeKeywords {
@@ -188,7 +203,7 @@ func isCodeQuery(query string) bool {
 	}
 
 	// Also check for words at query boundaries
-	boundaryKeywords := []string{"class", "function", "method", "struct", "interface", "code", "source"}
+	boundaryKeywords := []string{"class", "function", "method", "struct", "interface"}
 	for _, kw := range boundaryKeywords {
 		// Match at end of query: "X class"
 		if strings.HasSuffix(queryLower, kw) {
@@ -201,6 +216,243 @@ func isCodeQuery(query string) bool {
 	}
 
 	return false
+}
+
+// isArchitectureQuery returns true if the query appears to be asking about
+// high-level architecture, design patterns, or system structure.
+func isArchitectureQuery(query string) bool {
+	if query == "" {
+		return false
+	}
+	queryLower := strings.ToLower(query)
+
+	// Architecture-related keywords suggest the user wants concepts/patterns
+	architectureKeywords := []string{
+		"architecture", "design", "pattern", "structure",
+		"overview", "module", "service", "component", "layer",
+		"system", "workflow", "responsibility", "concern", "abstraction",
+	}
+
+	for _, kw := range architectureKeywords {
+		if strings.Contains(queryLower, kw) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isRelationshipQuery returns true if the query is asking about relationships,
+// dependencies, or interactions between components.
+func isRelationshipQuery(query string) bool {
+	if query == "" {
+		return false
+	}
+	queryLower := strings.ToLower(query)
+
+	// Relationship-specific keywords
+	relationshipKeywords := []string{
+		"relationship between", "interact", "dependency", "depends on",
+		"calls", "invokes", "connects to", "linked to", "references",
+		"uses", "imports", "requires", "communicates with",
+		"coupling", "integration", "interface between",
+		"how does .* connect", "how does .* interact",
+		"what calls", "what uses", "what depends",
+	}
+
+	for _, kw := range relationshipKeywords {
+		if strings.Contains(queryLower, kw) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isDataFlowQuery returns true if the query is asking about data flow,
+// transformations, or pipelines.
+func isDataFlowQuery(query string) bool {
+	if query == "" {
+		return false
+	}
+	queryLower := strings.ToLower(query)
+
+	// Data flow specific keywords
+	dataFlowKeywords := []string{
+		"data flow", "data flows", "flows through", "passed to",
+		"transforms", "transformation", "pipeline", "processing",
+		"input", "output", "request", "response", "payload",
+		"how is .* processed", "where does .* come from",
+		"what happens to", "path of", "journey of",
+		"state", "propagate", "dispatch", "emit", "publish",
+		"subscribe", "event", "message", "queue",
+	}
+
+	for _, kw := range dataFlowKeywords {
+		if strings.Contains(queryLower, kw) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isSymbolLookupQuery returns true if the query is looking for a specific
+// symbol, function, class, or identifier by name.
+func isSymbolLookupQuery(query string) bool {
+	if query == "" {
+		return false
+	}
+	queryLower := strings.ToLower(query)
+
+	// Symbol lookup patterns - looking for specific named entities
+	symbolKeywords := []string{
+		"where is", "find", "locate", "show me",
+		"definition of", "implementation of",
+		"what file", "which file", "in what file",
+	}
+
+	for _, kw := range symbolKeywords {
+		if strings.Contains(queryLower, kw) {
+			return true
+		}
+	}
+
+	// Check for CamelCase or snake_case patterns suggesting a symbol name
+	// e.g., "getUserById" or "get_user_by_id"
+	camelCasePattern := regexp.MustCompile(`[A-Z][a-z]+[A-Z][a-z]+`)
+	snakeCasePattern := regexp.MustCompile(`[a-z]+_[a-z]+_[a-z]+`)
+	if camelCasePattern.MatchString(query) || snakeCasePattern.MatchString(query) {
+		return true
+	}
+
+	return false
+}
+
+// QueryGates holds adjusted weights based on query type
+type QueryGates struct {
+	VectorWeight     float64 // Adjusted alpha for vector similarity
+	ActivationWeight float64 // Adjusted beta for activation
+	L1Boost          float64 // Multiplier for layer 1+ nodes (concepts)
+	QueryType        string  // Detected query type for logging/debugging
+}
+
+// RetrievalHints provides query-type aware parameters for the retrieval layer.
+// Unlike QueryGates (which affects scoring), these affect what candidates are retrieved.
+type RetrievalHints struct {
+	SeedN            int      // Number of seeds for graph expansion (default: 50)
+	HopDepth         int      // How many hops to expand (default: 2)
+	VectorWeight     float64  // Weight for vector in RRF fusion (default: 0.7)
+	BM25Weight       float64  // Weight for BM25 in RRF fusion (default: 0.3)
+	EnableExpansion  bool     // Whether to do graph expansion (default: true)
+	EdgeTypeStrategy string   // Edge type strategy: "structural_first", "learned_only", "hybrid", "all"
+	QueryType        string   // Detected query type for logging
+}
+
+// ComputeRetrievalHints returns retrieval parameters based on query type.
+// This operates at the retrieval layer to fetch different candidates per query type.
+func ComputeRetrievalHints(queryText string, cfg config.Config) RetrievalHints {
+	// Default hints from config
+	hints := RetrievalHints{
+		SeedN:            50,
+		HopDepth:         cfg.DefaultHopDepth,
+		VectorWeight:     cfg.VectorWeight,
+		BM25Weight:       cfg.BM25Weight,
+		EnableExpansion:  true,
+		EdgeTypeStrategy: cfg.EdgeTypeStrategy,
+		QueryType:        "generic",
+	}
+
+	// Symbol lookup: maximize vector precision, minimize graph noise
+	if isSymbolLookupQuery(queryText) {
+		hints.SeedN = 30           // Fewer seeds (more precise)
+		hints.HopDepth = 1         // Minimal expansion
+		hints.VectorWeight = 0.85  // Strong vector preference
+		hints.BM25Weight = 0.15    // Weak BM25
+		hints.EnableExpansion = false // Skip graph expansion
+		hints.EdgeTypeStrategy = "structural_first"
+		hints.QueryType = "symbol_lookup"
+		return hints
+	}
+
+	// Code query: balance vector with some BM25 for keyword matching
+	if isCodeQuery(queryText) {
+		hints.SeedN = 40
+		hints.HopDepth = 1
+		hints.VectorWeight = 0.75
+		hints.BM25Weight = 0.25
+		hints.EdgeTypeStrategy = "structural_first"
+		hints.QueryType = "code"
+		return hints
+	}
+
+	// Relationship query: emphasize graph traversal
+	if isRelationshipQuery(queryText) {
+		hints.SeedN = 60           // More seeds for broader coverage
+		hints.HopDepth = 2         // Full expansion
+		hints.VectorWeight = 0.6   // Balanced
+		hints.BM25Weight = 0.4     // Higher BM25 for relationship keywords
+		hints.EdgeTypeStrategy = "hybrid"
+		hints.QueryType = "relationship"
+		return hints
+	}
+
+	// Data flow query: trace through graph
+	if isDataFlowQuery(queryText) {
+		hints.SeedN = 50
+		hints.HopDepth = 2
+		hints.VectorWeight = 0.65
+		hints.BM25Weight = 0.35
+		hints.EdgeTypeStrategy = "hybrid"
+		hints.QueryType = "data_flow"
+		return hints
+	}
+
+	// Architecture query: favor concepts and graph structure
+	if isArchitectureQuery(queryText) {
+		hints.SeedN = 60
+		hints.HopDepth = 2
+		hints.VectorWeight = 0.55
+		hints.BM25Weight = 0.45    // Higher BM25 for architecture keywords
+		hints.EdgeTypeStrategy = "hybrid"
+		hints.QueryType = "architecture"
+		return hints
+	}
+
+	return hints
+}
+
+// computeQueryGates adjusts scoring weights based on query characteristics.
+// Code queries favor vector similarity (finding exact code); architecture queries
+// favor activation (finding connected concepts).
+func computeQueryGates(queryText string, cfg config.Config) QueryGates {
+	// Default: balanced weights from config
+	gates := QueryGates{
+		VectorWeight:     cfg.ScoringAlpha,
+		ActivationWeight: cfg.ScoringBeta,
+		L1Boost:          1.0,
+		QueryType:        "generic",
+	}
+
+	if isCodeQuery(queryText) {
+		// Code queries: favor vector similarity (L0 files), slightly penalize concepts
+		gates.VectorWeight = cfg.ScoringAlpha * 1.3
+		gates.ActivationWeight = cfg.ScoringBeta * 0.7
+		gates.L1Boost = 0.85 // Slight penalty for concepts on code queries
+		gates.QueryType = "code"
+		return gates
+	}
+
+	if isArchitectureQuery(queryText) {
+		// Architecture queries: favor L1 concepts, boost activation
+		gates.VectorWeight = cfg.ScoringAlpha * 0.85
+		gates.ActivationWeight = cfg.ScoringBeta * 1.2
+		gates.L1Boost = 1.25 // Boost for concepts on architecture queries
+		gates.QueryType = "architecture"
+		return gates
+	}
+
+	return gates
 }
 
 // codeTypeBoost returns a multiplier for the score based on code vs config files.
@@ -300,15 +552,17 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 	}
 
 	// Hyperparameters from config (see config.Config for defaults)
-	alpha := cfg.ScoringAlpha       // vector similarity weight
-	beta := cfg.ScoringBeta         // activation weight
+	// Note: alpha and beta are now adjusted via query gating below
 	gamma := cfg.ScoringGamma       // recency weight
 	delta := cfg.ScoringDelta       // confidence weight
 	phi := cfg.ScoringPhi           // hub penalty coefficient
 	kappa := cfg.ScoringKappa       // redundancy penalty coefficient
-	rho := cfg.ScoringRho           // recency decay rate per day
+	// Note: rho is now layer-specific, computed per-candidate via getLayerDecayRate()
 	configBoost := cfg.ScoringConfigBoost // config node boost multiplier
 	pathBoost := cfg.ScoringPathBoost     // path match boost coefficient
+
+	// Query gating: adjust weights based on query type (code vs architecture)
+	gates := computeQueryGates(queryText, cfg)
 
 	// Extract path hints from query text for architecture-style queries
 	pathHints := extractPathHints(queryText)
@@ -346,6 +600,8 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 	for _, c := range cands {
 		a := act[c.NodeID]
 		ageDays := now.Sub(c.UpdatedAt).Hours() / 24.0
+		// Layer-specific decay: L0 files decay faster, L1/L2+ concepts decay slower
+		rho := getLayerDecayRate(c.Layer, cfg)
 		r := math.Exp(-rho * ageDays)
 		if r < 0 {
 			r = 0
@@ -373,15 +629,22 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 		cbRaw := comparisonMatchScore(c.Name, c.Summary, c.Tags, comparisonTargets)
 		cb := cbRaw * pathBoost
 
-		// Calculate individual weighted components
-		vecComponent := alpha * c.VectorSim
-		actComponent := beta * a
+		// Calculate individual weighted components using gated weights
+		vecComponent := gates.VectorWeight * c.VectorSim
+		actComponent := gates.ActivationWeight * a
 		recComponent := gamma * r
 		confComponent := delta * c.Confidence
 		hubPenComponent := phi * h
 		redPenComponent := kappa * d
 
-		s := vecComponent + actComponent + recComponent + confComponent + pb + cb - hubPenComponent - redPenComponent
+		// Apply L1 boost for concept nodes (layer > 0) based on query type
+		l1BoostEffect := 0.0
+		if c.Layer > 0 {
+			// L1Boost modifies the effective contribution of concepts
+			l1BoostEffect = (gates.L1Boost - 1.0) * (vecComponent + actComponent)
+		}
+
+		s := vecComponent + actComponent + recComponent + confComponent + pb + cb + l1BoostEffect - hubPenComponent - redPenComponent
 
 		// Apply code type boost/penalty
 		// For code queries: config/doc files get penalized, code files unchanged
@@ -410,6 +673,7 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			PathBoost:         pb,
 			ComparisonBoost:   cb,
 			ConfigBoost:       configBoostEffect,
+			L1Boost:           l1BoostEffect,
 			HubPenalty:        -hubPenComponent,
 			RedundancyPenalty: -redPenComponent,
 			RerankDelta:       0, // Set later by reranker
@@ -421,9 +685,11 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 		if scoringDebugEnabled {
 			if strings.Contains(strings.ToLower(c.Name), scoringDebugTerm) ||
 				strings.Contains(strings.ToLower(c.Path), scoringDebugTerm) {
-				log.Printf("[DEBUG Scoring] '%s': NodeID=%s, Name=%s", scoringDebugTerm, c.NodeID, c.Name)
-				log.Printf("[DEBUG Scoring]   Components: vec=%.4f, act=%.4f, rec=%.4f, conf=%.4f, pathBoost=%.4f, compBoost=%.4f",
-					vecComponent, actComponent, recComponent, confComponent, pb, cb)
+				log.Printf("[DEBUG Scoring] '%s': NodeID=%s, Name=%s, Layer=%d", scoringDebugTerm, c.NodeID, c.Name, c.Layer)
+				log.Printf("[DEBUG Scoring]   Gates: vecW=%.3f, actW=%.3f, l1Boost=%.3f",
+					gates.VectorWeight, gates.ActivationWeight, gates.L1Boost)
+				log.Printf("[DEBUG Scoring]   Components: vec=%.4f, act=%.4f, rec=%.4f, conf=%.4f, pathBoost=%.4f, compBoost=%.4f, l1Boost=%.4f",
+					vecComponent, actComponent, recComponent, confComponent, pb, cb, l1BoostEffect)
 				log.Printf("[DEBUG Scoring]   Penalties: hub=%.4f (degree=%d), redundancy=%.4f (prefixCount=%d)",
 					hubPenComponent, deg[c.NodeID], redPenComponent, prefixCount[prefixOf(c.Path)])
 				log.Printf("[DEBUG Scoring]   Final: %.4f, codeTypeMult=%.2f", s, codeTypeMult)
@@ -506,13 +772,14 @@ func hasTag(tags []string, tag string) bool {
 // ScoreBreakdown tracks each component's contribution to the final score.
 // Used by Jiminy to explain why a result was ranked where it is.
 type ScoreBreakdown struct {
-	VectorSimilarity  float64 `json:"vector_similarity"`   // α * VectorSim
-	Activation        float64 `json:"activation"`          // β * activation
+	VectorSimilarity  float64 `json:"vector_similarity"`   // α * VectorSim (gated)
+	Activation        float64 `json:"activation"`          // β * activation (gated)
 	Recency           float64 `json:"recency"`             // γ * recency factor
 	Confidence        float64 `json:"confidence"`          // δ * confidence
 	PathBoost         float64 `json:"path_boost"`          // path match boost
 	ComparisonBoost   float64 `json:"comparison_boost"`    // comparison query boost
 	ConfigBoost       float64 `json:"config_boost"`        // config node multiplier effect
+	L1Boost           float64 `json:"l1_boost"`            // query gating boost for concepts (layer > 0)
 	HubPenalty        float64 `json:"hub_penalty"`         // -φ * hub factor
 	RedundancyPenalty float64 `json:"redundancy_penalty"`  // -κ * redundancy factor
 	RerankDelta       float64 `json:"rerank_delta"`        // score change from LLM re-ranking

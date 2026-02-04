@@ -1,0 +1,60 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Unfreeze Learning",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "learning",
+      "unfreeze",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Unfreeze Learning endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "0b43ef32e854821ec64ad790fbf738f0e9705a8d9b89207295b4038e2e82491e"
+  },
+  "variables": {
+    "test_space": "uats-unfreeze-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/learning/unfreeze",
+    "body": {
+      "space_id": "{{test_space}}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.status",
+        "type": "string",
+        "value": "unfrozen"
+      },
+      {
+        "path": "$.state",
+        "type": "object"
+      },
+      {
+        "path": "$.message",
+        "type": "string"
+      }
+    ]
+  }
+}

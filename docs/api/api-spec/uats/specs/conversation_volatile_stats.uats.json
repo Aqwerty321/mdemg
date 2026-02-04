@@ -1,0 +1,65 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Volatile Stats",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "volatile",
+      "stats",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Volatile Stats endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "e20ceb762cf791a687c8f6ea280a5a25e5cd620f488273a58775fad3771ddaa8"
+  },
+  "variables": {
+    "test_space": "uats-volatile-test"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/conversation/volatile/stats",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.volatile_count",
+        "type": "integer"
+      },
+      {
+        "path": "$.permanent_count",
+        "type": "integer"
+      },
+      {
+        "path": "$.avg_volatile_stability",
+        "type": "number"
+      },
+      {
+        "path": "$.min_volatile_stability",
+        "type": "number"
+      },
+      {
+        "path": "$.max_volatile_stability",
+        "type": "number"
+      }
+    ]
+  }
+}

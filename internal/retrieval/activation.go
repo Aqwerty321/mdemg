@@ -1,6 +1,10 @@
 package retrieval
 
-import "math"
+import (
+	"math"
+
+	"mdemg/internal/config"
+)
 
 // SpreadingActivation computes transient activation scores in-memory.
 // - cands: candidates from vector recall (used for seeding)
@@ -118,4 +122,214 @@ func effectiveWeight(e Edge) float64 {
 		out = 1
 	}
 	return out
+}
+
+// =============================================================================
+// EDGE-TYPE ATTENTION (Phase 3)
+// =============================================================================
+// Attention-weighted activation spreading that considers different edge types
+// with query-aware modulation. Replaces the CO_ACTIVATED_WITH-only spreading
+// with weighted contributions from all relationship types.
+
+// EdgeAttentionWeights holds per-edge-type attention weights for activation spreading
+type EdgeAttentionWeights struct {
+	CoActivated  float64 // Weight for CO_ACTIVATED_WITH edges
+	Associated   float64 // Weight for ASSOCIATED_WITH edges
+	Generalizes  float64 // Weight for GENERALIZES edges
+	AbstractsTo  float64 // Weight for ABSTRACTS_TO edges
+	Temporal     float64 // Weight for TEMPORALLY_ADJACENT edges
+}
+
+// QueryContext provides context for attention modulation
+type QueryContext struct {
+	QueryText   string
+	IsCodeQuery bool
+	IsArchQuery bool
+}
+
+// ComputeEdgeAttention returns attention weights adjusted for query context
+func ComputeEdgeAttention(ctx QueryContext, cfg config.Config) EdgeAttentionWeights {
+	weights := EdgeAttentionWeights{
+		CoActivated: cfg.EdgeAttentionCoActivated,
+		Associated:  cfg.EdgeAttentionAssociated,
+		Generalizes: cfg.EdgeAttentionGeneralizes,
+		AbstractsTo: cfg.EdgeAttentionAbstractsTo,
+		Temporal:    cfg.EdgeAttentionTemporal,
+	}
+
+	if ctx.IsCodeQuery {
+		// Code queries: boost CO_ACTIVATED (practical patterns), reduce hierarchical
+		weights.CoActivated *= cfg.EdgeAttentionCodeBoost
+		weights.Generalizes *= 0.6
+		weights.AbstractsTo *= 0.5
+		weights.Associated *= 0.8
+	}
+
+	if ctx.IsArchQuery {
+		// Architecture queries: boost hierarchical edges, reduce CO_ACTIVATED
+		weights.Generalizes *= cfg.EdgeAttentionArchBoost
+		weights.AbstractsTo *= cfg.EdgeAttentionArchBoost
+		weights.Associated *= 1.2
+		weights.CoActivated *= 0.8
+	}
+
+	// Clamp all weights to [0, 1]
+	weights.CoActivated = clampWeight(weights.CoActivated)
+	weights.Associated = clampWeight(weights.Associated)
+	weights.Generalizes = clampWeight(weights.Generalizes)
+	weights.AbstractsTo = clampWeight(weights.AbstractsTo)
+	weights.Temporal = clampWeight(weights.Temporal)
+
+	return weights
+}
+
+// clampWeight clamps a weight to [0, 1]
+func clampWeight(w float64) float64 {
+	if w < 0 {
+		return 0
+	}
+	if w > 1 {
+		return 1
+	}
+	return w
+}
+
+// GetEdgeAttention returns the attention weight for a specific edge type
+func (w EdgeAttentionWeights) GetEdgeAttention(relType string) float64 {
+	switch relType {
+	case "CO_ACTIVATED_WITH":
+		return w.CoActivated
+	case "ASSOCIATED_WITH":
+		return w.Associated
+	case "GENERALIZES":
+		return w.Generalizes
+	case "ABSTRACTS_TO":
+		return w.AbstractsTo
+	case "TEMPORALLY_ADJACENT":
+		return w.Temporal
+	default:
+		return 0.5 // Unknown edge types get neutral weight
+	}
+}
+
+// DefaultEdgeAttention returns attention weights that match original behavior
+// (only CO_ACTIVATED_WITH edges contribute)
+func DefaultEdgeAttention() EdgeAttentionWeights {
+	return EdgeAttentionWeights{
+		CoActivated: 1.0,
+		Associated:  0.0,
+		Generalizes: 0.0,
+		AbstractsTo: 0.0,
+		Temporal:    0.0,
+	}
+}
+
+// WeightedEdge combines an Edge with its computed attention weight
+type WeightedEdge struct {
+	Edge
+	AttentionWeight float64
+}
+
+// SpreadingActivationWithAttention computes activation with edge-type attention.
+// Unlike SpreadingActivation which only uses CO_ACTIVATED_WITH edges, this
+// includes all edge types with query-aware attention weighting.
+func SpreadingActivationWithAttention(cands []Candidate, edges []Edge, steps int, lambda float64, attention EdgeAttentionWeights) map[string]float64 {
+	act := map[string]float64{}
+	if steps <= 0 {
+		steps = 2
+	}
+	if lambda < 0 {
+		lambda = 0
+	}
+	if lambda > 0.9 {
+		lambda = 0.9
+	}
+
+	// Seed: ALL candidates seeded from vector similarity
+	for _, c := range cands {
+		v := c.VectorSim
+		if v < 0 {
+			v = 0
+		}
+		if v > 1 {
+			v = 1
+		}
+		act[c.NodeID] = v
+	}
+
+	// Build incoming lists with attention weights
+	// KEY CHANGE: Include ALL edge types, not just CO_ACTIVATED_WITH
+	incoming := map[string][]WeightedEdge{}
+	inhib := map[string][]Edge{}
+
+	for _, e := range edges {
+		if e.RelType == "CONTRADICTS" {
+			inhib[e.Dst] = append(inhib[e.Dst], e)
+			continue
+		}
+
+		attnWeight := attention.GetEdgeAttention(e.RelType)
+		if attnWeight > 0.01 { // Skip near-zero attention edges
+			incoming[e.Dst] = append(incoming[e.Dst], WeightedEdge{
+				Edge:            e,
+				AttentionWeight: attnWeight,
+			})
+		}
+	}
+
+	clamp01 := func(x float64) float64 {
+		if x < 0 {
+			return 0
+		}
+		if x > 1 {
+			return 1
+		}
+		return x
+	}
+
+	// Propagation steps
+	for t := 0; t < steps; t++ {
+		next := map[string]float64{}
+
+		// Carry forward existing activations with decay
+		for id, a := range act {
+			next[id] = clamp01((1 - lambda) * a)
+		}
+
+		// Apply incoming with attention-weighted aggregation
+		for dst, ins := range incoming {
+			acc := next[dst]
+
+			// Attention-weighted degree normalization
+			// Edges with higher attention contribute more to normalization
+			var totalAttnWeight float64
+			for _, we := range ins {
+				totalAttnWeight += we.AttentionWeight
+			}
+			degreeNorm := math.Sqrt(totalAttnWeight)
+			if degreeNorm < 1 {
+				degreeNorm = 1
+			}
+
+			for _, we := range ins {
+				srcA := act[we.Src]
+				w := effectiveWeight(we.Edge)
+				// KEY: Apply attention weight to edge contribution
+				acc += (srcA * w * we.AttentionWeight) / degreeNorm
+			}
+
+			// Inhibitory edges (unchanged from original)
+			for _, e := range inhib[dst] {
+				srcA := act[e.Src]
+				w := math.Abs(effectiveWeight(e))
+				acc -= srcA * w
+			}
+
+			next[dst] = clamp01(acc)
+		}
+
+		act = next
+	}
+
+	return act
 }

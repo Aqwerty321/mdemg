@@ -1,0 +1,66 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Record Observation",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "observe",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Record Observation endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "c49cc40d0faa968e2d939eea7f1db29cbc23cc29a75f9f111a91d776d0d6d0c2"
+  },
+  "variables": {
+    "test_space": "uats-observe-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/observe",
+    "body": {
+      "space_id": "{{test_space}}",
+      "session_id": "uats-session",
+      "content": "Test observation from UATS",
+      "obs_type": "learning"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.obs_id",
+        "type": "string"
+      },
+      {
+        "path": "$.node_id",
+        "type": "string"
+      },
+      {
+        "path": "$.surprise_score",
+        "type": "number"
+      },
+      {
+        "path": "$.surprise_factors",
+        "type": "object"
+      },
+      {
+        "path": "$.summary",
+        "type": "string"
+      }
+    ]
+  }
+}

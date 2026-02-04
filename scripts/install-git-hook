@@ -5,7 +5,7 @@
 #
 # Options:
 #   -s, --space-id ID     Set space ID for the hook (default: repo basename)
-#   -e, --endpoint URL    Set MDEMG endpoint (default: http://localhost:8090)
+#   -e, --endpoint URL    Set MDEMG endpoint (default: http://localhost:9999)
 #   -f, --force           Overwrite existing hook
 #   -h, --help            Show this help message
 
@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  -s, --space-id ID     Set space ID for the hook (default: repo basename)"
-            echo "  -e, --endpoint URL    Set MDEMG endpoint (default: http://localhost:8090)"
+            echo "  -e, --endpoint URL    Set MDEMG endpoint (default: http://localhost:9999)"
             echo "  -f, --force           Overwrite existing hook"
             echo "  -h, --help            Show this help message"
             exit 0
@@ -81,15 +81,15 @@ chmod +x "$HOOK_DEST"
 
 # Add configuration if provided
 if [ -n "$SPACE_ID" ] || [ -n "$ENDPOINT" ]; then
-    # Create a wrapper that sets env vars
+    # Create a wrapper that sets env vars then sources the hook
     cat > "$HOOK_DEST" << EOF
 #!/bin/bash
 # MDEMG Git Hook (installed by install-git-hook)
 export MDEMG_SPACE_ID="${SPACE_ID:-\$(basename \$(git rev-parse --show-toplevel))}"
-export MDEMG_ENDPOINT="${ENDPOINT:-http://localhost:8090}"
+export MDEMG_ENDPOINT="${ENDPOINT:-}"
 
-$(cat "$HOOK_SOURCE")
 EOF
+    cat "$HOOK_SOURCE" >> "$HOOK_DEST"
     chmod +x "$HOOK_DEST"
 fi
 
@@ -97,7 +97,7 @@ echo "MDEMG post-commit hook installed at $HOOK_DEST"
 echo ""
 echo "Configuration:"
 echo "  Space ID: ${SPACE_ID:-<auto-detect from repo name>}"
-echo "  Endpoint: ${ENDPOINT:-http://localhost:8090}"
+echo "  Endpoint: ${ENDPOINT:-<dynamic: reads .mdemg.port, falls back to :9999>}"
 echo ""
 echo "The hook will run incremental ingestion after each commit."
 echo "Set MDEMG_DISABLED=true to temporarily disable."

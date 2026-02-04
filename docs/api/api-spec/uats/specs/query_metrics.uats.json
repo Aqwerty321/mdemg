@@ -1,0 +1,49 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Query Metrics",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "metrics",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Query Metrics endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "54022c9cb89b4aaea9d45c5169693f2ea75d20888e503cd38c19022051880615"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/query/metrics"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.total_queries",
+        "type": "integer"
+      },
+      {
+        "path": "$.avg_duration_ms",
+        "type": "integer"
+      },
+      {
+        "path": "$.slow_queries",
+        "type": "integer"
+      }
+    ]
+  }
+}

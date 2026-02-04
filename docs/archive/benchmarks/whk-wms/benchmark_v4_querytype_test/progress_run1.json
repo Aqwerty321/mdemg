@@ -1,0 +1,465 @@
+{
+  "total": 120,
+  "processed": 120,
+  "successful": 120,
+  "failed": 0,
+  "validation_errors": 75,
+  "with_refs": 45,
+  "without_refs": 0,
+  "start_time": "2026-02-02T06:14:28.628181",
+  "errors": [
+    {
+      "id": 379,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 77,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 258,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 450,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 270,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 172,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 251,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 69,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 262,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 336,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 438,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 391,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 189,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 436,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 98,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 404,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 466,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 60,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 481,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 454,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 249,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 353,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 263,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 206,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 211,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 383,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 173,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 253,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 480,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 68,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 406,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 80,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 79,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 192,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 171,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 119,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 15,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 18,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 240,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 75,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 283,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 339,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 304,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 482,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 130,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 83,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 355,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 217,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 487,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 152,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 408,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 74,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 133,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 449,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 140,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 328,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 318,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 472,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 156,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 464,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 82,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": 86,
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_1",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_3",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_4",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_5",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_6",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_7",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_9",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_12",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_13",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_14",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_15",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_18",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    },
+    {
+      "id": "hard_sym_20",
+      "errors": [
+        "No valid file_line_refs found"
+      ]
+    }
+  ],
+  "end_time": "2026-02-02T06:15:12.046542",
+  "duration_seconds": 43.41835904121399,
+  "ref_rate": 0.375
+}

@@ -1,0 +1,93 @@
+{
+  "$schema": "benchmark_summary_v2",
+  "metadata": {
+    "benchmark_id": "whk-wms-20260130-094347",
+    "date": "2026-01-30T13:43:45.022063Z",
+    "framework_version": "2.0",
+    "mode": "mdemg"
+  },
+  "environment": {
+    "mdemg_endpoint": "http://localhost:9999",
+    "space_id": "whk-wms",
+    "model": "haiku",
+    "target_repo": {
+      "name": "whk-wms",
+      "path": "/Users/reh3376/whk-wms"
+    }
+  },
+  "configuration": {
+    "question_count": 120,
+    "runs_per_mode": 1,
+    "questions_master": "/Users/reh3376/mdemg/docs/benchmarks/whk-wms/test_questions_120.json",
+    "questions_agent": "/Users/reh3376/mdemg/docs/benchmarks/whk-wms/test_questions_120_agent.json"
+  },
+  "runs": [
+    {
+      "run_id": "mdemg_run1",
+      "type": "mdemg",
+      "sequence": 1,
+      "status": "partial",
+      "timestamp": "2026-01-30T14:43:46.963366Z",
+      "completion": {
+        "questions_answered": 120,
+        "questions_expected": 120,
+        "completion_rate": 1.0
+      },
+      "timing": {
+        "duration_seconds": 3600.1
+      },
+      "output": {
+        "file_path": "/Users/reh3376/mdemg/docs/benchmarks/whk-wms/benchmark_multishot/mdemg/run_1_answers.jsonl"
+      },
+      "learning_edges": {
+        "before": 13914,
+        "after": 14304,
+        "delta": 390
+      },
+      "validation": {
+        "valid": false,
+        "errors": [
+          "Missing IDs: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]..."
+        ],
+        "warnings": [
+          "ID 188: No file references",
+          "ID 333: No file references",
+          "ID 339: No file references",
+          "ID 329: No file references",
+          "ID 379: No line numbers in refs",
+          "ID 77: No line numbers in refs",
+          "ID 258: No line numbers in refs",
+          "ID 450: No line numbers in refs",
+          "ID 424: No line numbers in refs",
+          "ID 161: No line numbers in refs"
+        ],
+        "answer_count": 120,
+        "unique_ids": 120,
+        "completion_rate": 1.0
+      },
+      "agent_result": {
+        "status": "timeout",
+        "output_file": "/Users/reh3376/mdemg/docs/benchmarks/whk-wms/benchmark_multishot/mdemg/run_1_answers.jsonl",
+        "duration_seconds": 3600
+      },
+      "grading": {
+        "graded": false,
+        "error": "unsupported operand type(s) for +: 'dict' and 'list'"
+      }
+    }
+  ],
+  "aggregate": {
+    "baseline": {
+      "valid_runs": 0,
+      "mean_score": null,
+      "evidence_rate": null
+    },
+    "mdemg": {
+      "valid_runs": 0,
+      "mean_score": null,
+      "evidence_rate": null,
+      "total_learning_edges": 0
+    }
+  },
+  "comparison": null
+}

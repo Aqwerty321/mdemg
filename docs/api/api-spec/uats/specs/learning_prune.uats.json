@@ -1,0 +1,59 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Prune Learning Edges",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "learning",
+      "prune",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Prune Learning Edges endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "1ab86e4726b6574bf870460bd7bcda0d85ce48f35b90d661d5fcd7ea6b801d3a"
+  },
+  "variables": {
+    "test_space": "uats-prune-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/learning/prune",
+    "query": {
+      "space_id": "{{test_space}}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.decayed_deleted",
+        "type": "integer"
+      },
+      {
+        "path": "$.excess_deleted",
+        "type": "integer"
+      },
+      {
+        "path": "$.total_deleted",
+        "type": "integer"
+      }
+    ]
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Submit Feedback",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "feedback",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Submit Feedback endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "895cd41b281012c620b7c33ce7d57e2a0428325347f80a918f000aa9b0db74af"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/feedback",
+    "body": {
+      "space_id": "{{test_space}}",
+      "query_text": "UATS test query",
+      "is_negative": false,
+      "comment": "UATS test feedback"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.status",
+        "type": "string",
+        "value": "recorded"
+      },
+      {
+        "path": "$.message",
+        "type": "string"
+      }
+    ]
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "$schema": "benchmark_summary_v2",
+  "metadata": {
+    "benchmark_id": "whk-wms-20260130-071907",
+    "date": "2026-01-30T12:15:15.300192Z",
+    "framework_version": "2.0",
+    "mode": "mdemg"
+  },
+  "environment": {
+    "mdemg_endpoint": "http://localhost:9999",
+    "space_id": "whk-wms",
+    "model": "haiku",
+    "target_repo": {
+      "name": "whk-wms",
+      "path": "/Users/reh3376/whk-wms"
+    }
+  },
+  "configuration": {
+    "question_count": 120,
+    "runs_per_mode": 1,
+    "questions_master": "whk-wms/test_questions_120.json",
+    "questions_agent": "whk-wms/test_questions_120_agent.json"
+  },
+  "runs": [
+    {
+      "run_id": "mdemg_run1",
+      "type": "mdemg",
+      "sequence": 1,
+      "status": "partial",
+      "timestamp": "2026-01-30T12:19:07.106547Z",
+      "completion": {
+        "questions_answered": 120,
+        "questions_expected": 120,
+        "completion_rate": 1.0
+      },
+      "timing": {
+        "duration_seconds": 230.2
+      },
+      "output": {
+        "file_path": "whk-wms/benchmark_post_fix/mdemg/run_1_answers.jsonl"
+      },
+      "learning_edges": {
+        "before": 12032,
+        "after": 12304,
+        "delta": 272
+      },
+      "validation": {
+        "valid": false,
+        "errors": [
+          "Missing IDs: [120]"
+        ],
+        "warnings": [
+          "ID 6: No file references",
+          "ID 7: No file references",
+          "ID 8: No file references",
+          "ID 9: No file references",
+          "ID 10: No file references",
+          "ID 11: No file references",
+          "ID 12: No file references",
+          "ID 13: No file references",
+          "ID 14: No file references",
+          "ID 15: No file references"
+        ],
+        "answer_count": 120,
+        "unique_ids": 120,
+        "completion_rate": 1.0
+      },
+      "agent_result": {
+        "status": "completed",
+        "output_file": "whk-wms/benchmark_post_fix/mdemg/run_1_answers.jsonl",
+        "duration_seconds": 230.2,
+        "returncode": 0,
+        "stdout_preview": "Perfect! Let me create a final summary of the completed benchmark task:\n\n## Summary\n\nI have successfully completed the benchmark task of answering all **120 whk-wms questions** using the MDEMG retrieval system. Here are the key results:\n\n### Output File\n- **Location**: `/Users/reh3376/mdemg/docs/benchmarks/whk-wms/benchmark_post_fix/mdemg/run_1_answers.jsonl`\n- **Format**: JSONL (JSON Lines) - one answer object per line\n- **Size**: 135 KB\n- **Validity**: 100% - All 120 answers are valid JSON wit",
+        "stderr_preview": ""
+      },
+      "grading": {
+        "graded": true,
+        "grades_file": "whk-wms/benchmark_post_fix/mdemg/run_1_grades.json",
+        "mean_score": 0.39,
+        "std_dev": 0.076,
+        "cv_pct": 19.5,
+        "high_score_rate": 0.045,
+        "evidence_rate": 0.045,
+        "evidence_tiers": {
+          "strong": 1,
+          "moderate": 0,
+          "weak": 0,
+          "none": 0
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "baseline": {
+      "valid_runs": 0,
+      "mean_score": null,
+      "evidence_rate": null
+    },
+    "mdemg": {
+      "valid_runs": 1,
+      "mean_score": 0.39,
+      "evidence_rate": 0.045,
+      "total_learning_edges": 272
+    }
+  },
+  "comparison": null
+}

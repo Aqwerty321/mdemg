@@ -78,7 +78,10 @@ type Config struct {
 	ScoringDelta       float64 // Confidence weight (default: 0.05)
 	ScoringPhi         float64 // Hub penalty coefficient (default: 0.08)
 	ScoringKappa       float64 // Redundancy penalty coefficient (default: 0.12)
-	ScoringRho         float64 // Recency decay rate per day (default: 0.05)
+	ScoringRho         float64 // Recency decay rate per day (default: 0.05) - legacy, used as fallback
+	ScoringRhoL0       float64 // Layer 0 decay rate per day (default: 0.05 - faster decay for files)
+	ScoringRhoL1       float64 // Layer 1 decay rate per day (default: 0.02 - slower for hidden/concepts)
+	ScoringRhoL2       float64 // Layer 2+ decay rate per day (default: 0.01 - slowest for abstractions)
 	ScoringConfigBoost float64 // Score multiplier for config nodes (default: 1.15)
 	ScoringPathBoost   float64 // Boost coefficient for path-matching nodes (default: 0.15)
 
@@ -99,6 +102,31 @@ type Config struct {
 	HiddenLayerBackwardSelf  float64 // Weight of self in backward pass (default: 0.2)
 	HiddenLayerBackwardBase  float64 // Weight of base signal in backward pass (default: 0.5)
 	HiddenLayerBackwardConc  float64 // Weight of concept signal in backward pass (default: 0.3)
+
+	// Concept merge settings (V0007) - deduplication during consolidation
+	ConceptMergeEnabled   bool    // Enable concept deduplication (default: true)
+	ConceptMergeThreshold float64 // Cosine similarity threshold for merging (default: 0.90)
+
+	// Edge-type attention settings (V0008) - query-aware edge weighting in activation spreading
+	EdgeAttentionEnabled     bool    // Feature toggle (default: true)
+	EdgeAttentionCoActivated float64 // Base weight for CO_ACTIVATED_WITH edges (default: 0.85)
+	EdgeAttentionAssociated  float64 // Base weight for ASSOCIATED_WITH edges (default: 0.65)
+	EdgeAttentionGeneralizes float64 // Base weight for GENERALIZES edges (default: 0.65)
+	EdgeAttentionAbstractsTo float64 // Base weight for ABSTRACTS_TO edges (default: 0.60)
+	EdgeAttentionTemporal    float64 // Base weight for TEMPORALLY_ADJACENT edges (default: 0.45)
+	EdgeAttentionCodeBoost   float64 // Multiplier for CO_ACTIVATED in code queries (default: 1.2)
+	EdgeAttentionArchBoost   float64 // Multiplier for hierarchical in arch queries (default: 1.5)
+
+	// Query-Aware Expansion settings (V0009) - attention-based neighbor selection during graph expansion
+	QueryAwareExpansionEnabled bool    // Feature toggle (default: true)
+	QueryAwareAttentionWeight  float64 // Weight of query-node similarity vs edge weight (default: 0.5)
+	NodeEmbeddingCacheSize     int     // LRU cache size for node embeddings (default: 5000)
+
+	// Hybrid Edge Type Strategy settings (V0010) - different edge types at different hop depths
+	EdgeTypeStrategy    string   // Strategy: "all", "structural_first", "learned_only", "hybrid" (default: "hybrid")
+	StructuralEdgeTypes []string // Edge types for structural hops (default: ASSOCIATED_WITH, GENERALIZES, ABSTRACTS_TO)
+	LearnedEdgeTypes    []string // Edge types for learned hops (default: CO_ACTIVATED_WITH)
+	HybridSwitchHop     int      // Hop depth at which to switch from structural to learned (default: 1)
 
 	// Hybrid retrieval settings (V0006)
 	HybridRetrievalEnabled bool    // Enable hybrid vector+BM25 retrieval (default: true)
@@ -146,6 +174,11 @@ type Config struct {
 	Neo4jAcquireTimeoutSec   int // Connection acquire timeout in seconds (default: 60)
 	Neo4jMaxConnLifetimeSec  int // Maximum connection lifetime in seconds (default: 3600)
 	Neo4jConnIdleTimeoutSec  int // Connection idle timeout in seconds (default: 0 = disabled)
+
+	// Dynamic port allocation
+	PortRangeStart int    // Start of fallback port range (default: derived from ListenAddr port)
+	PortRangeEnd   int    // End of fallback port range (default: PortRangeStart + 100)
+	PortFilePath   string // Path to write allocated port for client discovery (default: .mdemg.port)
 }
 
 func FromEnv() (Config, error) {
@@ -435,6 +468,28 @@ func FromEnv() (Config, error) {
 	if scoringRho < 0 {
 		return Config{}, errors.New("SCORING_RHO must be >= 0")
 	}
+	// Layer-specific decay rates (faster decay for L0 files, slower for abstractions)
+	scoringRhoL0, err := atof("SCORING_RHO_L0", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRhoL0 < 0 {
+		return Config{}, errors.New("SCORING_RHO_L0 must be >= 0")
+	}
+	scoringRhoL1, err := atof("SCORING_RHO_L1", 0.02)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRhoL1 < 0 {
+		return Config{}, errors.New("SCORING_RHO_L1 must be >= 0")
+	}
+	scoringRhoL2, err := atof("SCORING_RHO_L2", 0.01)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRhoL2 < 0 {
+		return Config{}, errors.New("SCORING_RHO_L2 must be >= 0")
+	}
 	scoringConfigBoost, err := atof("SCORING_CONFIG_BOOST", 1.15)
 	if err != nil {
 		return Config{}, err
@@ -549,6 +604,124 @@ func FromEnv() (Config, error) {
 	hiddenBackwardConc, err := atof("HIDDEN_LAYER_BACKWARD_CONC", 0.3)
 	if err != nil {
 		return Config{}, err
+	}
+
+	// Concept merge settings (V0007)
+	conceptMergeEnabled := getBool("CONCEPT_MERGE_ENABLED", true)
+	conceptMergeThreshold, err := atof("CONCEPT_MERGE_THRESHOLD", 0.90)
+	if err != nil {
+		return Config{}, err
+	}
+	if conceptMergeThreshold < 0.5 || conceptMergeThreshold > 1.0 {
+		return Config{}, errors.New("CONCEPT_MERGE_THRESHOLD must be in range [0.5, 1.0]")
+	}
+
+	// Edge-type attention settings (V0008)
+	edgeAttentionEnabled := getBool("EDGE_ATTENTION_ENABLED", true)
+	edgeAttentionCoActivated, err := atof("EDGE_ATTENTION_CO_ACTIVATED", 0.85)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionCoActivated < 0 || edgeAttentionCoActivated > 1 {
+		return Config{}, errors.New("EDGE_ATTENTION_CO_ACTIVATED must be in range [0, 1]")
+	}
+	edgeAttentionAssociated, err := atof("EDGE_ATTENTION_ASSOCIATED", 0.65)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionAssociated < 0 || edgeAttentionAssociated > 1 {
+		return Config{}, errors.New("EDGE_ATTENTION_ASSOCIATED must be in range [0, 1]")
+	}
+	edgeAttentionGeneralizes, err := atof("EDGE_ATTENTION_GENERALIZES", 0.65)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionGeneralizes < 0 || edgeAttentionGeneralizes > 1 {
+		return Config{}, errors.New("EDGE_ATTENTION_GENERALIZES must be in range [0, 1]")
+	}
+	edgeAttentionAbstractsTo, err := atof("EDGE_ATTENTION_ABSTRACTS_TO", 0.60)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionAbstractsTo < 0 || edgeAttentionAbstractsTo > 1 {
+		return Config{}, errors.New("EDGE_ATTENTION_ABSTRACTS_TO must be in range [0, 1]")
+	}
+	edgeAttentionTemporal, err := atof("EDGE_ATTENTION_TEMPORAL", 0.45)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionTemporal < 0 || edgeAttentionTemporal > 1 {
+		return Config{}, errors.New("EDGE_ATTENTION_TEMPORAL must be in range [0, 1]")
+	}
+	edgeAttentionCodeBoost, err := atof("EDGE_ATTENTION_CODE_BOOST", 1.2)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionCodeBoost < 0.5 || edgeAttentionCodeBoost > 3.0 {
+		return Config{}, errors.New("EDGE_ATTENTION_CODE_BOOST must be in range [0.5, 3.0]")
+	}
+	edgeAttentionArchBoost, err := atof("EDGE_ATTENTION_ARCH_BOOST", 1.5)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeAttentionArchBoost < 0.5 || edgeAttentionArchBoost > 3.0 {
+		return Config{}, errors.New("EDGE_ATTENTION_ARCH_BOOST must be in range [0.5, 3.0]")
+	}
+
+	// Query-Aware Expansion settings (V0009)
+	queryAwareExpansionEnabled := getBool("QUERY_AWARE_EXPANSION_ENABLED", true)
+	queryAwareAttentionWeight, err := atof("QUERY_AWARE_ATTENTION_WEIGHT", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	if queryAwareAttentionWeight < 0 || queryAwareAttentionWeight > 1 {
+		return Config{}, errors.New("QUERY_AWARE_ATTENTION_WEIGHT must be in range [0, 1]")
+	}
+	nodeEmbeddingCacheSize, err := atoi("NODE_EMBEDDING_CACHE_SIZE", 5000)
+	if err != nil {
+		return Config{}, err
+	}
+	if nodeEmbeddingCacheSize < 100 {
+		return Config{}, errors.New("NODE_EMBEDDING_CACHE_SIZE must be >= 100")
+	}
+
+	// Hybrid Edge Type Strategy settings (V0010)
+	edgeTypeStrategy := get("EDGE_TYPE_STRATEGY", "hybrid")
+	validStrategies := map[string]bool{"all": true, "structural_first": true, "learned_only": true, "hybrid": true}
+	if !validStrategies[edgeTypeStrategy] {
+		return Config{}, errors.New("EDGE_TYPE_STRATEGY must be one of: all, structural_first, learned_only, hybrid")
+	}
+
+	structuralEdgeTypesStr := get("STRUCTURAL_EDGE_TYPES", "ASSOCIATED_WITH,GENERALIZES,ABSTRACTS_TO")
+	structuralEdgeTypes := make([]string, 0)
+	for _, p := range strings.Split(structuralEdgeTypesStr, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			structuralEdgeTypes = append(structuralEdgeTypes, p)
+		}
+	}
+	if len(structuralEdgeTypes) == 0 {
+		return Config{}, errors.New("STRUCTURAL_EDGE_TYPES must not be empty")
+	}
+
+	learnedEdgeTypesStr := get("LEARNED_EDGE_TYPES", "CO_ACTIVATED_WITH")
+	learnedEdgeTypes := make([]string, 0)
+	for _, p := range strings.Split(learnedEdgeTypesStr, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			learnedEdgeTypes = append(learnedEdgeTypes, p)
+		}
+	}
+	if len(learnedEdgeTypes) == 0 {
+		return Config{}, errors.New("LEARNED_EDGE_TYPES must not be empty")
+	}
+
+	hybridSwitchHop, err := atoi("HYBRID_SWITCH_HOP", 1)
+	if err != nil {
+		return Config{}, err
+	}
+	if hybridSwitchHop < 0 || hybridSwitchHop > 3 {
+		return Config{}, errors.New("HYBRID_SWITCH_HOP must be in range [0, 3]")
 	}
 
 	// Hybrid retrieval settings (V0006)
@@ -703,6 +876,28 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// Dynamic port allocation
+	// Derive default PortRangeStart from ListenAddr port
+	defaultPortStart := 9999
+	if idx := strings.LastIndex(listen, ":"); idx >= 0 {
+		if p, parseErr := strconv.Atoi(listen[idx+1:]); parseErr == nil {
+			defaultPortStart = p
+		}
+	}
+	portRangeStart, err := atoi("PORT_RANGE_START", defaultPortStart)
+	if err != nil {
+		return Config{}, err
+	}
+	// Default PORT_RANGE_END to portRangeStart + 100 to ensure a valid ascending range
+	portRangeEnd, err := atoi("PORT_RANGE_END", portRangeStart+100)
+	if err != nil {
+		return Config{}, err
+	}
+	if portRangeStart > portRangeEnd {
+		return Config{}, errors.New("PORT_RANGE_START must be <= PORT_RANGE_END")
+	}
+	portFilePath := get("PORT_FILE_PATH", ".mdemg.port")
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -755,6 +950,9 @@ func FromEnv() (Config, error) {
 		ScoringPhi:                scoringPhi,
 		ScoringKappa:              scoringKappa,
 		ScoringRho:                scoringRho,
+		ScoringRhoL0:              scoringRhoL0,
+		ScoringRhoL1:              scoringRhoL1,
+		ScoringRhoL2:              scoringRhoL2,
 		ScoringConfigBoost:        scoringConfigBoost,
 		ScoringPathBoost:          scoringPathBoost,
 		LogFormat:                 logFormat,
@@ -771,7 +969,24 @@ func FromEnv() (Config, error) {
 		HiddenLayerBackwardSelf:   hiddenBackwardSelf,
 		HiddenLayerBackwardBase:   hiddenBackwardBase,
 		HiddenLayerBackwardConc:   hiddenBackwardConc,
-		HybridRetrievalEnabled:    hybridEnabled,
+		ConceptMergeEnabled:       conceptMergeEnabled,
+		ConceptMergeThreshold:     conceptMergeThreshold,
+		EdgeAttentionEnabled:      edgeAttentionEnabled,
+		EdgeAttentionCoActivated:  edgeAttentionCoActivated,
+		EdgeAttentionAssociated:   edgeAttentionAssociated,
+		EdgeAttentionGeneralizes:  edgeAttentionGeneralizes,
+		EdgeAttentionAbstractsTo:  edgeAttentionAbstractsTo,
+		EdgeAttentionTemporal:     edgeAttentionTemporal,
+		EdgeAttentionCodeBoost:       edgeAttentionCodeBoost,
+		EdgeAttentionArchBoost:       edgeAttentionArchBoost,
+		QueryAwareExpansionEnabled:   queryAwareExpansionEnabled,
+		QueryAwareAttentionWeight:    queryAwareAttentionWeight,
+		NodeEmbeddingCacheSize:       nodeEmbeddingCacheSize,
+		EdgeTypeStrategy:             edgeTypeStrategy,
+		StructuralEdgeTypes:          structuralEdgeTypes,
+		LearnedEdgeTypes:             learnedEdgeTypes,
+		HybridSwitchHop:              hybridSwitchHop,
+		HybridRetrievalEnabled:       hybridEnabled,
 		BM25TopK:                  bm25TopK,
 		BM25Weight:                bm25Weight,
 		VectorWeight:              vectorWeight,
@@ -804,5 +1019,43 @@ func FromEnv() (Config, error) {
 		Neo4jAcquireTimeoutSec:    neo4jAcquireTimeout,
 		Neo4jMaxConnLifetimeSec:   neo4jMaxConnLifetime,
 		Neo4jConnIdleTimeoutSec:   neo4jConnIdleTimeout,
+		PortRangeStart:            portRangeStart,
+		PortRangeEnd:              portRangeEnd,
+		PortFilePath:              portFilePath,
 	}, nil
+}
+
+// ResolveEndpoint determines the MDEMG API endpoint using a priority chain:
+//  1. MDEMG_ENDPOINT env var (explicit override)
+//  2. .mdemg.port file (dynamic port discovery)
+//  3. LISTEN_ADDR env var (static config)
+//  4. defaultAddr fallback
+func ResolveEndpoint(defaultAddr string) string {
+	// Priority 1: explicit env override
+	if ep := strings.TrimSpace(os.Getenv("MDEMG_ENDPOINT")); ep != "" {
+		return ep
+	}
+
+	// Priority 2: read port file
+	portFile := strings.TrimSpace(os.Getenv("PORT_FILE_PATH"))
+	if portFile == "" {
+		portFile = ".mdemg.port"
+	}
+	if data, err := os.ReadFile(portFile); err == nil {
+		port := strings.TrimSpace(string(data))
+		if port != "" {
+			return "http://localhost:" + port
+		}
+	}
+
+	// Priority 3: LISTEN_ADDR env var
+	if addr := strings.TrimSpace(os.Getenv("LISTEN_ADDR")); addr != "" {
+		if strings.HasPrefix(addr, ":") {
+			return "http://localhost" + addr
+		}
+		return "http://" + addr
+	}
+
+	// Priority 4: fallback
+	return defaultAddr
 }

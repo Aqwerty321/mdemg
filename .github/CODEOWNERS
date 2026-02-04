@@ -1,0 +1,25 @@
+# CODEOWNERS - defines default reviewers for pull requests
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @reh3376
+
+# Core retrieval and graph algorithms
+/internal/retrieval/ @reh3376
+/internal/hidden/ @reh3376
+/internal/learning/ @reh3376
+
+# API surface
+/internal/api/ @reh3376
+/cmd/ @reh3376
+
+# Database migrations (require extra care)
+/migrations/ @reh3376
+
+# CI/CD and project configuration
+/.github/ @reh3376
+/Makefile @reh3376
+/docker-compose.yml @reh3376
+
+# Documentation
+/docs/ @reh3376

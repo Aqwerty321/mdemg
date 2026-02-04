@@ -1,0 +1,76 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Memory Stats",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "stats",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Memory Stats endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "9b652e1f8f68b8a93e23d3630548b153e0686de86220c7df7049ddfafd8372ca"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/stats",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.memory_count",
+        "type": "integer"
+      },
+      {
+        "path": "$.observation_count",
+        "type": "integer"
+      },
+      {
+        "path": "$.embedding_coverage",
+        "type": "number"
+      },
+      {
+        "path": "$.health_score",
+        "type": "number"
+      },
+      {
+        "path": "$.computed_at",
+        "type": "string"
+      },
+      {
+        "path": "$.learning_activity",
+        "type": "object"
+      },
+      {
+        "path": "$.temporal_distribution",
+        "type": "object"
+      },
+      {
+        "path": "$.connectivity",
+        "type": "object"
+      }
+    ]
+  }
+}

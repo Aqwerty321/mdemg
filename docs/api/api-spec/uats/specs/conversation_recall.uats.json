@@ -1,0 +1,57 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Recall Memories",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "recall",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Recall Memories endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "e9302d7f26a87dab14cdec88cf10b3094cd21a47e1564da0c205688101f79091"
+  },
+  "variables": {
+    "test_space": "uats-recall-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/recall",
+    "body": {
+      "space_id": "{{test_space}}",
+      "query": "recent conversations",
+      "top_k": 5
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.query",
+        "type": "string"
+      },
+      {
+        "path": "$.results",
+        "type": "array"
+      }
+    ]
+  }
+}

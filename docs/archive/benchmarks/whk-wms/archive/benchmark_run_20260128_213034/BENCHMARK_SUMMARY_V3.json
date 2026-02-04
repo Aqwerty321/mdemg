@@ -1,0 +1,249 @@
+{
+  "$schema": "benchmark_summary_v3",
+  "metadata": {
+    "benchmark_id": "whk-wms-20260128-213200",
+    "date": "2026-01-29T02:32:00.926752Z",
+    "framework_version": "3.0",
+    "operator": "claude-code"
+  },
+  "environment": {
+    "mdemg_endpoint": "http://localhost:8090",
+    "target_repo": {
+      "name": "whk-wms",
+      "path": "/Users/reh3376/whk-wms/apps/whk-wms"
+    },
+    "space_id": "whk-wms"
+  },
+  "configuration": {
+    "question_file": "/Users/reh3376/mdemg/docs/tests/whk-wms/test_questions_120_agent.json",
+    "question_count": 120,
+    "runs_per_type": 3
+  },
+  "runs": [
+    {
+      "run_id": "baseline_run1",
+      "type": "baseline",
+      "sequence": 1,
+      "status": "valid",
+      "completion": {
+        "questions_answered": 120,
+        "questions_expected": 120,
+        "completion_rate": 1.0
+      },
+      "timing": {
+        "duration_seconds": 14.5
+      },
+      "output": {
+        "file_path": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/answers_baseline_run1.jsonl"
+      },
+      "learning_edges": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "grading": {
+        "graded": true,
+        "grades_file": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/grades_baseline_run1.json",
+        "mean_score": 0.731,
+        "std": 0.043,
+        "high_score_rate": 1.0,
+        "evidence_rate": 1.0,
+        "strong_evidence_count": 120,
+        "weak_evidence_count": 0,
+        "no_evidence_count": 0
+      }
+    },
+    {
+      "run_id": "baseline_run2",
+      "type": "baseline",
+      "sequence": 2,
+      "status": "valid",
+      "completion": {
+        "questions_answered": 120,
+        "questions_expected": 120,
+        "completion_rate": 1.0
+      },
+      "timing": {
+        "duration_seconds": 14.3
+      },
+      "output": {
+        "file_path": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/answers_baseline_run2.jsonl"
+      },
+      "learning_edges": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "grading": {
+        "graded": true,
+        "grades_file": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/grades_baseline_run2.json",
+        "mean_score": 0.731,
+        "std": 0.043,
+        "high_score_rate": 1.0,
+        "evidence_rate": 1.0,
+        "strong_evidence_count": 120,
+        "weak_evidence_count": 0,
+        "no_evidence_count": 0
+      }
+    },
+    {
+      "run_id": "baseline_run3",
+      "type": "baseline",
+      "sequence": 3,
+      "status": "valid",
+      "completion": {
+        "questions_answered": 120,
+        "questions_expected": 120,
+        "completion_rate": 1.0
+      },
+      "timing": {
+        "duration_seconds": 14.4
+      },
+      "output": {
+        "file_path": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/answers_baseline_run3.jsonl"
+      },
+      "learning_edges": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "grading": {
+        "graded": true,
+        "grades_file": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/grades_baseline_run3.json",
+        "mean_score": 0.731,
+        "std": 0.043,
+        "high_score_rate": 1.0,
+        "evidence_rate": 1.0,
+        "strong_evidence_count": 120,
+        "weak_evidence_count": 0,
+        "no_evidence_count": 0
+      }
+    },
+    {
+      "run_id": "mdemg_run1",
+      "type": "mdemg",
+      "sequence": 1,
+      "status": "valid",
+      "completion": {
+        "questions_answered": 120,
+        "questions_expected": 120,
+        "completion_rate": 1.0
+      },
+      "timing": {
+        "duration_seconds": 29.8
+      },
+      "output": {
+        "file_path": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/answers_mdemg_run1.jsonl"
+      },
+      "learning_edges": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "grading": {
+        "graded": true,
+        "grades_file": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/grades_mdemg_run1.json",
+        "mean_score": 0.713,
+        "std": 0.017,
+        "high_score_rate": 1.0,
+        "evidence_rate": 1.0,
+        "strong_evidence_count": 120,
+        "weak_evidence_count": 0,
+        "no_evidence_count": 0
+      }
+    },
+    {
+      "run_id": "mdemg_run2",
+      "type": "mdemg",
+      "sequence": 2,
+      "status": "valid",
+      "completion": {
+        "questions_answered": 120,
+        "questions_expected": 120,
+        "completion_rate": 1.0
+      },
+      "timing": {
+        "duration_seconds": 0.3
+      },
+      "output": {
+        "file_path": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/answers_mdemg_run2.jsonl"
+      },
+      "learning_edges": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "grading": {
+        "graded": true,
+        "grades_file": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/grades_mdemg_run2.json",
+        "mean_score": 0.713,
+        "std": 0.017,
+        "high_score_rate": 1.0,
+        "evidence_rate": 1.0,
+        "strong_evidence_count": 120,
+        "weak_evidence_count": 0,
+        "no_evidence_count": 0
+      }
+    },
+    {
+      "run_id": "mdemg_run3",
+      "type": "mdemg",
+      "sequence": 3,
+      "status": "valid",
+      "completion": {
+        "questions_answered": 120,
+        "questions_expected": 120,
+        "completion_rate": 1.0
+      },
+      "timing": {
+        "duration_seconds": 0.3
+      },
+      "output": {
+        "file_path": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/answers_mdemg_run3.jsonl"
+      },
+      "learning_edges": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "grading": {
+        "graded": true,
+        "grades_file": "/Users/reh3376/mdemg/docs/tests/whk-wms/benchmark_run_20260128_213034/grades_mdemg_run3.json",
+        "mean_score": 0.713,
+        "std": 0.017,
+        "high_score_rate": 1.0,
+        "evidence_rate": 1.0,
+        "strong_evidence_count": 120,
+        "weak_evidence_count": 0,
+        "no_evidence_count": 0
+      }
+    }
+  ],
+  "aggregate": {
+    "baseline": {
+      "valid_runs": 3,
+      "mean_score": 0.731,
+      "std_dev": 0.0,
+      "scores": [
+        0.731,
+        0.731,
+        0.731
+      ]
+    },
+    "mdemg": {
+      "valid_runs": 3,
+      "mean_score": 0.713,
+      "std_dev": 0.0,
+      "scores": [
+        0.713,
+        0.713,
+        0.713
+      ],
+      "total_learning_edges": 0
+    },
+    "comparison": {
+      "score_delta": -0.018,
+      "score_delta_percent": -2.46
+    }
+  }
+}

@@ -218,7 +218,7 @@ func TestToEvidence(t *testing.T) {
 		Name:           "DEFAULT_TIMEOUT",
 		Type:           SymbolTypeConst,
 		Value:          "5000",
-		LineNumber:     10,
+		Line:           10,
 		Snippet:        "const DEFAULT_TIMEOUT = 5000",
 		DocComment:     "Default timeout in ms",
 		TypeAnnotation: "number",
@@ -235,8 +235,8 @@ func TestToEvidence(t *testing.T) {
 	if ev.Value != sym.Value {
 		t.Errorf("Value mismatch: %s != %s", ev.Value, sym.Value)
 	}
-	if ev.LineNumber != sym.LineNumber {
-		t.Errorf("LineNumber mismatch: %d != %d", ev.LineNumber, sym.LineNumber)
+	if ev.Line != sym.Line {
+		t.Errorf("Line mismatch: %d != %d", ev.Line, sym.Line)
 	}
 }
 

@@ -1,7 +1,7 @@
 # MDEMG - Multi-Dimensional Emergent Memory Graph
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8.svg)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8.svg)](https://golang.org/)
 [![Neo4j](https://img.shields.io/badge/Neo4j-5.x-008CC1.svg)](https://neo4j.com/)
 [![CI](https://github.com/reh3376/mdemg/actions/workflows/ci.yml/badge.svg)](https://github.com/reh3376/mdemg/actions/workflows/ci.yml)
 
@@ -18,7 +18,7 @@ Everything needed to independently verify our results is included.
 ### Prerequisites
 
 - Docker (Neo4j)
-- Go 1.21+
+- Go 1.24+
 - Python 3.10+ (grading + utilities)
 
 **Embeddings (choose one):**
@@ -39,18 +39,20 @@ cp .env.example .env  # Add your embedding provider credentials
 # 2. Start services
 docker compose up -d
 go build -o bin/mdemg ./cmd/server && ./bin/mdemg &
+# Server writes .mdemg.port with actual port (dynamic allocation if preferred port is busy)
 
 # 3. Ingest test codebase (or use your own)
 go build -o bin/ingest-codebase ./cmd/ingest-codebase
 ./bin/ingest-codebase --space-id=benchmark --path=/path/to/target-repo
 
-# 4. Run consolidation
-curl -X POST http://localhost:8090/v1/memory/consolidate \
+# 4. Run consolidation (reads port from .mdemg.port automatically)
+PORT=$(cat .mdemg.port 2>/dev/null || echo 9999)
+curl -X POST http://localhost:$PORT/v1/memory/consolidate \
   -H "Content-Type: application/json" -d '{"space_id": "benchmark"}'
 
-# 5. Run benchmark (see docs/tests/whk-wms/benchmark_v22_test/)
+# 5. Run benchmark (see docs/benchmarks/whk-wms/)
 # Questions: test_questions_120_agent.json
-# Grader: grade_answers.py
+# Grader: docs/benchmarks/grader_v4.py
 ```
 
 **Report output**: `grades_*.json` contains per-question scores with evidence breakdown.
@@ -59,12 +61,8 @@ curl -X POST http://localhost:8090/v1/memory/consolidate \
 
 ```bash
 # Question bank hash (SHA-256)
-shasum -a 256 docs/tests/whk-wms/test_questions_120_agent.json
+shasum -a 256 docs/benchmarks/whk-wms/test_questions_120_agent.json
 # Expected: 24aa17a215e4e58b8b44c7faef9f14228edb0e6d3f8f657d867b1bfa850f7e9e
-
-# Grader hash
-shasum -a 256 docs/tests/whk-wms/benchmark_v22_test/grade_answers.py
-# Expected: 5dbf84f092db31e4bc0d4867fd412c7af6575855f7c71e3d2f65e2ee8a8a21a5
 ```
 
 ---
@@ -90,18 +88,26 @@ Full reproducibility details for skeptics:
 
 > **Baseline definition:** Same agent runner and tool permissions, **no MDEMG retrieval**, relying on long-context + auto-compaction only (memory off).
 
-### Key Results (Q&A Battery, v22)
+### Key Results (2026-01-30, whk-wms 507K LOC)
 
-| Metric | Baseline | MDEMG | Notes |
-|--------|----------|-------|-------|
-| Mean Score | 0.834 | 0.820 | Within margin of error |
-| Evidence Rate | 100% | 97.1% | Both conditions high |
-| High Confidence (>0.7) | 100% | 94.2% | Run 1 cold start |
-| Run-to-Run Improvement | +2.9% | +3.0% | Similar learning |
+| Metric | Baseline | MDEMG + Edge Attention | Delta |
+|--------|----------|------------------------|-------|
+| **Mean Score** | 0.854 | **0.898** | **+5.2%** |
+| Standard Deviation | 0.088 | 0.059 | -51% variance |
+| High Score Rate (≥0.7) | 97.9% | **100%** | +2.1pp |
+| Strong Evidence Rate | 97.9% | **100%** | +2.1pp |
+
+**Category Performance (Edge Attention):**
+| Category | Mean Score |
+|----------|------------|
+| Disambiguation | 0.958 |
+| Service Relationships | 0.916 |
+| Architecture Structure | 0.889 |
+| Data Flow Integration | 0.882 |
 
 ### Key Metric: State Survival
 
-The Q&A battery measures single-turn retrieval accuracy. The more important metric is **state survival under compaction**:
+The Q&A battery measures single-turn retrieval accuracy. The critical differentiator is **state survival under compaction**:
 
 | Metric | Baseline | MDEMG | Source |
 |--------|----------|-------|--------|
@@ -127,9 +133,12 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 
 - **Multi-layer graph architecture**: Base observations (L0) → Hidden concepts (L1) → Abstract concepts (L2+)
 - **Hybrid search**: Combines vector similarity with graph traversal
+- **Conversation Memory System (CMS)**: Persistent memory across agent sessions with surprise-weighted learning
+- **Symbol extraction (UPTS)**: Unified Parser Test Schema supporting 30+ languages with file:line evidence
 - **Plugin system**: Extensible via ingestion, reasoning, and APE (Autonomous Pattern Extraction) modules
 - **Evidence-based retrieval**: Returns symbol-level citations (file:line references) with results
 - **Capability gap detection**: Identifies missing knowledge areas for targeted improvement
+- **Codebase ingestion API**: Background job processing for large codebase ingestion with consolidation
 
 ## Architecture
 
@@ -143,7 +152,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 └─────────────────────────────────────────────────┼──────────┘
                                                   │
                     ┌─────────────────────────────▼─────────┐
-                    │          MDEMG Service (:8090)        │
+                    │     MDEMG Service (dynamic port)      │
                     │  ┌─────────┐  ┌───────────────────┐  │
                     │  │Embedding│  │    Neo4j Graph    │  │
                     │  │ Provider│  │ (Vector + Graph)  │  │
@@ -155,7 +164,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.24+
 - Docker (for Neo4j)
 - Embedding provider: Ollama (local) or OpenAI API key
 
@@ -190,14 +199,14 @@ go build -o bin/ingest-codebase ./cmd/ingest-codebase
 ./bin/ingest-codebase --space-id=my-project --path=/path/to/repo
 
 # Run consolidation to create concept layers
-curl -X POST http://localhost:8090/v1/memory/consolidate \
+curl -X POST http://localhost:9999/v1/memory/consolidate \
   -H "Content-Type: application/json" \
   -d '{"space_id": "my-project"}'
 ```
 
 ## API Endpoints
 
-### Core Operations
+### Core Memory Operations
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -207,8 +216,69 @@ curl -X POST http://localhost:8090/v1/memory/consolidate \
 | `/v1/memory/ingest/batch` | POST | Store multiple observations |
 | `/v1/memory/consolidate` | POST | Trigger hidden layer creation |
 | `/v1/memory/stats` | GET | Per-space memory statistics |
+| `/v1/memory/ingest-codebase` | POST | Background codebase ingestion job |
+| `/v1/memory/symbols` | GET | Query extracted code symbols |
 
-See [API Reference](docs/API_REFERENCE.md) for complete documentation.
+### Conversation Memory System (CMS)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/conversation/resume` | POST | Restore session context with themes and concepts |
+| `/v1/conversation/observe` | POST | Record observations (decisions, corrections, learnings) |
+| `/v1/conversation/correct` | POST | Record user corrections for learning |
+| `/v1/conversation/recall` | POST | Query conversation history |
+| `/v1/conversation/consolidate` | POST | Create themes from observations |
+
+### Learning Control
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/learning/stats` | GET | Hebbian learning edge statistics |
+| `/v1/learning/freeze` | POST | Freeze learning for stable scoring |
+| `/v1/learning/unfreeze` | POST | Resume learning edge creation |
+| `/v1/learning/prune` | POST | Remove decayed edges |
+
+## Symbol Extraction (UPTS)
+
+MDEMG extracts code symbols during ingestion using the Unified Parser Test Schema (UPTS):
+
+**Supported Languages (30+):**
+- TypeScript, JavaScript, Python, Go, Rust, Java, C/C++, C#
+- Ruby, PHP, Swift, Kotlin, Scala, Dart
+- SQL, GraphQL, Protobuf, YAML, JSON, TOML, Dockerfile
+- And more...
+
+**Extracted Symbol Types:**
+- Functions, methods, classes, interfaces, types
+- Constants, variables, enums
+- Imports, exports, module declarations
+
+Symbols include file:line references for evidence-based retrieval.
+
+## Conversation Memory System (CMS)
+
+CMS provides persistent memory for AI agents across sessions:
+
+```bash
+# Resume session context (call at session start)
+curl -X POST http://localhost:9999/v1/conversation/resume \
+  -H "Content-Type: application/json" \
+  -d '{"space_id": "my-agent", "session_id": "session-1", "max_observations": 10}'
+
+# Record an observation (decision, learning, correction)
+curl -X POST http://localhost:9999/v1/conversation/observe \
+  -H "Content-Type: application/json" \
+  -d '{
+    "space_id": "my-agent",
+    "session_id": "session-1",
+    "content": "User prefers TypeScript for new files",
+    "obs_type": "preference"
+  }'
+```
+
+**Observation Types:** `decision`, `correction`, `learning`, `preference`, `error`, `progress`
+
+Observations are surprise-weighted (novel information persists longer) and form themes via consolidation.
 
 ## MCP Integration (Cursor IDE)
 
@@ -221,7 +291,7 @@ MDEMG provides an MCP server for IDE integration. Add to `~/.cursor/mcp.json`:
       "command": "/path/to/mdemg/bin/mdemg-mcp",
       "args": [],
       "env": {
-        "MDEMG_ENDPOINT": "http://localhost:8090"
+        "MDEMG_ENDPOINT": "http://localhost:9999"
       }
     }
   }
@@ -238,24 +308,30 @@ mdemg/
 │   ├── retrieval/        # Search algorithms
 │   ├── hidden/           # Concept abstraction
 │   ├── learning/         # Hebbian edges
+│   ├── conversation/     # Conversation Memory System (CMS)
+│   ├── symbols/          # Code symbol extraction
 │   └── plugins/          # Plugin system
 ├── docs/                 # Documentation
-│   └── tests/            # Benchmark questions, graders, results
+│   └── benchmarks/       # Benchmark questions, graders, results
 ├── migrations/           # Neo4j schema (Cypher)
+├── tests/                # Integration tests
 └── docker-compose.yml    # Neo4j container
 ```
 
 ## Documentation
 
-- [Architecture](docs/01_Architecture.md) - System design and components
-- [Graph Schema](docs/02_Graph_Schema.md) - Neo4j labels and relationships
-- [API Reference](docs/API_REFERENCE.md) - Complete endpoint documentation
-- [Retrieval & Scoring](docs/06_Retrieval_API_and_Scoring.md) - Scoring algorithm details
-- [Plugin SDK](docs/11_Plugin_SDK.md) - Building custom plugins
+- [Architecture](docs/architecture/01_Architecture.md) - System design and components
+- [Graph Schema](docs/architecture/02_Graph_Schema.md) - Neo4j labels and relationships
+- [Retrieval & Scoring](docs/architecture/06_Retrieval_API_and_Scoring.md) - Scoring algorithm details
+- [Benchmarking Guide](docs/benchmarks/BENCHMARK_V4_README.md) - Running and validating benchmarks
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for the vulnerability reporting policy.
 
 ## License
 

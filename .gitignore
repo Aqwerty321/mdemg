@@ -80,3 +80,20 @@ temp/
 # Logs
 *.log
 logs/
+
+# Dynamic port file
+.mdemg.port
+.mdemg.port.tmp
+
+# Build artifacts
+mdemg
+
+# Neo4j data
+mdemg_neo4j/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Parser spec (generated)
+parser-spec/

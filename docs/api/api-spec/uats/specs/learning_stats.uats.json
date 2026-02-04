@@ -1,0 +1,64 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Learning Stats",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "learning",
+      "stats",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Learning Stats endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "09537fd5d4aade9b77570f4ab73f67d22eb8d599b0e0ce92090be5593345a846"
+  },
+  "variables": {
+    "test_space": "uats-learning-test"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/learning/stats",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.total_edges",
+        "type": "integer"
+      },
+      {
+        "path": "$.decay_per_day",
+        "type": "number"
+      },
+      {
+        "path": "$.prune_threshold",
+        "type": "number"
+      },
+      {
+        "path": "$.max_edges_per_node",
+        "type": "integer"
+      },
+      {
+        "path": "$.freeze_state",
+        "type": "object"
+      }
+    ]
+  }
+}

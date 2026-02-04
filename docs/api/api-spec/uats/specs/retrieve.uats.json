@@ -1,0 +1,83 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Retrieve Memories",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "retrieve",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-29",
+    "description": "Validates Retrieve Memories endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "e50ed96454d6f45011e6190809c512740e6c92d7db893020e6c04195a05db26a"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/retrieve",
+    "body": {
+      "space_id": "{{test_space}}",
+      "query_text": "test query",
+      "top_k": 10
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "equals": "{{test_space}}"
+      },
+      {
+        "path": "$.results",
+        "type": "array"
+      },
+      {
+        "path": "$.evidence_metrics",
+        "type": "object"
+      },
+      {
+        "path": "$.debug",
+        "type": "object"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_query",
+      "description": "Test validation error when query_text is missing",
+      "request": {
+        "body": {
+          "space_id": "{{test_space}}",
+          "query_text": null,
+          "top_k": 10
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "equals": "validation_failed"
+          }
+        ]
+      }
+    }
+  ]
+}

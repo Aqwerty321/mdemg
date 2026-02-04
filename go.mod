@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/mark3labs/mcp-go v0.17.0
-	github.com/neo4j/neo4j-go-driver/v5 v5.24.0
+	github.com/neo4j/neo4j-go-driver/v5 v5.28.4
 	github.com/smacker/go-tree-sitter v0.0.0-20240827094217-dd81d9e9be82
 	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11

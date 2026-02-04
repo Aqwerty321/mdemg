@@ -527,9 +527,11 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			"cache_hit":              false,
 			"edge_type_strategy":     s.cfg.EdgeTypeStrategy,
 			"hybrid_switch_hop":      s.cfg.HybridSwitchHop,
-			"temporal_mode":          string(hints.TemporalIntent.Mode),
-			"temporal_keywords":      hints.TemporalIntent.Keywords,
-			"temporal_confidence":    hints.TemporalIntent.Confidence,
+			"temporal_mode":              string(hints.TemporalIntent.Mode),
+			"temporal_keywords":          hints.TemporalIntent.Keywords,
+			"temporal_confidence":        hints.TemporalIntent.Confidence,
+			"temporal_source_type_decay": s.cfg.TemporalSourceTypeDecayEnabled,
+			"temporal_stale_ref_days":    s.cfg.TemporalStaleRefDays,
 		},
 	}
 
@@ -549,15 +551,16 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 }
 
 type Candidate struct {
-	NodeID     string
-	Path       string
-	Name       string
-	Summary    string
-	UpdatedAt  time.Time
-	Confidence float64
-	VectorSim  float64
-	Layer      int      // 0=base, 1=hidden/concern, 2+=concept
-	Tags       []string // Tags for scoring boosts (e.g., "config")
+	NodeID        string
+	Path          string
+	Name          string
+	Summary       string
+	UpdatedAt     time.Time
+	CanonicalTime time.Time // Phase 2: content-relevant time (zero = use UpdatedAt)
+	Confidence    float64
+	VectorSim     float64
+	Layer         int      // 0=base, 1=hidden/concern, 2+=concept
+	Tags          []string // Tags for scoring boosts (e.g., "config")
 }
 
 // SimilarNode represents a node returned from vector similarity search
@@ -599,6 +602,7 @@ RETURN node.node_id AS node_id,
        coalesce(node.summary,'') AS summary,
        coalesce(node.confidence,0.6) AS confidence,
        coalesce(node.updated_at, datetime()) AS updated_at,
+       coalesce(node.canonical_time, node.updated_at, datetime()) AS canonical_time,
        coalesce(node.layer, 0) AS layer,
        coalesce(node.tags, []) AS tags,
        score AS score
@@ -619,6 +623,7 @@ ORDER BY score DESC`
 			sum, _ := rec.Get("summary")
 			conf, _ := rec.Get("confidence")
 			upd, _ := rec.Get("updated_at")
+			canonicalAny, _ := rec.Get("canonical_time")
 			layer, _ := rec.Get("layer")
 			tagsAny, _ := rec.Get("tags")
 			sc, _ := rec.Get("score")
@@ -639,6 +644,13 @@ ORDER BY score DESC`
 				ct.UpdatedAt = v
 			default:
 				ct.UpdatedAt = time.Now()
+			}
+			// Parse canonical_time (Phase 2 Temporal)
+			switch v := canonicalAny.(type) {
+			case time.Time:
+				ct.CanonicalTime = v
+			default:
+				ct.CanonicalTime = ct.UpdatedAt // fallback
 			}
 			cands = append(cands, ct)
 		}
@@ -1042,20 +1054,31 @@ func (s *Service) IngestObservation(ctx context.Context, req models.IngestReques
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
+	// Auto-extract canonical_time if not explicitly provided (Phase 2 Temporal)
+	canonicalTimeStr := req.CanonicalTime
+	if canonicalTimeStr == "" {
+		if contentStr, ok := req.Content.(string); ok && contentStr != "" {
+			if extracted := ExtractCanonicalTime(contentStr, req.Tags); !extracted.IsZero() {
+				canonicalTimeStr = extracted.Format(time.RFC3339)
+			}
+		}
+	}
+
 	params := map[string]any{
-		"spaceId":     req.SpaceID,
-		"nodeId":      nodeID,
-		"path":        req.Path,
-		"name":        req.Name,
-		"summary":     req.Summary,
-		"obsId":       obsID,
-		"timestamp":   req.Timestamp,
-		"source":      req.Source,
-		"content":     req.Content,
-		"tags":        req.Tags,
-		"sensitivity": req.Sensitivity,
-		"confidence":  req.Confidence,
-		"embedding":   req.Embedding, // May be nil/empty
+		"spaceId":       req.SpaceID,
+		"nodeId":        nodeID,
+		"path":          req.Path,
+		"name":          req.Name,
+		"summary":       req.Summary,
+		"obsId":         obsID,
+		"timestamp":     req.Timestamp,
+		"source":        req.Source,
+		"content":       req.Content,
+		"tags":          req.Tags,
+		"sensitivity":   req.Sensitivity,
+		"confidence":    req.Confidence,
+		"embedding":     req.Embedding, // May be nil/empty
+		"canonicalTime": canonicalTimeStr,
 	}
 
 	// Determine merge key: prefer path if provided, else use node_id
@@ -1090,6 +1113,7 @@ ON CREATE SET n.node_id=$nodeId,
               n.status='active',
               n.created_at=datetime(),
               n.updated_at=datetime(),
+              n.canonical_time = CASE WHEN $canonicalTime <> '' THEN datetime($canonicalTime) ELSE datetime() END,
               n.update_count=0,
               n.summary=coalesce($summary,''),
               n.description='',
@@ -1107,6 +1131,7 @@ CREATE (o:Observation {
 })
 MERGE (n)-[:HAS_OBSERVATION {space_id:$spaceId, created_at:datetime()}]->(o)
 SET n.updated_at=datetime(),
+    n.canonical_time = CASE WHEN $canonicalTime <> '' THEN datetime($canonicalTime) ELSE n.canonical_time END,
     n.update_count = coalesce(n.update_count,0) + 1,
     n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END` + embeddingClause + `
 RETURN n.node_id AS node_id`
@@ -1124,13 +1149,14 @@ ON CREATE SET n.path=coalesce($path, $mergeValue),
               n.status='active',
               n.created_at=datetime(),
               n.updated_at=datetime(),
+              n.canonical_time = CASE WHEN $canonicalTime <> '' THEN datetime($canonicalTime) ELSE datetime() END,
               n.update_count=0,
               n.summary=coalesce($summary,''),
               n.description='',
               n.confidence=coalesce($confidence, 0.6),
               n.sensitivity=coalesce($sensitivity,'internal'),
               n.tags=coalesce($tags,[])
-WITH n
+With n
 CREATE (o:Observation {
   space_id:$spaceId,
   obs_id:$obsId,
@@ -1141,6 +1167,7 @@ CREATE (o:Observation {
 })
 MERGE (n)-[:HAS_OBSERVATION {space_id:$spaceId, created_at:datetime()}]->(o)
 SET n.updated_at=datetime(),
+    n.canonical_time = CASE WHEN $canonicalTime <> '' THEN datetime($canonicalTime) ELSE n.canonical_time END,
     n.update_count = coalesce(n.update_count,0) + 1,
     n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END` + embeddingClause + `
 RETURN n.node_id AS node_id`
@@ -1198,18 +1225,19 @@ func (s *Service) BatchIngestObservations(ctx context.Context, req models.BatchI
 	for i, obs := range req.Observations {
 		// Convert BatchIngestItem to IngestRequest
 		ingestReq := models.IngestRequest{
-			SpaceID:     req.SpaceID,
-			Timestamp:   obs.Timestamp,
-			Source:      obs.Source,
-			Content:     obs.Content,
-			Tags:        obs.Tags,
-			NodeID:      obs.NodeID,
-			Path:        obs.Path,
-			Name:        obs.Name,
-			Summary:     obs.Summary,
-			Sensitivity: obs.Sensitivity,
-			Confidence:  obs.Confidence,
-			Embedding:   obs.Embedding,
+			SpaceID:       req.SpaceID,
+			Timestamp:     obs.Timestamp,
+			Source:        obs.Source,
+			Content:       obs.Content,
+			Tags:          obs.Tags,
+			NodeID:        obs.NodeID,
+			Path:          obs.Path,
+			Name:          obs.Name,
+			Summary:       obs.Summary,
+			Sensitivity:   obs.Sensitivity,
+			Confidence:    obs.Confidence,
+			Embedding:     obs.Embedding,
+			CanonicalTime: obs.CanonicalTime,
 		}
 
 		// Validate required fields

@@ -27,6 +27,7 @@ const (
 	StageComparisonBoost     RetrievalPathStage = "comparison_boost"
 	StageConfigBoost         RetrievalPathStage = "config_boost"
 	StageTemporalBoost       RetrievalPathStage = "temporal_boost"
+	StageStaleRefPenalty     RetrievalPathStage = "stale_ref_penalty"
 )
 
 // GenerateJiminyExplanation creates a human-readable explanation for why a result was ranked.
@@ -71,6 +72,11 @@ func GenerateJiminyExplanation(breakdown ScoreBreakdown, path []string) JiminyEx
 		parts = append(parts, fmt.Sprintf("temporal recency boost (+%.2f)", breakdown.TemporalBoost))
 	}
 
+	// Stale reference penalty (Phase 2 Temporal)
+	if breakdown.StaleRefPenalty < -0.01 {
+		parts = append(parts, fmt.Sprintf("stale reference penalty (%.2f)", breakdown.StaleRefPenalty))
+	}
+
 	// Rerank delta (if LLM reranking affected position)
 	if breakdown.RerankDelta > 0.01 {
 		parts = append(parts, fmt.Sprintf("LLM rerank boost (+%.2f)", breakdown.RerankDelta))
@@ -109,6 +115,7 @@ func GenerateJiminyExplanation(breakdown ScoreBreakdown, path []string) JiminyEx
 		"rerank_delta":        breakdown.RerankDelta,
 		"learning_edge_boost": breakdown.LearningEdgeBoost,
 		"temporal_boost":      breakdown.TemporalBoost,
+		"stale_ref_penalty":   breakdown.StaleRefPenalty,
 		"final_score":         breakdown.FinalScore,
 	}
 
@@ -198,6 +205,10 @@ func DetermineRetrievalPath(breakdown ScoreBreakdown, wasReranked bool) []string
 
 	if breakdown.TemporalBoost > 0.01 {
 		path = append(path, string(StageTemporalBoost))
+	}
+
+	if breakdown.StaleRefPenalty < -0.01 {
+		path = append(path, string(StageStaleRefPenalty))
 	}
 
 	if wasReranked {

@@ -76,6 +76,17 @@ type Config struct {
 	TemporalSoftBoostMultiplier float64 // Gamma multiplier for soft-mode recency boost (default: 3.0, range: [1.0, 10.0])
 	TemporalHardFilterEnabled   bool    // Enable hard-mode time range filtering (default: true)
 
+	// Phase 2 Temporal: Source-type-specific decay rates
+	TemporalSourceTypeDecayEnabled bool    // TEMPORAL_SOURCE_TYPE_DECAY (default: false)
+	ScoringRhoDocumentation        float64 // SCORING_RHO_DOCUMENTATION (default: 0.01)
+	ScoringRhoConfig               float64 // SCORING_RHO_CONFIG (default: 0.03)
+	ScoringRhoConversation         float64 // SCORING_RHO_CONVERSATION (default: 0.10)
+	ScoringRhoChangelog            float64 // SCORING_RHO_CHANGELOG (default: 0.08)
+
+	// Phase 2 Temporal: Stale reference detection
+	TemporalStaleRefDays    int     // TEMPORAL_STALE_REF_DAYS (default: 0 = disabled)
+	TemporalStaleRefMaxPen  float64 // TEMPORAL_STALE_REF_MAX_PENALTY (default: 0.15)
+
 	// Scoring hyperparameters for retrieval ranking
 	ScoringAlpha       float64 // Vector similarity weight (default: 0.55)
 	ScoringBeta        float64 // Activation weight (default: 0.30)
@@ -520,6 +531,53 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("TEMPORAL_SOFT_BOOST must be in range [1.0, 10.0]")
 	}
 	temporalHardFilterEnabled := getBool("TEMPORAL_HARD_FILTER", true)
+
+	// Phase 2 Temporal: Source-type-specific decay rates
+	temporalSourceTypeDecayEnabled := getBool("TEMPORAL_SOURCE_TYPE_DECAY", false)
+	scoringRhoDocumentation, err := atof("SCORING_RHO_DOCUMENTATION", 0.01)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRhoDocumentation < 0 {
+		return Config{}, errors.New("SCORING_RHO_DOCUMENTATION must be >= 0")
+	}
+	scoringRhoConfig, err := atof("SCORING_RHO_CONFIG", 0.03)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRhoConfig < 0 {
+		return Config{}, errors.New("SCORING_RHO_CONFIG must be >= 0")
+	}
+	scoringRhoConversation, err := atof("SCORING_RHO_CONVERSATION", 0.10)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRhoConversation < 0 {
+		return Config{}, errors.New("SCORING_RHO_CONVERSATION must be >= 0")
+	}
+	scoringRhoChangelog, err := atof("SCORING_RHO_CHANGELOG", 0.08)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringRhoChangelog < 0 {
+		return Config{}, errors.New("SCORING_RHO_CHANGELOG must be >= 0")
+	}
+
+	// Phase 2 Temporal: Stale reference detection
+	temporalStaleRefDays, err := atoi("TEMPORAL_STALE_REF_DAYS", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	if temporalStaleRefDays < 0 {
+		return Config{}, errors.New("TEMPORAL_STALE_REF_DAYS must be >= 0")
+	}
+	temporalStaleRefMaxPen, err := atof("TEMPORAL_STALE_REF_MAX_PENALTY", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	if temporalStaleRefMaxPen < 0 {
+		return Config{}, errors.New("TEMPORAL_STALE_REF_MAX_PENALTY must be >= 0")
+	}
 
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "")
@@ -971,9 +1029,16 @@ func FromEnv() (Config, error) {
 		ScoringRhoL2:              scoringRhoL2,
 		ScoringConfigBoost:        scoringConfigBoost,
 		ScoringPathBoost:          scoringPathBoost,
-		TemporalEnabled:             temporalEnabled,
-		TemporalSoftBoostMultiplier: temporalSoftBoost,
-		TemporalHardFilterEnabled:   temporalHardFilterEnabled,
+		TemporalEnabled:                temporalEnabled,
+		TemporalSoftBoostMultiplier:    temporalSoftBoost,
+		TemporalHardFilterEnabled:      temporalHardFilterEnabled,
+		TemporalSourceTypeDecayEnabled: temporalSourceTypeDecayEnabled,
+		ScoringRhoDocumentation:        scoringRhoDocumentation,
+		ScoringRhoConfig:               scoringRhoConfig,
+		ScoringRhoConversation:         scoringRhoConversation,
+		ScoringRhoChangelog:            scoringRhoChangelog,
+		TemporalStaleRefDays:           temporalStaleRefDays,
+		TemporalStaleRefMaxPen:         temporalStaleRefMaxPen,
 		LogFormat:                 logFormat,
 		LogSkipHealth:             logSkipHealth,
 		HiddenLayerEnabled:        hiddenEnabled,

@@ -28,6 +28,7 @@ linters:
       - path: \.pb\.go
         linters:
           - all
-    # Don't fail on existing issues - report only new
-    max-issues-per-linter: 0
-    max-same-issues: 0
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

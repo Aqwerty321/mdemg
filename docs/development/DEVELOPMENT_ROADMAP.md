@@ -281,11 +281,16 @@ This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 
 - [ ] Benchmark: RPC overhead vs direct call (target: <5ms added latency).
 
 ### Deliverable 6.4: Non-Code Integration Modules ✅ PARTIAL
-- **Priority**: P2 | **Status**: Linear COMPLETE, Obsidian pending
+- **Priority**: P2 | **Status**: Linear CRUD COMPLETE (Phase 4), Obsidian pending
 - [x] Implement **Linear Module** (Go binary) for engineering tasks.
   - Full sync of teams, projects, and issues
   - Streaming gRPC with batch ingestion
   - Incremental sync via cursor
+  - **Phase 4**: Full CRUD operations (create/read/update/delete issues, projects, comments)
+  - **Phase 4**: CRUDModule protobuf service with generic entity_type dispatch
+  - **Phase 4**: REST API endpoints (`/v1/linear/issues`, `/v1/linear/projects`, `/v1/linear/comments`)
+  - **Phase 4**: 6 MCP tools for IDE integration
+  - **Phase 4**: Config-driven workflow engine (YAML triggers, conditions, actions)
 - [ ] Implement **Obsidian Module** (Go binary) for SME notes.
 - [ ] Define non-code specific edge types (e.g., `BLOCKS`, `ASSIGNED_TO`).
 

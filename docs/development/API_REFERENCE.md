@@ -14,6 +14,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Conversation Memory](#conversation-memory)
 - [Capability Gaps](#capability-gaps)
 - [Linear Integration](#linear-integration)
+- [Webhooks](#webhooks)
 - [Plugins & Modules](#plugins--modules)
 - [System & Monitoring](#system--monitoring)
 
@@ -983,6 +984,46 @@ Add a comment to an issue.
   "created_at": "2026-02-03T10:05:00Z"
 }
 ```
+
+---
+
+## Webhooks
+
+### POST /v1/webhooks/linear
+
+Receives Linear webhook events and ingests them as observations via the `linear-module` plugin.
+
+**Authentication:** HMAC-SHA256 signature verification via the `Linear-Signature` header.
+
+**Environment variables:**
+- `LINEAR_WEBHOOK_SECRET` — HMAC-SHA256 signing secret (required)
+- `LINEAR_WEBHOOK_SPACE_ID` — Target space ID for ingested observations (required)
+
+**Supported events:**
+- `Issue` create/update
+- `Project` update
+
+Other event types are acknowledged with 200 but ignored.
+
+**Debouncing:** Rapid events for the same entity are coalesced with a 10-second window.
+
+**Request headers:**
+- `Linear-Signature` — HMAC-SHA256 hex digest of the request body
+
+**Response:**
+```json
+{
+  "status": "accepted",
+  "type": "Issue",
+  "action": "create",
+  "debounce": "Issue:ISS-123"
+}
+```
+
+**Error responses:**
+- `401 Unauthorized` — Missing or invalid signature
+- `405 Method Not Allowed` — Non-POST request
+- `500 Internal Server Error` — Webhook secret not configured
 
 ---
 

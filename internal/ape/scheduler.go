@@ -77,13 +77,19 @@ func (s *Scheduler) Stop() {
 
 // TriggerEvent triggers all APE modules subscribed to the given event
 func (s *Scheduler) TriggerEvent(event string) {
+	s.TriggerEventWithContext(event, nil)
+}
+
+// TriggerEventWithContext triggers all APE modules subscribed to the given event,
+// passing additional context (e.g., space_id, ingest_type) to the module execution.
+func (s *Scheduler) TriggerEventWithContext(event string, ctx map[string]string) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	for moduleID, sched := range s.schedules {
 		for _, trigger := range sched.EventTriggers {
 			if trigger == event {
-				go s.executeModule(moduleID, "event:"+event)
+				go s.executeModuleWithContext(moduleID, "event:"+event, ctx)
 				break
 			}
 		}
@@ -184,8 +190,13 @@ func (s *Scheduler) checkScheduledTasks() {
 	}
 }
 
-// executeModule runs an APE module
+// executeModule runs an APE module with no additional context.
 func (s *Scheduler) executeModule(moduleID, trigger string) {
+	s.executeModuleWithContext(moduleID, trigger, nil)
+}
+
+// executeModuleWithContext runs an APE module, passing eventCtx to the ExecuteRequest.
+func (s *Scheduler) executeModuleWithContext(moduleID, trigger string, eventCtx map[string]string) {
 	// Check if already running
 	s.mu.Lock()
 	if s.runningTask[moduleID] {
@@ -213,6 +224,12 @@ func (s *Scheduler) executeModule(moduleID, trigger string) {
 	taskID := uuid.New().String()
 	log.Printf("ape: executing %s (task=%s, trigger=%s)", moduleID, taskID[:8], trigger)
 
+	// Merge event context into request context
+	reqCtx := make(map[string]string)
+	for k, v := range eventCtx {
+		reqCtx[k] = v
+	}
+
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Minute)
 	defer cancel()
@@ -220,7 +237,7 @@ func (s *Scheduler) executeModule(moduleID, trigger string) {
 	resp, err := modInfo.APEClient.Execute(ctx, &pb.ExecuteRequest{
 		TaskId:  taskID,
 		Trigger: trigger,
-		Context: map[string]string{},
+		Context: reqCtx,
 	})
 
 	elapsed := time.Since(start)

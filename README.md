@@ -142,6 +142,8 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Git commit hooks**: Automatic incremental ingestion on every commit via post-commit hook
 - **Freshness tracking**: TapRoot-level staleness detection with configurable thresholds
 - **Scheduled sync**: Periodic background sync to keep memory graphs up-to-date
+- **Webhook integration**: Linear webhook endpoint with HMAC signature verification and debouncing
+- **File watcher**: Standalone `mdemg-watch` binary for automatic re-ingestion on file changes
 
 ## Architecture
 
@@ -247,6 +249,7 @@ Install the post-commit hook to automatically ingest changes on every commit:
 | `/v1/memory/symbols` | GET | Query extracted code symbols |
 | `/v1/memory/ingest/files` | POST | Ingest files with background job processing |
 | `/v1/memory/spaces/{id}/freshness` | GET | Space freshness and staleness status |
+| `/v1/webhooks/linear` | POST | Linear webhook receiver with HMAC verification |
 
 ### Conversation Memory System (CMS)
 

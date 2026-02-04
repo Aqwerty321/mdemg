@@ -38,7 +38,7 @@ Properties:
 - `name`
 - `created_at`
 - `last_ingest_at` — datetime of most recent ingest (Phase 9.2)
-- `last_ingest_type` — type of last ingest: `codebase-ingest`, `file-ingest`, `scheduled-sync` (Phase 9.2)
+- `last_ingest_type` — type of last ingest: `codebase-ingest`, `file-ingest`, `scheduled-sync`, `linear-webhook` (Phase 9.2, 9.4)
 - `ingest_count` — running counter of total ingestions for this space (Phase 9.2)
 
 ### `:MemoryNode`

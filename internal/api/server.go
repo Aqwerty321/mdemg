@@ -43,6 +43,7 @@ type Server struct {
 	contextCooler   *conversation.ContextCooler
 	sessionTracker  *conversation.SessionTracker
 	hiddenSvc       *hidden.Service // alias for handleConversationConsolidate
+	webhookDebouncer   *linearWebhookDebouncer
 	stopConsolidate    chan struct{}
 	stopCooler         chan struct{}
 	stopInterviewer    chan struct{}
@@ -171,7 +172,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	sessTracker := conversation.NewSessionTracker(2 * time.Hour)
 	log.Printf("Session tracker initialized (TTL: 2h)")
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, hiddenSvc: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, gapInterviewer: gapInt, conversationSvc: convSvc, contextCooler: ctxCooler, sessionTracker: sessTracker}
+	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, hiddenSvc: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, gapInterviewer: gapInt, conversationSvc: convSvc, contextCooler: ctxCooler, sessionTracker: sessTracker, webhookDebouncer: newLinearWebhookDebouncer()}
 }
 
 // Shutdown gracefully stops background services
@@ -471,6 +472,14 @@ func (s *Server) TriggerAPEEvent(event string) {
 	}
 }
 
+// TriggerAPEEventWithContext triggers APE modules subscribed to the given event,
+// passing additional context (e.g., space_id, ingest_type) to module execution.
+func (s *Server) TriggerAPEEventWithContext(event string, ctx map[string]string) {
+	if s.apeScheduler != nil {
+		s.apeScheduler.TriggerEventWithContext(event, ctx)
+	}
+}
+
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.handleHealthz)
@@ -537,6 +546,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/linear/projects", s.handleLinearProjects)
 	mux.HandleFunc("/v1/linear/projects/", s.handleLinearProjects)
 	mux.HandleFunc("/v1/linear/comments", s.handleLinearComments)
+
+	// Webhook endpoints (Phase 9.4)
+	mux.HandleFunc("/v1/webhooks/linear", s.handleLinearWebhook)
 
 	// Space freshness endpoint (Phase 9.2)
 	mux.HandleFunc("/v1/memory/spaces/", s.handleSpacesRoute)

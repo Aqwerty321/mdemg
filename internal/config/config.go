@@ -177,6 +177,10 @@ type Config struct {
 	LinearTeamID      string // Default team ID for issue creation
 	LinearWorkspaceID string // Workspace identifier
 
+	// Linear webhook settings (Phase 9.4)
+	LinearWebhookSecret  string // LINEAR_WEBHOOK_SECRET — HMAC-SHA256 signing secret
+	LinearWebhookSpaceID string // LINEAR_WEBHOOK_SPACE_ID — space for webhook observations
+
 	// Capability gap detection settings (Task #23)
 	GapLowScoreThreshold   float64 // Queries below this avg score are considered poor (default: 0.5)
 	GapMinOccurrences      int     // Min occurrences to create a gap (default: 3)
@@ -868,6 +872,10 @@ func FromEnv() (Config, error) {
 	linearTeamID := get("LINEAR_TEAM_ID", "")
 	linearWorkspaceID := get("LINEAR_WORKSPACE_ID", "")
 
+	// Linear webhook settings (Phase 9.4)
+	linearWebhookSecret := get("LINEAR_WEBHOOK_SECRET", "")
+	linearWebhookSpaceID := get("LINEAR_WEBHOOK_SPACE_ID", "")
+
 	// LLM Summary settings (semantic summaries for ingest)
 	llmSummaryEnabled := getBool("LLM_SUMMARY_ENABLED", false)
 	llmSummaryProvider := get("LLM_SUMMARY_PROVIDER", "openai")
@@ -1134,6 +1142,8 @@ func FromEnv() (Config, error) {
 		MdemgVersion:              mdemgVersion,
 		LinearTeamID:              linearTeamID,
 		LinearWorkspaceID:         linearWorkspaceID,
+		LinearWebhookSecret:      linearWebhookSecret,
+		LinearWebhookSpaceID:     linearWebhookSpaceID,
 		LLMSummaryEnabled:         llmSummaryEnabled,
 		LLMSummaryProvider:        llmSummaryProvider,
 		LLMSummaryModel:           llmSummaryModel,

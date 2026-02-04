@@ -337,6 +337,17 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Update TapRoot freshness after successful batch ingest
+	if resp.SuccessCount > 0 {
+		if err := s.retriever.UpdateTapRootFreshness(r.Context(), req.SpaceID, "batch-ingest"); err != nil {
+			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", req.SpaceID, err)
+		}
+		s.TriggerAPEEventWithContext("ingest_complete", map[string]string{
+			"space_id":    req.SpaceID,
+			"ingest_type": "batch-ingest",
+		})
+	}
+
 	// Set appropriate status code based on results
 	statusCode := http.StatusOK
 	if resp.ErrorCount > 0 && resp.SuccessCount > 0 {
@@ -2191,6 +2202,16 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 			if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest"); err != nil {
 				log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
 			}
+			s.TriggerAPEEventWithContext("source_changed", map[string]string{
+				"space_id":    spaceID,
+				"file_count":  fmt.Sprintf("%d", evt.Ingested),
+				"ingest_type": "codebase-ingest",
+			})
+			s.TriggerAPEEventWithContext("ingest_complete", map[string]string{
+				"space_id":    spaceID,
+				"file_count":  fmt.Sprintf("%d", evt.Ingested),
+				"ingest_type": "codebase-ingest",
+			})
 		}
 	}
 
@@ -2218,6 +2239,10 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest"); err != nil {
 			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
 		}
+		s.TriggerAPEEventWithContext("ingest_complete", map[string]string{
+			"space_id":    spaceID,
+			"ingest_type": "codebase-ingest",
+		})
 	}
 }
 
@@ -2528,6 +2553,16 @@ func (s *Server) handleIngestFiles(w http.ResponseWriter, r *http.Request) {
 		if err := s.retriever.UpdateTapRootFreshness(r.Context(), req.SpaceID, "file-ingest"); err != nil {
 			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", req.SpaceID, err)
 		}
+		s.TriggerAPEEventWithContext("source_changed", map[string]string{
+			"space_id":    req.SpaceID,
+			"file_count":  fmt.Sprintf("%d", successCount),
+			"ingest_type": "file-ingest",
+		})
+		s.TriggerAPEEventWithContext("ingest_complete", map[string]string{
+			"space_id":    req.SpaceID,
+			"file_count":  fmt.Sprintf("%d", successCount),
+			"ingest_type": "file-ingest",
+		})
 	}
 
 	writeJSON(w, http.StatusOK, models.IngestFilesResponse{
@@ -2702,6 +2737,16 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "file-ingest"); err != nil {
 			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
 		}
+		s.TriggerAPEEventWithContext("source_changed", map[string]string{
+			"space_id":    spaceID,
+			"file_count":  fmt.Sprintf("%d", successCount),
+			"ingest_type": "file-ingest-job",
+		})
+		s.TriggerAPEEventWithContext("ingest_complete", map[string]string{
+			"space_id":    spaceID,
+			"file_count":  fmt.Sprintf("%d", successCount),
+			"ingest_type": "file-ingest-job",
+		})
 	}
 
 	log.Printf("Ingest files job %s completed: %d/%d files ingested", job.ID, successCount, len(files))

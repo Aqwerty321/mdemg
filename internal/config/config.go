@@ -71,6 +71,11 @@ type Config struct {
 	AnomalyStaleDays        int     // Days after which an update is considered stale (default: 30)
 	AnomalyMaxCheckMs       int     // Maximum time for anomaly checks in ms (default: 100)
 
+	// Temporal reasoning settings (Phase 1: Time-Aware Retrieval)
+	TemporalEnabled             bool    // Feature toggle for temporal reasoning (default: true)
+	TemporalSoftBoostMultiplier float64 // Gamma multiplier for soft-mode recency boost (default: 3.0, range: [1.0, 10.0])
+	TemporalHardFilterEnabled   bool    // Enable hard-mode time range filtering (default: true)
+
 	// Scoring hyperparameters for retrieval ranking
 	ScoringAlpha       float64 // Vector similarity weight (default: 0.55)
 	ScoringBeta        float64 // Activation weight (default: 0.30)
@@ -504,6 +509,17 @@ func FromEnv() (Config, error) {
 	if scoringPathBoost < 0 {
 		return Config{}, errors.New("SCORING_PATH_BOOST must be >= 0")
 	}
+
+	// Temporal reasoning settings (Phase 1: Time-Aware Retrieval)
+	temporalEnabled := getBool("TEMPORAL_ENABLED", true)
+	temporalSoftBoost, err := atof("TEMPORAL_SOFT_BOOST", 3.0)
+	if err != nil {
+		return Config{}, err
+	}
+	if temporalSoftBoost < 1.0 || temporalSoftBoost > 10.0 {
+		return Config{}, errors.New("TEMPORAL_SOFT_BOOST must be in range [1.0, 10.0]")
+	}
+	temporalHardFilterEnabled := getBool("TEMPORAL_HARD_FILTER", true)
 
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "")
@@ -955,6 +971,9 @@ func FromEnv() (Config, error) {
 		ScoringRhoL2:              scoringRhoL2,
 		ScoringConfigBoost:        scoringConfigBoost,
 		ScoringPathBoost:          scoringPathBoost,
+		TemporalEnabled:             temporalEnabled,
+		TemporalSoftBoostMultiplier: temporalSoftBoost,
+		TemporalHardFilterEnabled:   temporalHardFilterEnabled,
 		LogFormat:                 logFormat,
 		LogSkipHealth:             logSkipHealth,
 		HiddenLayerEnabled:        hiddenEnabled,

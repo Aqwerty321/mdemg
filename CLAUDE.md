@@ -171,21 +171,25 @@ A persistent memory system for LLMs providing:
 - `internal/api/` - HTTP API handlers
 - `docs/tests/` - Benchmark tests and results
 
-### Current Status (as of 2026-02-02)
+### Current Status (as of 2026-02-03)
 
-**Benchmark Performance:**
-- MDEMG + Edge Attention: 0.898 mean score (whk-wms 120q)
-- Baseline: 0.854 mean score
-- Delta: +5.2% improvement over baseline
+**Benchmark Performance (Temporal Baseline — Feb 3):**
+- MDEMG + Temporal Retrieval: 0.783 mean score (whk-wms 120q, sonnet)
+- Evidence score: 1.000 (100% strong evidence)
+- High score rate: 100%
+- Canonical baseline: `docs/benchmarks/whk-wms/temporal_validation_20260203/`
 
 **Key Features Implemented:**
 - Edge-Type Attention for query-aware activation spreading
 - Query-type detection (symbol_lookup, data_flow, architecture, generic)
 - RetrievalHints for fine-grained control
 - Layer-specific temporal decay (L0: 0.05/day, L1: 0.02/day, L2: 0.01/day)
+- Temporal Retrieval Phase 1: time-aware query understanding (soft/hard modes)
+- CMS temporal filtering: `temporal_after`/`temporal_before` on recall endpoint
 
 ## Testing
-- Canonical benchmark: `docs/benchmarks/whk-wms/benchmark_run_20260130/`
+- Canonical benchmark: `docs/benchmarks/whk-wms/temporal_validation_20260203/`
+- Previous benchmark: `docs/benchmarks/whk-wms/benchmark_run_20260130/`
 - Question set: `test_questions_120.json` (120 questions)
 - Run V4 benchmark: `python docs/benchmarks/run_benchmark_v4.py`
 - Grader: `python docs/benchmarks/grader_v4.py`

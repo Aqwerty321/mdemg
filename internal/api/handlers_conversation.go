@@ -213,6 +213,8 @@ func (s *Server) handleRecall(w http.ResponseWriter, r *http.Request) {
 		IncludeThemes:    req.IncludeThemes,
 		IncludeConcepts:  req.IncludeConcepts,
 		RequestingUserID: req.RequestingUserID,
+		TemporalAfter:    req.TemporalAfter,
+		TemporalBefore:   req.TemporalBefore,
 	}
 
 	resp, err := s.conversationSvc.Recall(r.Context(), internalReq)

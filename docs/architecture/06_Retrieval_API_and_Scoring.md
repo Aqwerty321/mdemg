@@ -48,6 +48,8 @@
 | `hop_depth` | No | 2 | Graph expansion depth |
 | `layer_range` | No | - | Filter by abstraction layer |
 | `policy_context` | No | - | Access control context |
+| `temporal_after` | No | - | ISO 8601 timestamp: force hard filter after this time |
+| `temporal_before` | No | - | ISO 8601 timestamp: force hard filter before this time |
 
 ### Response
 ```json
@@ -497,8 +499,13 @@ Compute activation over fetched subgraph in-memory (see `04_Activation_and_Learn
 ## Final Ranking (Scoring Formula)
 
 ```
-score = α*vector_sim + β*activation + γ*recency + δ*confidence - κ*redundancy - φ*hub_penalty
+score = α*vector_sim + β*activation + γ_eff*recency + δ*confidence - κ*redundancy - φ*hub_penalty
 ```
+
+Where `γ_eff` depends on temporal mode:
+- **none** (default): `γ_eff = γ` — no change to scoring
+- **soft** ("recent changes to auth"): `γ_eff = γ × TEMPORAL_SOFT_BOOST` (default 3.0×)
+- **hard** ("in the last 7 days"): candidates filtered by time range before scoring
 
 **Default Hyperparameters:**
 | Symbol | Name | Default | Description |
@@ -515,6 +522,27 @@ score = α*vector_sim + β*activation + γ*recency + δ*confidence - κ*redundan
 - `hub_penalty`: proportional to log(degree) to avoid generic nodes dominating
 - `redundancy`: penalizes near-duplicates (same abstraction parent, same path prefix)
 
+### Temporal Retrieval
+
+The retrieval pipeline detects temporal intent from natural language queries:
+
+| Temporal Mode | Detection | Pipeline Effect |
+|---------------|-----------|-----------------|
+| `none` | No temporal language | Scoring formula unchanged |
+| `soft` | "recent", "latest", "what's new" | `γ_eff = γ × 3.0` (configurable) |
+| `hard` | "in the last N days", "since DATE" | Candidates filtered to `[after, before)` range |
+
+**Pipeline integration points:**
+1. `ComputeRetrievalHints()` — parses temporal intent from query text
+2. After BM25 fusion — hard-mode filter removes out-of-range candidates
+3. `ScoreAndRankWithBreakdown()` — soft-mode multiplies gamma for recency boost
+
+**API override:** Pass `temporal_after` / `temporal_before` (ISO 8601) to force hard-mode filtering regardless of query text.
+
+**Cache behavior:** Temporal queries (`soft` or `hard`) skip the query cache.
+
+**Debug output** includes: `temporal_mode`, `temporal_keywords`, `temporal_confidence`, `temporal_constraint`
+
 ---
 
 ## Explainability
@@ -522,11 +550,13 @@ score = α*vector_sim + β*activation + γ*recency + δ*confidence - κ*redundan
 Each result includes:
 - `vector_sim` - Raw cosine similarity to query
 - `activation` - Computed activation score
+- `temporal_boost` - Additional score from temporal recency boost (0 when mode=none)
 - `top_incoming_contributors[]` - List of (src_node_id, relType, w_eff, src_activation)
 
 For detailed explanations, return:
 - Top contributing paths: (seed → ... → result) with edge weights and types
 - Evidence counts and timestamps for edges used
+- Temporal boost contribution when applicable
 
 ---
 

@@ -1,7 +1,7 @@
 ### MDEMG API Tests
 ### Use with REST Client extension (humao.rest-client)
 
-@baseUrl = http://localhost:8082
+@baseUrl = http://localhost:9999
 
 ### Health Check
 GET {{baseUrl}}/healthz

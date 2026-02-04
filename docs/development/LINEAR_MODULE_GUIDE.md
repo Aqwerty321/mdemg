@@ -16,7 +16,7 @@ The Linear module syncs teams, projects, and issues from Linear into MDEMG's mem
 3. **Sync data:**
    ```bash
    # Sync everything (teams, projects, issues)
-   curl -X POST http://localhost:8090/v1/modules/linear-module/sync \
+   curl -X POST http://localhost:9999/v1/modules/linear-module/sync \
      -H "Content-Type: application/json" \
      -d '{"source_id": "linear://all", "ingest": true, "space_id": "linear"}'
    ```
@@ -100,7 +100,7 @@ Metadata:    linear_id, identifier, team_key, state, state_type, priority,
 
 ```bash
 # Search for issues related to documentation
-curl -X POST http://localhost:8090/v1/memory/retrieve \
+curl -X POST http://localhost:9999/v1/memory/retrieve \
   -H "Content-Type: application/json" \
   -d '{
     "space_id": "linear",
@@ -113,7 +113,7 @@ curl -X POST http://localhost:8090/v1/memory/retrieve \
 
 ```bash
 # Check module status
-curl http://localhost:8090/v1/modules | jq '.data.modules[] | select(.id == "linear-module")'
+curl http://localhost:9999/v1/modules | jq '.data.modules[] | select(.id == "linear-module")'
 ```
 
 Response includes:

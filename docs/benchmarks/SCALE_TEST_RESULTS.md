@@ -23,7 +23,7 @@
 | Parameter | Value |
 |-----------|-------|
 | Space ID | vscode-scale |
-| Endpoint | http://localhost:8090 |
+| Endpoint | http://localhost:9999 |
 | Batch size | 100 |
 | Workers | 4 |
 | Timeout | 300s |

@@ -107,9 +107,9 @@ jobs:
           export NEO4J_URI=bolt://localhost:7687
           export NEO4J_USER=neo4j
           export NEO4J_PASS=testpassword
-          export LISTEN_ADDR=:8090
-          export PORT_RANGE_START=8090
-          export PORT_RANGE_END=8199
+          export LISTEN_ADDR=:9999
+          export PORT_RANGE_START=10000
+          export PORT_RANGE_END=10099
           export PORT_FILE_PATH=.mdemg.port
           export EMBEDDING_PROVIDER=
           export REQUIRED_SCHEMA_VERSION=10

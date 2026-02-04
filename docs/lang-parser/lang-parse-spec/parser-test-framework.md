@@ -276,7 +276,7 @@ SPACE_ID="parser-test-${LANGUAGE}"
 echo "Testing ${LANGUAGE} parser pipeline..."
 
 # 1. Clear test space
-curl -s -X DELETE "http://localhost:8090/v1/memory/space/${SPACE_ID}"
+curl -s -X DELETE "http://localhost:9999/v1/memory/space/${SPACE_ID}"
 
 # 2. Ingest fixture file
 go run ./cmd/ingest-codebase \
@@ -287,11 +287,11 @@ go run ./cmd/ingest-codebase \
 
 # 3. Query symbols
 echo "Symbols stored:"
-curl -s "http://localhost:8090/v1/memory/symbols?space_id=${SPACE_ID}&limit=50" | jq '.symbols[] | {name, type, line_number}'
+curl -s "http://localhost:9999/v1/memory/symbols?space_id=${SPACE_ID}&limit=50" | jq '.symbols[] | {name, type, line_number}'
 
 # 4. Test retrieval with evidence
 echo "Retrieval test:"
-curl -s -X POST "http://localhost:8090/v1/memory/retrieve" \
+curl -s -X POST "http://localhost:9999/v1/memory/retrieve" \
   -H "Content-Type: application/json" \
   -d "{\"space_id\": \"${SPACE_ID}\", \"query_text\": \"findById method\", \"top_k\": 3}" | jq '.results[] | {path, evidence}'
 ```

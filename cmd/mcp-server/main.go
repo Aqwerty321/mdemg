@@ -1,5 +1,5 @@
 // MDEMG MCP Server - Provides memory tools for coding agents
-// Connects to the MDEMG HTTP API running on localhost:8082
+// Connects to the MDEMG HTTP API (endpoint resolved via .mdemg.port or MDEMG_ENDPOINT env)
 package main
 
 import (

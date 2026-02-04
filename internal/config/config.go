@@ -177,7 +177,7 @@ type Config struct {
 
 	// Dynamic port allocation
 	PortRangeStart int    // Start of fallback port range (default: derived from ListenAddr port)
-	PortRangeEnd   int    // End of fallback port range (default: 8999)
+	PortRangeEnd   int    // End of fallback port range (default: PortRangeStart + 100)
 	PortFilePath   string // Path to write allocated port for client discovery (default: .mdemg.port)
 }
 
@@ -888,7 +888,8 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	portRangeEnd, err := atoi("PORT_RANGE_END", 8999)
+	// Default PORT_RANGE_END to portRangeStart + 100 to ensure a valid ascending range
+	portRangeEnd, err := atoi("PORT_RANGE_END", portRangeStart+100)
 	if err != nil {
 		return Config{}, err
 	}

@@ -337,9 +337,9 @@ Use this checklist to run a benchmark from scratch. Each step must be completed 
 
 ### Pre-Flight (Before Starting)
 
-- [ ] **1. Verify MDEMG is running**: `curl -s localhost:8090/healthz`
+- [ ] **1. Verify MDEMG is running**: `curl -s localhost:9999/healthz`
 - [ ] **2. Verify Neo4j is running**: `curl -s localhost:7474`
-- [ ] **3. Verify space exists**: `curl -s 'localhost:8090/v1/memory/stats?space_id=<SPACE_ID>'`
+- [ ] **3. Verify space exists**: `curl -s 'localhost:9999/v1/memory/stats?space_id=<SPACE_ID>'`
 - [ ] **4. Verify question files exist**:
   - [ ] Agent file (NO answers): `ls <path>/test_questions_*_agent.json`
   - [ ] Master file (HAS answers): `ls <path>/test_questions_*.json` (not `_agent`)
@@ -754,7 +754,7 @@ export VECTOR_INDEX_NAME=memNodeEmbedding
 export OPENAI_API_KEY=sk-...  # For embeddings
 go run ./cmd/server
 
-# Verify: curl localhost:8090/healthz
+# Verify: curl localhost:9999/healthz
 ```
 
 ---
@@ -891,7 +891,7 @@ Common verification findings:
 
 ```bash
 # Create a new space for the codebase
-curl -s -X POST 'http://localhost:8090/v1/spaces' \
+curl -s -X POST 'http://localhost:9999/v1/spaces' \
   -H 'content-type: application/json' \
   -d '{"space_id": "your-project-name", "description": "Description of project"}'
 ```
@@ -912,7 +912,7 @@ go run ./cmd/ingest-codebase \
 
 ```bash
 # For each batch of files
-curl -s -X POST 'http://localhost:8090/v1/memory/batch-ingest' \
+curl -s -X POST 'http://localhost:9999/v1/memory/batch-ingest' \
   -H 'content-type: application/json' \
   -d '{
     "space_id": "your-project-name",
@@ -926,7 +926,7 @@ curl -s -X POST 'http://localhost:8090/v1/memory/batch-ingest' \
 
 ```bash
 # Check node count
-curl -s 'http://localhost:8090/v1/memory/stats?space_id=your-project-name' | jq
+curl -s 'http://localhost:9999/v1/memory/stats?space_id=your-project-name' | jq
 
 # Expected output:
 # {
@@ -942,7 +942,7 @@ curl -s 'http://localhost:8090/v1/memory/stats?space_id=your-project-name' | jq
 
 ```bash
 # Build hidden layer concepts
-curl -s -X POST 'http://localhost:8090/v1/memory/consolidate' \
+curl -s -X POST 'http://localhost:9999/v1/memory/consolidate' \
   -H 'content-type: application/json' \
   -d '{"space_id":"your-project-name"}' | jq
 ```
@@ -1028,7 +1028,7 @@ from collections import defaultdict
 TEST_DIR = Path(__file__).parent
 QUESTIONS_FILE = TEST_DIR / "test_questions.json"
 OUTPUT_FILE = TEST_DIR / f"mdemg-test-{datetime.now().strftime('%Y%m%d-%H%M%S')}.md"
-MDEMG_ENDPOINT = "http://localhost:8090"
+MDEMG_ENDPOINT = "http://localhost:9999"
 SPACE_ID = "your-project-name"
 
 def load_questions():
@@ -1245,17 +1245,17 @@ REPOSITORY PATH: {{REPO_PATH}}
 QUESTION FILE: {{QUESTION_FILE}}
 OUTPUT FILE: {{OUTPUT_FILE}}
 SPACE ID: {{SPACE_ID}}
-MDEMG API: http://localhost:8090
+MDEMG API: http://localhost:9999
 TIME LIMIT: 20 minutes
 QUESTION COUNT: {{QUESTION_COUNT}}
 
 MDEMG API CALLS (use curl, NOT /mdemg skills):
 - For "symbol-lookup" questions:
-  curl -s 'http://localhost:8090/v1/memory/retrieve' -H 'content-type: application/json' \
+  curl -s 'http://localhost:9999/v1/memory/retrieve' -H 'content-type: application/json' \
     -d '{"space_id":"{{SPACE_ID}}","query_text":"<symbol_name>","top_k":10}'
 
 - For ALL other questions:
-  curl -s 'http://localhost:8090/v1/memory/consult' -H 'content-type: application/json' \
+  curl -s 'http://localhost:9999/v1/memory/consult' -H 'content-type: application/json' \
     -d '{"space_id":"{{SPACE_ID}}","context":"Answering benchmark question","question":"<full_question>"}'
 
 WORKFLOW FOR EACH QUESTION (MANDATORY):
@@ -1333,24 +1333,24 @@ BEGIN NOW - Read {{QUESTION_FILE}} and start answering ALL {{QUESTION_COUNT}} qu
 
 | Endpoint | Purpose | Example |
 |----------|---------|---------|
-| `GET /healthz` | Health check | `curl localhost:8090/healthz` |
+| `GET /healthz` | Health check | `curl localhost:9999/healthz` |
 | `POST /v1/memory/consult` | Get SME advice | See below |
 | `POST /v1/memory/retrieve` | Search memories | See below |
-| `GET /v1/memory/stats` | Space statistics | `curl 'localhost:8090/v1/memory/stats?space_id=whk-wms'` |
+| `GET /v1/memory/stats` | Space statistics | `curl 'localhost:9999/v1/memory/stats?space_id=whk-wms'` |
 
 #### API Call Examples
 
 ```bash
 # Verify MDEMG is accessible before spawning agents
-curl -s localhost:8090/healthz
+curl -s localhost:9999/healthz
 
 # Consult API - for complex questions (requires context + question)
-curl -s 'http://localhost:8090/v1/memory/consult' \
+curl -s 'http://localhost:9999/v1/memory/consult' \
   -H 'content-type: application/json' \
   -d '{"space_id":"whk-wms","context":"Answering benchmark question","question":"How should I handle authentication?"}'
 
 # Retrieve API - for symbol lookups (uses query_text)
-curl -s 'http://localhost:8090/v1/memory/retrieve' \
+curl -s 'http://localhost:9999/v1/memory/retrieve' \
   -H 'content-type: application/json' \
   -d '{"space_id":"whk-wms","query_text":"JwtStrategy","top_k":10}'
 ```
@@ -1632,7 +1632,7 @@ docs/tests/vscode-scale/
 # Activate test environment
 source /tmp/mdemg-test-venv/bin/activate
 
-# Run the benchmark (requires MDEMG running on localhost:8090)
+# Run the benchmark (requires MDEMG running on localhost:9999)
 python docs/tests/vscode-scale/run_combined_benchmark.py
 
 # Results saved to combined_benchmark_results.json
@@ -2012,13 +2012,13 @@ find . -type f -name "*.go" \
 
 ```bash
 # Check MDEMG health
-curl -s localhost:8090/healthz
+curl -s localhost:9999/healthz
 
 # Get space stats
-curl -s 'localhost:8090/v1/memory/stats?space_id=your-project' | jq
+curl -s 'localhost:9999/v1/memory/stats?space_id=your-project' | jq
 
 # Test retrieval
-curl -s localhost:8090/v1/memory/retrieve \
+curl -s localhost:9999/v1/memory/retrieve \
   -H 'content-type: application/json' \
   -d '{"space_id":"your-project","query_text":"How does X work?","top_k":5}' | jq '.results[].path'
 
@@ -2602,7 +2602,7 @@ Save as `benchmark_config.json`:
     "output_dir": "docs/tests/whk-wms/benchmark_results",
     "run_count": 3,
     "conditions": ["baseline", "mdemg"],
-    "mdemg_endpoint": "http://localhost:8090",
+    "mdemg_endpoint": "http://localhost:9999",
     "cold_start": true
 }
 ```
@@ -2807,11 +2807,11 @@ Run consolidation with both SpaceIDs present:
 
 ```bash
 # Consolidate each space
-curl -X POST 'http://localhost:8090/v1/memory/consolidate' \
+curl -X POST 'http://localhost:9999/v1/memory/consolidate' \
   -H 'Content-Type: application/json' \
   -d '{"space_id":"whk-wms"}'
 
-curl -X POST 'http://localhost:8090/v1/memory/consolidate' \
+curl -X POST 'http://localhost:9999/v1/memory/consolidate' \
   -H 'Content-Type: application/json' \
   -d '{"space_id":"plc-gbt"}'
 ```

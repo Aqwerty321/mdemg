@@ -20,12 +20,12 @@ REQUIRED_SCHEMA_VERSION=4
 
 ```bash
 # HTTP Server
-LISTEN_ADDR=:8082                    # Service listen address (default :8082)
+LISTEN_ADDR=:9999                    # Service listen address (default :9999)
 
 # Dynamic Port Allocation
 # If LISTEN_ADDR port is busy, the server scans this range for an available port.
 # PORT_RANGE_START=9999              # Start of fallback range (default: derived from LISTEN_ADDR)
-# PORT_RANGE_END=8999                # End of fallback range (default: 8999)
+# PORT_RANGE_END=10099               # End of fallback range (default: PORT_RANGE_START + 100)
 # PORT_FILE_PATH=.mdemg.port        # Port file for client discovery (default: .mdemg.port)
 
 # Vector Index
@@ -228,7 +228,7 @@ NEO4J_PASS=testpassword
 REQUIRED_SCHEMA_VERSION=4
 
 # Service
-LISTEN_ADDR=:8082
+LISTEN_ADDR=:9999
 
 # Dynamic Port Allocation (optional)
 # PORT_RANGE_START=9999

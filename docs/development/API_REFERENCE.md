@@ -2,7 +2,7 @@
 
 This document provides a complete reference for all MDEMG HTTP API endpoints.
 
-**Base URL**: `http://localhost:8090` (default)
+**Base URL**: `http://localhost:9999` (default)
 
 ## Table of Contents
 

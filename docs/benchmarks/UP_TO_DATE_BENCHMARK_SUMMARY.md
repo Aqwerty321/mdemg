@@ -121,7 +121,7 @@ docker compose up -d
 ./bin/ingest-codebase --space-id=benchmark --path=/path/to/whk-wms
 
 # 3. Run consolidation
-curl -X POST http://localhost:8090/v1/memory/consolidate \
+curl -X POST http://localhost:9999/v1/memory/consolidate \
   -H "Content-Type: application/json" -d '{"space_id": "benchmark"}'
 
 # 4. Run benchmark

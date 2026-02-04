@@ -110,7 +110,7 @@ make test-api
 ## Directory Structure
 
 ```
-docs/api-spec/uats/
+docs/api/api-spec/uats/
 ├── schema/
 │   └── uats.schema.json
 ├── specs/
@@ -131,43 +131,43 @@ docs/api-spec/uats/
 ```makefile
 # Run all API tests
 test-api:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
-		--spec-dir docs/api-spec/uats/specs/ \
-		--base-url http://localhost:8082 \
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+		--spec-dir docs/api/api-spec/uats/specs/ \
+		--base-url http://localhost:9999 \
 		--report /tmp/api-report.json
 
 # Test single endpoint
 test-api-%:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate \
-		--spec docs/api-spec/uats/specs/$*.uats.json \
-		--base-url http://localhost:8082
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
+		--spec docs/api/api-spec/uats/specs/$*.uats.json \
+		--base-url http://localhost:9999
 
 # Smoke tests only (health + readiness)
 test-smoke:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate \
-		--spec docs/api-spec/uats/specs/health.uats.json \
-		--base-url http://localhost:8082
-	python3 docs/api-spec/uats/runners/uats_runner.py validate \
-		--spec docs/api-spec/uats/specs/readiness.uats.json \
-		--base-url http://localhost:8082
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
+		--spec docs/api/api-spec/uats/specs/health.uats.json \
+		--base-url http://localhost:9999
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
+		--spec docs/api/api-spec/uats/specs/readiness.uats.json \
+		--base-url http://localhost:9999
 
 # Test by category
 test-api-memory:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
-		--spec-dir docs/api-spec/uats/specs/ \
-		--base-url http://localhost:8082 \
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+		--spec-dir docs/api/api-spec/uats/specs/ \
+		--base-url http://localhost:9999 \
 		--pattern "*retrieve*|*ingest*|*reflect*|*stats*"
 
 test-api-learning:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
-		--spec-dir docs/api-spec/uats/specs/ \
-		--base-url http://localhost:8082 \
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+		--spec-dir docs/api/api-spec/uats/specs/ \
+		--base-url http://localhost:9999 \
 		--pattern "learning_*.uats.json"
 
 test-api-conversation:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
-		--spec-dir docs/api-spec/uats/specs/ \
-		--base-url http://localhost:8082 \
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+		--spec-dir docs/api/api-spec/uats/specs/ \
+		--base-url http://localhost:9999 \
 		--pattern "conversation_*.uats.json"
 ```
 
@@ -179,24 +179,24 @@ test-api-conversation:
 # Validate single spec
 python3 uats_runner.py validate \
     --spec specs/health.uats.json \
-    --base-url http://localhost:8082
+    --base-url http://localhost:9999
 
 # Validate all specs
 python3 uats_runner.py validate-all \
     --spec-dir specs/ \
-    --base-url http://localhost:8082 \
+    --base-url http://localhost:9999 \
     --report report.json
 
 # With auth token
 python3 uats_runner.py validate-all \
     --spec-dir specs/ \
-    --base-url http://localhost:8082 \
+    --base-url http://localhost:9999 \
     --token "$API_TOKEN"
 
 # Custom timeout (seconds)
 python3 uats_runner.py validate \
     --spec specs/retrieve.uats.json \
-    --base-url http://localhost:8082 \
+    --base-url http://localhost:9999 \
     --timeout 60
 ```
 
@@ -241,9 +241,9 @@ jobs:
       - name: Run UATS tests
         run: |
           pip install requests jsonpath-ng
-          python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
-            --spec-dir docs/api-spec/uats/specs/ \
-            --base-url http://localhost:8082 \
+          python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+            --spec-dir docs/api/api-spec/uats/specs/ \
+            --base-url http://localhost:9999 \
             --report api-report.json
       
       - name: Upload report
@@ -265,7 +265,7 @@ jobs:
 | Output | Symbols JSON | HTTP responses |
 | Validation | Symbol matching | Status, headers, body |
 | Makefile | `make test-parsers` | `make test-api` |
-| Directory | `docs/lang-parser/lang-parse-spec/upts/` | `docs/api-spec/uats/` |
+| Directory | `docs/lang-parser/lang-parse-spec/upts/` | `docs/api/api-spec/uats/` |
 
 ---
 
@@ -299,7 +299,7 @@ Assertions: 1/1 passed
 ============================================================
 UATS Test Summary
 ============================================================
-Base URL: http://localhost:8082
+Base URL: http://localhost:9999
 Total Specs: 41
 Total Variants: 58
 Passed: 58
@@ -312,7 +312,7 @@ Pass Rate: 100.0%
 
 ## Adding New Specs
 
-1. Create `docs/api-spec/uats/specs/<name>.uats.json`
+1. Create `docs/api/api-spec/uats/specs/<name>.uats.json`
 2. Follow the schema structure
 3. Add error case variants
 4. Run `make test-api-<name>`

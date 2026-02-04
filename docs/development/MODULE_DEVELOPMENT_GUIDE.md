@@ -346,10 +346,10 @@ func (m *MyModule) Execute(ctx context.Context, req *pb.ExecuteRequest) (*pb.Exe
 
 ```bash
 # Check scheduler status
-curl http://localhost:8090/v1/ape/status
+curl http://localhost:9999/v1/ape/status
 
 # Manually trigger an event
-curl -X POST http://localhost:8090/v1/ape/trigger \
+curl -X POST http://localhost:9999/v1/ape/trigger \
   -H "Content-Type: application/json" \
   -d '{"event": "session_end"}'
 ```

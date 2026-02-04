@@ -6,7 +6,7 @@
 #
 # Configuration (environment variables):
 #   MDEMG_SPACE_ID     - Target space ID (default: basename of repo)
-#   MDEMG_ENDPOINT     - MDEMG API endpoint (default: http://localhost:8090)
+#   MDEMG_ENDPOINT     - MDEMG API endpoint (default: reads .mdemg.port, falls back to http://localhost:9999)
 #   MDEMG_INGEST_BIN   - Path to ingest-codebase binary (default: mdemg ingest-codebase in PATH)
 #   MDEMG_SKIP_PATTERNS - Comma-separated patterns to skip (default: .git,node_modules,vendor)
 #   MDEMG_VERBOSE      - Enable verbose output (default: false)

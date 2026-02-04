@@ -75,7 +75,6 @@ help:
 	@echo "  run            - Run MDEMG server"
 # ============================================================
 # UATS API Testing Targets
-# Add to your existing Makefile
 # ============================================================
 
 .PHONY: test-api test-api-% test-smoke test-all uats-setup
@@ -83,8 +82,8 @@ help:
 # Run all UATS API validation tests
 test-api:
 	@echo "Running UATS API validation (41 endpoints)..."
-	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
-		--spec-dir docs/api-spec/uats/specs/ \
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+		--spec-dir docs/api/api-spec/uats/specs/ \
 		--base-url $(BASE_URL) \
 		--report /tmp/api-report.json
 	@echo "Report saved to /tmp/api-report.json"
@@ -93,18 +92,18 @@ test-api:
 # Usage: make test-api-health, test-api-retrieve, test-api-ingest
 test-api-%:
 	@echo "Validating $* API..."
-	python3 docs/api-spec/uats/runners/uats_runner.py validate \
-		--spec docs/api-spec/uats/specs/$*.uats.json \
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
+		--spec docs/api/api-spec/uats/specs/$*.uats.json \
 		--base-url $(BASE_URL)
 
 # Smoke tests (health + readiness only)
 test-smoke:
 	@echo "Running smoke tests..."
-	python3 docs/api-spec/uats/runners/uats_runner.py validate \
-		--spec docs/api-spec/uats/specs/health.uats.json \
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
+		--spec docs/api/api-spec/uats/specs/health.uats.json \
 		--base-url $(BASE_URL)
-	python3 docs/api-spec/uats/runners/uats_runner.py validate \
-		--spec docs/api-spec/uats/specs/readiness.uats.json \
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
+		--spec docs/api/api-spec/uats/specs/readiness.uats.json \
 		--base-url $(BASE_URL)
 
 # Run all tests (parsers + API)
@@ -118,7 +117,7 @@ uats-setup:
 # Test with custom base URL
 # Usage: make test-api-remote BASE_URL=https://staging.example.com
 test-api-remote:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
-		--spec-dir docs/api-spec/uats/specs/ \
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+		--spec-dir docs/api/api-spec/uats/specs/ \
 		--base-url $(BASE_URL) \
 		--report /tmp/api-report.json

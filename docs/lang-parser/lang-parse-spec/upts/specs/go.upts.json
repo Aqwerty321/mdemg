@@ -26,7 +26,7 @@
   "fixture": {
     "type": "file",
     "path": "../fixtures/go_test_fixture.go",
-    "sha256": "37d181dc9edcdf8e133a6a0c436771ca5d734b05f1c52636f276cb21773712e9"
+    "sha256": "a95030aa689f0f6312c781aa2bf73847f2919a85b09dcac794f9a2069d8e1e98"
   },
   "expected": {
     "symbol_count": {

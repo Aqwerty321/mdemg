@@ -222,7 +222,8 @@ func ParseTemporalIntent(query string, now time.Time) TemporalIntent {
 }
 
 // FilterCandidatesByTime applies hard-mode time range filtering.
-// Returns only candidates whose UpdatedAt falls within [After, Before).
+// Returns only candidates within [After, Before).
+// Uses CanonicalTime when available, falling back to UpdatedAt.
 // If constraint is nil, returns all candidates unchanged.
 func FilterCandidatesByTime(cands []Candidate, constraint *TemporalConstraint) []Candidate {
 	if constraint == nil {
@@ -231,15 +232,65 @@ func FilterCandidatesByTime(cands []Candidate, constraint *TemporalConstraint) [
 
 	filtered := make([]Candidate, 0, len(cands))
 	for _, c := range cands {
-		if constraint.After != nil && c.UpdatedAt.Before(*constraint.After) {
+		// Use canonical_time for temporal filtering when available
+		ref := c.UpdatedAt
+		if !c.CanonicalTime.IsZero() {
+			ref = c.CanonicalTime
+		}
+		if constraint.After != nil && ref.Before(*constraint.After) {
 			continue
 		}
-		if constraint.Before != nil && !c.UpdatedAt.Before(*constraint.Before) {
+		if constraint.Before != nil && !ref.Before(*constraint.Before) {
 			continue
 		}
 		filtered = append(filtered, c)
 	}
 	return filtered
+}
+
+// StaleReferencePenalty computes a penalty for candidates that reference
+// significantly newer content (suggesting the candidate may be outdated).
+// Returns map[NodeID]penalty. Penalty is capped at maxPenalty.
+// Returns nil map if staleDays <= 0.
+func StaleReferencePenalty(cands []Candidate, edges []Edge, staleDays float64, maxPenalty float64) map[string]float64 {
+	if staleDays <= 0 {
+		return nil
+	}
+
+	// Build map of node → time reference (canonical_time or fallback to UpdatedAt)
+	nodeTime := make(map[string]time.Time, len(cands))
+	for _, c := range cands {
+		ref := c.UpdatedAt
+		if !c.CanonicalTime.IsZero() {
+			ref = c.CanonicalTime
+		}
+		nodeTime[c.NodeID] = ref
+	}
+
+	penalties := make(map[string]float64)
+
+	for _, e := range edges {
+		srcTime, srcOK := nodeTime[e.Src]
+		dstTime, dstOK := nodeTime[e.Dst]
+		if !srcOK || !dstOK {
+			continue
+		}
+
+		// If dst is significantly newer than src, penalize src
+		daysDiff := dstTime.Sub(srcTime).Hours() / 24.0
+		if daysDiff > staleDays {
+			penalty := 0.05 * (daysDiff - staleDays) / staleDays
+			if penalty > maxPenalty {
+				penalty = maxPenalty
+			}
+			// Keep the largest penalty for each node
+			if penalty > penalties[e.Src] {
+				penalties[e.Src] = penalty
+			}
+		}
+	}
+
+	return penalties
 }
 
 // CleanTemporalKeywords strips detected temporal phrases from the query text

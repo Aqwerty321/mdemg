@@ -449,3 +449,180 @@ func TestParseTemporalIntent_HardPriority(t *testing.T) {
 		t.Errorf("expected hard mode to take priority, got %s", intent.Mode)
 	}
 }
+
+// Phase 2 Temporal Tests
+
+func TestStaleReferencePenalty_Disabled(t *testing.T) {
+	// staleDays <= 0 should return nil
+	cands := []Candidate{{NodeID: "a", UpdatedAt: time.Now()}}
+	edges := []Edge{{Src: "a", Dst: "b"}}
+	result := StaleReferencePenalty(cands, edges, 0, 0.15)
+	if result != nil {
+		t.Errorf("expected nil map when staleDays=0, got %v", result)
+	}
+}
+
+func TestStaleReferencePenalty_NoPenalty(t *testing.T) {
+	// Both nodes are same age, no penalty
+	now := time.Now()
+	cands := []Candidate{
+		{NodeID: "a", UpdatedAt: now},
+		{NodeID: "b", UpdatedAt: now},
+	}
+	edges := []Edge{{Src: "a", Dst: "b"}}
+	result := StaleReferencePenalty(cands, edges, 30, 0.15)
+	if p := result["a"]; p > 0 {
+		t.Errorf("expected no penalty when nodes are same age, got %.4f", p)
+	}
+}
+
+func TestStaleReferencePenalty_PenalizeOld(t *testing.T) {
+	// Src is 60 days old, dst is brand new, staleDays=30
+	// daysDiff = 60, penalty = 0.05 * (60-30)/30 = 0.05
+	now := time.Now()
+	cands := []Candidate{
+		{NodeID: "old", UpdatedAt: now.Add(-60 * 24 * time.Hour)},
+		{NodeID: "new", UpdatedAt: now},
+	}
+	edges := []Edge{{Src: "old", Dst: "new"}}
+	result := StaleReferencePenalty(cands, edges, 30, 0.15)
+	penalty := result["old"]
+	if penalty < 0.04 || penalty > 0.06 {
+		t.Errorf("expected penalty ~0.05, got %.4f", penalty)
+	}
+}
+
+func TestStaleReferencePenalty_CappedAtMax(t *testing.T) {
+	// Very large age difference should be capped at maxPenalty
+	now := time.Now()
+	cands := []Candidate{
+		{NodeID: "ancient", UpdatedAt: now.Add(-365 * 24 * time.Hour)},
+		{NodeID: "fresh", UpdatedAt: now},
+	}
+	edges := []Edge{{Src: "ancient", Dst: "fresh"}}
+	maxPen := 0.15
+	result := StaleReferencePenalty(cands, edges, 30, maxPen)
+	penalty := result["ancient"]
+	if penalty != maxPen {
+		t.Errorf("expected penalty capped at %.2f, got %.4f", maxPen, penalty)
+	}
+}
+
+func TestStaleReferencePenalty_UsesCanonicalTime(t *testing.T) {
+	// CanonicalTime should be used instead of UpdatedAt when available
+	now := time.Now()
+	cands := []Candidate{
+		{
+			NodeID:        "old-content",
+			UpdatedAt:     now,                                    // recently re-ingested
+			CanonicalTime: now.Add(-90 * 24 * time.Hour),         // but content is 90 days old
+		},
+		{
+			NodeID:    "new-content",
+			UpdatedAt: now,
+		},
+	}
+	edges := []Edge{{Src: "old-content", Dst: "new-content"}}
+	result := StaleReferencePenalty(cands, edges, 30, 0.15)
+	penalty := result["old-content"]
+	if penalty <= 0 {
+		t.Errorf("expected penalty > 0 when CanonicalTime is old, got %.4f", penalty)
+	}
+}
+
+func TestGetDecayRate_LayerOverridesSourceType(t *testing.T) {
+	// L1+ nodes should always use layer-specific rates, even with source tags
+	cfg := config.Config{
+		TemporalSourceTypeDecayEnabled: true,
+		ScoringRhoDocumentation:        0.01,
+		ScoringRhoL0:                   0.05,
+		ScoringRhoL1:                   0.02,
+		ScoringRhoL2:                   0.01,
+	}
+	tags := []string{"documentation"}
+	rate := getDecayRate(1, tags, cfg)
+	if rate != 0.02 {
+		t.Errorf("expected L1 rate 0.02 for layer 1 even with documentation tag, got %.4f", rate)
+	}
+}
+
+func TestGetDecayRate_SourceTypeEnabled(t *testing.T) {
+	cfg := config.Config{
+		TemporalSourceTypeDecayEnabled: true,
+		ScoringRhoDocumentation:        0.01,
+		ScoringRhoConfig:               0.03,
+		ScoringRhoConversation:         0.10,
+		ScoringRhoChangelog:            0.08,
+		ScoringRhoL0:                   0.05,
+		ScoringRhoL1:                   0.02,
+		ScoringRhoL2:                   0.01,
+	}
+
+	tests := []struct {
+		tags []string
+		want float64
+		desc string
+	}{
+		{[]string{"documentation"}, 0.01, "documentation tag"},
+		{[]string{"markdown"}, 0.01, "markdown tag"},
+		{[]string{"config"}, 0.03, "config tag"},
+		{[]string{"configuration"}, 0.03, "configuration tag"},
+		{[]string{"conversation"}, 0.10, "conversation tag"},
+		{[]string{"conversation_observation"}, 0.10, "conversation_observation tag"},
+		{[]string{"changelog"}, 0.08, "changelog tag"},
+		{[]string{"python"}, 0.05, "unmatched tag falls back to L0"},
+		{nil, 0.05, "no tags falls back to L0"},
+	}
+
+	for _, tc := range tests {
+		rate := getDecayRate(0, tc.tags, cfg)
+		if rate != tc.want {
+			t.Errorf("%s: expected %.4f, got %.4f", tc.desc, tc.want, rate)
+		}
+	}
+}
+
+func TestGetDecayRate_SourceTypeDisabled(t *testing.T) {
+	// When disabled, should always use L0 rate regardless of tags
+	cfg := config.Config{
+		TemporalSourceTypeDecayEnabled: false,
+		ScoringRhoDocumentation:        0.01,
+		ScoringRhoL0:                   0.05,
+		ScoringRhoL1:                   0.02,
+		ScoringRhoL2:                   0.01,
+	}
+	rate := getDecayRate(0, []string{"documentation"}, cfg)
+	if rate != 0.05 {
+		t.Errorf("expected L0 rate 0.05 when source type decay disabled, got %.4f", rate)
+	}
+}
+
+func TestFilterCandidatesByTime_UsesCanonicalTime(t *testing.T) {
+	now := time.Date(2026, 2, 1, 12, 0, 0, 0, time.UTC)
+	after := now.Add(-7 * 24 * time.Hour)
+
+	cands := []Candidate{
+		{
+			NodeID:        "new-content",
+			UpdatedAt:     now.Add(-30 * 24 * time.Hour), // UpdatedAt is old
+			CanonicalTime: now.Add(-1 * 24 * time.Hour),  // but CanonicalTime is recent
+		},
+		{
+			NodeID:        "old-content",
+			UpdatedAt:     now.Add(-1 * 24 * time.Hour),   // UpdatedAt is recent
+			CanonicalTime: now.Add(-30 * 24 * time.Hour),  // but CanonicalTime is old
+		},
+	}
+
+	constraint := &TemporalConstraint{After: &after}
+	filtered := FilterCandidatesByTime(cands, constraint)
+
+	// "new-content" should survive (CanonicalTime is recent)
+	// "old-content" should be filtered out (CanonicalTime is old)
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 candidate, got %d", len(filtered))
+	}
+	if filtered[0].NodeID != "new-content" {
+		t.Errorf("expected new-content to survive, got %s", filtered[0].NodeID)
+	}
+}

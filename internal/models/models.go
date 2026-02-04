@@ -97,7 +97,8 @@ type IngestRequest struct {
 	Summary     string    `json:"summary,omitempty" validate:"omitempty,max=1000"` // Brief summary for reranking (max 1000 chars)
 	Sensitivity string    `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
 	Confidence  *float64  `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
-	Embedding   []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"` // Optional: pre-computed embedding
+	Embedding     []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"` // Optional: pre-computed embedding
+	CanonicalTime string    `json:"canonical_time,omitempty"` // ISO8601: content-relevant time (Phase 2 Temporal)
 }
 
 type IngestResponse struct {
@@ -216,7 +217,8 @@ type BatchIngestItem struct {
 	Symbols     []IngestSymbol `json:"symbols,omitempty"`                               // Extracted code symbols (Phase 8)
 	Sensitivity string         `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
 	Confidence  *float64       `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
-	Embedding   []float32      `json:"embedding,omitempty" validate:"omitempty,embedding_dims"`
+	Embedding     []float32      `json:"embedding,omitempty" validate:"omitempty,embedding_dims"`
+	CanonicalTime string         `json:"canonical_time,omitempty"` // ISO8601: content-relevant time (Phase 2 Temporal)
 }
 
 // IngestSymbol represents an extracted code symbol (constant, function, class, etc.)

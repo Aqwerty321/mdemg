@@ -337,6 +337,13 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Update TapRoot freshness after successful batch ingest
+	if resp.SuccessCount > 0 {
+		if err := s.retriever.UpdateTapRootFreshness(r.Context(), req.SpaceID, "batch-ingest"); err != nil {
+			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", req.SpaceID, err)
+		}
+	}
+
 	// Set appropriate status code based on results
 	statusCode := http.StatusOK
 	if resp.ErrorCount > 0 && resp.SuccessCount > 0 {

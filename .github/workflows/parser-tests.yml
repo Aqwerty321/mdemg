@@ -54,7 +54,7 @@ jobs:
           echo "8975b14f5f72c81f2184f2a7446e1ab332c108a14b2b6543479cd9c4154b11f5  python_test_fixture.py" | shasum -a 256 -c
 
           # Check Go fixture
-          echo "37d181dc9edcdf8e133a6a0c436771ca5d734b05f1c52636f276cb21773712e9  go_test_fixture.go" | shasum -a 256 -c
+          echo "a95030aa689f0f6312c781aa2bf73847f2919a85b09dcac794f9a2069d8e1e98  go_test_fixture.go" | shasum -a 256 -c
 
           # Check TypeScript fixture
           echo "76778e09f46d57890cbc947a1f3b34764ecdcce75f526c30985f3cf8d89f49d6  typescript_test_fixture.ts" | shasum -a 256 -c

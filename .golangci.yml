@@ -1,33 +1,33 @@
+version: "2"
+
 run:
   timeout: 5m
   modules-download-mode: readonly
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - govet
-
-linters-settings:
-  govet:
-    enable:
-      - nilness
-    disable:
-      - shadow
-
-issues:
-  exclude-dirs:
-    - docs
-    - archive
-  exclude-rules:
-    # Exclude linters from running on test files
-    - path: _test\.go
-      linters:
-        - errcheck
-        - govet
-    # Exclude generated protobuf files
-    - path: \.pb\.go
-      linters:
-        - all
-  # Don't fail on existing issues - report only new
-  max-issues-per-linter: 0
-  max-same-issues: 0
+  settings:
+    govet:
+      enable:
+        - nilness
+      disable:
+        - shadow
+  exclusions:
+    paths:
+      - docs
+      - archive
+    rules:
+      # Exclude linters from running on test files
+      - path: _test\.go
+        linters:
+          - errcheck
+          - govet
+      # Exclude generated protobuf files
+      - path: \.pb\.go
+        linters:
+          - all
+    # Don't fail on existing issues - report only new
+    max-issues-per-linter: 0
+    max-same-issues: 0

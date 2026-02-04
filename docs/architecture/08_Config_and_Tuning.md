@@ -96,8 +96,10 @@ MAX_TOTAL_EDGES_FETCHED=5000         # Total edge limit (default 5000)
 
 The scoring formula is:
 ```
-S = α*V + β*A + γ*R + δ*C - φ*log(1+deg) - κ*d
+S = α*V + β*A + γ_eff*R + δ*C - φ*log(1+deg) - κ*d
 ```
+
+Where `γ_eff` = `γ` normally, or `γ * TEMPORAL_SOFT_BOOST` when temporal soft-mode is active.
 
 Current defaults (hardcoded in `scoring.go`, configurable via future update):
 
@@ -110,6 +112,46 @@ Current defaults (hardcoded in `scoring.go`, configurable via future update):
 | φ | SCORING_PENALTY_HUB | 0.08 | Hub penalty (log degree) |
 | κ | SCORING_PENALTY_REDUNDANCY | 0.12 | Path-prefix redundancy penalty |
 | ρ | SCORING_RECENCY_DECAY | 0.05 | Recency decay rate per day |
+
+---
+
+## Temporal Retrieval
+
+Time-aware retrieval that detects temporal intent in queries and adjusts scoring or filtering accordingly.
+
+```bash
+TEMPORAL_ENABLED=true              # Enable temporal query understanding (default: true)
+TEMPORAL_SOFT_BOOST=3.0            # Recency weight multiplier for soft-mode (default: 3.0, range: 1.0-10.0)
+TEMPORAL_HARD_FILTER=true          # Enable hard time-range filtering (default: true)
+```
+
+### Temporal Modes
+
+| Mode | Trigger | Behavior |
+|------|---------|----------|
+| `none` | No temporal language detected | Pipeline unchanged — zero regression |
+| `soft` | "recent", "latest", "what's new" | Boosts recency weight: `γ_eff = γ × TEMPORAL_SOFT_BOOST` |
+| `hard` | "in the last 7 days", "since Jan 2026" | Filters candidates by time range `[after, before)` |
+
+### Hard-Mode Triggers
+- "in the last N days/weeks/months"
+- "since YYYY-MM-DD" or "since Month Year"
+- "before YYYY-MM-DD" or "before Month Year"
+- "between DATE and DATE"
+- "this week/month/year"
+
+### Soft-Mode Triggers
+- "recent", "recently", "latest", "newest"
+- "what changed", "what's new", "updates to"
+- "new changes", "latest changes", "recent changes"
+
+### API Override
+
+Explicit temporal constraints can be passed via `temporal_after` and `temporal_before` (ISO 8601) on the retrieve and recall endpoints. These override auto-detected intent and force hard-mode filtering.
+
+### Cache Behavior
+
+Temporal queries (`soft` or `hard` mode) bypass the query cache since results are time-sensitive.
 
 ---
 
@@ -270,4 +312,9 @@ ANOMALY_DETECTION_ENABLED=true
 ANOMALY_DUPLICATE_THRESHOLD=0.95
 ANOMALY_STALE_DAYS=30
 ANOMALY_MAX_CHECK_MS=100
+
+# Temporal Retrieval
+TEMPORAL_ENABLED=true
+TEMPORAL_SOFT_BOOST=3.0
+TEMPORAL_HARD_FILTER=true
 ```

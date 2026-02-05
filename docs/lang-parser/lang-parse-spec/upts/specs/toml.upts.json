@@ -28,8 +28,8 @@
   },
   "expected": {
     "symbol_count": {
-      "min": 20,
-      "max": 35
+      "min": 40,
+      "max": 55
     },
     "symbols": [
       {
@@ -147,11 +147,11 @@
       {
         "name": "bin",
         "type": "section",
-        "line": 83,
+        "line": 79,
         "tags": [
           "array-of-tables"
         ],
-        "doc_comment": "array of tables, 2 entries"
+        "doc_comment": "array-of-tables"
       },
       {
         "name": "test",

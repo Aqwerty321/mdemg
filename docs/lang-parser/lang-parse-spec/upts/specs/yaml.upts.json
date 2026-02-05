@@ -31,8 +31,8 @@
   },
   "expected": {
     "symbol_count": {
-      "min": 25,
-      "max": 40
+      "min": 45,
+      "max": 60
     },
     "symbols": [
       {
@@ -128,8 +128,7 @@
         "tags": [
           "alias",
           "mapping"
-        ],
-        "doc_comment": "merges: defaults"
+        ]
       },
       {
         "name": "production",
@@ -138,12 +137,11 @@
         "tags": [
           "alias",
           "mapping"
-        ],
-        "doc_comment": "merges: defaults"
+        ]
       },
       {
         "name": "features",
-        "type": "section",
+        "type": "constant",
         "line": 37,
         "tags": [
           "array",

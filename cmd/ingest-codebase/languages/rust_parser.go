@@ -167,46 +167,170 @@ func (p *RustParser) extractSymbols(content string) []Symbol {
 	var symbols []Symbol
 	lines := strings.Split(content, "\n")
 
-	// Pattern: const NAME: Type = value;
-	constPattern := regexp.MustCompile(`^\s*(?:pub\s+)?const\s+([A-Z][A-Z0-9_]*)\s*:\s*([^=]+)\s*=\s*(.+?);`)
-	// Pattern: pub fn name(...) -> Type
-	fnPattern := regexp.MustCompile(`^\s*(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)(?:\s*->\s*([^\{]+))?`)
+	// Patterns for Rust constructs
+	// pub, pub(crate), pub(super), pub(self), pub(in path) are all visibility modifiers
+	pubPattern := `(pub(?:\s*\([^)]*\))?\s+)?`
+	constPattern := regexp.MustCompile(`^\s*` + pubPattern + `const\s+([A-Z][A-Z0-9_]*)\s*:\s*([^=]+)\s*=\s*(.+?);`)
+	typeAliasPattern := regexp.MustCompile(`^\s*` + pubPattern + `type\s+(\w+)\s*=\s*(.+?);`)
+	structPattern := regexp.MustCompile(`^\s*` + pubPattern + `struct\s+(\w+)(?:<[^>]*>)?`)
+	enumPattern := regexp.MustCompile(`^\s*` + pubPattern + `enum\s+(\w+)`)
+	traitPattern := regexp.MustCompile(`^\s*` + pubPattern + `trait\s+(\w+)`)
+	implPattern := regexp.MustCompile(`^\s*impl(?:<[^>]*>)?\s+(?:(\w+)(?:<[^>]*>)?\s+for\s+)?(\w+)(?:<[^>]*>)?`)
+	fnPattern := regexp.MustCompile(`^\s*` + pubPattern + `(?:async\s+)?fn\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)(?:\s*->\s*([^\{]+))?`)
+	modPattern := regexp.MustCompile(`^\s*` + pubPattern + `mod\s+(\w+)`)
+	macroPattern := regexp.MustCompile(`^\s*macro_rules!\s+(\w+)`)
+
+	// Track current impl block for method parent assignment
+	var currentImpl string
+	var braceDepth int
 
 	for i, line := range lines {
 		lineNum := i + 1
+		trimmed := strings.TrimSpace(line)
+
+		// Skip empty lines and comments
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+
+		// Track brace depth to know when we exit impl blocks
+		braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
+		if braceDepth == 0 {
+			currentImpl = ""
+		}
 
 		// Extract constants
 		if matches := constPattern.FindStringSubmatch(line); matches != nil {
-			sym := Symbol{
-				Name:           matches[1],
+			symbols = append(symbols, Symbol{
+				Name:           matches[2],
 				Type:           "constant",
-				TypeAnnotation: strings.TrimSpace(matches[2]),
-				Value:          CleanValue(matches[3]),
-				RawValue:       matches[3],
-				Line:     lineNum,
-				Exported:       strings.HasPrefix(strings.TrimSpace(line), "pub"),
+				TypeAnnotation: strings.TrimSpace(matches[3]),
+				Value:          CleanValue(matches[4]),
+				RawValue:       matches[4],
+				Line:           lineNum,
+				Exported:       matches[1] != "",
 				Language:       "rust",
-			}
-			symbols = append(symbols, sym)
+			})
+			continue
 		}
 
-		// Extract function signatures
+		// Extract type aliases
+		if matches := typeAliasPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, Symbol{
+				Name:           matches[2],
+				Type:           "type",
+				TypeAnnotation: strings.TrimSpace(matches[3]),
+				Line:           lineNum,
+				Exported:       matches[1] != "",
+				Language:       "rust",
+			})
+			continue
+		}
+
+		// Extract struct definitions
+		if matches := structPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, Symbol{
+				Name:     matches[2],
+				Type:     "struct",
+				Line:     lineNum,
+				Exported: matches[1] != "",
+				Language: "rust",
+			})
+			continue
+		}
+
+		// Extract enum definitions
+		if matches := enumPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, Symbol{
+				Name:     matches[2],
+				Type:     "enum",
+				Line:     lineNum,
+				Exported: matches[1] != "",
+				Language: "rust",
+			})
+			continue
+		}
+
+		// Extract trait definitions
+		if matches := traitPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, Symbol{
+				Name:     matches[2],
+				Type:     "trait",
+				Line:     lineNum,
+				Exported: matches[1] != "",
+				Language: "rust",
+			})
+			continue
+		}
+
+		// Track impl blocks for method parent assignment
+		if matches := implPattern.FindStringSubmatch(line); matches != nil {
+			// matches[1] is trait name (if "impl Trait for Type")
+			// matches[2] is the type being implemented
+			currentImpl = matches[2]
+			if matches[1] != "" {
+				// This is a trait implementation, include trait info
+				currentImpl = matches[2] + " (impl " + matches[1] + ")"
+			}
+			continue
+		}
+
+		// Extract module definitions
+		if matches := modPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, Symbol{
+				Name:     matches[2],
+				Type:     "module",
+				Line:     lineNum,
+				Exported: matches[1] != "",
+				Language: "rust",
+			})
+			continue
+		}
+
+		// Extract macro definitions
+		if matches := macroPattern.FindStringSubmatch(line); matches != nil {
+			// Check if previous line has #[macro_export]
+			exported := false
+			if i > 0 && strings.Contains(lines[i-1], "#[macro_export]") {
+				exported = true
+			}
+			symbols = append(symbols, Symbol{
+				Name:     matches[1],
+				Type:     "macro",
+				Line:     lineNum,
+				Exported: exported,
+				Language: "rust",
+			})
+			continue
+		}
+
+		// Extract functions and methods
 		if matches := fnPattern.FindStringSubmatch(line); matches != nil {
 			returnType := ""
-			if len(matches) > 3 && matches[3] != "" {
-				returnType = strings.TrimSpace(matches[3])
+			if len(matches) > 4 && matches[4] != "" {
+				returnType = strings.TrimSpace(matches[4])
 			}
 
-			sym := Symbol{
-				Name:           matches[1],
-				Type:           "function",
-				Signature:      fmt.Sprintf("fn %s(%s)%s", matches[1], matches[2], formatReturn(returnType)),
-				TypeAnnotation: returnType,
-				Line:     lineNum,
-				Exported:       strings.HasPrefix(strings.TrimSpace(line), "pub"),
-				Language:       "rust",
+			symType := "function"
+			parent := ""
+			if currentImpl != "" {
+				symType = "method"
+				parent = currentImpl
 			}
-			symbols = append(symbols, sym)
+
+			sig := fmt.Sprintf("(%s)%s", matches[3], formatReturn(returnType))
+
+			symbols = append(symbols, Symbol{
+				Name:           matches[2],
+				Type:           symType,
+				Parent:         parent,
+				Signature:      sig,
+				TypeAnnotation: returnType,
+				Line:           lineNum,
+				Exported:       matches[1] != "",
+				Language:       "rust",
+			})
+			continue
 		}
 	}
 

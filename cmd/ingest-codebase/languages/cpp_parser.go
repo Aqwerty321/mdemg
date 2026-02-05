@@ -198,30 +198,74 @@ func (p *CppParser) extractSymbols(content string) []Symbol {
 	var symbols []Symbol
 	lines := strings.Split(content, "\n")
 
-	// Pattern: #define NAME value
-	definePattern := regexp.MustCompile(`^\s*#define\s+([A-Z][A-Z0-9_]*)\s+(.+)$`)
-	// Pattern: const TYPE NAME = value;
-	constPattern := regexp.MustCompile(`^\s*(?:const|constexpr)\s+[\w:]+\s+([A-Z][A-Z0-9_]*)\s*=\s*(.+?);`)
-	// Pattern: static const TYPE NAME = value;
-	staticConstPattern := regexp.MustCompile(`^\s*static\s+(?:const|constexpr)\s+[\w:]+\s+([A-Z][A-Z0-9_]*)\s*=\s*(.+?);`)
-	// Pattern: enum NAME { ... }
-	enumPattern := regexp.MustCompile(`^\s*enum\s+(?:class\s+)?(\w+)`)
-	// Pattern: function declarations
-	fnPattern := regexp.MustCompile(`^\s*(?:virtual\s+)?(?:static\s+)?([\w:]+(?:\s*[*&])?)\s+(\w+)\s*\(([^)]*)\)\s*(?:const)?\s*(?:override)?\s*(?:noexcept)?`)
+	// Patterns for C++ constructs
+	// Constants: constexpr TYPE NAME = value; or const TYPE NAME = value;
+	constPattern := regexp.MustCompile(`^\s*(?:inline\s+)?(?:constexpr|const)\s+(?:const\s+)?([^\s=]+(?:\s*\*)?)\s+([A-Z][A-Z0-9_]*)\s*=\s*(.+?);`)
+	staticConstPattern := regexp.MustCompile(`^\s*static\s+(?:const|constexpr)\s+([^\s=]+)\s+([A-Z][A-Z0-9_]*)\s*=\s*(.+?);`)
+	// Type alias: using Name = Type;
+	usingPattern := regexp.MustCompile(`^\s*using\s+(\w+)\s*=`)
+	// Namespace: namespace Name {
+	namespacePattern := regexp.MustCompile(`^\s*namespace\s+(\w+)\s*\{`)
+	// Enum: enum [class] Name {
+	enumPattern := regexp.MustCompile(`^\s*enum\s+(?:class\s+)?(\w+)\s*(?:\{|:)`)
+	// Class/struct: [template<...>] class Name [: inheritance] {
+	classPattern := regexp.MustCompile(`^\s*(?:template\s*<[^>]*>\s*)?class\s+(\w+)`)
+	structPattern := regexp.MustCompile(`^\s*(?:template\s*<[^>]*>\s*)?struct\s+(\w+)`)
+	// Method/function: [virtual] [static] [const] RetType [&*] Name(params) [const] [override] [noexcept] [= 0/default/delete] [;{]
+	// Handle return types like: void, int, const UserId&, std::optional<User>, const std::string&
+	methodPattern := regexp.MustCompile(`^\s*(?:virtual\s+)?(?:static\s+)?(?:explicit\s+)?(?:inline\s+)?((?:const\s+)?[\w:]+(?:<[^>]*>)?(?:\s*[*&])?)\s+(\w+)\s*\(([^)]*)\)\s*(?:const)?\s*(?:override)?\s*(?:noexcept)?`)
+	// Pure virtual or deleted: = 0, = default, = delete
+	pureVirtualPattern := regexp.MustCompile(`=\s*(?:0|default|delete)\s*;`)
+
+	// Scope tracking
+	var scopeStack []string
+	var scopeDepths []int
+	braceDepth := 0
+	inPrivate := false
+	_ = inPrivate // will be used for export tracking
 
 	for i, line := range lines {
 		lineNum := i + 1
+		trimmed := strings.TrimSpace(line)
 
-		// Check for #define
-		if matches := definePattern.FindStringSubmatch(line); matches != nil {
+		// Skip empty lines and comments
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
+			continue
+		}
+
+		// Check for scope changes (public/private/protected)
+		if strings.Contains(trimmed, "private:") {
+			inPrivate = true
+		} else if strings.Contains(trimmed, "protected:") || strings.Contains(trimmed, "public:") {
+			inPrivate = false
+		}
+
+		// Track brace depth - but process scope exit AFTER pattern matching
+		// This ensures inline methods like `int getValue() const { return v_; }`
+		// are properly associated with their parent class
+		openBraces := strings.Count(line, "{")
+		closeBraces := strings.Count(line, "}")
+
+		// Check for namespace
+		if matches := namespacePattern.FindStringSubmatch(line); matches != nil {
 			symbols = append(symbols, Symbol{
-				Name:       matches[1],
-				Type:       "macro",
-				Value:      CleanValue(matches[2]),
-				RawValue:   matches[2],
-				Line: lineNum,
-				Exported:   true,
-				Language:   "cpp",
+				Name:     matches[1],
+				Type:     "namespace",
+				Line:     lineNum,
+				Exported: true,
+				Language: "cpp",
+			})
+			continue
+		}
+
+		// Check for using type alias
+		if matches := usingPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, Symbol{
+				Name:     matches[1],
+				Type:     "type",
+				Line:     lineNum,
+				Exported: true,
+				Language: "cpp",
 			})
 			continue
 		}
@@ -229,27 +273,29 @@ func (p *CppParser) extractSymbols(content string) []Symbol {
 		// Check for static const
 		if matches := staticConstPattern.FindStringSubmatch(line); matches != nil {
 			symbols = append(symbols, Symbol{
-				Name:       matches[1],
-				Type:       "constant",
-				Value:      CleanValue(matches[2]),
-				RawValue:   matches[2],
-				Line: lineNum,
-				Exported:   !strings.Contains(line, "private"),
-				Language:   "cpp",
+				Name:           matches[2],
+				Type:           "constant",
+				TypeAnnotation: matches[1],
+				Value:          CleanValue(matches[3]),
+				RawValue:       matches[3],
+				Line:           lineNum,
+				Exported:       !inPrivate,
+				Language:       "cpp",
 			})
 			continue
 		}
 
-		// Check for const
+		// Check for const/constexpr
 		if matches := constPattern.FindStringSubmatch(line); matches != nil {
 			symbols = append(symbols, Symbol{
-				Name:       matches[1],
-				Type:       "constant",
-				Value:      CleanValue(matches[2]),
-				RawValue:   matches[2],
-				Line: lineNum,
-				Exported:   !strings.Contains(line, "private"),
-				Language:   "cpp",
+				Name:           matches[2],
+				Type:           "constant",
+				TypeAnnotation: matches[1],
+				Value:          CleanValue(matches[3]),
+				RawValue:       matches[3],
+				Line:           lineNum,
+				Exported:       !inPrivate,
+				Language:       "cpp",
 			})
 			continue
 		}
@@ -257,27 +303,79 @@ func (p *CppParser) extractSymbols(content string) []Symbol {
 		// Check for enum
 		if matches := enumPattern.FindStringSubmatch(line); matches != nil {
 			symbols = append(symbols, Symbol{
-				Name:       matches[1],
-				Type:       "enum",
-				Line: lineNum,
-				Exported:   true,
-				Language:   "cpp",
+				Name:     matches[1],
+				Type:     "enum",
+				Line:     lineNum,
+				Exported: true,
+				Language: "cpp",
 			})
 			continue
 		}
 
-		// Check for function declarations (in headers)
-		if matches := fnPattern.FindStringSubmatch(line); matches != nil {
+		// Check for class
+		if matches := classPattern.FindStringSubmatch(line); matches != nil {
+			className := matches[1]
+			symbols = append(symbols, Symbol{
+				Name:     className,
+				Type:     "class",
+				Line:     lineNum,
+				Exported: true,
+				Language: "cpp",
+			})
+			if strings.Contains(line, "{") {
+				scopeStack = append(scopeStack, className)
+				scopeDepths = append(scopeDepths, braceDepth)
+			}
+			continue
+		}
+
+		// Check for struct (treated as class in C++)
+		if matches := structPattern.FindStringSubmatch(line); matches != nil {
+			structName := matches[1]
+			symbols = append(symbols, Symbol{
+				Name:     structName,
+				Type:     "class",
+				Line:     lineNum,
+				Exported: true,
+				Language: "cpp",
+			})
+			if strings.Contains(line, "{") {
+				scopeStack = append(scopeStack, structName)
+				scopeDepths = append(scopeDepths, braceDepth)
+			}
+			continue
+		}
+
+		// Check for method/function
+		if matches := methodPattern.FindStringSubmatch(line); matches != nil {
 			returnType := strings.TrimSpace(matches[1])
 			funcName := matches[2]
 			params := matches[3]
 
-			// Skip constructors/destructors (no return type or same as class name)
-			if returnType == "" || strings.HasPrefix(funcName, "~") {
+			// Skip destructors
+			if strings.HasPrefix(funcName, "~") {
 				continue
 			}
-			// Skip common keywords that aren't function names
-			if funcName == "if" || funcName == "for" || funcName == "while" || funcName == "switch" {
+			// Skip keywords
+			if funcName == "if" || funcName == "for" || funcName == "while" || funcName == "switch" || funcName == "return" || funcName == "catch" {
+				continue
+			}
+			// Skip member variable initializers (like id_(std::move(...)))
+			if strings.Contains(funcName, "_") && strings.HasSuffix(funcName, "_") {
+				continue
+			}
+
+			// Determine if this is a method (inside a class) or function
+			symType := "function"
+			parent := ""
+			if len(scopeStack) > 0 {
+				symType = "method"
+				parent = scopeStack[len(scopeStack)-1]
+			}
+
+			// Check if this is a pure virtual, default, or deleted function (declaration only)
+			isPure := pureVirtualPattern.MatchString(line)
+			if !isPure && !strings.Contains(line, "{") && !strings.Contains(line, ";") {
 				continue
 			}
 
@@ -288,13 +386,27 @@ func (p *CppParser) extractSymbols(content string) []Symbol {
 
 			symbols = append(symbols, Symbol{
 				Name:           funcName,
-				Type:           "function",
+				Type:           symType,
+				Parent:         parent,
 				Signature:      signature,
 				TypeAnnotation: returnType,
-				Line:     lineNum,
-				Exported:       !strings.Contains(line, "private"),
+				Line:           lineNum,
+				Exported:       !inPrivate,
 				Language:       "cpp",
 			})
+		}
+
+		// Update brace depth and check for scope exit AFTER pattern matching
+		// This ensures inline methods are associated with their parent before scope changes
+		braceDepth += openBraces
+		for closeBraces > 0 {
+			braceDepth--
+			if len(scopeStack) > 0 && len(scopeDepths) > 0 && braceDepth < scopeDepths[len(scopeDepths)-1] {
+				scopeStack = scopeStack[:len(scopeStack)-1]
+				scopeDepths = scopeDepths[:len(scopeDepths)-1]
+				inPrivate = false
+			}
+			closeBraces--
 		}
 	}
 

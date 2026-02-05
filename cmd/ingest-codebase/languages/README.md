@@ -4,7 +4,7 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 
 ## Supported Languages
 
-22 parsers, 20 with UPTS validation specs.
+25 parsers, 25 with UPTS validation specs (100%).
 
 | Language | File | Extensions | UPTS |
 |----------|------|------------|------|
@@ -18,6 +18,9 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 | C++ | [`cpp_parser.go`](cpp_parser.go) | `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.h` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/cpp.upts.json) |
 | C | [`c_parser.go`](c_parser.go) | `.c`, `.h` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/c.upts.json) |
 | CUDA | [`cuda_parser.go`](cuda_parser.go) | `.cu`, `.cuh` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/cuda.upts.json) |
+| Protocol Buffers | [`protobuf_parser.go`](protobuf_parser.go) | `.proto` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/protobuf.upts.json) |
+| GraphQL | [`graphql_parser.go`](graphql_parser.go) | `.graphql`, `.gql` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/graphql.upts.json) |
+| OpenAPI/Swagger | [`openapi_parser.go`](openapi_parser.go) | `.yaml`, `.yml`, `.json` (with openapi/swagger marker) | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/openapi.upts.json) |
 | SQL | [`sql_parser.go`](sql_parser.go) | `.sql` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/sql.upts.json) |
 | Cypher (Neo4j) | [`cypher_parser.go`](cypher_parser.go) | `.cypher`, `.cql` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/cypher.upts.json) |
 | Terraform/HCL | [`terraform_parser.go`](terraform_parser.go) | `.tf`, `.tfvars` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/terraform.upts.json) |
@@ -28,15 +31,15 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 | Makefile | [`makefile_parser.go`](makefile_parser.go) | `.mk`, `Makefile` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/makefile.upts.json) |
 | Dockerfile | [`dockerfile_parser.go`](dockerfile_parser.go) | `Dockerfile`, `*.dockerfile` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/dockerfile.upts.json) |
 | Shell/Bash | [`shell_parser.go`](shell_parser.go) | `.sh`, `.bash`, `.zsh` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/shell.upts.json) |
-| Markdown | [`markdown_parser.go`](markdown_parser.go) | `.md`, `.markdown` | No |
-| XML | [`xml_parser.go`](xml_parser.go) | `.xml`, `.xsd`, `.xsl`, etc. | No |
+| Markdown | [`markdown_parser.go`](markdown_parser.go) | `.md`, `.markdown` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/markdown.upts.json) |
+| XML | [`xml_parser.go`](xml_parser.go) | `.xml`, `.xsd`, `.xsl`, etc. | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/xml.upts.json) |
 
 ## UPTS Validation
 
 Each parser's symbol extraction is validated against a [UPTS (Universal Parser Test Specification)](../../../docs/lang-parser/lang-parse-spec/upts/README.md) spec file. The Go-native test harness loads the spec, parses the associated fixture file through the parser, and asserts that all expected symbols are found with correct name, type, line number, and export status.
 
 ```bash
-# Run all 20 UPTS-validated parsers
+# Run all 25 UPTS-validated parsers
 go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
 
 # Run a single language

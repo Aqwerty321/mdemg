@@ -1,0 +1,290 @@
+{
+  "upts_version": "1.0.0",
+  "language": "openapi",
+  "variants": [".yaml", ".yml", ".json"],
+  "description": "OpenAPI/Swagger specification parser test",
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_parent": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/openapi_test_fixture.yaml",
+    "sha256": "793eb7dbb0c2a57498cffe0d5319056f3d10a5f329fb3fc9acb1b40ce72a444e"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 30,
+      "max": 40
+    },
+    "symbols": [
+      {
+        "name": "info",
+        "type": "section",
+        "line": 9,
+        "exported": true,
+        "pattern": "P_INFO"
+      },
+      {
+        "name": "servers",
+        "type": "section",
+        "line": 17,
+        "exported": true,
+        "pattern": "P_SERVERS"
+      },
+      {
+        "name": "https://api.example.com/v1",
+        "type": "constant",
+        "line": 18,
+        "parent": "servers",
+        "exported": true,
+        "pattern": "P_SERVER_URL"
+      },
+      {
+        "name": "https://staging.example.com/v1",
+        "type": "constant",
+        "line": 19,
+        "parent": "servers",
+        "exported": true,
+        "pattern": "P_SERVER_URL"
+      },
+      {
+        "name": "/users",
+        "type": "endpoint",
+        "line": 28,
+        "exported": true,
+        "pattern": "P_PATH"
+      },
+      {
+        "name": "GET",
+        "type": "method",
+        "line": 29,
+        "parent": "/users",
+        "exported": true,
+        "pattern": "P_METHOD"
+      },
+      {
+        "name": "listUsers",
+        "type": "function",
+        "line": 31,
+        "parent": "/users.GET",
+        "doc_comment": "operationId",
+        "exported": true,
+        "pattern": "P_OPERATION_ID"
+      },
+      {
+        "name": "limit",
+        "type": "parameter",
+        "line": 35,
+        "parent": "/users.GET",
+        "exported": true,
+        "pattern": "P_PARAMETER"
+      },
+      {
+        "name": "offset",
+        "type": "parameter",
+        "line": 39,
+        "parent": "/users.GET",
+        "exported": true,
+        "pattern": "P_PARAMETER"
+      },
+      {
+        "name": "POST",
+        "type": "method",
+        "line": 46,
+        "parent": "/users",
+        "exported": true,
+        "pattern": "P_METHOD"
+      },
+      {
+        "name": "createUser",
+        "type": "function",
+        "line": 48,
+        "parent": "/users.POST",
+        "doc_comment": "operationId",
+        "exported": true,
+        "pattern": "P_OPERATION_ID"
+      },
+      {
+        "name": "/users/{id}",
+        "type": "endpoint",
+        "line": 60,
+        "exported": true,
+        "pattern": "P_PATH"
+      },
+      {
+        "name": "GET",
+        "type": "method",
+        "line": 61,
+        "parent": "/users/{id}",
+        "exported": true,
+        "pattern": "P_METHOD"
+      },
+      {
+        "name": "getUserById",
+        "type": "function",
+        "line": 63,
+        "parent": "/users/{id}.GET",
+        "doc_comment": "operationId",
+        "exported": true,
+        "pattern": "P_OPERATION_ID"
+      },
+      {
+        "name": "id",
+        "type": "parameter",
+        "line": 65,
+        "parent": "/users/{id}.GET",
+        "exported": true,
+        "pattern": "P_PARAMETER"
+      },
+      {
+        "name": "PUT",
+        "type": "method",
+        "line": 73,
+        "parent": "/users/{id}",
+        "exported": true,
+        "pattern": "P_METHOD"
+      },
+      {
+        "name": "updateUser",
+        "type": "function",
+        "line": 75,
+        "parent": "/users/{id}.PUT",
+        "doc_comment": "operationId",
+        "exported": true,
+        "pattern": "P_OPERATION_ID"
+      },
+      {
+        "name": "id",
+        "type": "parameter",
+        "line": 77,
+        "parent": "/users/{id}.PUT",
+        "exported": true,
+        "pattern": "P_PARAMETER"
+      },
+      {
+        "name": "DELETE",
+        "type": "method",
+        "line": 83,
+        "parent": "/users/{id}",
+        "exported": true,
+        "pattern": "P_METHOD"
+      },
+      {
+        "name": "deleteUser",
+        "type": "function",
+        "line": 85,
+        "parent": "/users/{id}.DELETE",
+        "doc_comment": "operationId",
+        "exported": true,
+        "pattern": "P_OPERATION_ID"
+      },
+      {
+        "name": "/items",
+        "type": "endpoint",
+        "line": 90,
+        "exported": true,
+        "pattern": "P_PATH"
+      },
+      {
+        "name": "GET",
+        "type": "method",
+        "line": 91,
+        "parent": "/items",
+        "exported": true,
+        "pattern": "P_METHOD"
+      },
+      {
+        "name": "listItems",
+        "type": "function",
+        "line": 93,
+        "parent": "/items.GET",
+        "doc_comment": "operationId",
+        "exported": true,
+        "pattern": "P_OPERATION_ID"
+      },
+      {
+        "name": "category",
+        "type": "parameter",
+        "line": 95,
+        "parent": "/items.GET",
+        "exported": true,
+        "pattern": "P_PARAMETER"
+      },
+      {
+        "name": "/health",
+        "type": "endpoint",
+        "line": 101,
+        "exported": true,
+        "pattern": "P_PATH"
+      },
+      {
+        "name": "GET",
+        "type": "method",
+        "line": 102,
+        "parent": "/health",
+        "exported": true,
+        "pattern": "P_METHOD"
+      },
+      {
+        "name": "healthCheck",
+        "type": "function",
+        "line": 104,
+        "parent": "/health.GET",
+        "doc_comment": "operationId",
+        "exported": true,
+        "pattern": "P_OPERATION_ID"
+      },
+      {
+        "name": "User",
+        "type": "class",
+        "line": 112,
+        "parent": "components.schemas",
+        "exported": true,
+        "pattern": "P_SCHEMA"
+      },
+      {
+        "name": "UserInput",
+        "type": "class",
+        "line": 121,
+        "parent": "components.schemas",
+        "exported": true,
+        "pattern": "P_SCHEMA"
+      },
+      {
+        "name": "Item",
+        "type": "class",
+        "line": 131,
+        "parent": "components.schemas",
+        "exported": true,
+        "pattern": "P_SCHEMA"
+      },
+      {
+        "name": "Error",
+        "type": "class",
+        "line": 140,
+        "parent": "components.schemas",
+        "exported": true,
+        "pattern": "P_SCHEMA"
+      },
+      {
+        "name": "bearerAuth",
+        "type": "constant",
+        "line": 149,
+        "parent": "components.securitySchemes",
+        "exported": true,
+        "pattern": "P_SECURITY_SCHEME"
+      },
+      {
+        "name": "apiKey",
+        "type": "constant",
+        "line": 152,
+        "parent": "components.securitySchemes",
+        "exported": true,
+        "pattern": "P_SECURITY_SCHEME"
+      }
+    ]
+  }
+}

@@ -166,11 +166,19 @@ func (p *JSONParser) extractSymbols(content string) []Symbol {
 		closeBrackets := strings.Count(line, "]")
 
 		// Pop sections when closing braces
-		for i := 0; i < closeBraces && len(sectionStack) > 0; i++ {
+		// braceDepth represents nesting: 1=root, 2=first section, etc.
+		// sectionStack has N elements when inside N named sections
+		for i := 0; i < closeBraces; i++ {
 			if braceDepth > 0 {
 				braceDepth--
-				if braceDepth < len(sectionStack) {
-					sectionStack = sectionStack[:braceDepth]
+				// Keep only sections that are at a level <= current brace depth - 1
+				// (depth 1 = root, no sections; depth 2 = 1 section; etc.)
+				targetLen := braceDepth - 1
+				if targetLen < 0 {
+					targetLen = 0
+				}
+				if targetLen < len(sectionStack) {
+					sectionStack = sectionStack[:targetLen]
 				}
 			}
 		}

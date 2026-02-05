@@ -1,0 +1,101 @@
+{
+  "upts_version": "1.0.0",
+  "language": "xml",
+  "variants": [".xml", ".csproj", ".vbproj"],
+  "description": "XML file parser test (dotnet-project variant)",
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_parent": false
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/xml_test_fixture.xml",
+    "sha256": "7b48cb9c6b271451e8b6c1b00eb0eed452db17738c350c296c567711861d1482"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 8,
+      "max": 15
+    },
+    "symbols": [
+      {
+        "name": "PropertyGroup",
+        "type": "section",
+        "line": 8,
+        "exported": true,
+        "pattern": "P_PROPERTY_GROUP"
+      },
+      {
+        "name": "ItemGroup",
+        "type": "section",
+        "line": 15,
+        "exported": true,
+        "pattern": "P_ITEM_GROUP"
+      },
+      {
+        "name": "Newtonsoft.Json",
+        "type": "package-reference",
+        "line": 16,
+        "value": "13.0.3",
+        "exported": true,
+        "pattern": "P_PACKAGE_REF"
+      },
+      {
+        "name": "Microsoft.Extensions.Logging",
+        "type": "package-reference",
+        "line": 17,
+        "value": "8.0.0",
+        "exported": true,
+        "pattern": "P_PACKAGE_REF"
+      },
+      {
+        "name": "Serilog",
+        "type": "package-reference",
+        "line": 18,
+        "value": "3.1.1",
+        "exported": true,
+        "pattern": "P_PACKAGE_REF"
+      },
+      {
+        "name": "ItemGroup",
+        "type": "section",
+        "line": 21,
+        "exported": true,
+        "optional": true,
+        "pattern": "P_ITEM_GROUP"
+      },
+      {
+        "name": "xunit",
+        "type": "package-reference",
+        "line": 22,
+        "value": "2.6.1",
+        "exported": true,
+        "pattern": "P_PACKAGE_REF"
+      },
+      {
+        "name": "Moq",
+        "type": "package-reference",
+        "line": 23,
+        "value": "4.20.69",
+        "exported": true,
+        "pattern": "P_PACKAGE_REF"
+      },
+      {
+        "name": "PreBuild",
+        "type": "target",
+        "line": 26,
+        "exported": true,
+        "pattern": "P_TARGET"
+      },
+      {
+        "name": "PostBuild",
+        "type": "target",
+        "line": 30,
+        "exported": true,
+        "pattern": "P_TARGET"
+      }
+    ]
+  }
+}

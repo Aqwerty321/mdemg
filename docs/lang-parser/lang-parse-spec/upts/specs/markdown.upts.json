@@ -1,0 +1,160 @@
+{
+  "upts_version": "1.0.0",
+  "language": "markdown",
+  "variants": [".md", ".markdown"],
+  "description": "Markdown documentation parser test",
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_parent": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/markdown_test_fixture.md",
+    "sha256": "34adf65a63c9848e1e05af65b5eaec23fbaa8b1eef6a5c340450c17d295286b5"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 15,
+      "max": 25
+    },
+    "symbols": [
+      {
+        "name": "Markdown Parser Test Fixture",
+        "type": "section",
+        "line": 1,
+        "exported": true,
+        "doc_comment": "#",
+        "pattern": "P_HEADING_H1"
+      },
+      {
+        "name": "Overview",
+        "type": "heading",
+        "line": 6,
+        "parent": "Markdown Parser Test Fixture",
+        "exported": true,
+        "pattern": "P_HEADING_H2"
+      },
+      {
+        "name": "Nested Section",
+        "type": "heading",
+        "line": 13,
+        "parent": "Overview",
+        "exported": true,
+        "pattern": "P_HEADING_H3"
+      },
+      {
+        "name": "Deeply Nested",
+        "type": "heading",
+        "line": 17,
+        "parent": "Nested Section",
+        "exported": true,
+        "pattern": "P_HEADING_H4"
+      },
+      {
+        "name": "Code Examples",
+        "type": "heading",
+        "line": 21,
+        "exported": true,
+        "pattern": "P_HEADING_H2"
+      },
+      {
+        "name": "python",
+        "type": "code_block",
+        "line": 25,
+        "exported": true,
+        "pattern": "P_CODE_BLOCK"
+      },
+      {
+        "name": "go",
+        "type": "code_block",
+        "line": 30,
+        "exported": true,
+        "pattern": "P_CODE_BLOCK"
+      },
+      {
+        "name": "bash",
+        "type": "code_block",
+        "line": 36,
+        "exported": true,
+        "pattern": "P_CODE_BLOCK"
+      },
+      {
+        "name": "External Links",
+        "type": "heading",
+        "line": 40,
+        "exported": true,
+        "pattern": "P_HEADING_H2"
+      },
+      {
+        "name": "GitHub",
+        "type": "link",
+        "line": 42,
+        "value": "https://github.com",
+        "exported": true,
+        "pattern": "P_LINK"
+      },
+      {
+        "name": "Documentation",
+        "type": "link",
+        "line": 43,
+        "value": "https://docs.example.com",
+        "exported": true,
+        "pattern": "P_LINK"
+      },
+      {
+        "name": "API Reference",
+        "type": "link",
+        "line": 44,
+        "value": "/api/reference",
+        "exported": true,
+        "pattern": "P_LINK"
+      },
+      {
+        "name": "Configuration",
+        "type": "heading",
+        "line": 46,
+        "exported": true,
+        "pattern": "P_HEADING_H2"
+      },
+      {
+        "name": "Environment Variables",
+        "type": "heading",
+        "line": 48,
+        "parent": "Configuration",
+        "exported": true,
+        "pattern": "P_HEADING_H3"
+      },
+      {
+        "name": "Build Settings",
+        "type": "heading",
+        "line": 52,
+        "exported": true,
+        "pattern": "P_HEADING_H3"
+      },
+      {
+        "name": "Summary",
+        "type": "heading",
+        "line": 56,
+        "exported": true,
+        "pattern": "P_HEADING_H2"
+      },
+      {
+        "name": "Subsection A",
+        "type": "heading",
+        "line": 60,
+        "parent": "Summary",
+        "exported": true,
+        "pattern": "P_HEADING_H3"
+      },
+      {
+        "name": "Subsection B",
+        "type": "heading",
+        "line": 64,
+        "exported": true,
+        "pattern": "P_HEADING_H3"
+      }
+    ]
+  }
+}

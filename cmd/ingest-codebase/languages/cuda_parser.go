@@ -209,16 +209,22 @@ func (p *CudaParser) extractKernels(content string) []string {
 
 // extractDeviceFunctions finds __device__ functions (not also __host__)
 func (p *CudaParser) extractDeviceFunctions(content string) []string {
-	// Pattern: __device__ (but not __host__ __device__) [return type] funcName(
-	pattern := regexp.MustCompile(`(?:^|[^_])__device__\s+(?:inline\s+)?(?!__host__)(\w+(?:\s*[*&])?)\s+(\w+)\s*\(`)
-	matches := pattern.FindAllStringSubmatch(content, -1)
+	// First find all lines with __device__
+	lines := strings.Split(content, "\n")
+	pattern := regexp.MustCompile(`__device__\s+(?:inline\s+)?([\w:]+(?:\s*[*&])?)\s+(\w+)\s*\(`)
 
 	var funcs []string
 	seen := make(map[string]bool)
-	for _, match := range matches {
-		if len(match) > 2 && !seen[match[2]] {
-			funcs = append(funcs, match[2])
-			seen[match[2]] = true
+	for _, line := range lines {
+		// Skip __host__ __device__ functions
+		if strings.Contains(line, "__host__") {
+			continue
+		}
+		if matches := pattern.FindStringSubmatch(line); matches != nil {
+			if len(matches) > 2 && !seen[matches[2]] {
+				funcs = append(funcs, matches[2])
+				seen[matches[2]] = true
+			}
 		}
 	}
 	return funcs
@@ -260,10 +266,10 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 	var symbols []Symbol
 	lines := strings.Split(content, "\n")
 
-	// Pattern: __global__ kernel
-	kernelPattern := regexp.MustCompile(`^\s*__global__\s+(?:void|[\w:]+)\s+(\w+)\s*\(([^)]*)\)`)
-	// Pattern: __device__ function
-	devicePattern := regexp.MustCompile(`^\s*__device__\s+(?:inline\s+)?(?!__host__)([\w:]+(?:\s*[*&])?)\s+(\w+)\s*\(([^)]*)\)`)
+	// Pattern: __global__ kernel (may be multi-line, so don't require closing paren)
+	kernelPattern := regexp.MustCompile(`^\s*__global__\s+(?:void|[\w:]+)\s+(\w+)\s*\(`)
+	// Pattern: __device__ function (we'll filter out __host__ __device__ in code)
+	devicePattern := regexp.MustCompile(`^\s*__device__\s+(?:inline\s+)?([\w:]+(?:\s*[*&])?)\s+(\w+)\s*\(([^)]*)\)`)
 	// Pattern: __host__ __device__ function
 	hostDevicePattern := regexp.MustCompile(`^\s*__host__\s+__device__\s+(?:inline\s+)?([\w:]+(?:\s*[*&])?)\s+(\w+)\s*\(([^)]*)\)`)
 	// Pattern: __shared__ variable
@@ -278,17 +284,14 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 
 		// Check for kernel
 		if matches := kernelPattern.FindStringSubmatch(line); matches != nil {
-			signature := fmt.Sprintf("__global__ void %s(%s)", matches[1], matches[2])
-			if len(signature) > 150 {
-				signature = signature[:150] + "..."
-			}
+			signature := fmt.Sprintf("__global__ void %s(...)", matches[1])
 			symbols = append(symbols, Symbol{
-				Name:       matches[1],
-				Type:       "kernel",
-				Signature:  signature,
-				Line: lineNum,
-				Exported:   true,
-				Language:   "cuda",
+				Name:      matches[1],
+				Type:      "kernel",
+				Signature: signature,
+				Line:      lineNum,
+				Exported:  true,
+				Language:  "cuda",
 			})
 			continue
 		}
@@ -311,22 +314,24 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 			continue
 		}
 
-		// Check for __device__ function
-		if matches := devicePattern.FindStringSubmatch(line); matches != nil {
-			signature := fmt.Sprintf("__device__ %s %s(%s)", matches[1], matches[2], matches[3])
-			if len(signature) > 150 {
-				signature = signature[:150] + "..."
+		// Check for __device__ function (but not __host__ __device__)
+		if !strings.Contains(line, "__host__") {
+			if matches := devicePattern.FindStringSubmatch(line); matches != nil {
+				signature := fmt.Sprintf("__device__ %s %s(%s)", matches[1], matches[2], matches[3])
+				if len(signature) > 150 {
+					signature = signature[:150] + "..."
+				}
+				symbols = append(symbols, Symbol{
+					Name:           matches[2],
+					Type:           "device_function",
+					Signature:      signature,
+					TypeAnnotation: matches[1],
+					Line:           lineNum,
+					Exported:       true,
+					Language:       "cuda",
+				})
+				continue
 			}
-			symbols = append(symbols, Symbol{
-				Name:           matches[2],
-				Type:           "device_function",
-				Signature:      signature,
-				TypeAnnotation: matches[1],
-				Line:     lineNum,
-				Exported:       true,
-				Language:       "cuda",
-			})
-			continue
 		}
 
 		// Check for __shared__ variable

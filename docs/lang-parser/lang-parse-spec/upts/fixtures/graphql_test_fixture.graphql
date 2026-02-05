@@ -1,0 +1,129 @@
+# GraphQL Parser Test Fixture
+# Tests symbol extraction for GraphQL schemas
+# Line numbers are predictable for UPTS validation
+
+# === Pattern: Scalar definitions ===
+# Line 7-8
+scalar DateTime
+scalar UUID
+
+# === Pattern: Enum definitions ===
+# Line 12-17
+enum Status {
+  ACTIVE
+  INACTIVE
+  PENDING
+  DELETED
+}
+
+# Line 20-24
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+# === Pattern: Interface definitions ===
+# Line 28-33
+interface Node {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# Line 36-40
+interface Timestamped {
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# === Pattern: Type definitions ===
+# Line 44-52
+type User implements Node & Timestamped {
+  id: ID!
+  name: String!
+  email: String!
+  status: Status!
+  roles: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# Line 55-64
+type Item implements Node {
+  id: ID!
+  name: String!
+  value: Int!
+  priority: Priority!
+  owner: User!
+  tags: [String!]
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# === Pattern: Input definitions ===
+# Line 68-72
+input CreateUserInput {
+  name: String!
+  email: String!
+  roles: [String!]
+}
+
+# Line 75-79
+input UpdateUserInput {
+  name: String
+  email: String
+  status: Status
+}
+
+# Line 82-87
+input ItemFilterInput {
+  priority: Priority
+  ownerId: ID
+  minValue: Int
+  maxValue: Int
+}
+
+# === Pattern: Union definitions ===
+# Line 91
+union SearchResult = User | Item
+
+# === Pattern: Query type ===
+# Line 95-101
+type Query {
+  user(id: ID!): User
+  users(limit: Int, offset: Int): [User!]!
+  item(id: ID!): Item
+  items(filter: ItemFilterInput): [Item!]!
+  search(query: String!): [SearchResult!]!
+}
+
+# === Pattern: Mutation type ===
+# Line 105-111
+type Mutation {
+  createUser(input: CreateUserInput!): User!
+  updateUser(id: ID!, input: UpdateUserInput!): User
+  deleteUser(id: ID!): Boolean!
+  createItem(name: String!, value: Int!): Item!
+  updateItem(id: ID!, value: Int): Item
+}
+
+# === Pattern: Subscription type ===
+# Line 115-118
+type Subscription {
+  userCreated: User!
+  itemUpdated(ownerId: ID): Item!
+}
+
+# === Pattern: Directive definitions ===
+# Line 122-123
+directive @auth(requires: String!) on FIELD_DEFINITION
+directive @deprecated(reason: String) on FIELD_DEFINITION | ENUM_VALUE
+
+# === Pattern: Type extension ===
+# Line 127-130
+extend type User {
+  items: [Item!]!
+  itemCount: Int!
+}

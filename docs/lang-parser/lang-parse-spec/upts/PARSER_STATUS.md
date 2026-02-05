@@ -2,8 +2,8 @@
 
 **Generated:** 2026-01-29
 **Last Updated:** 2026-02-05
-**Schema Version:** 1.2 (evidence validation, 4 new parsers)
-**Status:** 20/20 UPTS-validated languages passing (100%)
+**Schema Version:** 1.4 (added Protocol Buffers, GraphQL, and OpenAPI parsers)
+**Status:** 25/25 UPTS-validated languages passing (100%)
 
 ---
 
@@ -59,7 +59,7 @@ if validate_parent and exp_parent and actual_parent != exp_parent:
 
 ## Current Status
 
-All 20 UPTS-validated parsers pass via `go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v`:
+All 25 UPTS-validated parsers pass via `go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v`:
 
 | Language | Parser Type | Status | Notes |
 |----------|-------------|--------|-------|
@@ -68,31 +68,42 @@ All 20 UPTS-validated parsers pass via `go test ./cmd/ingest-codebase/languages/
 | Python | Regex | ✅ PASS | |
 | TypeScript | Regex | ✅ PASS | Includes JS/JSX/TSX |
 | Java | Regex | ✅ PASS | Brace-depth scope tracking |
-| C# | Regex | ✅ PASS | **NEW** - Brace-depth scope tracking |
-| Kotlin | Regex | ✅ PASS | **NEW** - Handles data/sealed/object |
+| C# | Regex | ✅ PASS | Brace-depth scope tracking |
+| Kotlin | Regex | ✅ PASS | Handles data/sealed/object |
 | C++ | Regex | ✅ PASS | |
 | C | Regex | ✅ PASS | |
 | CUDA | Regex | ✅ PASS | Kernel, device, shared memory |
+| Protocol Buffers | Regex | ✅ PASS | gRPC services, messages, enums |
+| GraphQL | Regex | ✅ PASS | Types, interfaces, queries, mutations |
+| OpenAPI/Swagger | Regex | ✅ PASS | **NEW** - REST endpoints, methods, schemas, parameters |
 | SQL | Regex | ✅ PASS | |
 | Cypher | Regex | ✅ PASS | Neo4j labels, constraints, indexes |
-| Terraform | Regex | ✅ PASS | **NEW** - HCL resource/variable/output |
+| Terraform | Regex | ✅ PASS | HCL resource/variable/output |
 | YAML | Regex | ✅ PASS | Hierarchical key paths |
 | TOML | Regex | ✅ PASS | Section and key extraction |
 | JSON | Regex | ✅ PASS | |
 | INI | Regex | ✅ PASS | Section and key extraction |
-| Makefile | Regex | ✅ PASS | **NEW** - Targets, variables, .PHONY |
+| Makefile | Regex | ✅ PASS | Targets, variables, .PHONY |
 | Dockerfile | Regex | ✅ PASS | |
 | Shell | Regex | ✅ PASS | |
 
-**Pass Rate:** 100% (20/20)
+**Pass Rate:** 100% (25/25)
 
-2 additional parsers without UPTS specs: Markdown, XML. Total: 22 parsers.
+All 25 parsers now have UPTS validation specs.
 
 ---
 
 ## Recent Changes (2026-02-05)
 
-### New Parsers
+### New Parsers (Phase 5: API Schemas)
+
+| Parser | Features |
+|--------|----------|
+| Protocol Buffers | Messages (with nesting), enums, services, RPC methods (with signatures), fields, oneof, package, options |
+| GraphQL | Types, interfaces, inputs, enums, unions, scalars, directives, Query/Mutation/Subscription, fields, extend type |
+| OpenAPI/Swagger | REST endpoints, HTTP methods, operationIds, parameters, schemas, security schemes, server URLs |
+
+### Previously Added Parsers (Phase 4: Extended)
 
 | Parser | Features |
 |--------|----------|

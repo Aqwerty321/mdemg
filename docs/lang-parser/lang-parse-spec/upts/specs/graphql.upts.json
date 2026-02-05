@@ -1,0 +1,788 @@
+{
+  "upts_version": "1.0.0",
+  "language": "graphql",
+  "variants": [
+    ".graphql",
+    ".gql"
+  ],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-05",
+    "updated": "2026-02-05",
+    "description": "GraphQL schema parser - tests all symbol extraction patterns including types, interfaces, inputs, enums, unions, scalars, directives, and type extensions",
+    "parser_status": "enhanced",
+    "tags": [
+      "canonical",
+      "schema",
+      "api"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_signature": false,
+    "validate_value": false,
+    "validate_parent": true,
+    "validate_evidence": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/graphql_test_fixture.graphql",
+    "sha256": "611b731b2f4ab72939ea6ee69b485ec66489c2423bc2d75787a22e001111fc25"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 55,
+      "max": 65
+    },
+    "symbols": [
+      {
+        "name": "DateTime",
+        "type": "type",
+        "line": 7,
+        "exported": true,
+        "pattern": "P_SCALAR",
+        "tags": ["scalar"]
+      },
+      {
+        "name": "UUID",
+        "type": "type",
+        "line": 8,
+        "exported": true,
+        "pattern": "P_SCALAR",
+        "tags": ["scalar"]
+      },
+      {
+        "name": "Status",
+        "type": "enum",
+        "line": 12,
+        "exported": true,
+        "pattern": "P5_ENUM",
+        "tags": ["enum"]
+      },
+      {
+        "name": "ACTIVE",
+        "type": "enum_value",
+        "line": 13,
+        "parent": "Status",
+        "exported": true,
+        "pattern": "P5_ENUM_VALUE",
+        "tags": ["enum_value"]
+      },
+      {
+        "name": "INACTIVE",
+        "type": "enum_value",
+        "line": 14,
+        "parent": "Status",
+        "exported": true,
+        "pattern": "P5_ENUM_VALUE",
+        "tags": ["enum_value"]
+      },
+      {
+        "name": "PENDING",
+        "type": "enum_value",
+        "line": 15,
+        "parent": "Status",
+        "exported": true,
+        "pattern": "P5_ENUM_VALUE",
+        "tags": ["enum_value"]
+      },
+      {
+        "name": "DELETED",
+        "type": "enum_value",
+        "line": 16,
+        "parent": "Status",
+        "exported": true,
+        "pattern": "P5_ENUM_VALUE",
+        "tags": ["enum_value"]
+      },
+      {
+        "name": "Priority",
+        "type": "enum",
+        "line": 20,
+        "exported": true,
+        "pattern": "P5_ENUM",
+        "tags": ["enum"]
+      },
+      {
+        "name": "LOW",
+        "type": "enum_value",
+        "line": 21,
+        "parent": "Priority",
+        "exported": true,
+        "pattern": "P5_ENUM_VALUE",
+        "tags": ["enum_value"]
+      },
+      {
+        "name": "MEDIUM",
+        "type": "enum_value",
+        "line": 22,
+        "parent": "Priority",
+        "exported": true,
+        "pattern": "P5_ENUM_VALUE",
+        "tags": ["enum_value"]
+      },
+      {
+        "name": "HIGH",
+        "type": "enum_value",
+        "line": 23,
+        "parent": "Priority",
+        "exported": true,
+        "pattern": "P5_ENUM_VALUE",
+        "tags": ["enum_value"]
+      },
+      {
+        "name": "CRITICAL",
+        "type": "enum_value",
+        "line": 24,
+        "parent": "Priority",
+        "exported": true,
+        "pattern": "P5_ENUM_VALUE",
+        "tags": ["enum_value"]
+      },
+      {
+        "name": "Node",
+        "type": "interface",
+        "line": 29,
+        "exported": true,
+        "pattern": "P4_INTERFACE_TRAIT",
+        "tags": ["interface"]
+      },
+      {
+        "name": "id",
+        "type": "field",
+        "line": 30,
+        "parent": "Node",
+        "type_annotation": "ID!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "createdAt",
+        "type": "field",
+        "line": 31,
+        "parent": "Node",
+        "type_annotation": "DateTime!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "updatedAt",
+        "type": "field",
+        "line": 32,
+        "parent": "Node",
+        "type_annotation": "DateTime!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "Timestamped",
+        "type": "interface",
+        "line": 36,
+        "exported": true,
+        "pattern": "P4_INTERFACE_TRAIT",
+        "tags": ["interface"]
+      },
+      {
+        "name": "createdAt",
+        "type": "field",
+        "line": 37,
+        "parent": "Timestamped",
+        "type_annotation": "DateTime!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "updatedAt",
+        "type": "field",
+        "line": 38,
+        "parent": "Timestamped",
+        "type_annotation": "DateTime!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "User",
+        "type": "class",
+        "line": 43,
+        "doc_comment": "implements Node & Timestamped",
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["type", "implements"]
+      },
+      {
+        "name": "id",
+        "type": "field",
+        "line": 44,
+        "parent": "User",
+        "type_annotation": "ID!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "name",
+        "type": "field",
+        "line": 45,
+        "parent": "User",
+        "type_annotation": "String!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "email",
+        "type": "field",
+        "line": 46,
+        "parent": "User",
+        "type_annotation": "String!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "status",
+        "type": "field",
+        "line": 47,
+        "parent": "User",
+        "type_annotation": "Status!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "roles",
+        "type": "field",
+        "line": 48,
+        "parent": "User",
+        "type_annotation": "[String!]!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "list"]
+      },
+      {
+        "name": "createdAt",
+        "type": "field",
+        "line": 49,
+        "parent": "User",
+        "type_annotation": "DateTime!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "updatedAt",
+        "type": "field",
+        "line": 50,
+        "parent": "User",
+        "type_annotation": "DateTime!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "Item",
+        "type": "class",
+        "line": 54,
+        "doc_comment": "implements Node",
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["type", "implements"]
+      },
+      {
+        "name": "id",
+        "type": "field",
+        "line": 55,
+        "parent": "Item",
+        "type_annotation": "ID!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "name",
+        "type": "field",
+        "line": 56,
+        "parent": "Item",
+        "type_annotation": "String!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "value",
+        "type": "field",
+        "line": 57,
+        "parent": "Item",
+        "type_annotation": "Int!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "priority",
+        "type": "field",
+        "line": 58,
+        "parent": "Item",
+        "type_annotation": "Priority!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "owner",
+        "type": "field",
+        "line": 59,
+        "parent": "Item",
+        "type_annotation": "User!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "reference"]
+      },
+      {
+        "name": "tags",
+        "type": "field",
+        "line": 60,
+        "parent": "Item",
+        "type_annotation": "[String!]",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "list", "nullable"]
+      },
+      {
+        "name": "createdAt",
+        "type": "field",
+        "line": 61,
+        "parent": "Item",
+        "type_annotation": "DateTime!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "updatedAt",
+        "type": "field",
+        "line": 62,
+        "parent": "Item",
+        "type_annotation": "DateTime!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "CreateUserInput",
+        "type": "class",
+        "line": 67,
+        "exported": true,
+        "pattern": "P_INPUT",
+        "tags": ["input"]
+      },
+      {
+        "name": "name",
+        "type": "field",
+        "line": 68,
+        "parent": "CreateUserInput",
+        "type_annotation": "String!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "email",
+        "type": "field",
+        "line": 69,
+        "parent": "CreateUserInput",
+        "type_annotation": "String!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "roles",
+        "type": "field",
+        "line": 70,
+        "parent": "CreateUserInput",
+        "type_annotation": "[String!]",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "list", "nullable"]
+      },
+      {
+        "name": "UpdateUserInput",
+        "type": "class",
+        "line": 74,
+        "exported": true,
+        "pattern": "P_INPUT",
+        "tags": ["input"]
+      },
+      {
+        "name": "name",
+        "type": "field",
+        "line": 75,
+        "parent": "UpdateUserInput",
+        "type_annotation": "String",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "nullable"]
+      },
+      {
+        "name": "email",
+        "type": "field",
+        "line": 76,
+        "parent": "UpdateUserInput",
+        "type_annotation": "String",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "nullable"]
+      },
+      {
+        "name": "status",
+        "type": "field",
+        "line": 77,
+        "parent": "UpdateUserInput",
+        "type_annotation": "Status",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "nullable"]
+      },
+      {
+        "name": "ItemFilterInput",
+        "type": "class",
+        "line": 81,
+        "exported": true,
+        "pattern": "P_INPUT",
+        "tags": ["input"]
+      },
+      {
+        "name": "priority",
+        "type": "field",
+        "line": 82,
+        "parent": "ItemFilterInput",
+        "type_annotation": "Priority",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "nullable"]
+      },
+      {
+        "name": "ownerId",
+        "type": "field",
+        "line": 83,
+        "parent": "ItemFilterInput",
+        "type_annotation": "ID",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "nullable"]
+      },
+      {
+        "name": "minValue",
+        "type": "field",
+        "line": 84,
+        "parent": "ItemFilterInput",
+        "type_annotation": "Int",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "nullable"]
+      },
+      {
+        "name": "maxValue",
+        "type": "field",
+        "line": 85,
+        "parent": "ItemFilterInput",
+        "type_annotation": "Int",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "nullable"]
+      },
+      {
+        "name": "SearchResult",
+        "type": "type",
+        "line": 90,
+        "doc_comment": "User | Item",
+        "exported": true,
+        "pattern": "P_UNION",
+        "tags": ["union"]
+      },
+      {
+        "name": "Query",
+        "type": "interface",
+        "line": 94,
+        "exported": true,
+        "pattern": "P_ROOT_OPERATION",
+        "tags": ["root", "query"]
+      },
+      {
+        "name": "user",
+        "type": "field",
+        "line": 95,
+        "parent": "Query",
+        "type_annotation": "User",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver", "nullable"]
+      },
+      {
+        "name": "users",
+        "type": "field",
+        "line": 96,
+        "parent": "Query",
+        "type_annotation": "[User!]!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver", "list"]
+      },
+      {
+        "name": "item",
+        "type": "field",
+        "line": 97,
+        "parent": "Query",
+        "type_annotation": "Item",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver", "nullable"]
+      },
+      {
+        "name": "items",
+        "type": "field",
+        "line": 98,
+        "parent": "Query",
+        "type_annotation": "[Item!]!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver", "list"]
+      },
+      {
+        "name": "search",
+        "type": "field",
+        "line": 99,
+        "parent": "Query",
+        "type_annotation": "[SearchResult!]!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver", "list"]
+      },
+      {
+        "name": "Mutation",
+        "type": "interface",
+        "line": 104,
+        "exported": true,
+        "pattern": "P_ROOT_OPERATION",
+        "tags": ["root", "mutation"]
+      },
+      {
+        "name": "createUser",
+        "type": "field",
+        "line": 105,
+        "parent": "Mutation",
+        "type_annotation": "User!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver"]
+      },
+      {
+        "name": "updateUser",
+        "type": "field",
+        "line": 106,
+        "parent": "Mutation",
+        "type_annotation": "User",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver", "nullable"]
+      },
+      {
+        "name": "deleteUser",
+        "type": "field",
+        "line": 107,
+        "parent": "Mutation",
+        "type_annotation": "Boolean!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver"]
+      },
+      {
+        "name": "createItem",
+        "type": "field",
+        "line": 108,
+        "parent": "Mutation",
+        "type_annotation": "Item!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver"]
+      },
+      {
+        "name": "updateItem",
+        "type": "field",
+        "line": 109,
+        "parent": "Mutation",
+        "type_annotation": "Item",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver", "nullable"]
+      },
+      {
+        "name": "Subscription",
+        "type": "interface",
+        "line": 114,
+        "exported": true,
+        "pattern": "P_ROOT_OPERATION",
+        "tags": ["root", "subscription"]
+      },
+      {
+        "name": "userCreated",
+        "type": "field",
+        "line": 115,
+        "parent": "Subscription",
+        "type_annotation": "User!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver"]
+      },
+      {
+        "name": "itemUpdated",
+        "type": "field",
+        "line": 116,
+        "parent": "Subscription",
+        "type_annotation": "Item!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "resolver"]
+      },
+      {
+        "name": "@auth",
+        "type": "function",
+        "line": 121,
+        "exported": true,
+        "pattern": "P_DIRECTIVE",
+        "tags": ["directive"]
+      },
+      {
+        "name": "@deprecated",
+        "type": "function",
+        "line": 122,
+        "exported": true,
+        "pattern": "P_DIRECTIVE",
+        "tags": ["directive"]
+      },
+      {
+        "name": "User",
+        "type": "class",
+        "line": 126,
+        "doc_comment": "extension",
+        "exported": true,
+        "pattern": "P_EXTEND_TYPE",
+        "tags": ["extension"]
+      },
+      {
+        "name": "items",
+        "type": "field",
+        "line": 127,
+        "parent": "User",
+        "type_annotation": "[Item!]!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field", "list"]
+      },
+      {
+        "name": "itemCount",
+        "type": "field",
+        "line": 128,
+        "parent": "User",
+        "type_annotation": "Int!",
+        "exported": true,
+        "pattern": "P_FIELD",
+        "tags": ["field"]
+      }
+    ],
+    "excluded": [
+      {
+        "name": "#",
+        "reason": "comments are not symbols"
+      }
+    ],
+    "relationships": [
+      {
+        "source": "User",
+        "relation": "IMPLEMENTS",
+        "target": "Node"
+      },
+      {
+        "source": "User",
+        "relation": "IMPLEMENTS",
+        "target": "Timestamped"
+      },
+      {
+        "source": "Item",
+        "relation": "IMPLEMENTS",
+        "target": "Node"
+      },
+      {
+        "source": "Status",
+        "relation": "DEFINES_VALUE",
+        "target": "ACTIVE"
+      },
+      {
+        "source": "Status",
+        "relation": "DEFINES_VALUE",
+        "target": "INACTIVE"
+      },
+      {
+        "source": "Status",
+        "relation": "DEFINES_VALUE",
+        "target": "PENDING"
+      },
+      {
+        "source": "Status",
+        "relation": "DEFINES_VALUE",
+        "target": "DELETED"
+      },
+      {
+        "source": "Priority",
+        "relation": "DEFINES_VALUE",
+        "target": "LOW"
+      },
+      {
+        "source": "Priority",
+        "relation": "DEFINES_VALUE",
+        "target": "MEDIUM"
+      },
+      {
+        "source": "Priority",
+        "relation": "DEFINES_VALUE",
+        "target": "HIGH"
+      },
+      {
+        "source": "Priority",
+        "relation": "DEFINES_VALUE",
+        "target": "CRITICAL"
+      },
+      {
+        "source": "SearchResult",
+        "relation": "UNION_OF",
+        "target": "User"
+      },
+      {
+        "source": "SearchResult",
+        "relation": "UNION_OF",
+        "target": "Item"
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P_SCALAR",
+    "P3_CLASS_STRUCT",
+    "P4_INTERFACE_TRAIT",
+    "P5_ENUM",
+    "P5_ENUM_VALUE",
+    "P_INPUT",
+    "P_UNION",
+    "P_ROOT_OPERATION",
+    "P_DIRECTIVE",
+    "P_EXTEND_TYPE",
+    "P_FIELD"
+  ]
+}

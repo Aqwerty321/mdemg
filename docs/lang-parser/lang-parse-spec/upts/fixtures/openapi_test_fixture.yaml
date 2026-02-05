@@ -1,0 +1,159 @@
+# OpenAPI Parser Test Fixture
+# Tests symbol extraction for OpenAPI/Swagger specifications
+# Line numbers are predictable for UPTS validation
+
+# === Line 6: OpenAPI version ===
+openapi: 3.0.3
+
+# === Line 9-14: Info section ===
+info:
+  title: MDEMG Test API
+  description: Test API for parser validation
+  version: 1.0.0
+  contact:
+    email: test@example.com
+
+# === Line 17-20: Servers section ===
+servers:
+  - url: https://api.example.com/v1
+  - url: https://staging.example.com/v1
+
+# === Line 22-24: Tags ===
+tags:
+  - name: users
+  - name: items
+
+# === Line 27-82: Paths section ===
+paths:
+  /users:
+    get:
+      summary: List all users
+      operationId: listUsers
+      tags:
+        - users
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+    post:
+      summary: Create a user
+      operationId: createUser
+      tags:
+        - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '201':
+          description: Created
+
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      operationId: getUserById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+    put:
+      summary: Update user
+      operationId: updateUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+      responses:
+        '200':
+          description: Updated
+    delete:
+      summary: Delete user
+      operationId: deleteUser
+      responses:
+        '204':
+          description: Deleted
+
+  /items:
+    get:
+      summary: List items
+      operationId: listItems
+      parameters:
+        - name: category
+          in: query
+      responses:
+        '200':
+          description: Success
+
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Healthy
+
+# === Line 118-146: Components section ===
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+    UserInput:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+    Item:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        value:
+          type: integer
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+# === Line 167-169: Security ===
+security:
+  - bearerAuth: []

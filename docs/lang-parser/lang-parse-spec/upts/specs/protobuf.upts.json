@@ -1,0 +1,712 @@
+{
+  "upts_version": "1.0.0",
+  "language": "protobuf",
+  "variants": [
+    ".proto"
+  ],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-05",
+    "updated": "2026-02-05",
+    "description": "Protocol Buffers parser - messages, enums, services, RPCs, fields, and nested types",
+    "parser_status": "enhanced",
+    "tags": [
+      "canonical",
+      "grpc",
+      "api"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_signature": true,
+    "validate_value": true,
+    "validate_parent": true,
+    "validate_evidence": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/protobuf_test_fixture.proto",
+    "sha256": "ff11725d90c85a8906565f910422a43f289219540b14309afd63f99c490c1d12"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 55,
+      "max": 70
+    },
+    "symbols": [
+      {
+        "name": "mdemg.api.v1",
+        "type": "namespace",
+        "line": 8,
+        "exported": true,
+        "pattern": "P5_NAMESPACE",
+        "tags": ["package"]
+      },
+      {
+        "name": "go_package",
+        "type": "constant",
+        "line": 11,
+        "value": "mdemg/api/v1;apiv1",
+        "exported": true,
+        "pattern": "P1_CONSTANT",
+        "tags": ["option"]
+      },
+      {
+        "name": "java_package",
+        "type": "constant",
+        "line": 12,
+        "value": "com.mdemg.api.v1",
+        "exported": true,
+        "pattern": "P1_CONSTANT",
+        "tags": ["option"]
+      },
+      {
+        "name": "Status",
+        "type": "enum",
+        "line": 16,
+        "exported": true,
+        "pattern": "P8_ENUM",
+        "tags": ["enum"]
+      },
+      {
+        "name": "STATUS_UNSPECIFIED",
+        "type": "enum_value",
+        "line": 17,
+        "value": "0",
+        "parent": "Status",
+        "exported": true,
+        "pattern": "P8_ENUM_VALUE",
+        "tags": ["enum-value"]
+      },
+      {
+        "name": "STATUS_ACTIVE",
+        "type": "enum_value",
+        "line": 18,
+        "value": "1",
+        "parent": "Status",
+        "exported": true,
+        "pattern": "P8_ENUM_VALUE",
+        "tags": ["enum-value"]
+      },
+      {
+        "name": "STATUS_INACTIVE",
+        "type": "enum_value",
+        "line": 19,
+        "value": "2",
+        "parent": "Status",
+        "exported": true,
+        "pattern": "P8_ENUM_VALUE",
+        "tags": ["enum-value"]
+      },
+      {
+        "name": "STATUS_PENDING",
+        "type": "enum_value",
+        "line": 20,
+        "value": "3",
+        "parent": "Status",
+        "exported": true,
+        "pattern": "P8_ENUM_VALUE",
+        "tags": ["enum-value"]
+      },
+      {
+        "name": "Priority",
+        "type": "enum",
+        "line": 24,
+        "exported": true,
+        "pattern": "P8_ENUM",
+        "tags": ["enum"]
+      },
+      {
+        "name": "PRIORITY_UNSPECIFIED",
+        "type": "enum_value",
+        "line": 25,
+        "value": "0",
+        "parent": "Priority",
+        "exported": true,
+        "pattern": "P8_ENUM_VALUE",
+        "tags": ["enum-value"]
+      },
+      {
+        "name": "PRIORITY_LOW",
+        "type": "enum_value",
+        "line": 26,
+        "value": "1",
+        "parent": "Priority",
+        "exported": true,
+        "pattern": "P8_ENUM_VALUE",
+        "tags": ["enum-value"]
+      },
+      {
+        "name": "PRIORITY_MEDIUM",
+        "type": "enum_value",
+        "line": 27,
+        "value": "2",
+        "parent": "Priority",
+        "exported": true,
+        "pattern": "P8_ENUM_VALUE",
+        "tags": ["enum-value"]
+      },
+      {
+        "name": "PRIORITY_HIGH",
+        "type": "enum_value",
+        "line": 28,
+        "value": "3",
+        "parent": "Priority",
+        "exported": true,
+        "pattern": "P8_ENUM_VALUE",
+        "tags": ["enum-value"]
+      },
+      {
+        "name": "User",
+        "type": "class",
+        "line": 33,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["message"]
+      },
+      {
+        "name": "id",
+        "type": "field",
+        "line": 34,
+        "type_annotation": "string",
+        "value": "1",
+        "parent": "User",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "name",
+        "type": "field",
+        "line": 35,
+        "type_annotation": "string",
+        "value": "2",
+        "parent": "User",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "email",
+        "type": "field",
+        "line": 36,
+        "type_annotation": "string",
+        "value": "3",
+        "parent": "User",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "status",
+        "type": "field",
+        "line": 37,
+        "type_annotation": "Status",
+        "value": "4",
+        "parent": "User",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "created_at",
+        "type": "field",
+        "line": 38,
+        "type_annotation": "int64",
+        "value": "5",
+        "parent": "User",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "roles",
+        "type": "field",
+        "line": 39,
+        "type_annotation": "repeated string",
+        "value": "6",
+        "parent": "User",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field", "repeated"]
+      },
+      {
+        "name": "Item",
+        "type": "class",
+        "line": 43,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["message"]
+      },
+      {
+        "name": "id",
+        "type": "field",
+        "line": 44,
+        "type_annotation": "string",
+        "value": "1",
+        "parent": "Item",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "name",
+        "type": "field",
+        "line": 45,
+        "type_annotation": "string",
+        "value": "2",
+        "parent": "Item",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "value",
+        "type": "field",
+        "line": 46,
+        "type_annotation": "int32",
+        "value": "3",
+        "parent": "Item",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "priority",
+        "type": "field",
+        "line": 47,
+        "type_annotation": "Priority",
+        "value": "4",
+        "parent": "Item",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "owner_id",
+        "type": "field",
+        "line": 48,
+        "type_annotation": "string",
+        "value": "5",
+        "parent": "Item",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "Item.Metadata",
+        "type": "class",
+        "line": 51,
+        "parent": "Item",
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["message", "nested"]
+      },
+      {
+        "name": "tags",
+        "type": "field",
+        "line": 52,
+        "type_annotation": "map<string, string>",
+        "value": "1",
+        "parent": "Item.Metadata",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field", "map"]
+      },
+      {
+        "name": "updated_at",
+        "type": "field",
+        "line": 53,
+        "type_annotation": "int64",
+        "value": "2",
+        "parent": "Item.Metadata",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "metadata",
+        "type": "field",
+        "line": 55,
+        "type_annotation": "Metadata",
+        "value": "6",
+        "parent": "Item",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "CreateUserRequest",
+        "type": "class",
+        "line": 59,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["message", "request"]
+      },
+      {
+        "name": "name",
+        "type": "field",
+        "line": 60,
+        "type_annotation": "string",
+        "value": "1",
+        "parent": "CreateUserRequest",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "email",
+        "type": "field",
+        "line": 61,
+        "type_annotation": "string",
+        "value": "2",
+        "parent": "CreateUserRequest",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "roles",
+        "type": "field",
+        "line": 62,
+        "type_annotation": "repeated string",
+        "value": "3",
+        "parent": "CreateUserRequest",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field", "repeated"]
+      },
+      {
+        "name": "CreateUserResponse",
+        "type": "class",
+        "line": 66,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["message", "response"]
+      },
+      {
+        "name": "user",
+        "type": "field",
+        "line": 67,
+        "type_annotation": "User",
+        "value": "1",
+        "parent": "CreateUserResponse",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "GetUserRequest",
+        "type": "class",
+        "line": 71,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["message", "request"]
+      },
+      {
+        "name": "id",
+        "type": "field",
+        "line": 72,
+        "type_annotation": "string",
+        "value": "1",
+        "parent": "GetUserRequest",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "ListUsersRequest",
+        "type": "class",
+        "line": 76,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["message", "request"]
+      },
+      {
+        "name": "page_size",
+        "type": "field",
+        "line": 77,
+        "type_annotation": "int32",
+        "value": "1",
+        "parent": "ListUsersRequest",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "page_token",
+        "type": "field",
+        "line": 78,
+        "type_annotation": "string",
+        "value": "2",
+        "parent": "ListUsersRequest",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "ListUsersResponse",
+        "type": "class",
+        "line": 82,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["message", "response"]
+      },
+      {
+        "name": "users",
+        "type": "field",
+        "line": 83,
+        "type_annotation": "repeated User",
+        "value": "1",
+        "parent": "ListUsersResponse",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field", "repeated"]
+      },
+      {
+        "name": "next_page_token",
+        "type": "field",
+        "line": 84,
+        "type_annotation": "string",
+        "value": "2",
+        "parent": "ListUsersResponse",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "UserService",
+        "type": "interface",
+        "line": 89,
+        "exported": true,
+        "pattern": "P4_INTERFACE_TRAIT",
+        "tags": ["service", "grpc"]
+      },
+      {
+        "name": "CreateUser",
+        "type": "method",
+        "line": 90,
+        "signature": "rpc CreateUser(CreateUserRequest) returns (CreateUserResponse)",
+        "parent": "UserService",
+        "exported": true,
+        "pattern": "P6_METHOD",
+        "tags": ["rpc"]
+      },
+      {
+        "name": "GetUser",
+        "type": "method",
+        "line": 91,
+        "signature": "rpc GetUser(GetUserRequest) returns (User)",
+        "parent": "UserService",
+        "exported": true,
+        "pattern": "P6_METHOD",
+        "tags": ["rpc"]
+      },
+      {
+        "name": "ListUsers",
+        "type": "method",
+        "line": 92,
+        "signature": "rpc ListUsers(ListUsersRequest) returns (ListUsersResponse)",
+        "parent": "UserService",
+        "exported": true,
+        "pattern": "P6_METHOD",
+        "tags": ["rpc"]
+      },
+      {
+        "name": "StreamUsers",
+        "type": "method",
+        "line": 93,
+        "signature": "rpc StreamUsers(ListUsersRequest) returns (stream User)",
+        "parent": "UserService",
+        "exported": true,
+        "pattern": "P6_METHOD",
+        "tags": ["rpc", "server-streaming"]
+      },
+      {
+        "name": "ItemService",
+        "type": "interface",
+        "line": 97,
+        "exported": true,
+        "pattern": "P4_INTERFACE_TRAIT",
+        "tags": ["service", "grpc"]
+      },
+      {
+        "name": "CreateItem",
+        "type": "method",
+        "line": 98,
+        "signature": "rpc CreateItem(Item) returns (Item)",
+        "parent": "ItemService",
+        "exported": true,
+        "pattern": "P6_METHOD",
+        "tags": ["rpc"]
+      },
+      {
+        "name": "GetItem",
+        "type": "method",
+        "line": 99,
+        "signature": "rpc GetItem(GetUserRequest) returns (Item)",
+        "parent": "ItemService",
+        "exported": true,
+        "pattern": "P6_METHOD",
+        "tags": ["rpc"]
+      },
+      {
+        "name": "WatchItems",
+        "type": "method",
+        "line": 100,
+        "signature": "rpc WatchItems(GetUserRequest) returns (stream Item)",
+        "parent": "ItemService",
+        "exported": true,
+        "pattern": "P6_METHOD",
+        "tags": ["rpc", "server-streaming"]
+      },
+      {
+        "name": "SearchRequest",
+        "type": "class",
+        "line": 105,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": ["message", "request"]
+      },
+      {
+        "name": "query",
+        "type": "field",
+        "line": 106,
+        "type_annotation": "string",
+        "value": "1",
+        "parent": "SearchRequest",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      },
+      {
+        "name": "target",
+        "type": "section",
+        "line": 108,
+        "parent": "SearchRequest",
+        "exported": true,
+        "pattern": "P10_SECTION",
+        "tags": ["oneof"]
+      },
+      {
+        "name": "user_id",
+        "type": "field",
+        "line": 109,
+        "type_annotation": "string",
+        "value": "2",
+        "parent": "SearchRequest.target",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field", "oneof-member"]
+      },
+      {
+        "name": "item_id",
+        "type": "field",
+        "line": 110,
+        "type_annotation": "string",
+        "value": "3",
+        "parent": "SearchRequest.target",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field", "oneof-member"]
+      },
+      {
+        "name": "limit",
+        "type": "field",
+        "line": 113,
+        "type_annotation": "int32",
+        "value": "4",
+        "parent": "SearchRequest",
+        "exported": true,
+        "pattern": "P9_FIELD",
+        "tags": ["field"]
+      }
+    ],
+    "excluded": [],
+    "relationships": [
+      {
+        "source": "User",
+        "relation": "DEFINES_FIELD",
+        "target": "id"
+      },
+      {
+        "source": "User",
+        "relation": "DEFINES_FIELD",
+        "target": "status"
+      },
+      {
+        "source": "Item",
+        "relation": "DEFINES_NESTED",
+        "target": "Item.Metadata"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "CreateUser"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "GetUser"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "ListUsers"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "StreamUsers"
+      },
+      {
+        "source": "ItemService",
+        "relation": "DEFINES_METHOD",
+        "target": "CreateItem"
+      },
+      {
+        "source": "ItemService",
+        "relation": "DEFINES_METHOD",
+        "target": "GetItem"
+      },
+      {
+        "source": "ItemService",
+        "relation": "DEFINES_METHOD",
+        "target": "WatchItems"
+      },
+      {
+        "source": "Status",
+        "relation": "DEFINES_VALUE",
+        "target": "STATUS_UNSPECIFIED"
+      },
+      {
+        "source": "Status",
+        "relation": "DEFINES_VALUE",
+        "target": "STATUS_ACTIVE"
+      },
+      {
+        "source": "Priority",
+        "relation": "DEFINES_VALUE",
+        "target": "PRIORITY_LOW"
+      },
+      {
+        "source": "SearchRequest",
+        "relation": "DEFINES_ONEOF",
+        "target": "target"
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P3_CLASS_STRUCT",
+    "P4_INTERFACE_TRAIT",
+    "P5_NAMESPACE",
+    "P6_METHOD",
+    "P8_ENUM",
+    "P8_ENUM_VALUE",
+    "P9_FIELD",
+    "P10_SECTION"
+  ]
+}

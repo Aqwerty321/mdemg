@@ -4,7 +4,7 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 
 ## Supported Languages
 
-22 parsers, 20 with UPTS validation specs.
+25 parsers, 23 with UPTS validation specs.
 
 | Language | File | Extensions | UPTS |
 |----------|------|------------|------|
@@ -18,6 +18,9 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 | C++ | [`cpp_parser.go`](cpp_parser.go) | `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.h` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/cpp.upts.json) |
 | C | [`c_parser.go`](c_parser.go) | `.c`, `.h` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/c.upts.json) |
 | CUDA | [`cuda_parser.go`](cuda_parser.go) | `.cu`, `.cuh` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/cuda.upts.json) |
+| Protocol Buffers | [`protobuf_parser.go`](protobuf_parser.go) | `.proto` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/protobuf.upts.json) |
+| GraphQL | [`graphql_parser.go`](graphql_parser.go) | `.graphql`, `.gql` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/graphql.upts.json) |
+| OpenAPI/Swagger | [`openapi_parser.go`](openapi_parser.go) | `.yaml`, `.yml`, `.json` (with openapi/swagger marker) | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/openapi.upts.json) |
 | SQL | [`sql_parser.go`](sql_parser.go) | `.sql` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/sql.upts.json) |
 | Cypher (Neo4j) | [`cypher_parser.go`](cypher_parser.go) | `.cypher`, `.cql` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/cypher.upts.json) |
 | Terraform/HCL | [`terraform_parser.go`](terraform_parser.go) | `.tf`, `.tfvars` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/terraform.upts.json) |
@@ -36,7 +39,7 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 Each parser's symbol extraction is validated against a [UPTS (Universal Parser Test Specification)](../../../docs/lang-parser/lang-parse-spec/upts/README.md) spec file. The Go-native test harness loads the spec, parses the associated fixture file through the parser, and asserts that all expected symbols are found with correct name, type, line number, and export status.
 
 ```bash
-# Run all 20 UPTS-validated parsers
+# Run all 23 UPTS-validated parsers
 go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
 
 # Run a single language

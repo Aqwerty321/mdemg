@@ -1,0 +1,114 @@
+// Protocol Buffer Parser Test Fixture
+// Tests symbol extraction for gRPC/protobuf definitions
+// Line numbers are predictable for UPTS validation
+
+syntax = "proto3";
+
+// Line 8
+package mdemg.api.v1;
+
+// Line 11
+option go_package = "mdemg/api/v1;apiv1";
+option java_package = "com.mdemg.api.v1";
+
+// === Pattern: Enum definitions ===
+// Line 15-20
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+  STATUS_INACTIVE = 2;
+  STATUS_PENDING = 3;
+}
+
+// Line 23-28
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  PRIORITY_LOW = 1;
+  PRIORITY_MEDIUM = 2;
+  PRIORITY_HIGH = 3;
+}
+
+// === Pattern: Message definitions ===
+// Line 32-40
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  Status status = 4;
+  int64 created_at = 5;
+  repeated string roles = 6;
+}
+
+// Line 43-54
+message Item {
+  string id = 1;
+  string name = 2;
+  int32 value = 3;
+  Priority priority = 4;
+  string owner_id = 5;
+
+  // Nested message
+  message Metadata {
+    map<string, string> tags = 1;
+    int64 updated_at = 2;
+  }
+  Metadata metadata = 6;
+}
+
+// Line 58-64
+message CreateUserRequest {
+  string name = 1;
+  string email = 2;
+  repeated string roles = 3;
+}
+
+// Line 67-69
+message CreateUserResponse {
+  User user = 1;
+}
+
+// Line 72-75
+message GetUserRequest {
+  string id = 1;
+}
+
+// Line 78-82
+message ListUsersRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+// Line 85-88
+message ListUsersResponse {
+  repeated User users = 1;
+  string next_page_token = 2;
+}
+
+// === Pattern: Service definitions ===
+// Line 92-98
+service UserService {
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc GetUser(GetUserRequest) returns (User);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc StreamUsers(ListUsersRequest) returns (stream User);
+}
+
+// Line 101-105
+service ItemService {
+  rpc CreateItem(Item) returns (Item);
+  rpc GetItem(GetUserRequest) returns (Item);
+  rpc WatchItems(GetUserRequest) returns (stream Item);
+}
+
+// === Pattern: Oneof ===
+// Line 109-117
+message SearchRequest {
+  string query = 1;
+
+  oneof target {
+    string user_id = 2;
+    string item_id = 3;
+  }
+
+  int32 limit = 4;
+}

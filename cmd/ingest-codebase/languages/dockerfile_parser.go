@@ -100,6 +100,7 @@ var (
 	dockerCmdRegex        = regexp.MustCompile(`(?i)^CMD\s+(.+)`)
 	dockerWorkdirRegex    = regexp.MustCompile(`(?i)^WORKDIR\s+(.+)`)
 	dockerCopyRegex       = regexp.MustCompile(`(?i)^COPY\s+(?:--from=(\S+)\s+)?(.+)`)
+	dockerVolumeRegex     = regexp.MustCompile(`(?i)^VOLUME\s+(.+)`)
 )
 
 func (p *DockerfileParser) extractSymbols(content string) []Symbol {
@@ -156,11 +157,12 @@ func (p *DockerfileParser) extractSymbols(content string) []Symbol {
 			// Add stage as section if named
 			if stageName != "" {
 				symbols = append(symbols, Symbol{
-					Name:     stageName,
-					Type:     "section",
-					Line:     lineNum,
-					Exported: true,
-					Language: "dockerfile",
+					Name:       stageName,
+					Type:       "section",
+					Line:       lineNum,
+					Exported:   true,
+					DocComment: "FROM " + image,
+					Language:   "dockerfile",
 				})
 			}
 			continue
@@ -175,7 +177,7 @@ func (p *DockerfileParser) extractSymbols(content string) []Symbol {
 			}
 
 			symbols = append(symbols, Symbol{
-				Name:     "ARG:" + name,
+				Name:     name,
 				Type:     "constant",
 				Line:     lineNum,
 				Value:    value,
@@ -196,7 +198,7 @@ func (p *DockerfileParser) extractSymbols(content string) []Symbol {
 			}
 
 			symbols = append(symbols, Symbol{
-				Name:     "ENV:" + name,
+				Name:     name,
 				Type:     "constant",
 				Line:     lineNum,
 				Value:    value,
@@ -263,6 +265,44 @@ func (p *DockerfileParser) extractSymbols(content string) []Symbol {
 				Exported: true,
 				Language: "dockerfile",
 			})
+			continue
+		}
+
+		// VOLUME instruction
+		if matches := dockerVolumeRegex.FindStringSubmatch(trimmed); matches != nil {
+			volumeSpec := strings.TrimSpace(matches[1])
+			// Handle JSON array format: ["vol1", "vol2"]
+			if strings.HasPrefix(volumeSpec, "[") {
+				volumeSpec = strings.Trim(volumeSpec, "[]")
+				volumes := strings.Split(volumeSpec, ",")
+				for _, vol := range volumes {
+					vol = strings.TrimSpace(vol)
+					vol = strings.Trim(vol, `"'`)
+					symbols = append(symbols, Symbol{
+						Name:     "VOLUME:" + vol,
+						Type:     "constant",
+						Line:     lineNum,
+						Value:    vol,
+						Parent:   currentStage,
+						Exported: true,
+						Language: "dockerfile",
+					})
+				}
+			} else {
+				// Space-separated format
+				volumes := strings.Fields(volumeSpec)
+				for _, vol := range volumes {
+					symbols = append(symbols, Symbol{
+						Name:     "VOLUME:" + vol,
+						Type:     "constant",
+						Line:     lineNum,
+						Value:    vol,
+						Parent:   currentStage,
+						Exported: true,
+						Language: "dockerfile",
+					})
+				}
+			}
 			continue
 		}
 	}

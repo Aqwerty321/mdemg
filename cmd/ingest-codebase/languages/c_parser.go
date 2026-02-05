@@ -170,52 +170,256 @@ func (p *CParser) extractSymbols(content string) []Symbol {
 	var symbols []Symbol
 	lines := strings.Split(content, "\n")
 
-	// Pattern: #define NAME value
-	definePattern := regexp.MustCompile(`^\s*#define\s+([A-Z][A-Z0-9_]*)\s+(.+)$`)
-	// Pattern: const TYPE NAME = value;
-	constPattern := regexp.MustCompile(`^\s*(?:static\s+)?const\s+[\w*]+\s+([A-Z][A-Z0-9_]*)\s*=\s*(.+?);`)
-	// Pattern: enum { VALUE, ... }
-	enumValuePattern := regexp.MustCompile(`^\s*([A-Z][A-Z0-9_]*)\s*(?:=\s*[^,]+)?\s*[,}]`)
+	// Patterns for C constructs
+	// Simple macro: #define NAME value or #define NAME (no value)
+	defineSimplePattern := regexp.MustCompile(`^\s*#define\s+([A-Z_][A-Z0-9_]*)\s*$`)
+	defineValuePattern := regexp.MustCompile(`^\s*#define\s+([A-Z_][A-Z0-9_]*)\s+([^(].*)$`)
+	// Function-like macro: #define NAME(args) ...
+	defineFuncPattern := regexp.MustCompile(`^\s*#define\s+([A-Z_][A-Z0-9_]*)\s*\(`)
+	// Typedef: typedef TYPE NAME; (captures the last word before semicolon)
+	typedefSimplePattern := regexp.MustCompile(`^\s*typedef\s+[\w\s*]+\s+(\w+)\s*;`)
+	// Typedef struct pointer: typedef struct X* Y; (needs special handling)
+	typedefStructPtrPattern := regexp.MustCompile(`^\s*typedef\s+struct\s+\w+\s*\*\s*(\w+)\s*;`)
+	// Typedef struct alias: typedef struct X X; (needs special handling)
+	typedefStructAliasPattern := regexp.MustCompile(`^\s*typedef\s+struct\s+(\w+)\s+(\w+)\s*;`)
+	// Typedef struct: typedef struct [Name] { ... } Name;
+	typedefStructPattern := regexp.MustCompile(`^\s*typedef\s+struct\s+(\w+)?`)
+	// Typedef enum: typedef enum [Name] { ... } Name;
+	typedefEnumPattern := regexp.MustCompile(`^\s*typedef\s+enum\s*(\w*)`)
+	// Standalone struct: struct Name { or struct Name;
+	structPattern := regexp.MustCompile(`^\s*struct\s+(\w+)\s*[{;]`)
+	// Standalone enum: enum Name {
+	enumPattern := regexp.MustCompile(`^\s*enum\s+(\w+)\s*\{`)
+	// Enum values - more lenient pattern (doesn't require trailing comma/brace)
+	enumValuePattern := regexp.MustCompile(`^\s*([A-Z][A-Z0-9_]*)\s*(?:=\s*[^,}\n]+)?`)
+	// Function declaration/definition
+	funcPattern := regexp.MustCompile(`^\s*(?:static\s+)?(?:inline\s+)?(?:extern\s+)?([\w*\s]+?)\s+\*?(\w+)\s*\(([^)]*)\)\s*[;{]`)
+	// Const variable
+	constPattern := regexp.MustCompile(`^\s*(?:static\s+)?const\s+([\w*]+)\s+([A-Z][A-Z0-9_]*)\s*=\s*(.+?);`)
 
 	inEnum := false
+	inStruct := false
+	currentTypeName := ""
+	braceDepth := 0
 
 	for i, line := range lines {
 		lineNum := i + 1
+		trimmed := strings.TrimSpace(line)
 
-		// Check for enum block
-		if strings.Contains(line, "enum") && strings.Contains(line, "{") {
-			inEnum = true
-			continue
-		}
-		if inEnum && strings.Contains(line, "}") {
-			inEnum = false
+		// Skip empty and comment lines
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
 
-		// Extract enum values
+		// Track brace depth
+		braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
+
+		// Handle being inside an enum
 		if inEnum {
-			if matches := enumValuePattern.FindStringSubmatch(line); matches != nil {
-				symbols = append(symbols, Symbol{
-					Name:       matches[1],
-					Type:       "enum_value",
-					Line: lineNum,
-					Exported:   true,
-					Language:   "c",
-				})
+			if strings.Contains(line, "}") {
+				// First check if this line also has a final enum value before the brace
+				// e.g., "    LAST_VALUE = 3\n}" or "    LAST_VALUE\n}"
+				// We already processed previous lines, but need to check for closing typedef name
+				if matches := regexp.MustCompile(`\}\s*(\w+)\s*;`).FindStringSubmatch(line); matches != nil {
+					if currentTypeName == "" {
+						symbols = append(symbols, Symbol{
+							Name:     matches[1],
+							Type:     "type",
+							Line:     lineNum,
+							Exported: true,
+							Language: "c",
+						})
+					}
+				}
+				inEnum = false
+				currentTypeName = ""
+			} else if matches := enumValuePattern.FindStringSubmatch(trimmed); matches != nil {
+				// Only extract if it looks like an enum value (all caps with underscores)
+				name := matches[1]
+				if len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z' {
+					symbols = append(symbols, Symbol{
+						Name:     name,
+						Type:     "enum_value",
+						Line:     lineNum,
+						Exported: true,
+						Language: "c",
+					})
+				}
 			}
 			continue
 		}
 
-		// Check for #define
-		if matches := definePattern.FindStringSubmatch(line); matches != nil {
+		// Handle being inside a struct
+		if inStruct {
+			if strings.Contains(line, "}") {
+				// Check if typedef name follows: } Name;
+				if matches := regexp.MustCompile(`\}\s*(\w+)\s*;`).FindStringSubmatch(line); matches != nil {
+					symbols = append(symbols, Symbol{
+						Name:     matches[1],
+						Type:     "type",
+						Line:     lineNum,
+						Exported: true,
+						Language: "c",
+					})
+				}
+				inStruct = false
+				currentTypeName = ""
+			}
+			continue
+		}
+
+		// Check for typedef enum
+		if matches := typedefEnumPattern.FindStringSubmatch(line); matches != nil {
+			if matches[1] != "" {
+				symbols = append(symbols, Symbol{
+					Name:     matches[1],
+					Type:     "enum",
+					Line:     lineNum,
+					Exported: true,
+					Language: "c",
+				})
+				currentTypeName = matches[1]
+			}
+			if strings.Contains(line, "{") {
+				inEnum = true
+			}
+			continue
+		}
+
+		// Check for typedef struct pointer alias: typedef struct X* Y;
+		// Must check BEFORE general typedef struct pattern
+		if matches := typedefStructPtrPattern.FindStringSubmatch(line); matches != nil {
 			symbols = append(symbols, Symbol{
-				Name:       matches[1],
-				Type:       "macro",
-				Value:      CleanValue(matches[2]),
-				RawValue:   matches[2],
-				Line: lineNum,
-				Exported:   true,
-				Language:   "c",
+				Name:     matches[1],
+				Type:     "type",
+				Line:     lineNum,
+				Exported: true,
+				Language: "c",
+			})
+			continue
+		}
+
+		// Check for typedef struct alias: typedef struct X Y; (creates alias Y for struct X)
+		// Must check BEFORE general typedef struct pattern
+		if matches := typedefStructAliasPattern.FindStringSubmatch(line); matches != nil {
+			structName := matches[1]
+			aliasName := matches[2]
+			// Emit the struct
+			symbols = append(symbols, Symbol{
+				Name:     structName,
+				Type:     "struct",
+				Line:     lineNum,
+				Exported: true,
+				Language: "c",
+			})
+			// Emit the type alias
+			symbols = append(symbols, Symbol{
+				Name:     aliasName,
+				Type:     "type",
+				Line:     lineNum,
+				Exported: true,
+				Language: "c",
+			})
+			continue
+		}
+
+		// Check for typedef struct with body: typedef struct [Name] { ... } Name;
+		if matches := typedefStructPattern.FindStringSubmatch(line); matches != nil {
+			structName := matches[1]
+			if structName != "" {
+				symbols = append(symbols, Symbol{
+					Name:     structName,
+					Type:     "struct",
+					Line:     lineNum,
+					Exported: true,
+					Language: "c",
+				})
+				currentTypeName = structName
+			}
+			if strings.Contains(line, "{") {
+				inStruct = true
+			}
+			continue
+		}
+
+		// Check for simple typedef (non-struct, non-enum)
+		if !strings.Contains(line, "struct") && !strings.Contains(line, "enum") {
+			if matches := typedefSimplePattern.FindStringSubmatch(line); matches != nil {
+				symbols = append(symbols, Symbol{
+					Name:     matches[1],
+					Type:     "type",
+					Line:     lineNum,
+					Exported: true,
+					Language: "c",
+				})
+				continue
+			}
+		}
+
+		// Check for standalone struct
+		if matches := structPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, Symbol{
+				Name:     matches[1],
+				Type:     "struct",
+				Line:     lineNum,
+				Exported: true,
+				Language: "c",
+			})
+			if strings.Contains(line, "{") && !strings.Contains(line, "}") {
+				inStruct = true
+				currentTypeName = matches[1]
+			}
+			continue
+		}
+
+		// Check for standalone enum
+		if matches := enumPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, Symbol{
+				Name:     matches[1],
+				Type:     "enum",
+				Line:     lineNum,
+				Exported: true,
+				Language: "c",
+			})
+			inEnum = true
+			currentTypeName = matches[1]
+			continue
+		}
+
+		// Check for function-like macro
+		if matches := defineFuncPattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, Symbol{
+				Name:     matches[1],
+				Type:     "macro",
+				Line:     lineNum,
+				Exported: true,
+				Language: "c",
+			})
+			continue
+		}
+
+		// Check for simple #define with value
+		if matches := defineValuePattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, Symbol{
+				Name:     matches[1],
+				Type:     "macro",
+				Value:    CleanValue(matches[2]),
+				RawValue: matches[2],
+				Line:     lineNum,
+				Exported: true,
+				Language: "c",
+			})
+			continue
+		}
+
+		// Check for simple #define without value (header guard)
+		if matches := defineSimplePattern.FindStringSubmatch(line); matches != nil {
+			symbols = append(symbols, Symbol{
+				Name:     matches[1],
+				Type:     "macro",
+				Line:     lineNum,
+				Exported: true,
+				Language: "c",
 			})
 			continue
 		}
@@ -223,13 +427,36 @@ func (p *CParser) extractSymbols(content string) []Symbol {
 		// Check for const
 		if matches := constPattern.FindStringSubmatch(line); matches != nil {
 			symbols = append(symbols, Symbol{
-				Name:       matches[1],
-				Type:       "constant",
-				Value:      CleanValue(matches[2]),
-				RawValue:   matches[2],
-				Line: lineNum,
-				Exported:   !strings.Contains(line, "static"),
-				Language:   "c",
+				Name:     matches[2],
+				Type:     "constant",
+				Value:    CleanValue(matches[3]),
+				RawValue: matches[3],
+				Line:     lineNum,
+				Exported: !strings.Contains(line, "static"),
+				Language: "c",
+			})
+			continue
+		}
+
+		// Check for function declaration/definition
+		if matches := funcPattern.FindStringSubmatch(line); matches != nil {
+			funcName := matches[2]
+			// Skip if function name is a keyword
+			if funcName == "if" || funcName == "for" || funcName == "while" || funcName == "switch" || funcName == "return" {
+				continue
+			}
+			returnType := strings.TrimSpace(matches[1])
+			params := matches[3]
+			signature := fmt.Sprintf("%s %s(%s)", returnType, funcName, params)
+
+			symbols = append(symbols, Symbol{
+				Name:           funcName,
+				Type:           "function",
+				Signature:      signature,
+				TypeAnnotation: returnType,
+				Line:           lineNum,
+				Exported:       !strings.Contains(line, "static"),
+				Language:       "c",
 			})
 		}
 	}

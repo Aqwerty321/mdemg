@@ -108,16 +108,17 @@ func (p *CypherParser) detectFileKind(content string) string {
 
 // Regex patterns for Cypher parsing
 var (
-	// Node labels: (n:Label) or (:Label)
+	// Node labels: (n:Label) or (:Label) - captures only the label after colon
 	labelRegex = regexp.MustCompile(`\([\w]*:([\w]+)`)
-	// Multiple labels: (:Label1:Label2)
-	multiLabelRegex = regexp.MustCompile(`\(:?([\w]+(?::[\w]+)+)\)`)
-	// Relationship types: -[:TYPE]-> or -[r:TYPE]->
-	relTypeRegex = regexp.MustCompile(`-\[[\w]*:([\w]+)\]->?`)
-	// CREATE CONSTRAINT
-	constraintRegex = regexp.MustCompile(`(?i)CREATE\s+CONSTRAINT\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:(\w+)\s+)?(?:ON|FOR)`)
-	// CREATE INDEX
-	indexRegex = regexp.MustCompile(`(?i)CREATE\s+(?:BTREE\s+|FULLTEXT\s+|POINT\s+|RANGE\s+|TEXT\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)?\s+(?:ON|FOR)`)
+	// Multiple labels: (:Label1:Label2) or (n:Label1:Label2) - captures all colons and labels
+	// We'll filter out variable names in code
+	multiLabelRegex = regexp.MustCompile(`\([\w]*:([\w]+(?::[\w]+)+)`)
+	// Relationship types: -[:TYPE]-> or -[r:TYPE]-> or -[:TYPE {...}]-> or -[:TYPE*1..3]->
+	relTypeRegex = regexp.MustCompile(`-\[[\w]*:([\w]+)[^\]]*\]->?`)
+	// CREATE CONSTRAINT - Neo4j syntax: CREATE CONSTRAINT name [IF NOT EXISTS] FOR/ON
+	constraintRegex = regexp.MustCompile(`(?i)CREATE\s+CONSTRAINT\s+(\w+)\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:ON|FOR)`)
+	// CREATE INDEX - Neo4j syntax: CREATE [type] INDEX name [IF NOT EXISTS] FOR/ON
+	indexRegex = regexp.MustCompile(`(?i)CREATE\s+(?:BTREE\s+|FULLTEXT\s+|POINT\s+|RANGE\s+|TEXT\s+)?INDEX\s+(\w+)\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:ON|FOR)`)
 	// Property keys in {key: value}
 	propertyRegex = regexp.MustCompile(`\{([^}]+)\}`)
 	// CALL procedure
@@ -151,7 +152,7 @@ func (p *CypherParser) extractSymbols(content string) []Symbol {
 				seenLabels[label] = true
 				symbols = append(symbols, Symbol{
 					Name:     label,
-					Type:     "class", // Labels are like classes in graph model
+					Type:     "label", // Cypher node labels
 					Line:     lineNum,
 					Exported: true,
 					Language: "cypher",
@@ -167,7 +168,7 @@ func (p *CypherParser) extractSymbols(content string) []Symbol {
 					seenLabels[label] = true
 					symbols = append(symbols, Symbol{
 						Name:     label,
-						Type:     "class",
+						Type:     "label",
 						Line:     lineNum,
 						Exported: true,
 						Language: "cypher",
@@ -183,7 +184,7 @@ func (p *CypherParser) extractSymbols(content string) []Symbol {
 				seenRels[relType] = true
 				symbols = append(symbols, Symbol{
 					Name:     relType,
-					Type:     "constant", // Relationship types are like constants
+					Type:     "relationship_type",
 					Line:     lineNum,
 					Exported: true,
 					Language: "cypher",
@@ -200,12 +201,11 @@ func (p *CypherParser) extractSymbols(content string) []Symbol {
 			if !seenConstraints[name] {
 				seenConstraints[name] = true
 				symbols = append(symbols, Symbol{
-					Name:       name,
-					Type:       "constant",
-					Line:       lineNum,
-					Exported:   true,
-					DocComment: "constraint",
-					Language:   "cypher",
+					Name:     name,
+					Type:     "constraint",
+					Line:     lineNum,
+					Exported: true,
+					Language: "cypher",
 				})
 			}
 		}
@@ -219,12 +219,11 @@ func (p *CypherParser) extractSymbols(content string) []Symbol {
 			if !seenIndexes[name] {
 				seenIndexes[name] = true
 				symbols = append(symbols, Symbol{
-					Name:       name,
-					Type:       "constant",
-					Line:       lineNum,
-					Exported:   true,
-					DocComment: "index",
-					Language:   "cypher",
+					Name:     name,
+					Type:     "index",
+					Line:     lineNum,
+					Exported: true,
+					Language: "cypher",
 				})
 			}
 		}

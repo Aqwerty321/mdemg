@@ -297,38 +297,184 @@ func (p *SQLParser) detectFileType(fileName string, content string) string {
 
 func (p *SQLParser) extractSymbols(content string) []Symbol {
 	var symbols []Symbol
+	lines := strings.Split(content, "\n")
 
-	// Extract table columns from CREATE TABLE statements
-	tablePattern := regexp.MustCompile(`(?is)CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[\w.]+\.)?(\w+)\s*\((.*?)\)`)
-	columnPattern := regexp.MustCompile(`(?i)^\s*(\w+)\s+([\w()]+)`)
+	// Regex patterns for SQL constructs
+	tablePattern := regexp.MustCompile(`(?i)^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[\w.]+\.)?(\w+)\s*\(`)
+	columnPattern := regexp.MustCompile(`(?i)^\s*(\w+)\s+([\w()]+(?:\s*\([^)]*\))?)`)
+	defaultPattern := regexp.MustCompile(`(?i)DEFAULT\s+('[^']*'|[\w()]+)`)
+	indexPattern := regexp.MustCompile(`(?i)^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:CONCURRENTLY\s+)?(\w+)\s+ON\s+(\w+)`)
+	viewPattern := regexp.MustCompile(`(?i)^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:TEMP(?:ORARY)?\s+)?(?:MATERIALIZED\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[\w.]+\.)?(\w+)`)
+	functionPattern := regexp.MustCompile(`(?i)^\s*CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:[\w.]+\.)?(\w+)`)
+	triggerPattern := regexp.MustCompile(`(?i)^\s*CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER\s+(?:[\w.]+\.)?(\w+)`)
+	enumPattern := regexp.MustCompile(`(?i)^\s*CREATE\s+TYPE\s+(\w+)\s+AS\s+ENUM`)
+	sequencePattern := regexp.MustCompile(`(?i)^\s*CREATE\s+SEQUENCE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)`)
 
-	tableMatches := tablePattern.FindAllStringSubmatch(content, -1)
-	for _, match := range tableMatches {
-		if len(match) >= 3 {
-			tableName := match[1]
-			columnsStr := match[2]
+	var currentTable string
+	inTableDef := false
+	parenDepth := 0
 
-			// Parse columns
-			lines := strings.Split(columnsStr, ",")
-			for _, line := range lines {
-				if colMatch := columnPattern.FindStringSubmatch(line); colMatch != nil {
-					colName := colMatch[1]
-					colType := colMatch[2]
+	for lineNum, line := range lines {
+		lineNo := lineNum + 1
+		trimmed := strings.TrimSpace(line)
 
-					// Skip keywords
-					if isKeyword(colName) {
-						continue
+		// Skip empty lines and comments
+		if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+			continue
+		}
+
+		// Check for table start
+		if matches := tablePattern.FindStringSubmatch(line); matches != nil {
+			tableName := matches[1]
+			currentTable = tableName
+			inTableDef = true
+			parenDepth = strings.Count(line, "(") - strings.Count(line, ")")
+
+			symbols = append(symbols, Symbol{
+				Name:     tableName,
+				Type:     "table",
+				Line:     lineNo,
+				Exported: true,
+				Language: "sql",
+			})
+			continue
+		}
+
+		// Process table columns
+		if inTableDef && currentTable != "" {
+			parenDepth += strings.Count(line, "(") - strings.Count(line, ")")
+
+			// Check for column definition
+			if matches := columnPattern.FindStringSubmatch(trimmed); matches != nil {
+				colName := matches[1]
+				colType := matches[2]
+
+				// Skip keywords
+				if !isKeyword(colName) {
+					// Check for DEFAULT value and PRIMARY KEY
+					var defaultVal string
+					var docComment string
+					upperTrimmed := strings.ToUpper(trimmed)
+					if strings.Contains(upperTrimmed, "PRIMARY KEY") {
+						docComment = "PRIMARY KEY"
+					}
+					if defMatch := defaultPattern.FindStringSubmatch(trimmed); defMatch != nil {
+						defaultVal = strings.Trim(defMatch[1], "'")
+						if docComment != "" {
+							docComment += " DEFAULT " + defMatch[1]
+						} else {
+							docComment = "DEFAULT " + defMatch[1]
+						}
 					}
 
 					symbols = append(symbols, Symbol{
-						Name:           fmt.Sprintf("%s.%s", tableName, colName),
+						Name:           fmt.Sprintf("%s.%s", currentTable, colName),
 						Type:           "column",
 						TypeAnnotation: colType,
+						Line:           lineNo,
+						Parent:         currentTable,
+						Value:          defaultVal,
+						DocComment:     docComment,
 						Exported:       true,
 						Language:       "sql",
 					})
 				}
 			}
+
+			// End of table definition
+			if parenDepth <= 0 || strings.HasSuffix(trimmed, ";") {
+				inTableDef = false
+				currentTable = ""
+			}
+			continue
+		}
+
+		// Check for index
+		if matches := indexPattern.FindStringSubmatch(line); matches != nil {
+			indexName := matches[1]
+			tableName := matches[2]
+			symbols = append(symbols, Symbol{
+				Name:     indexName,
+				Type:     "index",
+				Line:     lineNo,
+				Parent:   tableName,
+				Exported: true,
+				Language: "sql",
+			})
+			continue
+		}
+
+		// Check for view
+		if matches := viewPattern.FindStringSubmatch(line); matches != nil {
+			viewName := matches[1]
+			symbols = append(symbols, Symbol{
+				Name:     viewName,
+				Type:     "view",
+				Line:     lineNo,
+				Exported: true,
+				Language: "sql",
+			})
+			continue
+		}
+
+		// Check for function
+		if matches := functionPattern.FindStringSubmatch(line); matches != nil {
+			funcName := matches[1]
+			// Try to detect return type
+			var signature string
+			if strings.Contains(strings.ToUpper(line), "RETURNS TRIGGER") {
+				signature = "RETURNS TRIGGER"
+			} else if strings.Contains(strings.ToUpper(line), "RETURNS TABLE") {
+				signature = "RETURNS TABLE"
+			}
+			symbols = append(symbols, Symbol{
+				Name:      funcName,
+				Type:      "function",
+				Signature: signature,
+				Line:      lineNo,
+				Exported:  true,
+				Language:  "sql",
+			})
+			continue
+		}
+
+		// Check for trigger
+		if matches := triggerPattern.FindStringSubmatch(line); matches != nil {
+			triggerName := matches[1]
+			symbols = append(symbols, Symbol{
+				Name:     triggerName,
+				Type:     "trigger",
+				Line:     lineNo,
+				Exported: true,
+				Language: "sql",
+			})
+			continue
+		}
+
+		// Check for enum
+		if matches := enumPattern.FindStringSubmatch(line); matches != nil {
+			enumName := matches[1]
+			symbols = append(symbols, Symbol{
+				Name:     enumName,
+				Type:     "enum",
+				Line:     lineNo,
+				Exported: true,
+				Language: "sql",
+			})
+			continue
+		}
+
+		// Check for sequence
+		if matches := sequencePattern.FindStringSubmatch(line); matches != nil {
+			seqName := matches[1]
+			symbols = append(symbols, Symbol{
+				Name:     seqName,
+				Type:     "constant",
+				Line:     lineNo,
+				Exported: true,
+				Language: "sql",
+			})
+			continue
 		}
 	}
 

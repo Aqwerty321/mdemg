@@ -144,6 +144,8 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Scheduled sync**: Periodic background sync to keep memory graphs up-to-date
 - **Webhook integration**: Linear webhook endpoint with HMAC signature verification and debouncing
 - **File watcher**: Standalone `mdemg-watch` binary for automatic re-ingestion on file changes
+- **Orphan detection**: Timestamp-based detection of nodes missing from re-ingestion with archive/delete/list actions
+- **Edge consistency**: Automatic staleness tracking and edge weight refresh during consolidation
 
 ## Architecture
 

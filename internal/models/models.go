@@ -484,6 +484,7 @@ type ConsolidateResponse struct {
 	UINodesCreated          int     `json:"ui_nodes_created"`           // Number of UI pattern nodes created (P4 Track 6)
 	UIEdgesCreated          int     `json:"ui_edges_created"`           // Number of SHARES_UI_PATTERN edges created
 	SummariesGenerated      int     `json:"summaries_generated"`        // Number of summaries generated
+	EdgesRefreshed          int     `json:"edges_refreshed"`            // Number of stale edges refreshed (Phase 9.5.3)
 	EdgesStrengthened   int     `json:"edges_strengthened"`
 	DurationMs          float64 `json:"duration_ms"`
 	Enabled             bool    `json:"enabled"` // Whether hidden layer is enabled
@@ -757,4 +758,37 @@ type ContextRetrieveRequest struct {
 	RetrieveRequest                       // Embedded base request
 	BlendConversationContext bool         `json:"blend_conversation_context,omitempty"` // Enable conversation blending
 	ConversationBoostFactor  float64      `json:"conversation_boost_factor,omitempty"`  // Boost factor for conversation-supported results (default: 1.2)
+}
+
+// =============================================================================
+// PHASE 9.5: ORPHAN CLEANUP
+// =============================================================================
+
+// OrphanCleanupRequest - request for POST /v1/memory/cleanup/orphans
+// Detects and optionally acts on orphaned L0 nodes that were not included
+// in the most recent re-ingestion (last_ingested_at < TapRoot.last_ingest_at).
+type OrphanCleanupRequest struct {
+	SpaceID string `json:"space_id" validate:"required,min=1,max=256"`
+	Action  string `json:"action" validate:"required,oneof=archive delete list"`
+	Limit   int    `json:"limit,omitempty"`   // default: 100, max: 1000
+	DryRun  bool   `json:"dry_run,omitempty"` // preview without acting
+}
+
+// OrphanCleanupResponse - response from POST /v1/memory/cleanup/orphans
+type OrphanCleanupResponse struct {
+	SpaceID      string       `json:"space_id"`
+	OrphansFound int          `json:"orphans_found"`
+	OrphansActed int          `json:"orphans_acted"`
+	Action       string       `json:"action"`
+	DryRun       bool         `json:"dry_run"`
+	Orphans      []OrphanNode `json:"orphans"`
+}
+
+// OrphanNode represents a single orphan candidate detected during cleanup.
+type OrphanNode struct {
+	NodeID         string `json:"node_id"`
+	Path           string `json:"path"`
+	Name           string `json:"name"`
+	LastIngestedAt string `json:"last_ingested_at"`
+	Status         string `json:"status"` // "archived", "deleted", "listed"
 }

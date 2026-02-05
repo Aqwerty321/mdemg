@@ -2065,72 +2065,122 @@ func parseOpenAPI(filePath string, content string) ([]FallbackSymbol, bool, erro
 	var symbols []FallbackSymbol
 	lines := strings.Split(content, "\n")
 
-	// Patterns for OpenAPI
-	pathPattern := regexp.MustCompile(`^  /[^:]+:`)
-	methodPattern := regexp.MustCompile(`^\s{4}(get|post|put|patch|delete|head|options):`)
+	// Patterns for OpenAPI - match UPTS spec expectations
+	pathPattern := regexp.MustCompile(`^  (/[^:]*):`)                            // Paths start with 2 spaces
+	methodPattern := regexp.MustCompile(`^\s{4}(get|post|put|patch|delete|head|options):`) // Methods at 4 spaces
 	operationIdPattern := regexp.MustCompile(`^\s+operationId:\s*(\S+)`)
-	schemaPattern := regexp.MustCompile(`^\s{4}(\w+):$`)
-	parameterPattern := regexp.MustCompile(`^\s+-\s+name:\s*(\S+)`)
-	securitySchemePattern := regexp.MustCompile(`^\s{4}(\w+):$`)
-	serverPattern := regexp.MustCompile(`^\s+-\s+url:\s*(\S+)`)
+	schemaPattern := regexp.MustCompile(`^\s{4}(\w+):\s*$`)                      // Schema names at 4 spaces under schemas:
+	parameterNamePattern := regexp.MustCompile(`^\s+-\s*name:\s*(\S+)`)          // Parameter names in arrays
+	securitySchemePattern := regexp.MustCompile(`^\s{4}(\w+):\s*$`)              // Security scheme names
+	serverUrlPattern := regexp.MustCompile(`^\s+-\s*url:\s*(\S+)`)               // Server URLs
 
 	var inPaths bool
 	var inSchemas bool
 	var inSecuritySchemes bool
 	var inServers bool
+	var inParameters bool
 	var currentPath string
 	var currentMethod string
 
 	for i, line := range lines {
 		lineNum := i + 1
+		trimmedLine := strings.TrimRight(line, " \t\r")
 
-		// Section detection
-		if strings.HasPrefix(line, "paths:") {
+		// Top-level section detection
+		if strings.HasPrefix(trimmedLine, "info:") && !strings.HasPrefix(trimmedLine, " ") {
+			symbols = append(symbols, FallbackSymbol{
+				Name:     "info",
+				Type:     "section",
+				Line:     lineNum,
+				Exported: true,
+			})
+			inPaths = false
+			inSchemas = false
+			inSecuritySchemes = false
+			inServers = false
+			continue
+		}
+
+		if strings.HasPrefix(trimmedLine, "servers:") && !strings.HasPrefix(trimmedLine, " ") {
+			symbols = append(symbols, FallbackSymbol{
+				Name:     "servers",
+				Type:     "section",
+				Line:     lineNum,
+				Exported: true,
+			})
+			inServers = true
+			inPaths = false
+			inSchemas = false
+			inSecuritySchemes = false
+			continue
+		}
+
+		if strings.HasPrefix(trimmedLine, "paths:") && !strings.HasPrefix(trimmedLine, " ") {
 			inPaths = true
 			inSchemas = false
 			inSecuritySchemes = false
 			inServers = false
 			continue
 		}
-		if strings.HasPrefix(line, "components:") {
+
+		if strings.HasPrefix(trimmedLine, "components:") && !strings.HasPrefix(trimmedLine, " ") {
 			inPaths = false
+			inServers = false
 			continue
 		}
-		if strings.HasPrefix(line, "  schemas:") {
+
+		if strings.HasPrefix(trimmedLine, "  schemas:") {
 			inSchemas = true
 			inSecuritySchemes = false
 			continue
 		}
-		if strings.HasPrefix(line, "  securitySchemes:") {
+
+		if strings.HasPrefix(trimmedLine, "  securitySchemes:") {
 			inSecuritySchemes = true
 			inSchemas = false
 			continue
 		}
-		if strings.HasPrefix(line, "servers:") {
-			inServers = true
-			inPaths = false
-			continue
+
+		// Servers section - extract URLs with parent "servers"
+		if inServers {
+			if match := serverUrlPattern.FindStringSubmatch(line); match != nil {
+				symbols = append(symbols, FallbackSymbol{
+					Name:     match[1],
+					Type:     "constant",
+					Line:     lineNum,
+					Parent:   "servers",
+					Exported: true,
+				})
+				continue
+			}
+			// Exit servers section when we hit another top-level section
+			if len(line) > 0 && line[0] != ' ' && line[0] != '#' {
+				inServers = false
+			}
 		}
 
 		// Paths section
 		if inPaths {
-			// New path
-			if pathPattern.MatchString(line) {
-				currentPath = strings.TrimSuffix(strings.TrimSpace(line), ":")
+			// New path - type "endpoint"
+			if match := pathPattern.FindStringSubmatch(line); match != nil {
+				currentPath = match[1]
+				currentMethod = ""
+				inParameters = false
 				symbols = append(symbols, FallbackSymbol{
 					Name:     currentPath,
-					Type:     "section",
+					Type:     "endpoint",
 					Line:     lineNum,
 					Exported: true,
 				})
 				continue
 			}
 
-			// Method under path
+			// HTTP Method under path - just the method name, parent is the path
 			if match := methodPattern.FindStringSubmatch(line); match != nil {
 				currentMethod = strings.ToUpper(match[1])
+				inParameters = false
 				symbols = append(symbols, FallbackSymbol{
-					Name:     currentMethod + " " + currentPath,
+					Name:     currentMethod,
 					Type:     "method",
 					Line:     lineNum,
 					Parent:   currentPath,
@@ -2139,66 +2189,77 @@ func parseOpenAPI(filePath string, content string) ([]FallbackSymbol, bool, erro
 				continue
 			}
 
-			// Operation ID
-			if match := operationIdPattern.FindStringSubmatch(line); match != nil {
+			// Operation ID - parent is "path.METHOD"
+			if match := operationIdPattern.FindStringSubmatch(line); match != nil && currentPath != "" && currentMethod != "" {
 				symbols = append(symbols, FallbackSymbol{
-					Name:     match[1],
-					Type:     "function",
-					Line:     lineNum,
-					Parent:   currentPath,
-					Exported: true,
+					Name:       match[1],
+					Type:       "function",
+					Line:       lineNum,
+					Parent:     currentPath + "." + currentMethod,
+					DocComment: "operationId",
+					Exported:   true,
 				})
 				continue
 			}
 
-			// Parameters
-			if match := parameterPattern.FindStringSubmatch(line); match != nil {
-				symbols = append(symbols, FallbackSymbol{
-					Name:     match[1],
-					Type:     "constant",
-					Line:     lineNum,
-					Parent:   currentPath,
-					Exported: true,
-				})
+			// Parameters section marker
+			if strings.Contains(line, "parameters:") {
+				inParameters = true
 				continue
+			}
+
+			// Parameter names - type "parameter", parent is "path.METHOD"
+			if inParameters {
+				if match := parameterNamePattern.FindStringSubmatch(line); match != nil && currentPath != "" && currentMethod != "" {
+					symbols = append(symbols, FallbackSymbol{
+						Name:     match[1],
+						Type:     "parameter",
+						Line:     lineNum,
+						Parent:   currentPath + "." + currentMethod,
+						Exported: true,
+					})
+					continue
+				}
+			}
+
+			// Exit parameters when we see responses, requestBody, or another method
+			if strings.Contains(line, "responses:") || strings.Contains(line, "requestBody:") {
+				inParameters = false
 			}
 		}
 
-		// Schemas section
+		// Schemas section - type "class" with parent "components.schemas"
 		if inSchemas {
 			if match := schemaPattern.FindStringSubmatch(line); match != nil {
-				symbols = append(symbols, FallbackSymbol{
-					Name:     match[1],
-					Type:     "struct",
-					Line:     lineNum,
-					Exported: true,
-				})
+				// Skip sub-properties like "type:", "properties:", etc.
+				name := match[1]
+				if name != "type" && name != "properties" && name != "required" && name != "items" && name != "format" && name != "description" {
+					symbols = append(symbols, FallbackSymbol{
+						Name:     name,
+						Type:     "class",
+						Line:     lineNum,
+						Parent:   "components.schemas",
+						Exported: true,
+					})
+				}
 				continue
 			}
 		}
 
-		// Security schemes section
+		// Security schemes section - parent "components.securitySchemes"
 		if inSecuritySchemes {
 			if match := securitySchemePattern.FindStringSubmatch(line); match != nil {
-				symbols = append(symbols, FallbackSymbol{
-					Name:     match[1],
-					Type:     "constant",
-					Line:     lineNum,
-					Exported: true,
-				})
-				continue
-			}
-		}
-
-		// Servers section
-		if inServers {
-			if match := serverPattern.FindStringSubmatch(line); match != nil {
-				symbols = append(symbols, FallbackSymbol{
-					Name:     match[1],
-					Type:     "constant",
-					Line:     lineNum,
-					Exported: true,
-				})
+				name := match[1]
+				// Skip sub-properties
+				if name != "type" && name != "scheme" && name != "in" && name != "name" && name != "bearerFormat" {
+					symbols = append(symbols, FallbackSymbol{
+						Name:     name,
+						Type:     "constant",
+						Line:     lineNum,
+						Parent:   "components.securitySchemes",
+						Exported: true,
+					})
+				}
 				continue
 			}
 		}

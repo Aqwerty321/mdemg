@@ -91,10 +91,37 @@ func ReadFileContent(path string) (string, error) {
 
 // TruncateContent truncates content to maxLen, adding a truncation marker
 func TruncateContent(content string, maxLen int) string {
+	truncated, _ := TruncateContentWithInfo(content, maxLen)
+	return truncated
+}
+
+// TruncateContentWithInfo truncates content to maxLen and reports whether truncation occurred.
+func TruncateContentWithInfo(content string, maxLen int) (string, bool) {
 	if len(content) > maxLen {
-		return content[:maxLen] + "\n... [truncated]"
+		return content[:maxLen] + "\n... [truncated]", true
 	}
-	return content
+	return content, false
+}
+
+// NewDiagnostic creates a new Diagnostic with the given fields.
+func NewDiagnostic(severity, code, message, parser string) Diagnostic {
+	return Diagnostic{
+		Severity: severity,
+		Code:     code,
+		Message:  message,
+		Parser:   parser,
+	}
+}
+
+// NewDiagnosticWithContext creates a Diagnostic with additional key-value context.
+func NewDiagnosticWithContext(severity, code, message, parser string, ctx map[string]string) Diagnostic {
+	return Diagnostic{
+		Severity: severity,
+		Code:     code,
+		Message:  message,
+		Parser:   parser,
+		Context:  ctx,
+	}
 }
 
 // CleanValue cleans up a value string (removes quotes, trims whitespace)

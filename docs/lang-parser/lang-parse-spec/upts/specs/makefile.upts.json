@@ -1,0 +1,238 @@
+{
+  "upts_version": "1.0.0",
+  "language": "makefile",
+  "variants": [".mk"],
+  "metadata": {
+    "author": "auto-generated",
+    "created": "2026-02-05",
+    "description": "Makefile parser spec",
+    "parser_status": "planned",
+    "tags": [
+      "build",
+      "phase1",
+      "automation"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_parent": false,
+    "validate_value": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/makefile_test_fixture.mk",
+    "sha256": ""
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 18,
+      "max": 25
+    },
+    "symbols": [
+      {
+        "name": "CC",
+        "type": "constant",
+        "line": 7,
+        "exported": false,
+        "value": "gcc",
+        "pattern": "P1_CONSTANT",
+        "tags": ["variable", "simple-assign"]
+      },
+      {
+        "name": "CFLAGS",
+        "type": "constant",
+        "line": 8,
+        "exported": false,
+        "value": "-Wall -Wextra -O2",
+        "pattern": "P1_CONSTANT",
+        "tags": ["variable", "immediate-assign"]
+      },
+      {
+        "name": "PREFIX",
+        "type": "constant",
+        "line": 9,
+        "exported": false,
+        "value": "/usr/local",
+        "pattern": "P1_CONSTANT",
+        "tags": ["variable", "conditional-assign"]
+      },
+      {
+        "name": "LDFLAGS",
+        "type": "constant",
+        "line": 10,
+        "exported": false,
+        "value": "-lpthread",
+        "pattern": "P1_CONSTANT",
+        "tags": ["variable", "append-assign"]
+      },
+      {
+        "name": "SOURCES",
+        "type": "constant",
+        "line": 13,
+        "exported": false,
+        "value": "main.c",
+        "pattern": "P1_CONSTANT",
+        "tags": ["variable", "multi-line"]
+      },
+      {
+        "name": "VERSION",
+        "type": "constant",
+        "line": 18,
+        "exported": false,
+        "value": "1.2.3",
+        "pattern": "P1_CONSTANT",
+        "tags": ["variable", "immediate-assign"]
+      },
+      {
+        "name": "BUILD_DIR",
+        "type": "constant",
+        "line": 19,
+        "exported": false,
+        "value": "build",
+        "pattern": "P1_CONSTANT",
+        "tags": ["variable", "immediate-assign"]
+      },
+      {
+        "name": "PATH",
+        "type": "constant",
+        "line": 23,
+        "exported": true,
+        "value": "",
+        "pattern": "P1_CONSTANT",
+        "tags": ["export"]
+      },
+      {
+        "name": "all",
+        "type": "function",
+        "line": 31,
+        "exported": true,
+        "pattern": "P2_FUNCTION",
+        "tags": ["target", "phony"]
+      },
+      {
+        "name": "$(BUILD_DIR)/app",
+        "type": "function",
+        "line": 35,
+        "exported": false,
+        "pattern": "P2_FUNCTION",
+        "tags": ["target", "build"]
+      },
+      {
+        "name": "clean",
+        "type": "function",
+        "line": 40,
+        "exported": true,
+        "pattern": "P2_FUNCTION",
+        "tags": ["target", "phony"]
+      },
+      {
+        "name": "install",
+        "type": "function",
+        "line": 45,
+        "exported": true,
+        "pattern": "P2_FUNCTION",
+        "tags": ["target", "phony"]
+      },
+      {
+        "name": "test",
+        "type": "function",
+        "line": 50,
+        "exported": true,
+        "pattern": "P2_FUNCTION",
+        "tags": ["target", "phony"]
+      },
+      {
+        "name": "lint",
+        "type": "function",
+        "line": 54,
+        "exported": true,
+        "pattern": "P2_FUNCTION",
+        "tags": ["target", "phony"]
+      },
+      {
+        "name": "%.o",
+        "type": "function",
+        "line": 59,
+        "exported": false,
+        "pattern": "P2_FUNCTION",
+        "tags": ["target", "pattern-rule"]
+      },
+      {
+        "name": "run_checks",
+        "type": "function",
+        "line": 64,
+        "line_end": 68,
+        "exported": false,
+        "doc_comment": "macro",
+        "pattern": "P2_FUNCTION",
+        "tags": ["macro", "define"]
+      },
+      {
+        "name": "help",
+        "type": "function",
+        "line": 76,
+        "exported": true,
+        "pattern": "P2_FUNCTION",
+        "tags": ["target", "phony", "semicolon-recipe"]
+      },
+      {
+        "name": "DEBUG_FLAGS",
+        "type": "constant",
+        "line": 80,
+        "exported": false,
+        "value": "-g -DDEBUG",
+        "pattern": "P1_CONSTANT",
+        "tags": ["variable", "conditional-assign"]
+      },
+      {
+        "name": "GOPATH",
+        "type": "constant",
+        "line": 84,
+        "exported": true,
+        "value": "$(HOME)/go",
+        "pattern": "P1_CONSTANT",
+        "tags": ["export", "variable"]
+      },
+      {
+        "name": "release",
+        "type": "function",
+        "line": 88,
+        "exported": false,
+        "pattern": "P2_FUNCTION",
+        "tags": ["target"]
+      },
+      {
+        "name": "docker",
+        "type": "function",
+        "line": 94,
+        "exported": false,
+        "pattern": "P2_FUNCTION",
+        "tags": ["target"]
+      },
+      {
+        "name": "deploy",
+        "type": "function",
+        "line": 99,
+        "exported": false,
+        "pattern": "P2_FUNCTION",
+        "tags": ["target"]
+      }
+    ],
+    "excluded": [
+      {
+        "name": "include config.mk",
+        "reason": "include statements are metadata, not symbols"
+      },
+      {
+        "name": ".PHONY",
+        "reason": ".PHONY is a directive, not a target symbol"
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P2_FUNCTION"
+  ]
+}

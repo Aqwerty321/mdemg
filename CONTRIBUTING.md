@@ -63,13 +63,19 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
   # Integration tests (requires running Neo4j + MDEMG server)
   go test -tags=integration ./tests/integration/...
 
-  # Parser validation (UPTS - Universal Parser Test Specification)
+  # Parser validation — Go-native UPTS harness (no external deps)
+  go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
+
+  # Parser validation — Python UPTS runner (requires bin/extract-symbols)
   make test-parsers
 
   # Validate a single language parser
   make test-parser-go
   make test-parser-python
   make test-parser-typescript
+
+  # Go-native UPTS for a single language
+  go test ./cmd/ingest-codebase/languages/ -run TestUPTS/rust -v
 
   # API validation (UATS - requires running server)
   make test-api
@@ -84,10 +90,34 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 
 ### Test Frameworks
 
-**UPTS (Universal Parser Test Specification)** validates language parsers against JSON spec files. Specs live in `docs/lang-parser/lang-parse-spec/upts/specs/`. To add or update a parser test:
+**UPTS (Universal Parser Test Specification)** validates 20 language parsers against JSON spec files. There are two runners:
+
+1. **Go-native test harness** (`cmd/ingest-codebase/languages/upts_test.go`): Loads UPTS specs, parses fixtures through the actual Go parser, and validates output against expected symbols. No external dependencies — runs via standard `go test`. This is the primary validation method.
+
+2. **Python runner** (`docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py`): Validates via the `bin/extract-symbols` CLI binary. Useful for cross-validation and CI.
+
+Specs live in `docs/lang-parser/lang-parse-spec/upts/specs/`. Fixtures live in `docs/lang-parser/lang-parse-spec/upts/fixtures/`.
+
+### Adding or Updating a Parser Test
+
 1. Create or edit `docs/lang-parser/lang-parse-spec/upts/specs/<language>.upts.json`
-2. Add fixture files in `docs/lang-parser/lang-parse-spec/upts/fixtures/`
-3. Run `make test-parser-<language>` to validate
+2. Create or edit the fixture file in `docs/lang-parser/lang-parse-spec/upts/fixtures/`
+3. Run the Go-native harness: `go test ./cmd/ingest-codebase/languages/ -run TestUPTS/<language> -v`
+4. Optionally cross-validate with the Python runner: `make test-parser-<language>`
+
+### Parser Development Workflow
+
+When adding a new language parser or modifying an existing one:
+
+1. **Create the parser** in `cmd/ingest-codebase/languages/<language>_parser.go` (see that directory's README for the interface)
+2. **Create a fixture** — a representative source file covering all symbol types the parser should extract
+3. **Create a UPTS spec** — JSON file declaring expected symbols with name, type, line number, and export status
+4. **Validate** — run `go test ./cmd/ingest-codebase/languages/ -run TestUPTS/<language> -v` until all assertions pass
+5. **Key spec fields:**
+   - `line_tolerance`: how far actual line can be from expected (default ±2)
+   - `optional`: set `true` on symbols that may or may not be emitted (e.g., duplicate declarations)
+   - `pattern`: document which extraction pattern this symbol tests (e.g., `P2_FUNCTION`)
+   - See existing specs for examples of the full schema
 
 **UATS (Universal API Test Specification)** validates API endpoints against JSON spec files. Specs live in `docs/api/api-spec/uats/specs/`. The `--base-url` flag in the Makefile dynamically reads the server's port from `.mdemg.port` (see Dynamic Port Allocation below). To add or update an API test:
 1. Create or edit `docs/api/api-spec/uats/specs/<endpoint>.uats.json`

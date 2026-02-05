@@ -13,7 +13,8 @@
     "line_tolerance": 2,
     "require_all_symbols": true,
     "allow_extra_symbols": true,
-    "validate_parent": true
+    "validate_parent": true,
+    "validate_evidence": true
   },
   "fixture": {
     "type": "file",

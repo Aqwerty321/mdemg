@@ -1,9 +1,9 @@
 # Parser Implementation Status
 
-**Generated:** 2026-01-29  
-**Last Updated:** 2026-01-29  
-**Schema Version:** 1.1 (fixture path fix)  
-**Status:** 11/16 languages passing (69%)
+**Generated:** 2026-01-29
+**Last Updated:** 2026-02-05
+**Schema Version:** 1.2 (evidence validation, 4 new parsers)
+**Status:** 20/20 UPTS-validated languages passing (100%)
 
 ---
 
@@ -59,79 +59,73 @@ if validate_parent and exp_parent and actual_parent != exp_parent:
 
 ## Current Status
 
+All 20 UPTS-validated parsers pass via `go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v`:
+
 | Language | Parser Type | Status | Notes |
 |----------|-------------|--------|-------|
-| Go | Tree-sitter | ✅ PASS | 100% |
-| Python | Tree-sitter | ✅ PASS | 100% |
-| TypeScript | Tree-sitter | ✅ PASS | 100% |
-| Rust | Tree-sitter | ✅ PASS | 100% |
-| C | Tree-sitter | ✅ PASS | 100% |
-| C++ | Tree-sitter | ✅ PASS | 100% |
-| Java | Tree-sitter | ✅ PASS | 100% |
-| YAML | Config | ✅ PASS | 100% |
-| TOML | Config | ✅ PASS | 100% |
-| JSON | Config | ✅ PASS | 100% |
-| INI/dotenv | Config | ✅ PASS | 100% |
-| CUDA | Tree-sitter | ⚙️ BUILD | Needs config change |
-| Shell | Config | ⚙️ BUILD | Needs config change |
-| Dockerfile | Config | ⚙️ BUILD | Needs config change |
-| SQL | Config | ⚙️ BUILD | Needs config change |
-| Cypher | Config | ⚙️ BUILD | Needs config change |
+| Go | AST-based | ✅ PASS | Evidence validation enabled |
+| Rust | Regex | ✅ PASS | Evidence validation enabled |
+| Python | Regex | ✅ PASS | |
+| TypeScript | Regex | ✅ PASS | Includes JS/JSX/TSX |
+| Java | Regex | ✅ PASS | Brace-depth scope tracking |
+| C# | Regex | ✅ PASS | **NEW** - Brace-depth scope tracking |
+| Kotlin | Regex | ✅ PASS | **NEW** - Handles data/sealed/object |
+| C++ | Regex | ✅ PASS | |
+| C | Regex | ✅ PASS | |
+| CUDA | Regex | ✅ PASS | Kernel, device, shared memory |
+| SQL | Regex | ✅ PASS | |
+| Cypher | Regex | ✅ PASS | Neo4j labels, constraints, indexes |
+| Terraform | Regex | ✅ PASS | **NEW** - HCL resource/variable/output |
+| YAML | Regex | ✅ PASS | Hierarchical key paths |
+| TOML | Regex | ✅ PASS | Section and key extraction |
+| JSON | Regex | ✅ PASS | |
+| INI | Regex | ✅ PASS | Section and key extraction |
+| Makefile | Regex | ✅ PASS | **NEW** - Targets, variables, .PHONY |
+| Dockerfile | Regex | ✅ PASS | |
+| Shell | Regex | ✅ PASS | |
 
-**Pass Rate:** 69% (11/16) → Target: 100% (16/16)
+**Pass Rate:** 100% (20/20)
 
----
-
-## Remaining 5: Build Configuration Fixes
-
-### Languages Pending Build Config
-
-| Language | Issue | Fix Required |
-|----------|-------|--------------|
-| CUDA | | |
-| Shell | | |
-| Dockerfile | | |
-| SQL | | |
-| Cypher | | |
-
-*Document the specific build changes needed below:*
+2 additional parsers without UPTS specs: Markdown, XML. Total: 22 parsers.
 
 ---
 
-## Build Configuration Changes
+## Recent Changes (2026-02-05)
 
-### CUDA
+### New Parsers
 
-```
-Issue: 
-Fix: 
-```
+| Parser | Features |
+|--------|----------|
+| C# | Classes, structs, interfaces, enums, records, properties, methods, constants, attributes, namespaces |
+| Kotlin | Data/sealed/abstract classes, objects, companion objects, interfaces, enum classes, typealiases, extension functions |
+| Terraform | Resources, data sources, modules, providers, variables (with default/description), outputs, locals |
+| Makefile | Targets (with .PHONY export tracking), variables (all assignment operators), define/endef macros |
 
-### Shell
+### Evidence Validation
 
-```
-Issue: 
-Fix: 
-```
+Added `validate_evidence` config flag. When enabled, the test harness runs structural consistency checks:
+- LineEnd >= Line for symbols
+- StartLine <= EndLine for CodeElements
+- Symbol Line within CodeElement range
+- LineEnd matching against spec (within tolerance)
 
-### Dockerfile
+Currently enabled for Go and Rust. Other parsers can opt in.
 
-```
-Issue: 
-Fix: 
-```
+### Diagnostics Framework
 
-### SQL
+All new parsers emit `TRUNCATED` diagnostic when content exceeds 4000 chars. See [`interface.go`](../../../../cmd/ingest-codebase/languages/interface.go) for the `Diagnostic` struct.
 
-```
-Issue: 
-Fix: 
-```
+### Ingestion Whitelist Fix
 
-### Cypher
+`getEnabledLanguages()` in `main.go` now includes all 22 parsers. Previously missing: yaml, toml, ini, dockerfile, shell, cuda, cypher.
 
-```
-Issue: 
+---
+
+## Archived: Previous Build Configuration Issues
+
+*All previously documented issues have been resolved.*
+
+### Historical Issue 
 Fix: 
 ```
 

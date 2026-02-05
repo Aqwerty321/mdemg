@@ -1,5 +1,23 @@
 # UPTS Changelog
 
+## [1.2.0] - 2026-02-05
+
+### Added
+- **4 New Language Parsers + UPTS Specs**: C# (.cs), Kotlin (.kt, .kts), Terraform/HCL (.tf, .tfvars), Makefile (.mk)
+- **Evidence Validation**: `validate_evidence` config flag enables structural consistency checks (LineEnd, CodeElement ranges, symbol containment, LineEnd matching)
+- **Go-native test harness**: `validateEvidence()` function with 4 checks, wired into `TestUPTS`
+
+### Fixed
+- **Makefile parser**: `:=` variable assignments were incorrectly rejected by the target/variable disambiguation logic
+
+### Status After v1.2
+
+| Category | Passing | Total |
+|----------|---------|-------|
+| All parsers | 20 | 20 |
+
+---
+
 ## [1.1.0] - 2026-01-29
 
 ### Fixed

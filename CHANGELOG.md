@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Diagnostics Framework**: Structured `Diagnostic` struct with severity, code, message, parser, and context fields; `DiagnosticSummary` for aggregate reporting; `TruncateContentWithInfo()` and `NewDiagnostic()` helpers; wired into `walkCodebase` with summary logging
+- **4 New Language Parsers**: C# (.cs), Kotlin (.kt, .kts), Terraform/HCL (.tf, .tfvars), Makefile (.mk, Makefile) — all with UPTS specs, test fixtures, and diagnostics support
+- **UPTS Evidence Validation**: Structural consistency checks in the Go-native test harness — validates LineEnd consistency, CodeElement ranges, symbol containment, and LineEnd matching against specs; enabled for Go and Rust parsers
+- **20 UPTS-Validated Parsers**: All 20 language parsers pass via `go test` across Go, Python, TypeScript, Rust, Java, C, C++, CUDA, SQL, Cypher, YAML, TOML, JSON, INI, Dockerfile, Shell, C#, Kotlin, Terraform, and Makefile
+
+### Fixed
+- **Ingestion whitelist**: `getEnabledLanguages()` now includes all 22 registered parsers (was missing yaml, toml, ini, dockerfile, shell, cuda, cypher)
+- **Makefile parser `:=` assignment**: Fixed disambiguation logic that incorrectly rejected `:=` variable assignments as target definitions
+
+### Previously Added
+- **UPTS Go-Native Test Harness**: `upts_test.go` and `upts_types.go` — validates all language parsers directly via `go test` without external dependencies
 - **Phase 9.5: Conflict Resolution & Consistency**: Data integrity during concurrent updates, orphan detection, and edge consistency
   - Version tracking: `version` counter incremented on every MERGE update, archive, and unarchive operation
   - `last_ingested_at` timestamp on every ingest update, distinct from `updated_at`
@@ -60,6 +71,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CONTRIBUTING.md with development guidelines
 
 ### Fixed
+- **Parser symbol extraction**: Fixed C, C++, CUDA, SQL, Cypher parsers for correct function name extraction (was extracting parameter names)
+- **CUDA multi-line kernel signatures**: Kernel pattern now handles `__global__` functions with parameters spanning multiple lines
+- **SQL DEFAULT value parsing**: Parenthesis balancing prevents truncation of function calls like `gen_random_uuid()`
+- **Cypher symbol types**: Labels, relationships, constraints, and indexes now emit correct UPTS types
+- **C++ `static const` extraction**: Parser now recognizes `static const` and `static constexpr` constants
+- **UPTS spec corrections**: Fixed 45 spec authoring errors across C (16), C++ (21), and CUDA (16) specs where auto-generated entries had parameter names instead of function names
 - VectorSim floor to prevent spurious learning edges
 - Migration files excluded from learning edge creation
 - L0-only learning scope to reduce noise

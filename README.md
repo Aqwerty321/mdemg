@@ -7,7 +7,7 @@
 
 A persistent memory system for AI coding agents built on Neo4j with native vector indexes. Implements semantic retrieval with hidden layer concept abstraction and Hebbian learning.
 
-> **Key insight**: The critical metric isn't average retrieval score—it's **state survival under context compaction**. Baseline agents forget architectural decisions after ~3 compactions. MDEMG maintains decision persistence indefinitely.
+> **Key insight**: The critical metric isn't average retrieval score—it's **state survival under context compaction**. Baseline agents forget architectural decisions after compactions. MDEMG maintains decision persistence indefinitely.
 
 ---
 

@@ -547,6 +547,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/linear/projects/", s.handleLinearProjects)
 	mux.HandleFunc("/v1/linear/comments", s.handleLinearComments)
 
+	// Cleanup endpoints (Phase 9.5)
+	mux.HandleFunc("/v1/memory/cleanup/orphans", s.handleCleanupOrphans)
+
 	// Webhook endpoints (Phase 9.4)
 	mux.HandleFunc("/v1/webhooks/linear", s.handleLinearWebhook)
 

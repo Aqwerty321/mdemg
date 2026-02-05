@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 9.5: Conflict Resolution & Consistency**: Data integrity during concurrent updates, orphan detection, and edge consistency
+  - Version tracking: `version` counter incremented on every MERGE update, archive, and unarchive operation
+  - `last_ingested_at` timestamp on every ingest update, distinct from `updated_at`
+  - Conflict logging: DEBUG log when a node is updated (update_count > 1) with version and update_count
+  - `POST /v1/memory/cleanup/orphans` — Orphan detection endpoint with `list`, `archive`, and `delete` actions; supports `dry_run` mode and `limit` parameter
+  - Protected space enforcement: `delete` action blocked on protected spaces (e.g., `mdemg-dev`)
+  - `edges_stale` flag: set on nodes when embedding changes during re-ingest
+  - `RefreshStaleEdges()` method: refreshes ASSOCIATED_WITH edge weights for stale nodes, propagates staleness to parent hidden nodes
+  - Edge refresh wired into consolidation pipeline as Step 6
 - **Phase 9.4: Plugin-Specific Triggers**: Event-driven integration layer for external event sources
   - `TriggerEventWithContext()` on APE scheduler — passes `space_id`, `ingest_type`, and other context to APE modules
   - `POST /v1/webhooks/linear` — Linear webhook endpoint with HMAC-SHA256 signature verification, 10s debouncing, and automatic observation ingestion via plugin Parse

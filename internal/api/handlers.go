@@ -1151,6 +1151,14 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 	}
 	resp.SummariesGenerated = summariesUpdated
 
+	// Step 6: Refresh stale edges (Phase 9.5.3)
+	edgesRefreshed, err := s.retriever.RefreshStaleEdges(r.Context(), req.SpaceID)
+	if err != nil {
+		log.Printf("warning: failed to refresh stale edges: %v", err)
+	} else {
+		resp.EdgesRefreshed = edgesRefreshed
+	}
+
 	resp.DurationMs = float64(time.Since(start).Milliseconds())
 
 	writeJSON(w, http.StatusOK, map[string]any{"data": resp})
@@ -1221,7 +1229,8 @@ func (s *Server) handleArchiveNode(w http.ResponseWriter, r *http.Request) {
 MATCH (n:MemoryNode {node_id: $nodeId})
 SET n.is_archived = true,
     n.archived_at = datetime(),
-    n.archive_reason = $reason
+    n.archive_reason = $reason,
+    n.version = coalesce(n.version, 0) + 1
 RETURN n.node_id AS node_id,
        coalesce(n.name, n.node_id) AS name,
        n.archived_at AS archived_at`
@@ -1304,6 +1313,7 @@ func (s *Server) handleUnarchiveNode(w http.ResponseWriter, r *http.Request) {
 MATCH (n:MemoryNode {node_id: $nodeId})
 REMOVE n.is_archived, n.archived_at, n.archive_reason
 WITH n, datetime() AS unarchiveTime
+SET n.version = coalesce(n.version, 0) + 1
 RETURN n.node_id AS node_id,
        coalesce(n.name, n.node_id) AS name,
        unarchiveTime AS unarchived_at`

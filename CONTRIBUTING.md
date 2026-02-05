@@ -225,6 +225,12 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | GET | `/v1/conversation/volatile/stats` | Volatile memory stats |
 | POST | `/v1/conversation/graduate` | Graduate volatile to permanent |
 
+### Cleanup
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/memory/cleanup/orphans` | Detect/archive/delete orphaned nodes after re-ingestion |
+
 ### Webhooks
 
 | Method | Endpoint | Description |

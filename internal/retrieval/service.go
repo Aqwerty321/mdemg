@@ -1171,9 +1171,10 @@ func (s *Service) IngestObservation(ctx context.Context, req models.IngestReques
 	params["mergeValue"] = mergeValue
 
 	// Build embedding SET clause (only if embedding provided)
+	// Also flag edges as stale when embedding changes (Phase 9.5.3)
 	embeddingClause := ""
 	if len(req.Embedding) > 0 {
-		embeddingClause = ", n.embedding = $embedding"
+		embeddingClause = ", n.embedding = $embedding, n.edges_stale = true"
 	}
 
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -1213,8 +1214,10 @@ MERGE (n)-[:HAS_OBSERVATION {space_id:$spaceId, created_at:datetime()}]->(o)
 SET n.updated_at=datetime(),
     n.canonical_time = CASE WHEN $canonicalTime <> '' THEN datetime($canonicalTime) ELSE n.canonical_time END,
     n.update_count = coalesce(n.update_count,0) + 1,
+    n.version = coalesce(n.version, 0) + 1,
+    n.last_ingested_at = datetime(),
     n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END` + embeddingClause + `
-RETURN n.node_id AS node_id`
+RETURN n.node_id AS node_id, n.version AS version, n.update_count AS update_count`
 		} else {
 			cypher = `
 MERGE (t:TapRoot {space_id:$spaceId})
@@ -1249,8 +1252,10 @@ MERGE (n)-[:HAS_OBSERVATION {space_id:$spaceId, created_at:datetime()}]->(o)
 SET n.updated_at=datetime(),
     n.canonical_time = CASE WHEN $canonicalTime <> '' THEN datetime($canonicalTime) ELSE n.canonical_time END,
     n.update_count = coalesce(n.update_count,0) + 1,
+    n.version = coalesce(n.version, 0) + 1,
+    n.last_ingested_at = datetime(),
     n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END` + embeddingClause + `
-RETURN n.node_id AS node_id`
+RETURN n.node_id AS node_id, n.version AS version, n.update_count AS update_count`
 		}
 
 		res, err := tx.Run(ctx, cypher, params)
@@ -1258,7 +1263,14 @@ RETURN n.node_id AS node_id`
 			return nil, err
 		}
 		for res.Next(ctx) {
-			// consume
+			rec := res.Record()
+			version, _ := rec.Get("version")
+			updateCount, _ := rec.Get("update_count")
+			vc := toInt(version, 1)
+			uc := toInt(updateCount, 0)
+			if uc > 1 {
+				log.Printf("ingest: node %s updated (version=%d, update_count=%d)", nodeID, vc, uc)
+			}
 		}
 		return nil, res.Err()
 	})
@@ -1372,6 +1384,128 @@ func (s *Service) BatchIngestObservations(ctx context.Context, req models.BatchI
 		ErrorCount:   errorCount,
 		Results:      results,
 	}, nil
+}
+
+// RefreshStaleEdges finds nodes with edges_stale=true and refreshes their
+// ASSOCIATED_WITH edges based on current embeddings. Processes up to 50
+// nodes per call. Returns the number of nodes refreshed.
+func (s *Service) RefreshStaleEdges(ctx context.Context, spaceID string) (int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Step 1: Find stale nodes (limit 50 per call)
+	findCypher := `
+MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE n.edges_stale = true
+  AND n.embedding IS NOT NULL
+  AND NOT coalesce(n.is_archived, false)
+RETURN n.node_id AS node_id
+LIMIT 50`
+
+	result, err := sess.Run(ctx, findCypher, map[string]any{"spaceId": spaceID})
+	if err != nil {
+		return 0, fmt.Errorf("find stale nodes: %w", err)
+	}
+
+	var staleNodeIDs []string
+	for result.Next(ctx) {
+		rec := result.Record()
+		nid, _ := rec.Get("node_id")
+		staleNodeIDs = append(staleNodeIDs, fmt.Sprint(nid))
+	}
+	if err := result.Err(); err != nil {
+		return 0, fmt.Errorf("read stale nodes: %w", err)
+	}
+	sess.Close(ctx)
+
+	if len(staleNodeIDs) == 0 {
+		return 0, nil
+	}
+
+	// Step 2: For each stale node, get its embedding and refresh edges
+	refreshed := 0
+	for _, nodeID := range staleNodeIDs {
+		// Get the node's current embedding
+		embSess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		embResult, embErr := embSess.Run(ctx, `
+MATCH (n:MemoryNode {space_id: $spaceId, node_id: $nodeId})
+RETURN n.embedding AS embedding`, map[string]any{
+			"spaceId": spaceID,
+			"nodeId":  nodeID,
+		})
+		if embErr != nil {
+			embSess.Close(ctx)
+			log.Printf("warning: failed to get embedding for stale node %s: %v", nodeID, embErr)
+			continue
+		}
+
+		var embedding []float32
+		if embResult.Next(ctx) {
+			rec := embResult.Record()
+			embVal, _ := rec.Get("embedding")
+			if embSlice, ok := embVal.([]any); ok {
+				embedding = make([]float32, len(embSlice))
+				for i, v := range embSlice {
+					switch fv := v.(type) {
+					case float64:
+						embedding[i] = float32(fv)
+					case float32:
+						embedding[i] = fv
+					}
+				}
+			}
+		}
+		embSess.Close(ctx)
+
+		if len(embedding) == 0 {
+			continue
+		}
+
+		// Find similar nodes and update edges
+		similarNodes, findErr := s.FindSimilarNodes(ctx, spaceID, embedding, nodeID, s.cfg.SemanticEdgeTopN)
+		if findErr != nil {
+			log.Printf("warning: FindSimilarNodes failed for stale node %s: %v", nodeID, findErr)
+			continue
+		}
+
+		for _, sn := range similarNodes {
+			if sn.Score >= s.cfg.SemanticEdgeMinSimilarity {
+				edgeErr := s.CreateAssociatedWithEdge(ctx, spaceID, nodeID, sn.NodeID, sn.Score)
+				if edgeErr != nil {
+					log.Printf("warning: CreateAssociatedWithEdge failed from %s to %s: %v", nodeID, sn.NodeID, edgeErr)
+				}
+			}
+		}
+
+		// Clear the stale flag and propagate to parent hidden nodes
+		clearSess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		_, clearErr := clearSess.Run(ctx, `
+MATCH (n:MemoryNode {node_id: $nodeId, space_id: $spaceId})
+REMOVE n.edges_stale`, map[string]any{
+			"nodeId":  nodeID,
+			"spaceId": spaceID,
+		})
+		if clearErr != nil {
+			log.Printf("warning: failed to clear edges_stale for node %s: %v", nodeID, clearErr)
+		}
+
+		// Propagate staleness to parent hidden nodes
+		_, propErr := clearSess.Run(ctx, `
+MATCH (h:MemoryNode)-[:GENERALIZES]->(n:MemoryNode {node_id: $nodeId, space_id: $spaceId})
+WHERE h.layer > 0
+SET h.edges_stale = true`, map[string]any{
+			"nodeId":  nodeID,
+			"spaceId": spaceID,
+		})
+		if propErr != nil {
+			log.Printf("warning: failed to propagate edges_stale to parents of %s: %v", nodeID, propErr)
+		}
+		clearSess.Close(ctx)
+
+		refreshed++
+	}
+
+	return refreshed, nil
 }
 
 func newID(prefix string) string {

@@ -4,7 +4,7 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 
 ## Supported Languages
 
-25 parsers, 23 with UPTS validation specs.
+25 parsers, 25 with UPTS validation specs (100%).
 
 | Language | File | Extensions | UPTS |
 |----------|------|------------|------|
@@ -31,15 +31,15 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 | Makefile | [`makefile_parser.go`](makefile_parser.go) | `.mk`, `Makefile` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/makefile.upts.json) |
 | Dockerfile | [`dockerfile_parser.go`](dockerfile_parser.go) | `Dockerfile`, `*.dockerfile` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/dockerfile.upts.json) |
 | Shell/Bash | [`shell_parser.go`](shell_parser.go) | `.sh`, `.bash`, `.zsh` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/shell.upts.json) |
-| Markdown | [`markdown_parser.go`](markdown_parser.go) | `.md`, `.markdown` | No |
-| XML | [`xml_parser.go`](xml_parser.go) | `.xml`, `.xsd`, `.xsl`, etc. | No |
+| Markdown | [`markdown_parser.go`](markdown_parser.go) | `.md`, `.markdown` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/markdown.upts.json) |
+| XML | [`xml_parser.go`](xml_parser.go) | `.xml`, `.xsd`, `.xsl`, etc. | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/xml.upts.json) |
 
 ## UPTS Validation
 
 Each parser's symbol extraction is validated against a [UPTS (Universal Parser Test Specification)](../../../docs/lang-parser/lang-parse-spec/upts/README.md) spec file. The Go-native test harness loads the spec, parses the associated fixture file through the parser, and asserts that all expected symbols are found with correct name, type, line number, and export status.
 
 ```bash
-# Run all 23 UPTS-validated parsers
+# Run all 25 UPTS-validated parsers
 go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
 
 # Run a single language

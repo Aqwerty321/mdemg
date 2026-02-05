@@ -3,7 +3,7 @@
 **Generated:** 2026-01-29
 **Last Updated:** 2026-02-05
 **Schema Version:** 1.4 (added Protocol Buffers, GraphQL, and OpenAPI parsers)
-**Status:** 23/23 UPTS-validated languages passing (100%)
+**Status:** 25/25 UPTS-validated languages passing (100%)
 
 ---
 
@@ -59,7 +59,7 @@ if validate_parent and exp_parent and actual_parent != exp_parent:
 
 ## Current Status
 
-All 23 UPTS-validated parsers pass via `go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v`:
+All 25 UPTS-validated parsers pass via `go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v`:
 
 | Language | Parser Type | Status | Notes |
 |----------|-------------|--------|-------|
@@ -87,9 +87,9 @@ All 23 UPTS-validated parsers pass via `go test ./cmd/ingest-codebase/languages/
 | Dockerfile | Regex | ✅ PASS | |
 | Shell | Regex | ✅ PASS | |
 
-**Pass Rate:** 100% (23/23)
+**Pass Rate:** 100% (25/25)
 
-2 additional parsers without UPTS specs: Markdown, XML. Total: 25 parsers.
+All 25 parsers now have UPTS validation specs.
 
 ---
 

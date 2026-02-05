@@ -301,62 +301,165 @@ func (p *XMLParser) extractSchemaInfo(builder *strings.Builder, content string) 
 	}
 }
 
+// Regex patterns for XML symbol extraction with line tracking
+var (
+	xmlElementPattern       = regexp.MustCompile(`<(\w+)(?:\s|>|/)`)
+	xmlDependencyPattern    = regexp.MustCompile(`<dependency>`)
+	xmlGroupIdPattern       = regexp.MustCompile(`<groupId>([^<]+)</groupId>`)
+	xmlArtifactIdPattern    = regexp.MustCompile(`<artifactId>([^<]+)</artifactId>`)
+	xmlVersionPattern       = regexp.MustCompile(`<version>([^<]+)</version>`)
+	xmlPackageRefPattern    = regexp.MustCompile(`<PackageReference\s+Include="([^"]+)"(?:\s+Version="([^"]+)")?`)
+	xmlXsdElementPattern    = regexp.MustCompile(`<(?:xs|xsd):element\s+name="([^"]+)"`)
+	xmlXsdComplexPattern    = regexp.MustCompile(`<(?:xs|xsd):complexType\s+name="([^"]+)"`)
+	xmlPropertyGroupPattern = regexp.MustCompile(`<PropertyGroup`)
+	xmlItemGroupPattern     = regexp.MustCompile(`<ItemGroup`)
+	xmlTargetPattern        = regexp.MustCompile(`<Target\s+Name="([^"]+)"`)
+)
+
 func (p *XMLParser) extractSymbols(content string, xmlKind string) []Symbol {
 	var symbols []Symbol
+	lines := strings.Split(content, "\n")
 
-	switch xmlKind {
-	case "maven-pom":
-		// Extract dependencies as symbols
-		depPattern := regexp.MustCompile(`<dependency>\s*<groupId>([^<]+)</groupId>\s*<artifactId>([^<]+)</artifactId>(?:\s*<version>([^<]+)</version>)?`)
-		deps := depPattern.FindAllStringSubmatch(content, -1)
-		for _, dep := range deps {
-			name := dep[1] + ":" + dep[2]
-			version := ""
-			if len(dep) > 3 {
-				version = dep[3]
+	// Track state for multi-line patterns
+	var inDependency bool
+	var depGroupId, depArtifactId, depVersion string
+	var depStartLine int
+
+	for lineNum, line := range lines {
+		lineNo := lineNum + 1
+
+		switch xmlKind {
+		case "maven-pom":
+			// Track dependency blocks
+			if xmlDependencyPattern.MatchString(line) {
+				inDependency = true
+				depStartLine = lineNo
+				depGroupId = ""
+				depArtifactId = ""
+				depVersion = ""
 			}
-			symbols = append(symbols, Symbol{
-				Name:     name,
-				Type:     "dependency",
-				Value:    version,
-				Exported: true,
-				Language: "xml",
-			})
-		}
-
-	case "dotnet-project":
-		// Extract package references
-		pkgPattern := regexp.MustCompile(`<PackageReference\s+Include="([^"]+)"(?:\s+Version="([^"]+)")?`)
-		pkgs := pkgPattern.FindAllStringSubmatch(content, -1)
-		for _, pkg := range pkgs {
-			version := ""
-			if len(pkg) > 2 {
-				version = pkg[2]
+			if inDependency {
+				if matches := xmlGroupIdPattern.FindStringSubmatch(line); matches != nil {
+					depGroupId = matches[1]
+				}
+				if matches := xmlArtifactIdPattern.FindStringSubmatch(line); matches != nil {
+					depArtifactId = matches[1]
+				}
+				if matches := xmlVersionPattern.FindStringSubmatch(line); matches != nil {
+					depVersion = matches[1]
+				}
+				if strings.Contains(line, "</dependency>") {
+					if depGroupId != "" && depArtifactId != "" {
+						symbols = append(symbols, Symbol{
+							Name:     depGroupId + ":" + depArtifactId,
+							Type:     "dependency",
+							Line:     depStartLine,
+							Value:    depVersion,
+							Exported: true,
+							Language: "xml",
+						})
+					}
+					inDependency = false
+				}
 			}
-			symbols = append(symbols, Symbol{
-				Name:     pkg[1],
-				Type:     "package-reference",
-				Value:    version,
-				Exported: true,
-				Language: "xml",
-			})
-		}
 
-	case "xsd-schema":
-		// Extract element names
-		elemPattern := regexp.MustCompile(`<(?:xs|xsd):element\s+name="([^"]+)"`)
-		elems := elemPattern.FindAllStringSubmatch(content, -1)
-		for _, elem := range elems {
-			symbols = append(symbols, Symbol{
-				Name:     elem[1],
-				Type:     "xsd-element",
-				Exported: true,
-				Language: "xml",
-			})
+		case "dotnet-project":
+			// Extract package references
+			if matches := xmlPackageRefPattern.FindStringSubmatch(line); matches != nil {
+				version := ""
+				if len(matches) > 2 {
+					version = matches[2]
+				}
+				symbols = append(symbols, Symbol{
+					Name:     matches[1],
+					Type:     "package-reference",
+					Line:     lineNo,
+					Value:    version,
+					Exported: true,
+					Language: "xml",
+				})
+			}
+			// Extract targets
+			if matches := xmlTargetPattern.FindStringSubmatch(line); matches != nil {
+				symbols = append(symbols, Symbol{
+					Name:     matches[1],
+					Type:     "target",
+					Line:     lineNo,
+					Exported: true,
+					Language: "xml",
+				})
+			}
+			// Track PropertyGroup and ItemGroup sections
+			if xmlPropertyGroupPattern.MatchString(line) {
+				symbols = append(symbols, Symbol{
+					Name:     "PropertyGroup",
+					Type:     "section",
+					Line:     lineNo,
+					Exported: true,
+					Language: "xml",
+				})
+			}
+			if xmlItemGroupPattern.MatchString(line) {
+				symbols = append(symbols, Symbol{
+					Name:     "ItemGroup",
+					Type:     "section",
+					Line:     lineNo,
+					Exported: true,
+					Language: "xml",
+				})
+			}
+
+		case "xsd-schema":
+			// Extract element definitions
+			if matches := xmlXsdElementPattern.FindStringSubmatch(line); matches != nil {
+				symbols = append(symbols, Symbol{
+					Name:     matches[1],
+					Type:     "element",
+					Line:     lineNo,
+					Exported: true,
+					Language: "xml",
+				})
+			}
+			// Extract complex type definitions
+			if matches := xmlXsdComplexPattern.FindStringSubmatch(line); matches != nil {
+				symbols = append(symbols, Symbol{
+					Name:     matches[1],
+					Type:     "type",
+					Line:     lineNo,
+					Exported: true,
+					Language: "xml",
+				})
+			}
+
+		default:
+			// Generic XML: extract top-level elements
+			if strings.HasPrefix(strings.TrimSpace(line), "<") && !strings.HasPrefix(strings.TrimSpace(line), "<?") && !strings.HasPrefix(strings.TrimSpace(line), "<!") && !strings.HasPrefix(strings.TrimSpace(line), "</") {
+				if matches := xmlElementPattern.FindStringSubmatch(line); matches != nil {
+					elemName := matches[1]
+					// Only extract significant elements (not common structural ones)
+					if !isCommonXMLElement(elemName) {
+						symbols = append(symbols, Symbol{
+							Name:     elemName,
+							Type:     "element",
+							Line:     lineNo,
+							Exported: true,
+							Language: "xml",
+						})
+					}
+				}
+			}
 		}
 	}
 
 	return symbols
+}
+
+func isCommonXMLElement(name string) bool {
+	common := map[string]bool{
+		"xml": true, "root": true, "item": true, "items": true,
+		"list": true, "data": true, "value": true, "entry": true,
+	}
+	return common[strings.ToLower(name)]
 }
 
 // Helper to extract value between XML tags

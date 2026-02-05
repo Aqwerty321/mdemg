@@ -22,6 +22,55 @@ type CodeElement struct {
 	EndLine     int    // Last line of element in source file (1-indexed, 0 = not set)
 	StableID    string // Deterministic ID: hash(space_id + path + element_kind + qualname + start_line + end_line)
 	Signature   string // Human-readable signature (e.g., "func ParseFile(root, path string) ([]CodeElement, error)")
+
+	// Diagnostics (v2.1 - structured parser diagnostics)
+	Diagnostics []Diagnostic `json:"diagnostics,omitempty"` // Structured diagnostics
+}
+
+// Diagnostic represents a structured parser diagnostic.
+//
+// Diagnostic codes:
+//   - TRUNCATED: content was truncated by TruncateContent (severity: info)
+//   - LARGE_FILE: file exceeds size threshold (severity: warning)
+//   - PARTIAL_PARSE: parser skipped constructs it can't handle (severity: warning)
+//   - BINARY_DETECTED: non-text content detected (severity: info)
+type Diagnostic struct {
+	Severity string            `json:"severity"`           // "info", "warning", "error"
+	Code     string            `json:"code"`               // stable machine-readable code
+	Message  string            `json:"message"`            // human-readable description
+	Parser   string            `json:"parser,omitempty"`   // parser that emitted this
+	Context  map[string]string `json:"context,omitempty"`  // additional key-value context
+}
+
+// DiagnosticSummary collects diagnostic counts by severity and code.
+type DiagnosticSummary struct {
+	Total    int
+	BySev    map[string]int // severity → count
+	ByCode   map[string]int // code → count
+}
+
+// NewDiagnosticSummary creates an empty DiagnosticSummary.
+func NewDiagnosticSummary() *DiagnosticSummary {
+	return &DiagnosticSummary{
+		BySev:  make(map[string]int),
+		ByCode: make(map[string]int),
+	}
+}
+
+// Add records a diagnostic into the summary.
+func (ds *DiagnosticSummary) Add(d Diagnostic) {
+	ds.Total++
+	ds.BySev[d.Severity]++
+	ds.ByCode[d.Code]++
+}
+
+// AddAll records all diagnostics from a slice of CodeElements.
+func (ds *DiagnosticSummary) AddAll(elements []CodeElement) {
+	for _, elem := range elements {
+		for _, d := range elem.Diagnostics {
+			ds.Add(d)
+		}
+	}
 }
 
 // Symbol represents an extracted code symbol (constant, function signature, etc.)

@@ -72,7 +72,19 @@ func (p *GoParser) ParseFile(root, path string, extractSymbols bool) ([]CodeElem
 	var contentBuilder strings.Builder
 	contentBuilder.WriteString(fmt.Sprintf("Go package %s in file %s\n", pkgName, relPath))
 	contentBuilder.WriteString("\n--- Code ---\n")
-	contentBuilder.WriteString(TruncateContent(content, 4000))
+	truncated, wasTruncated := TruncateContentWithInfo(content, 4000)
+	contentBuilder.WriteString(truncated)
+
+	// Collect diagnostics
+	var diagnostics []Diagnostic
+	if wasTruncated {
+		diagnostics = append(diagnostics, NewDiagnosticWithContext(
+			"info", "TRUNCATED",
+			fmt.Sprintf("Content truncated from %d to 4000 chars", len(content)),
+			"go",
+			map[string]string{"original_size": fmt.Sprintf("%d", len(content))},
+		))
+	}
 
 	// Extract code symbols
 	var symbols []Symbol
@@ -82,15 +94,16 @@ func (p *GoParser) ParseFile(root, path string, extractSymbols bool) ([]CodeElem
 
 	// Add package-level element
 	elements = append(elements, CodeElement{
-		Name:     pkgName,
-		Kind:     kind,
-		Path:     "/" + relPath,
-		Content:  contentBuilder.String(),
-		Package:  pkgName,
-		FilePath: relPath,
-		Tags:     tags,
-		Concerns: concerns,
-		Symbols:  symbols,
+		Name:        pkgName,
+		Kind:        kind,
+		Path:        "/" + relPath,
+		Content:     contentBuilder.String(),
+		Package:     pkgName,
+		FilePath:    relPath,
+		Tags:        tags,
+		Concerns:    concerns,
+		Symbols:     symbols,
+		Diagnostics: diagnostics,
 	})
 
 	// Extract declarations
@@ -204,7 +217,7 @@ func (p *GoParser) extractSymbols(content string) []Symbol {
 	constBlockItem := regexp.MustCompile(`^\s*(\w+)\s*(?:\w+)?\s*=\s*(.+)$`)
 
 	// Type declarations
-	typeAliasPattern := regexp.MustCompile("^\\s*type\\s+(\\w+)\\s+(\\w+)(?:\\s*$|\\s*//)")
+	typeAliasPattern := regexp.MustCompile(`^\s*type\s+(\w+)\s+(\S+(?:\s*//.*)?)\s*$`)
 	structPattern := regexp.MustCompile("^\\s*type\\s+(\\w+)\\s+struct\\s*\\{")
 	interfacePattern := regexp.MustCompile("^\\s*type\\s+(\\w+)\\s+interface\\s*\\{")
 
@@ -299,9 +312,14 @@ func (p *GoParser) extractSymbols(content string) []Symbol {
 
 		// === Type alias (must check after struct/interface) ===
 		if matches := typeAliasPattern.FindStringSubmatch(line); matches != nil {
-			// Exclude struct and interface (already handled)
-			baseType := matches[2]
-			if baseType != "struct" && baseType != "interface" {
+			// Exclude struct and interface (already handled above via continue)
+			baseType := strings.TrimSpace(matches[2])
+			// Strip trailing inline comments
+			if idx := strings.Index(baseType, "//"); idx != -1 {
+				baseType = strings.TrimSpace(baseType[:idx])
+			}
+			if baseType != "struct" && baseType != "interface" &&
+				!strings.HasPrefix(baseType, "struct") && !strings.HasPrefix(baseType, "interface") {
 				symbols = append(symbols, Symbol{
 					Name:           matches[1],
 					Type:           "type",

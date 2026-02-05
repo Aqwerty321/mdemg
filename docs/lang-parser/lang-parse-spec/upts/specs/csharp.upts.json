@@ -1,0 +1,446 @@
+{
+  "upts_version": "1.0.0",
+  "language": "csharp",
+  "variants": [".cs"],
+  "metadata": {
+    "author": "auto-generated",
+    "created": "2026-02-05",
+    "description": "C# parser spec - generated from actual parser output"
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_parent": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/csharp_test_fixture.cs",
+    "sha256": ""
+  },
+  "expected": {
+    "symbol_count": {"min": 55, "max": 65},
+    "symbols": [
+      {
+        "name": "TestNamespace.Models",
+        "type": "namespace",
+        "line": 9,
+        "exported": true
+      },
+      {
+        "name": "AppConstants",
+        "type": "class",
+        "line": 12,
+        "exported": true
+      },
+      {
+        "name": "MaxRetries",
+        "type": "constant",
+        "line": 14,
+        "exported": true,
+        "parent": "AppConstants",
+        "value": "3"
+      },
+      {
+        "name": "ApiVersion",
+        "type": "constant",
+        "line": 15,
+        "exported": true,
+        "parent": "AppConstants",
+        "value": "2.0.0"
+      },
+      {
+        "name": "DebugMode",
+        "type": "constant",
+        "line": 16,
+        "exported": true,
+        "parent": "AppConstants",
+        "value": "false"
+      },
+      {
+        "name": "DefaultTimeout",
+        "type": "constant",
+        "line": 17,
+        "exported": true,
+        "parent": "AppConstants",
+        "value": "TimeSpan.FromSeconds(30)"
+      },
+      {
+        "name": "ConnectionString",
+        "type": "constant",
+        "line": 18,
+        "exported": true,
+        "parent": "AppConstants",
+        "value": "Server=localhost"
+      },
+      {
+        "name": "TaxRate",
+        "type": "constant",
+        "line": 19,
+        "exported": true,
+        "parent": "AppConstants",
+        "value": "0.08"
+      },
+      {
+        "name": "Status",
+        "type": "enum",
+        "line": 23,
+        "exported": true
+      },
+      {
+        "name": "Active",
+        "type": "enum_value",
+        "line": 25,
+        "exported": true,
+        "parent": "Status"
+      },
+      {
+        "name": "Inactive",
+        "type": "enum_value",
+        "line": 26,
+        "exported": true,
+        "parent": "Status"
+      },
+      {
+        "name": "Pending",
+        "type": "enum_value",
+        "line": 27,
+        "exported": true,
+        "parent": "Status"
+      },
+      {
+        "name": "Deleted",
+        "type": "enum_value",
+        "line": 28,
+        "exported": true,
+        "parent": "Status"
+      },
+      {
+        "name": "IRepository",
+        "type": "interface",
+        "line": 32,
+        "exported": true
+      },
+      {
+        "name": "FindById",
+        "type": "method",
+        "line": 34,
+        "exported": true,
+        "parent": "IRepository"
+      },
+      {
+        "name": "GetAll",
+        "type": "method",
+        "line": 35,
+        "exported": true,
+        "parent": "IRepository"
+      },
+      {
+        "name": "Save",
+        "type": "method",
+        "line": 36,
+        "exported": true,
+        "parent": "IRepository"
+      },
+      {
+        "name": "Delete",
+        "type": "method",
+        "line": 37,
+        "exported": true,
+        "parent": "IRepository"
+      },
+      {
+        "name": "IValidator",
+        "type": "interface",
+        "line": 41,
+        "exported": true
+      },
+      {
+        "name": "Validate",
+        "type": "method",
+        "line": 43,
+        "exported": true,
+        "parent": "IValidator"
+      },
+      {
+        "name": "GetErrors",
+        "type": "method",
+        "line": 44,
+        "exported": true,
+        "parent": "IValidator"
+      },
+      {
+        "name": "User",
+        "type": "class",
+        "line": 49,
+        "exported": true,
+        "doc_comment": "[Serializable]"
+      },
+      {
+        "name": "Id",
+        "type": "method",
+        "line": 55,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "Name",
+        "type": "method",
+        "line": 56,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "Email",
+        "type": "method",
+        "line": 57,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "CurrentStatus",
+        "type": "method",
+        "line": 58,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "CreatedAt",
+        "type": "method",
+        "line": 59,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "User",
+        "type": "method",
+        "line": 61,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "Deactivate",
+        "type": "method",
+        "line": 70,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "IsActive",
+        "type": "method",
+        "line": 75,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "ValidateEmail",
+        "type": "method",
+        "line": 80,
+        "exported": false,
+        "parent": "User"
+      },
+      {
+        "name": "FormatDisplay",
+        "type": "method",
+        "line": 86,
+        "exported": false,
+        "parent": "User"
+      },
+      {
+        "name": "StringUtils",
+        "type": "class",
+        "line": 93,
+        "exported": true
+      },
+      {
+        "name": "IsNullOrEmpty",
+        "type": "method",
+        "line": 95,
+        "exported": true,
+        "parent": "StringUtils"
+      },
+      {
+        "name": "Truncate",
+        "type": "method",
+        "line": 100,
+        "exported": true,
+        "parent": "StringUtils"
+      },
+      {
+        "name": "CountWords",
+        "type": "method",
+        "line": 106,
+        "exported": true,
+        "parent": "StringUtils"
+      },
+      {
+        "name": "Coordinate",
+        "type": "struct",
+        "line": 113,
+        "exported": true
+      },
+      {
+        "name": "Latitude",
+        "type": "method",
+        "line": 115,
+        "exported": true,
+        "parent": "Coordinate"
+      },
+      {
+        "name": "Longitude",
+        "type": "method",
+        "line": 116,
+        "exported": true,
+        "parent": "Coordinate"
+      },
+      {
+        "name": "Coordinate",
+        "type": "method",
+        "line": 118,
+        "exported": true,
+        "parent": "Coordinate"
+      },
+      {
+        "name": "DistanceTo",
+        "type": "method",
+        "line": 124,
+        "exported": true,
+        "parent": "Coordinate"
+      },
+      {
+        "name": "UserDto",
+        "type": "class",
+        "line": 131,
+        "exported": true
+      },
+      {
+        "name": "EventHandler",
+        "type": "type",
+        "line": 134,
+        "exported": true
+      },
+      {
+        "name": "UserService",
+        "type": "class",
+        "line": 138,
+        "exported": true,
+        "doc_comment": "[HttpController]"
+      },
+      {
+        "name": "ServiceName",
+        "type": "constant",
+        "line": 141,
+        "exported": false,
+        "parent": "UserService",
+        "value": "UserService"
+      },
+      {
+        "name": "UserService",
+        "type": "method",
+        "line": 143,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "FindById",
+        "type": "method",
+        "line": 149,
+        "exported": true,
+        "parent": "UserService",
+        "doc_comment": "[HttpGet]"
+      },
+      {
+        "name": "GetAll",
+        "type": "method",
+        "line": 154,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "Save",
+        "type": "method",
+        "line": 160,
+        "exported": true,
+        "parent": "UserService",
+        "doc_comment": "[HttpPost]"
+      },
+      {
+        "name": "Delete",
+        "type": "method",
+        "line": 167,
+        "exported": true,
+        "parent": "UserService",
+        "doc_comment": "[HttpDelete]"
+      },
+      {
+        "name": "FindByIdAsync",
+        "type": "method",
+        "line": 172,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "ValidateInput",
+        "type": "method",
+        "line": 178,
+        "exported": false,
+        "parent": "UserService"
+      },
+      {
+        "name": "UserComparer",
+        "type": "class",
+        "line": 184,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "Compare",
+        "type": "method",
+        "line": 186,
+        "exported": true,
+        "parent": "UserComparer"
+      },
+      {
+        "name": "BaseEntity",
+        "type": "class",
+        "line": 194,
+        "exported": true
+      },
+      {
+        "name": "Id",
+        "type": "method",
+        "line": 196,
+        "exported": true,
+        "parent": "BaseEntity"
+      },
+      {
+        "name": "CreatedAt",
+        "type": "method",
+        "line": 197,
+        "exported": true,
+        "parent": "BaseEntity"
+      },
+      {
+        "name": "UpdatedAt",
+        "type": "method",
+        "line": 198,
+        "exported": true,
+        "parent": "BaseEntity"
+      },
+      {
+        "name": "Validate",
+        "type": "method",
+        "line": 200,
+        "exported": true,
+        "parent": "BaseEntity"
+      },
+      {
+        "name": "Touch",
+        "type": "method",
+        "line": 202,
+        "exported": true,
+        "parent": "BaseEntity"
+      }
+    ]
+  }
+}

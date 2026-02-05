@@ -579,8 +579,11 @@ func main() {
 		}
 	}
 
+	// Diagnostics summary
+	diagSummary := languages.NewDiagnosticSummary()
+
 	// Collect all code elements
-	elements, err := walkCodebase(*codebasePath, excludeSet, excludePatterns)
+	elements, err := walkCodebase(*codebasePath, excludeSet, excludePatterns, diagSummary)
 	if err != nil {
 		log.Fatalf("Failed to walk codebase: %v", err)
 	}
@@ -609,6 +612,20 @@ func main() {
 
 	log.Printf("Found %d code elements", len(elements))
 	emitProgress(progressEvent{Event: "discovery_complete", Total: len(elements)})
+
+	// Log diagnostic summary
+	if diagSummary.Total > 0 {
+		log.Printf("Diagnostics: %d total (info=%d, warning=%d, error=%d)",
+			diagSummary.Total,
+			diagSummary.BySev["info"],
+			diagSummary.BySev["warning"],
+			diagSummary.BySev["error"])
+		if *verbose {
+			for code, count := range diagSummary.ByCode {
+				log.Printf("  %s: %d", code, count)
+			}
+		}
+	}
 
 	// Apply limit if specified
 	if *limitElements > 0 && len(elements) > *limitElements {
@@ -772,21 +789,34 @@ func convertLanguageElement(elem languages.CodeElement) CodeElement {
 // getEnabledLanguages returns a map of language names that are enabled via CLI flags
 func getEnabledLanguages() map[string]bool {
 	return map[string]bool{
-		"go":         true,       // Always enabled
+		"go":         true,
 		"rust":       *includeRust,
 		"python":     *includePy,
 		"typescript": *includeTS,
 		"java":       *includeJava,
 		"markdown":   *includeMd,
-		"json":       true,       // Config files always checked
-		"sql":        true,       // SQL always enabled
-		"xml":        true,       // XML always enabled
-		"c":          true,       // C always enabled
-		"cpp":        true,       // C++ always enabled
+		"json":       true,
+		"sql":        true,
+		"xml":        true,
+		"c":          true,
+		"cpp":        true,
+		// Previously missing existing parsers
+		"yaml":       true,
+		"toml":       true,
+		"ini":        true,
+		"dockerfile": true,
+		"shell":      true,
+		"cuda":       true,
+		"cypher":     true,
+		// New parsers
+		"csharp":     true,
+		"kotlin":     true,
+		"terraform":  true,
+		"makefile":   true,
 	}
 }
 
-func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []string) ([]CodeElement, error) {
+func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []string, diagSummary *languages.DiagnosticSummary) ([]CodeElement, error) {
 	var elements []CodeElement
 	enabledLangs := getEnabledLanguages()
 
@@ -810,6 +840,12 @@ func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []str
 			if *verbose {
 				log.Printf("Skipping oversized file (%d bytes > %d max): %s", info.Size(), *maxFileSize, path)
 			}
+			diagSummary.Add(languages.Diagnostic{
+				Severity: "warning",
+				Code:     "LARGE_FILE",
+				Message:  fmt.Sprintf("File exceeds size threshold (%d bytes > %d max)", info.Size(), *maxFileSize),
+				Context:  map[string]string{"path": path},
+			})
 			return nil
 		}
 
@@ -856,6 +892,16 @@ func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []str
 					log.Printf("Capping elements for %s: %d → %d", path, len(langElements), *maxElementsPerFile)
 				}
 				langElements = langElements[:*maxElementsPerFile]
+			}
+
+			// Collect diagnostics from parsed elements
+			for _, elem := range langElements {
+				for _, d := range elem.Diagnostics {
+					diagSummary.Add(d)
+					if *verbose {
+						log.Printf("  [diag] %s/%s: %s (%s)", d.Severity, d.Code, d.Message, path)
+					}
+				}
 			}
 
 			// Convert and append elements with symbol caps

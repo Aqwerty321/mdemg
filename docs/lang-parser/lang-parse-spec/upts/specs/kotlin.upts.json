@@ -1,0 +1,403 @@
+{
+  "upts_version": "1.0.0",
+  "language": "kotlin",
+  "variants": [".kt", ".kts"],
+  "metadata": {
+    "author": "auto-generated",
+    "created": "2026-02-05",
+    "description": "Kotlin parser spec - generated from actual parser output"
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_parent": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/kotlin_test_fixture.kt",
+    "sha256": ""
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 50,
+      "max": 60
+    },
+    "symbols": [
+      {
+        "name": "UserId",
+        "type": "type",
+        "line": 14,
+        "exported": true
+      },
+      {
+        "name": "EventHandler",
+        "type": "type",
+        "line": 15,
+        "exported": true
+      },
+      {
+        "name": "User",
+        "type": "class",
+        "line": 18,
+        "exported": true
+      },
+      {
+        "name": "Result",
+        "type": "class",
+        "line": 27,
+        "exported": true
+      },
+      {
+        "name": "Success",
+        "type": "class",
+        "line": 28,
+        "exported": true,
+        "parent": "Result"
+      },
+      {
+        "name": "Error",
+        "type": "class",
+        "line": 29,
+        "exported": true,
+        "parent": "Result"
+      },
+      {
+        "name": "Loading",
+        "type": "class",
+        "line": 30,
+        "exported": true,
+        "parent": "Result"
+      },
+      {
+        "name": "Status",
+        "type": "enum",
+        "line": 34,
+        "exported": true
+      },
+      {
+        "name": "ACTIVE",
+        "type": "enum_value",
+        "line": 35,
+        "exported": true,
+        "parent": "Status"
+      },
+      {
+        "name": "INACTIVE",
+        "type": "enum_value",
+        "line": 36,
+        "exported": true,
+        "parent": "Status"
+      },
+      {
+        "name": "PENDING",
+        "type": "enum_value",
+        "line": 37,
+        "exported": true,
+        "parent": "Status"
+      },
+      {
+        "name": "SUSPENDED",
+        "type": "enum_value",
+        "line": 38,
+        "exported": true,
+        "parent": "Status"
+      },
+      {
+        "name": "isUsable",
+        "type": "method",
+        "line": 40,
+        "exported": true,
+        "parent": "Status"
+      },
+      {
+        "name": "Repository",
+        "type": "interface",
+        "line": 44,
+        "exported": true
+      },
+      {
+        "name": "findById",
+        "type": "method",
+        "line": 45,
+        "exported": true,
+        "parent": "Repository"
+      },
+      {
+        "name": "save",
+        "type": "method",
+        "line": 46,
+        "exported": true,
+        "parent": "Repository"
+      },
+      {
+        "name": "delete",
+        "type": "method",
+        "line": 47,
+        "exported": true,
+        "parent": "Repository"
+      },
+      {
+        "name": "findAll",
+        "type": "method",
+        "line": 48,
+        "exported": true,
+        "parent": "Repository"
+      },
+      {
+        "name": "Auditable",
+        "type": "interface",
+        "line": 52,
+        "exported": true
+      },
+      {
+        "name": "auditInfo",
+        "type": "method",
+        "line": 56,
+        "exported": true,
+        "parent": "Auditable"
+      },
+      {
+        "name": "BaseEntity",
+        "type": "class",
+        "line": 60,
+        "exported": true
+      },
+      {
+        "name": "validate",
+        "type": "method",
+        "line": 61,
+        "exported": true,
+        "parent": "BaseEntity"
+      },
+      {
+        "name": "toMap",
+        "type": "method",
+        "line": 62,
+        "exported": true,
+        "parent": "BaseEntity"
+      },
+      {
+        "name": "describe",
+        "type": "method",
+        "line": 64,
+        "exported": true,
+        "parent": "BaseEntity"
+      },
+      {
+        "name": "AppConfig",
+        "type": "class",
+        "line": 68,
+        "exported": true
+      },
+      {
+        "name": "MAX_RETRIES",
+        "type": "constant",
+        "line": 69,
+        "exported": true,
+        "parent": "AppConfig",
+        "value": "3"
+      },
+      {
+        "name": "DEFAULT_TIMEOUT",
+        "type": "constant",
+        "line": 70,
+        "exported": true,
+        "parent": "AppConfig",
+        "value": "30_000L"
+      },
+      {
+        "name": "API_VERSION",
+        "type": "constant",
+        "line": 71,
+        "exported": true,
+        "parent": "AppConfig",
+        "value": "2.1.0"
+      },
+      {
+        "name": "register",
+        "type": "method",
+        "line": 75,
+        "exported": true,
+        "parent": "AppConfig"
+      },
+      {
+        "name": "UserService",
+        "type": "class",
+        "line": 81,
+        "exported": true
+      },
+      {
+        "name": "MAX_PAGE_SIZE",
+        "type": "constant",
+        "line": 84,
+        "exported": true,
+        "parent": "UserService",
+        "value": "100"
+      },
+      {
+        "name": "DEFAULT_PAGE_SIZE",
+        "type": "constant",
+        "line": 85,
+        "exported": true,
+        "parent": "UserService",
+        "value": "20"
+      },
+      {
+        "name": "create",
+        "type": "method",
+        "line": 88,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "findById",
+        "type": "method",
+        "line": 93,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "createUser",
+        "type": "method",
+        "line": 98,
+        "exported": true,
+        "parent": "UserService"
+      },
+      {
+        "name": "validateEmail",
+        "type": "method",
+        "line": 103,
+        "exported": false,
+        "parent": "UserService"
+      },
+      {
+        "name": "generateId",
+        "type": "method",
+        "line": 107,
+        "exported": false,
+        "parent": "UserService"
+      },
+      {
+        "name": "Priority",
+        "type": "enum",
+        "line": 113,
+        "exported": true
+      },
+      {
+        "name": "LOW",
+        "type": "enum_value",
+        "line": 114,
+        "exported": true,
+        "parent": "Priority"
+      },
+      {
+        "name": "MEDIUM",
+        "type": "enum_value",
+        "line": 115,
+        "exported": true,
+        "parent": "Priority"
+      },
+      {
+        "name": "HIGH",
+        "type": "enum_value",
+        "line": 116,
+        "exported": true,
+        "parent": "Priority"
+      },
+      {
+        "name": "CRITICAL",
+        "type": "enum_value",
+        "line": 117,
+        "exported": true,
+        "parent": "Priority"
+      },
+      {
+        "name": "isUrgent",
+        "type": "method",
+        "line": 119,
+        "exported": true,
+        "parent": "Priority"
+      },
+      {
+        "name": "isValidEmail",
+        "type": "function",
+        "line": 123,
+        "exported": true
+      },
+      {
+        "name": "activeUsers",
+        "type": "function",
+        "line": 127,
+        "exported": true
+      },
+      {
+        "name": "calculateTotal",
+        "type": "function",
+        "line": 132,
+        "exported": true
+      },
+      {
+        "name": "formatUser",
+        "type": "function",
+        "line": 137,
+        "exported": true
+      },
+      {
+        "name": "DEFAULT_LOCALE",
+        "type": "constant",
+        "line": 142,
+        "exported": true,
+        "value": "en_US"
+      },
+      {
+        "name": "currentEnvironment",
+        "type": "constant",
+        "line": 143,
+        "exported": true,
+        "value": "development"
+      },
+      {
+        "name": "InMemoryUserRepository",
+        "type": "class",
+        "line": 146,
+        "exported": true
+      },
+      {
+        "name": "findById",
+        "type": "method",
+        "line": 152,
+        "exported": true,
+        "parent": "InMemoryUserRepository"
+      },
+      {
+        "name": "save",
+        "type": "method",
+        "line": 154,
+        "exported": true,
+        "parent": "InMemoryUserRepository"
+      },
+      {
+        "name": "delete",
+        "type": "method",
+        "line": 159,
+        "exported": true,
+        "parent": "InMemoryUserRepository"
+      },
+      {
+        "name": "findAll",
+        "type": "method",
+        "line": 163,
+        "exported": true,
+        "parent": "InMemoryUserRepository"
+      },
+      {
+        "name": "clear",
+        "type": "method",
+        "line": 165,
+        "exported": false,
+        "parent": "InMemoryUserRepository"
+      }
+    ]
+  }
+}

@@ -1553,7 +1553,7 @@ func parseMakefile(filePath string) ([]FallbackSymbol, bool, error) {
 	lines := strings.Split(string(content), "\n")
 
 	// Patterns for Makefile
-	targetPattern := regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_.-]*)\s*:(?!=)`)
+	targetPattern := regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_.-]*)\s*:([^=]|$)`)
 	varPattern := regexp.MustCompile(`^([A-Z_][A-Z0-9_]*)\s*[:?+]?=\s*(.*)$`)
 	phonyPattern := regexp.MustCompile(`^\.PHONY\s*:\s*(.+)$`)
 	definePattern := regexp.MustCompile(`^define\s+(\w+)`)

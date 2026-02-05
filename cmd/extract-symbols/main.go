@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/cmd/ingest-codebase/languages"
 	"mdemg/internal/symbols"
 )
 
@@ -269,9 +270,44 @@ func runJSONMode(filePath string) {
 	ctx := context.Background()
 	result, err := svc.ParseFile(ctx, filePath)
 
-	// If tree-sitter fails or returns no symbols, try fallback parser
+	// If tree-sitter fails or returns no symbols, try ingest-codebase parser
 	treeSitterFailed := err != nil || (result != nil && len(result.Symbols) == 0) || result == nil
 	if treeSitterFailed {
+		// Try ingest-codebase parser first (matches UPTS specs exactly)
+		if parser, found := languages.GetParserForFile(filePath); found {
+			absPath, _ := filepath.Abs(filePath)
+			dir := filepath.Dir(absPath)
+			elements, parseErr := parser.ParseFile(dir, absPath, true)
+			if parseErr == nil && len(elements) > 0 {
+				// Use ingest-codebase parser symbols
+				var allSymbols []UPTSSymbol
+				for _, elem := range elements {
+					for _, sym := range elem.Symbols {
+						uptsSymbol := UPTSSymbol{
+							Name:       sym.Name,
+							Type:       normalizeType(sym.Type),
+							Line:       sym.Line,
+							LineEnd:    sym.LineEnd,
+							Exported:   sym.Exported,
+							Parent:     sym.Parent,
+							Signature:  sym.Signature,
+							Value:      sym.Value,
+							DocComment: sym.DocComment,
+						}
+						allSymbols = append(allSymbols, uptsSymbol)
+					}
+				}
+				output := UPTSOutput{Symbols: allSymbols}
+				jsonBytes, jsonErr := json.MarshalIndent(output, "", "  ")
+				if jsonErr != nil {
+					log.Fatalf("Failed to marshal JSON: %v", jsonErr)
+				}
+				fmt.Println(string(jsonBytes))
+				return
+			}
+		}
+
+		// Fall back to legacy fallback parsers if ingest-codebase parser not found
 		fallbackSymbols, handled, fallbackErr := TryFallbackParser(filePath)
 		if handled {
 			if fallbackErr != nil {

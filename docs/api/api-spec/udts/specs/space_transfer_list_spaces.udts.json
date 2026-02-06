@@ -9,7 +9,7 @@
   },
   "config": {
     "timeout_ms": 10000,
-    "proto_sha256": "e7731911ba1c87b37eac7ebe999dce84b95493fcfdaa389636520d447e3149b1"
+    "proto_sha256": "50c838e8cf291ac9c6b89341255c64aadaeb7cae3916c9f93a342bec75d9b85e"
   },
   "metadata": {
     "description": "ListSpaces unary RPC returns OK and a spaces array",

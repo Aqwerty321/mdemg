@@ -1,0 +1,20 @@
+{
+  "udts_version": "1.0.0",
+  "service": "mdemg.transfer.v1.SpaceTransfer",
+  "method": "Export",
+  "request": {
+    "space_id": "demo",
+    "since_timestamp": "2020-01-01T00:00:00Z"
+  },
+  "expected": {
+    "status_code": "OK"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "proto_sha256": "50c838e8cf291ac9c6b89341255c64aadaeb7cae3916c9f93a342bec75d9b85e"
+  },
+  "metadata": {
+    "description": "Export with since_timestamp (Phase 4 delta) returns stream ending with summary containing next_cursor",
+    "tags": ["space-transfer", "phase4", "delta", "streaming"]
+  }
+}

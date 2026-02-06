@@ -606,7 +606,9 @@ Rebalanced: α = 0.40, β = 0.20, γ = 0.10, δ = 0.05, ε = 0.25
 ---
 
 ### Deliverable 8.5: Symbol Search Endpoint & Proto Integration
-**Priority**: P2 | **Effort**: 1-2 days | **Status**: 🔶 PARTIAL (Proto done, endpoint pending)
+**Priority**: P2 | **Effort**: 1-2 days | **Status**: 📦 ARCHIVED (2026-02-06)
+
+> **Archive Note**: Deliverables 8.5-8.6 retired per user decision. Proto integration complete; dedicated symbol endpoint deferred in favor of Phase 9 incremental updates. Symbol search remains available via `/v1/memory/retrieve` with `include_symbols: true`.
 
 #### 8.5.0 Proto Updates (`api/proto/mdemg-module.proto`) ✅ COMPLETE
 Extended the proto definition to support symbols in module communication:
@@ -707,32 +709,15 @@ GET /v1/memory/symbols?space_id=vscode&name=DEFAULT_*&type=const&limit=20
 ---
 
 ### Deliverable 8.6: Testing & Validation
-**Priority**: P1 | **Effort**: 2 days | **Status**: 🔶 PARTIAL
+**Priority**: P1 | **Effort**: 2 days | **Status**: 📦 ARCHIVED (2026-02-06)
 
-#### 8.6.1 Unit Tests
+> **Archive Note**: Deliverable 8.6 retired per user decision. Core symbol parsing (8.6.1 parser tests) complete. VS Code benchmark validation deferred; existing symbol integration in retrieve pipeline provides sufficient coverage for current use cases.
+
+#### 8.6.1 Unit Tests (Completed)
 - [x] `internal/symbols/parser_test.go` - Tree-sitter parsing for each language (12 tests)
-- [ ] `internal/symbols/store_test.go` - Neo4j storage operations
-- [ ] `internal/retrieval/symbol_search_test.go` - Symbol search modes
 
-#### 8.6.2 Integration Tests
-- [ ] `tests/integration/symbol_ingest_test.go` - End-to-end symbol ingestion
-- [ ] `tests/integration/symbol_retrieval_test.go` - Symbol-aware retrieval
-
-#### 8.6.3 Benchmark Validation (VS Code V4 Re-test)
-Run the 15 evidence-locked questions from VS Code benchmark:
-
-| Question ID | Expected Symbol | Target |
-|-------------|-----------------|--------|
-| ev_001 | `EDITOR_FONT_DEFAULTS.fontSize` | Value: 12/14 |
-| ev_002 | `DEFAULT_FLUSH_INTERVAL` | Value: 60000 |
-| ev_004 | `minimumWidth` (SidebarPart) | Value: 170 |
-| ev_005 | CodeLens debounce min | Value: 250 |
-| ev_007 | hover delay | Value: 300 |
-| ev_008 | `DEFAULT_AUTO_SAVE_DELAY` | Value: 1000 |
-| ev_011 | `quickSuggestionsDelay` | Value: 10 |
-| ev_014 | `DEFAULT_MAX_SEARCH_RESULTS` | Value: 20000 |
-
-**Success Criteria**: 12/15 (80%) correct with evidence vs current ~3/15 (20%)
+#### 8.6.2-8.6.3 Deferred
+Integration tests and VS Code benchmark validation archived for future consideration.
 
 ---
 
@@ -744,7 +729,7 @@ Run the 15 evidence-locked questions from VS Code benchmark:
 | **Week 1-2** | 8.2 | V0007 migration, Neo4j schema, store.go | ✅ DONE |
 | **Week 2** | 8.3 | Ingestion pipeline, cmd/ingest-codebase | ✅ DONE |
 | **Week 3** | 8.4 | Hybrid retrieval, scoring formula update | ✅ DONE |
-| **Week 4** | 8.5, 8.6 | Symbol endpoint, testing, VS Code re-benchmark | ⏳ IN PROGRESS |
+| **Week 4** | 8.5, 8.6 | Symbol endpoint, testing, VS Code re-benchmark | 📦 ARCHIVED |
 
 ### Current Progress Summary
 
@@ -803,14 +788,13 @@ Run the 15 evidence-locked questions from VS Code benchmark:
    └─────────┘   └─────────┘   └─────────┘
 ```
 
-**⏳ In Progress (Deliverable 8.5-8.6)**:
-- VS Code scale re-ingestion with symbol extraction (28,406 elements)
-- After ingestion: verify SymbolNodes in Neo4j
-- Run V6 benchmark to measure improvement over 11.7% baseline
+**📦 Archived (Deliverable 8.5-8.6)** (2026-02-06):
+- Symbol search endpoint and VS Code benchmark validation deferred
+- Core symbol infrastructure (8.1-8.4) complete and integrated into retrieve pipeline
 
-**📋 Remaining**:
-- Create `/v1/memory/symbols` endpoint for direct symbol queries
-- Run full benchmark validation
+**📦 Archived Remaining Items** (moved to backlog):
+- `/v1/memory/symbols` endpoint - deferred, use retrieve with `include_symbols: true`
+- VS Code benchmark validation - deferred
 
 ---
 
@@ -859,25 +843,26 @@ Run the 15 evidence-locked questions from VS Code benchmark:
 ---
 
 ### Deliverable 9.1: Git Commit Hooks
-**Priority**: P1 | **Effort**: 2-3 days | **Status**: ⏳ PENDING
+**Priority**: P1 | **Effort**: 2-3 days | **Status**: ✅ COMPLETE
 
 #### 9.1.1 Git Diff-Based Ingestion
-- [ ] Add `--incremental` flag to `cmd/ingest-codebase`
-- [ ] Parse `git diff HEAD~1` to identify changed/added/deleted files
-- [ ] Only process changed files (skip unchanged)
-- [ ] Handle deletions: archive or delete corresponding MemoryNodes
-- [ ] Handle renames: update file_path, preserve node_id
+- [x] Add `--incremental` flag to `cmd/ingest-codebase`
+- [x] Add `--since` flag for specifying base commit (default: HEAD~1)
+- [x] Parse `git diff` to identify changed/added/deleted files
+- [x] Only process changed files (skip unchanged)
+- [x] Handle deletions via `--archive-deleted` flag (default: true)
+- [ ] Handle renames: update file_path, preserve node_id (deferred)
 
 #### 9.1.2 Post-Commit Hook Integration
 ```bash
 # .git/hooks/post-commit
 #!/bin/bash
-mdemg-cli ingest --incremental --space-id="my-project"
+go run ./cmd/ingest-codebase --incremental --space-id="my-project" --quiet --log-file=".mdemg/incremental.log"
 ```
 
-- [ ] Create `mdemg-cli` wrapper binary for hook integration
-- [ ] Support `--quiet` mode for background execution
-- [ ] Log to file for debugging (`.mdemg/incremental.log`)
+- [x] Support `--quiet` mode for background execution
+- [x] Support `--log-file` for file logging
+- [ ] Create `mdemg-cli` wrapper binary (deferred - use go run for now)
 
 #### 9.1.3 CI/CD Integration
 ```yaml
@@ -893,7 +878,7 @@ mdemg-cli ingest --incremental --space-id="my-project"
 ---
 
 ### Deliverable 9.2: Time-Based Scheduled Sync
-**Priority**: P2 | **Effort**: 1-2 days | **Status**: ⏳ PENDING
+**Priority**: P2 | **Effort**: 1-2 days | **Status**: ⏳ PARTIAL (Freshness tracking complete, APE INGEST pending)
 
 #### 9.2.1 APE Scheduled Ingestion
 Leverage existing APE scheduler for periodic re-ingestion:
@@ -913,58 +898,58 @@ Leverage existing APE scheduler for periodic re-ingestion:
 
 - [ ] Add `INGEST` action type to APE modules
 - [ ] Support `full_reingest` vs `incremental` modes
-- [ ] Track last_ingest_time per space_id
+- [x] Track last_ingest_time per space_id (via TapRoot)
 - [ ] Detect stale spaces (no update in N days) and trigger refresh
 
-#### 9.2.2 Freshness Tracking
+#### 9.2.2 Freshness Tracking ✅
 ```cypher
-// Add to TapRoot
+// TapRoot freshness properties (implemented)
 MATCH (t:TapRoot {space_id: $space_id})
 SET t.last_ingest_at = datetime(),
     t.last_ingest_type = 'incremental',
     t.ingest_count = coalesce(t.ingest_count, 0) + 1
 ```
 
-- [ ] Add freshness metadata to TapRoot nodes
-- [ ] API endpoint: `GET /v1/memory/spaces/{space_id}/freshness`
-- [ ] Alert when space is stale (configurable threshold)
+- [x] Add freshness metadata to TapRoot nodes
+- [x] API endpoint: `GET /v1/memory/spaces/{space_id}/freshness` (handlers_freshness.go)
+- [x] Configurable stale threshold (`SyncStaleThresholdHours` in config)
 
 ---
 
 ### Deliverable 9.3: User-Triggered Updates
-**Priority**: P1 | **Effort**: 1 day | **Status**: ⏳ PENDING
+**Priority**: P1 | **Effort**: 1 day | **Status**: ✅ COMPLETE
 
-#### 9.3.1 Manual Re-Ingest API
+> **UATS Coverage**: All endpoints have UATS specs in `docs/api/api-spec/uats/specs/`
+
+#### 9.3.1 Manual Re-Ingest API ✅
 ```bash
 POST /v1/memory/ingest/trigger
 {
   "space_id": "my-project",
-  "mode": "incremental",  // or "full"
-  "source_path": "/path/to/repo",
-  "options": {
-    "extract_symbols": true,
-    "run_consolidation": true
-  }
+  "path": "/path/to/repo",
+  "incremental": true,
+  "extract_symbols": true,
+  "consolidate": true
 }
 ```
 
 Response:
 ```json
 {
-  "data": {
-    "job_id": "ingest-abc123",
-    "status": "started",
-    "estimated_elements": 1500,
-    "started_at": "2026-01-23T15:30:00Z"
-  }
+  "job_id": "ingest-abc123",
+  "status": "running",
+  "message": "Ingestion job started"
 }
 ```
 
-- [ ] Implement background job queue for ingestion
-- [ ] Return job_id for status polling
-- [ ] `GET /v1/memory/ingest/status/{job_id}` for progress
+- [x] Background job queue implemented (internal/jobs/jobs.go)
+- [x] `POST /v1/memory/ingest/trigger` - start job (handlers.go:2162)
+- [x] `GET /v1/memory/ingest/status/{job_id}` - poll progress (handlers.go:2458)
+- [x] `POST /v1/memory/ingest/cancel/{job_id}` - cancel job
+- [x] `GET /v1/memory/ingest/jobs` - list all jobs
+- [x] UATS specs: ingest_trigger.uats.json, ingest_status.uats.json, ingest_cancel.uats.json, ingest_jobs.uats.json
 
-#### 9.3.2 File-Level Re-Ingest
+#### 9.3.2 File-Level Re-Ingest ✅
 ```bash
 POST /v1/memory/ingest/files
 {
@@ -976,9 +961,10 @@ POST /v1/memory/ingest/files
 }
 ```
 
-- [ ] Re-ingest specific files without full scan
-- [ ] Useful for IDE integration (save → update)
-- [ ] Update symbols, embeddings, edges for affected files only
+- [x] Re-ingest specific files without full scan (handlers.go:2591)
+- [x] Synchronous for ≤50 files, background job for >50
+- [x] Useful for IDE integration (save → update)
+- [x] Tests in handlers_ingest_test.go
 
 ---
 

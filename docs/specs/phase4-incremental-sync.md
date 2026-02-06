@@ -1,7 +1,7 @@
 # Phase 4: Incremental Sync
 
 **Parent plan:** [development-space-collaboration.md](./development-space-collaboration.md)  
-**Status:** Draft (spec only; implementation not started)  
+**Status:** Implementation in progress (proto + exporter + CLI done; UDTS pending)  
 **Date:** 2026-01-22
 
 ---
@@ -55,7 +55,7 @@
 
 ## Acceptance (when impl is done)
 
-- [ ] Export with `since_timestamp` or `since_cursor` returns only changed entities.
-- [ ] Import applies deltas cleanly; re-applying same cursor is idempotent.
-- [ ] UDTS + tests pass.
+- [x] Export with `since_timestamp` or `since_cursor` returns only changed entities (exporter filters nodes/edges/observations/symbols by updated_at/created_at/timestamp; next_cursor in summary).
+- [ ] Import applies deltas cleanly; re-applying same cursor is idempotent (unchanged conflict semantics).
+- [ ] UDTS spec for Export with since_timestamp; tests pass.
 - [ ] User or subagent verification of delta export/import.

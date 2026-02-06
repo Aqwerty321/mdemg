@@ -304,6 +304,62 @@ func TestDevSpacePullExport(t *testing.T) {
 	}
 }
 
+// TestSpaceTransferExportDelta runs the Export (delta) contract (Phase 4).
+func TestSpaceTransferExportDelta(t *testing.T) {
+	target := getTarget(t)
+	spec := loadSpec(t, "space_transfer_export_delta.udts.json")
+	verifyProtoHash(t, spec, "space-transfer.proto")
+	if spec.Service != "mdemg.transfer.v1.SpaceTransfer" || spec.Method != "Export" {
+		t.Fatalf("spec mismatch: %s / %s", spec.Service, spec.Method)
+	}
+
+	timeout := 15 * time.Second
+	if spec.Config.TimeoutMs > 0 {
+		timeout = time.Duration(spec.Config.TimeoutMs) * time.Millisecond
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("dial %s: %v", target, err)
+	}
+	defer conn.Close()
+
+	client := pb.NewSpaceTransferClient(conn)
+	stream, err := client.Export(ctx, &pb.ExportRequest{
+		SpaceId:        "demo",
+		SinceTimestamp: "2020-01-01T00:00:00Z",
+	})
+	if err != nil {
+		st, _ := status.FromError(err)
+		if spec.Expected.StatusCode != st.Code().String() {
+			t.Fatalf("Export: %v (expected status %s)", err, spec.Expected.StatusCode)
+		}
+		return
+	}
+	var lastChunk *pb.SpaceChunk
+	for {
+		chunk, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Export Recv: %v", err)
+		}
+		lastChunk = chunk
+	}
+	if lastChunk == nil {
+		t.Fatal("Export stream produced no chunks")
+	}
+	if lastChunk.ChunkType != pb.ChunkType_CHUNK_TYPE_SUMMARY {
+		t.Errorf("last chunk type: got %v, want SUMMARY", lastChunk.ChunkType)
+	}
+	if sum := lastChunk.GetSummary(); sum != nil && sum.NextCursor == "" {
+		t.Error("Phase 4 delta export: expected summary to have next_cursor")
+	}
+}
+
 // TestDevSpaceConnect runs the Connect contract (Phase 3 bidi stream).
 func TestDevSpaceConnect(t *testing.T) {
 	target := getTarget(t)

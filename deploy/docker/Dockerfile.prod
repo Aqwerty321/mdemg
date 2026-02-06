@@ -2,10 +2,10 @@
 # Multi-stage build for minimal image size
 
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
+# Install build dependencies (including C compiler for CGO)
+RUN apk add --no-cache git ca-certificates tzdata gcc musl-dev
 
 WORKDIR /build
 
@@ -16,8 +16,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build with optimizations
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+# Build with CGO enabled for tree-sitter support
+RUN CGO_ENABLED=1 \
     go build -ldflags="-s -w -X main.version=$(git describe --tags --always 2>/dev/null || echo 'dev')" \
     -o mdemg ./cmd/server
 
@@ -28,8 +28,8 @@ FROM alpine:3.19
 RUN addgroup -g 1000 mdemg && \
     adduser -u 1000 -G mdemg -s /bin/sh -D mdemg
 
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
+# Install runtime dependencies (libc for CGO binaries)
+RUN apk add --no-cache ca-certificates tzdata libc6-compat
 
 WORKDIR /app
 

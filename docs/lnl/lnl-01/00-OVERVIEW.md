@@ -199,11 +199,17 @@ With this much functionality:
 - **25 language parsers** — each must extract symbols correctly
 - **45+ API endpoints** — each must honor its contract
 - **Multiple integration points** — plugins, hooks, scheduled jobs
+- **Production requirements** — performance, security, observability
 
 > [!question] How do we ensure it all works?
 > **Specification-driven testing:**
 > - [[01-UPTS-DEEP-DIVE|UPTS]] — "This is what the Kotlin parser MUST extract from this file"
 > - [[02-UATS-DEEP-DIVE|UATS]] — "This is what POST /v1/memory/retrieve MUST return"
+>
+> **Production readiness frameworks (Phase 3):**
+> - **UBTS** — "Retrieval p95 latency MUST be under 250ms"
+> - **USTS** — "Unauthenticated requests MUST return 401"
+> - **UOBS** — "Prometheus metrics endpoint MUST expose these counters"
 
 ---
 
@@ -216,6 +222,14 @@ With this much functionality:
 | API endpoints | 45+ |
 | UATS test variants | ~90 |
 | Pass rate | 100% |
+
+### Production Test Frameworks (Phase 3)
+
+| Framework | Purpose | Specs |
+|-----------|---------|-------|
+| **UBTS** | Benchmark testing (latency, throughput, load) | 3 specs, 3 profiles (smoke/load/stress) |
+| **USTS** | Security testing (auth, rate limits, injection) | 4 specs with attack payloads |
+| **UOBS** | Observability (metrics, health, logging) | 3 specs + Grafana dashboard + alerts |
 
 ---
 

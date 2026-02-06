@@ -295,6 +295,12 @@ make test-api 2>&1 | tail -30
 > [!faq]- Can we use MDEMG with Claude Code / Cursor / other tools?
 > Yes — MDEMG has a standard HTTP API. Anything that can make HTTP requests can integrate.
 
+> [!faq]- What are UBTS, USTS, and UOBS?
+> Phase 3 production readiness frameworks following the same spec-driven pattern:
+> - **UBTS** — Benchmark tests (p50/p95/p99 latency thresholds, throughput)
+> - **USTS** — Security tests (auth enforcement, rate limiting, injection protection)
+> - **UOBS** — Observability tests (Prometheus metrics, health endpoints, log format)
+
 ---
 
 ## If Running Short on Time
@@ -324,6 +330,11 @@ make test-api 2>&1 | tail -30
 - `docs/lang-parser/lang-parse-spec/upts/README.md` — Full UPTS documentation
 - `docs/api/api-spec/uats/README.md` — Full UATS documentation
 - `cmd/ingest-codebase/languages/README.md` — Parser implementation guide
+
+**Production Test Frameworks (Phase 3):**
+- `docs/tests/ubts/README.md` — Benchmark testing (latency, throughput)
+- `docs/tests/usts/README.md` — Security testing (auth, rate limits, injection)
+- `docs/tests/uobs/README.md` — Observability testing (metrics, health, logs)
 
 ### Observe the session to CMS:
 

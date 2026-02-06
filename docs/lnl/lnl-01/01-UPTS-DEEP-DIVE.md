@@ -443,4 +443,21 @@ go test ./cmd/ingest-codebase/languages/ -run TestUPTS/zig -v
 
 ---
 
+## The Spec-Driven Family
+
+UPTS is part of a family of specification-driven test frameworks:
+
+| Framework | Scope | Status |
+|-----------|-------|--------|
+| **UPTS** | Parser testing (25 languages) | ✅ Production |
+| **UATS** | API testing (45+ endpoints) | ✅ Production |
+| **UBTS** | Benchmark testing (latency, throughput) | ✅ Phase 3 |
+| **USTS** | Security testing (auth, rate limits) | ✅ Phase 3 |
+| **UOBS** | Observability testing (metrics, health) | ✅ Phase 3 |
+
+> [!tip] Same Pattern Everywhere
+> Learn UPTS → understand UATS → understand UBTS/USTS/UOBS. Same JSON spec structure, same runner pattern, same CI integration.
+
+---
+
 **Next:** [[02-UATS-DEEP-DIVE|UATS Deep Dive →]]

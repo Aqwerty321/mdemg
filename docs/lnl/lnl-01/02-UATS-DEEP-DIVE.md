@@ -439,4 +439,19 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py add-hashes \
 
 ---
 
+## Related Frameworks (Phase 3)
+
+UPTS and UATS are the foundation. Phase 3 adds three more spec-driven frameworks for production readiness:
+
+| Framework | What It Tests | Location |
+|-----------|---------------|----------|
+| **UBTS** | Performance benchmarks (latency thresholds, throughput, concurrent load) | `docs/tests/ubts/` |
+| **USTS** | Security (auth enforcement, rate limiting, injection protection) | `docs/tests/usts/` |
+| **UOBS** | Observability (Prometheus metrics, health endpoints, log format) | `docs/tests/uobs/` |
+
+> [!tip] Same Pattern
+> All five frameworks (UPTS, UATS, UBTS, USTS, UOBS) follow the same principle: **the spec is the contract**. JSON schema, Python runner, CI integration.
+
+---
+
 **Next:** [[03-SPEAKER-NOTES|Speaker Notes & Timing →]]

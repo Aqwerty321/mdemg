@@ -358,6 +358,82 @@ mdemg/
 └── docker-compose.yml    # Neo4j container
 ```
 
+## Observability Stack
+
+MDEMG includes a complete observability stack for monitoring and debugging.
+
+### Quick Start
+
+```bash
+cd deploy/docker
+docker compose -f docker-compose.observability.yml up -d
+
+# Access dashboards
+open http://localhost:3000  # Grafana (admin/admin)
+open http://localhost:9090  # Prometheus
+```
+
+### Components
+
+| Component | Port | Description |
+|-----------|------|-------------|
+| Prometheus | 9090 | Metrics collection and alerting |
+| Grafana | 3000 | Dashboard visualization |
+| Blackbox Exporter | 9115 | HTTP/TCP health probes |
+
+### MDEMG Overview Dashboard
+
+Pre-configured dashboard with 10 panels:
+- Request Rate, P95 Latency, Error Rate, Circuit Breakers
+- Request Latency Distribution (p50/p95/p99)
+- Requests by Status, Cache Hit Ratios
+- Retrieval Latency, Rate Limit Rejections, Embedding Latency
+
+### Metrics Endpoint
+
+```bash
+curl http://localhost:9999/v1/prometheus
+```
+
+Exposes all MDEMG metrics in Prometheus format.
+
+---
+
+## Development Roadmap
+
+### Recently Completed
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 48.5 | Observability Stack (Prometheus/Grafana) | ✅ Complete |
+| 34 | Incremental Sync (Delta Export) | ✅ Complete |
+| 46 | Symbol Indexing | ✅ Complete |
+
+### In Progress / Next Up
+
+| Priority | Phase | Task | Description |
+|----------|-------|------|-------------|
+| 1 | 47 | Optimistic lock retry | Retry with backoff on concurrent updates |
+| 2 | 47 | Edge consistency | Re-run Hebbian learning on source changes |
+| 3 | 48.3 | Data transmission | gzip compression, cursor-based pagination |
+| 4 | 48.4 | Connection pooling | Neo4j pool tuning, pool metrics |
+| 5 | 49.4 | Plugin scaffolding | `mdemg plugin new <name> --type=<TYPE>` |
+| 6 | 35 | CRDT merge | Merge semantics for learned edges |
+
+### Planned
+
+| Phase | Name | Description |
+|-------|------|-------------|
+| 37 | Agent Health | Heartbeat, presence, agent status |
+| 38 | UNTS Hash Verification | Protected file integrity |
+| 44 | Linear Full CRUD | Issues, projects, comments + workflows |
+| 45.5 | APE Context Cooler | Volatile → long-term memory graduation |
+| 50 | Public Readiness | Open source hardening |
+
+See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for detailed phase specifications.
+
+---
+
 ## Documentation
 
 - [Architecture](docs/architecture/01_Architecture.md) - System design and components
@@ -366,6 +442,7 @@ mdemg/
 - [Benchmarking Guide](docs/benchmarks/BENCHMARK_V4_README.md) - Running and validating benchmarks
 - [CI/CD Integration](docs/development/CI_CD_INTEGRATION.md) - Git hooks, GitHub Actions, and scheduled sync
 - [API Reference](docs/development/API_REFERENCE.md) - Full API endpoint documentation
+- [Agent Handoff](AGENT_HANDOFF.md) - Complete development context and phase registry
 
 ## Contributing
 

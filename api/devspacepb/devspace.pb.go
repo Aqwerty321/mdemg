@@ -21,6 +21,59 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// PresenceStatus indicates the current status of an agent.
+type PresenceStatus int32
+
+const (
+	PresenceStatus_PRESENCE_UNKNOWN PresenceStatus = 0
+	PresenceStatus_PRESENCE_ONLINE  PresenceStatus = 1 // Heartbeat within threshold (default: 30s)
+	PresenceStatus_PRESENCE_AWAY    PresenceStatus = 2 // Heartbeat within extended threshold (default: 5min)
+	PresenceStatus_PRESENCE_OFFLINE PresenceStatus = 3 // No recent heartbeat
+)
+
+// Enum value maps for PresenceStatus.
+var (
+	PresenceStatus_name = map[int32]string{
+		0: "PRESENCE_UNKNOWN",
+		1: "PRESENCE_ONLINE",
+		2: "PRESENCE_AWAY",
+		3: "PRESENCE_OFFLINE",
+	}
+	PresenceStatus_value = map[string]int32{
+		"PRESENCE_UNKNOWN": 0,
+		"PRESENCE_ONLINE":  1,
+		"PRESENCE_AWAY":    2,
+		"PRESENCE_OFFLINE": 3,
+	}
+)
+
+func (x PresenceStatus) Enum() *PresenceStatus {
+	p := new(PresenceStatus)
+	*p = x
+	return p
+}
+
+func (x PresenceStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PresenceStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_proto_devspace_proto_enumTypes[0].Descriptor()
+}
+
+func (PresenceStatus) Type() protoreflect.EnumType {
+	return &file_api_proto_devspace_proto_enumTypes[0]
+}
+
+func (x PresenceStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PresenceStatus.Descriptor instead.
+func (PresenceStatus) EnumDescriptor() ([]byte, []int) {
+	return file_api_proto_devspace_proto_rawDescGZIP(), []int{0}
+}
+
 type RegisterAgentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DevSpaceId    string                 `protobuf:"bytes,1,opt,name=dev_space_id,json=devSpaceId,proto3" json:"dev_space_id,omitempty"`                                                   // Required: e.g. "my-team"
@@ -791,6 +844,433 @@ func (x *AgentMessage) GetSequence() int64 {
 	return 0
 }
 
+// HeartbeatRequest is sent periodically by agents to indicate they are alive.
+type HeartbeatRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevSpaceId    string                 `protobuf:"bytes,1,opt,name=dev_space_id,json=devSpaceId,proto3" json:"dev_space_id,omitempty"`                                               // Required: DevSpace the agent belongs to
+	AgentId       string                 `protobuf:"bytes,2,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`                                                          // Required: the agent sending the heartbeat
+	Status        map[string]string      `protobuf:"bytes,3,rep,name=status,proto3" json:"status,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Optional: status info (e.g. "load": "0.5", "task": "indexing")
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeartbeatRequest) Reset() {
+	*x = HeartbeatRequest{}
+	mi := &file_api_proto_devspace_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeartbeatRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeartbeatRequest) ProtoMessage() {}
+
+func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_devspace_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
+func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_devspace_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *HeartbeatRequest) GetDevSpaceId() string {
+	if x != nil {
+		return x.DevSpaceId
+	}
+	return ""
+}
+
+func (x *HeartbeatRequest) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *HeartbeatRequest) GetStatus() map[string]string {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+// HeartbeatResponse confirms the heartbeat was received.
+type HeartbeatResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	ServerTime    string                 `protobuf:"bytes,2,opt,name=server_time,json=serverTime,proto3" json:"server_time,omitempty"` // Server timestamp for clock sync (ISO8601)
+	QueueSize     int32                  `protobuf:"varint,3,opt,name=queue_size,json=queueSize,proto3" json:"queue_size,omitempty"`   // Number of queued messages waiting for this agent
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeartbeatResponse) Reset() {
+	*x = HeartbeatResponse{}
+	mi := &file_api_proto_devspace_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeartbeatResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeartbeatResponse) ProtoMessage() {}
+
+func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_devspace_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
+func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_devspace_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *HeartbeatResponse) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *HeartbeatResponse) GetServerTime() string {
+	if x != nil {
+		return x.ServerTime
+	}
+	return ""
+}
+
+func (x *HeartbeatResponse) GetQueueSize() int32 {
+	if x != nil {
+		return x.QueueSize
+	}
+	return 0
+}
+
+// GetPresenceRequest retrieves the presence status of agents in a DevSpace.
+type GetPresenceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevSpaceId    string                 `protobuf:"bytes,1,opt,name=dev_space_id,json=devSpaceId,proto3" json:"dev_space_id,omitempty"` // Required: DevSpace to query
+	AgentId       string                 `protobuf:"bytes,2,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`            // Optional: specific agent (empty = all agents)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPresenceRequest) Reset() {
+	*x = GetPresenceRequest{}
+	mi := &file_api_proto_devspace_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPresenceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPresenceRequest) ProtoMessage() {}
+
+func (x *GetPresenceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_devspace_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPresenceRequest.ProtoReflect.Descriptor instead.
+func (*GetPresenceRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_devspace_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetPresenceRequest) GetDevSpaceId() string {
+	if x != nil {
+		return x.DevSpaceId
+	}
+	return ""
+}
+
+func (x *GetPresenceRequest) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+// GetPresenceResponse returns the presence status of agents.
+type GetPresenceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Agents        []*AgentPresence       `protobuf:"bytes,1,rep,name=agents,proto3" json:"agents,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPresenceResponse) Reset() {
+	*x = GetPresenceResponse{}
+	mi := &file_api_proto_devspace_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPresenceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPresenceResponse) ProtoMessage() {}
+
+func (x *GetPresenceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_devspace_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPresenceResponse.ProtoReflect.Descriptor instead.
+func (*GetPresenceResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_devspace_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetPresenceResponse) GetAgents() []*AgentPresence {
+	if x != nil {
+		return x.Agents
+	}
+	return nil
+}
+
+// AgentPresence represents the online/offline status of an agent.
+type AgentPresence struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	AgentId               string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	Status                PresenceStatus         `protobuf:"varint,2,opt,name=status,proto3,enum=mdemg.devspace.v1.PresenceStatus" json:"status,omitempty"`
+	LastHeartbeat         string                 `protobuf:"bytes,3,opt,name=last_heartbeat,json=lastHeartbeat,proto3" json:"last_heartbeat,omitempty"`                                                                  // ISO8601 timestamp of last heartbeat
+	SecondsSinceHeartbeat int32                  `protobuf:"varint,4,opt,name=seconds_since_heartbeat,json=secondsSinceHeartbeat,proto3" json:"seconds_since_heartbeat,omitempty"`                                       // For convenience
+	Metadata              map[string]string      `protobuf:"bytes,5,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`                       // Agent metadata from registration
+	LastStatus            map[string]string      `protobuf:"bytes,6,rep,name=last_status,json=lastStatus,proto3" json:"last_status,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Status from last heartbeat
+	QueuedMessages        int32                  `protobuf:"varint,7,opt,name=queued_messages,json=queuedMessages,proto3" json:"queued_messages,omitempty"`                                                              // Messages waiting in offline queue
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *AgentPresence) Reset() {
+	*x = AgentPresence{}
+	mi := &file_api_proto_devspace_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentPresence) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentPresence) ProtoMessage() {}
+
+func (x *AgentPresence) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_devspace_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentPresence.ProtoReflect.Descriptor instead.
+func (*AgentPresence) Descriptor() ([]byte, []int) {
+	return file_api_proto_devspace_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *AgentPresence) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *AgentPresence) GetStatus() PresenceStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PresenceStatus_PRESENCE_UNKNOWN
+}
+
+func (x *AgentPresence) GetLastHeartbeat() string {
+	if x != nil {
+		return x.LastHeartbeat
+	}
+	return ""
+}
+
+func (x *AgentPresence) GetSecondsSinceHeartbeat() int32 {
+	if x != nil {
+		return x.SecondsSinceHeartbeat
+	}
+	return 0
+}
+
+func (x *AgentPresence) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AgentPresence) GetLastStatus() map[string]string {
+	if x != nil {
+		return x.LastStatus
+	}
+	return nil
+}
+
+func (x *AgentPresence) GetQueuedMessages() int32 {
+	if x != nil {
+		return x.QueuedMessages
+	}
+	return 0
+}
+
+// SetQueueConfigRequest configures the offline message queue for an agent.
+type SetQueueConfigRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevSpaceId    string                 `protobuf:"bytes,1,opt,name=dev_space_id,json=devSpaceId,proto3" json:"dev_space_id,omitempty"`
+	AgentId       string                 `protobuf:"bytes,2,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	MaxQueueSize  int32                  `protobuf:"varint,3,opt,name=max_queue_size,json=maxQueueSize,proto3" json:"max_queue_size,omitempty"` // Max messages to queue (0 = disable, -1 = unlimited)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetQueueConfigRequest) Reset() {
+	*x = SetQueueConfigRequest{}
+	mi := &file_api_proto_devspace_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetQueueConfigRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetQueueConfigRequest) ProtoMessage() {}
+
+func (x *SetQueueConfigRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_devspace_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetQueueConfigRequest.ProtoReflect.Descriptor instead.
+func (*SetQueueConfigRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_devspace_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SetQueueConfigRequest) GetDevSpaceId() string {
+	if x != nil {
+		return x.DevSpaceId
+	}
+	return ""
+}
+
+func (x *SetQueueConfigRequest) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *SetQueueConfigRequest) GetMaxQueueSize() int32 {
+	if x != nil {
+		return x.MaxQueueSize
+	}
+	return 0
+}
+
+// SetQueueConfigResponse confirms the queue configuration.
+type SetQueueConfigResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetQueueConfigResponse) Reset() {
+	*x = SetQueueConfigResponse{}
+	mi := &file_api_proto_devspace_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetQueueConfigResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetQueueConfigResponse) ProtoMessage() {}
+
+func (x *SetQueueConfigResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_devspace_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetQueueConfigResponse.ProtoReflect.Descriptor instead.
+func (*SetQueueConfigResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_devspace_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *SetQueueConfigResponse) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *SetQueueConfigResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 var File_api_proto_devspace_proto protoreflect.FileDescriptor
 
 const file_api_proto_devspace_proto_rawDesc = "" +
@@ -852,7 +1332,55 @@ const file_api_proto_devspace_proto_rawDesc = "" +
 	"\x05topic\x18\x03 \x01(\tR\x05topic\x12!\n" +
 	"\fpayload_type\x18\x04 \x01(\tR\vpayloadType\x12\x18\n" +
 	"\apayload\x18\x05 \x01(\fR\apayload\x12\x1a\n" +
-	"\bsequence\x18\x06 \x01(\x03R\bsequence2\xc5\x04\n" +
+	"\bsequence\x18\x06 \x01(\x03R\bsequence\"\xd3\x01\n" +
+	"\x10HeartbeatRequest\x12 \n" +
+	"\fdev_space_id\x18\x01 \x01(\tR\n" +
+	"devSpaceId\x12\x19\n" +
+	"\bagent_id\x18\x02 \x01(\tR\aagentId\x12G\n" +
+	"\x06status\x18\x03 \x03(\v2/.mdemg.devspace.v1.HeartbeatRequest.StatusEntryR\x06status\x1a9\n" +
+	"\vStatusEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"c\n" +
+	"\x11HeartbeatResponse\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x1f\n" +
+	"\vserver_time\x18\x02 \x01(\tR\n" +
+	"serverTime\x12\x1d\n" +
+	"\n" +
+	"queue_size\x18\x03 \x01(\x05R\tqueueSize\"Q\n" +
+	"\x12GetPresenceRequest\x12 \n" +
+	"\fdev_space_id\x18\x01 \x01(\tR\n" +
+	"devSpaceId\x12\x19\n" +
+	"\bagent_id\x18\x02 \x01(\tR\aagentId\"O\n" +
+	"\x13GetPresenceResponse\x128\n" +
+	"\x06agents\x18\x01 \x03(\v2 .mdemg.devspace.v1.AgentPresenceR\x06agents\"\x88\x04\n" +
+	"\rAgentPresence\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\tR\aagentId\x129\n" +
+	"\x06status\x18\x02 \x01(\x0e2!.mdemg.devspace.v1.PresenceStatusR\x06status\x12%\n" +
+	"\x0elast_heartbeat\x18\x03 \x01(\tR\rlastHeartbeat\x126\n" +
+	"\x17seconds_since_heartbeat\x18\x04 \x01(\x05R\x15secondsSinceHeartbeat\x12J\n" +
+	"\bmetadata\x18\x05 \x03(\v2..mdemg.devspace.v1.AgentPresence.MetadataEntryR\bmetadata\x12Q\n" +
+	"\vlast_status\x18\x06 \x03(\v20.mdemg.devspace.v1.AgentPresence.LastStatusEntryR\n" +
+	"lastStatus\x12'\n" +
+	"\x0fqueued_messages\x18\a \x01(\x05R\x0equeuedMessages\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a=\n" +
+	"\x0fLastStatusEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"z\n" +
+	"\x15SetQueueConfigRequest\x12 \n" +
+	"\fdev_space_id\x18\x01 \x01(\tR\n" +
+	"devSpaceId\x12\x19\n" +
+	"\bagent_id\x18\x02 \x01(\tR\aagentId\x12$\n" +
+	"\x0emax_queue_size\x18\x03 \x01(\x05R\fmaxQueueSize\">\n" +
+	"\x16SetQueueConfigResponse\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error*d\n" +
+	"\x0ePresenceStatus\x12\x14\n" +
+	"\x10PRESENCE_UNKNOWN\x10\x00\x12\x13\n" +
+	"\x0fPRESENCE_ONLINE\x10\x01\x12\x11\n" +
+	"\rPRESENCE_AWAY\x10\x02\x12\x14\n" +
+	"\x10PRESENCE_OFFLINE\x10\x032\xe2\x06\n" +
 	"\bDevSpace\x12b\n" +
 	"\rRegisterAgent\x12'.mdemg.devspace.v1.RegisterAgentRequest\x1a(.mdemg.devspace.v1.RegisterAgentResponse\x12h\n" +
 	"\x0fDeregisterAgent\x12).mdemg.devspace.v1.DeregisterAgentRequest\x1a*.mdemg.devspace.v1.DeregisterAgentResponse\x12\\\n" +
@@ -860,7 +1388,10 @@ const file_api_proto_devspace_proto_rawDesc = "" +
 	"\rPublishExport\x12%.mdemg.devspace.v1.PublishExportChunk\x1a(.mdemg.devspace.v1.PublishExportResponse(\x01\x12X\n" +
 	"\n" +
 	"PullExport\x12$.mdemg.devspace.v1.PullExportRequest\x1a\".mdemg.devspace.v1.PullExportChunk0\x01\x12O\n" +
-	"\aConnect\x12\x1f.mdemg.devspace.v1.AgentMessage\x1a\x1f.mdemg.devspace.v1.AgentMessage(\x010\x01B\x16Z\x14mdemg/api/devspacepbb\x06proto3"
+	"\aConnect\x12\x1f.mdemg.devspace.v1.AgentMessage\x1a\x1f.mdemg.devspace.v1.AgentMessage(\x010\x01\x12V\n" +
+	"\tHeartbeat\x12#.mdemg.devspace.v1.HeartbeatRequest\x1a$.mdemg.devspace.v1.HeartbeatResponse\x12\\\n" +
+	"\vGetPresence\x12%.mdemg.devspace.v1.GetPresenceRequest\x1a&.mdemg.devspace.v1.GetPresenceResponse\x12e\n" +
+	"\x0eSetQueueConfig\x12(.mdemg.devspace.v1.SetQueueConfigRequest\x1a).mdemg.devspace.v1.SetQueueConfigResponseB\x16Z\x14mdemg/api/devspacepbb\x06proto3"
 
 var (
 	file_api_proto_devspace_proto_rawDescOnce sync.Once
@@ -874,44 +1405,67 @@ func file_api_proto_devspace_proto_rawDescGZIP() []byte {
 	return file_api_proto_devspace_proto_rawDescData
 }
 
-var file_api_proto_devspace_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_api_proto_devspace_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_api_proto_devspace_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_api_proto_devspace_proto_goTypes = []any{
-	(*RegisterAgentRequest)(nil),    // 0: mdemg.devspace.v1.RegisterAgentRequest
-	(*RegisterAgentResponse)(nil),   // 1: mdemg.devspace.v1.RegisterAgentResponse
-	(*DeregisterAgentRequest)(nil),  // 2: mdemg.devspace.v1.DeregisterAgentRequest
-	(*DeregisterAgentResponse)(nil), // 3: mdemg.devspace.v1.DeregisterAgentResponse
-	(*ListExportsRequest)(nil),      // 4: mdemg.devspace.v1.ListExportsRequest
-	(*ListExportsResponse)(nil),     // 5: mdemg.devspace.v1.ListExportsResponse
-	(*ExportEntry)(nil),             // 6: mdemg.devspace.v1.ExportEntry
-	(*PublishExportChunk)(nil),      // 7: mdemg.devspace.v1.PublishExportChunk
-	(*PublishExportHeader)(nil),     // 8: mdemg.devspace.v1.PublishExportHeader
-	(*PublishExportResponse)(nil),   // 9: mdemg.devspace.v1.PublishExportResponse
-	(*PullExportRequest)(nil),       // 10: mdemg.devspace.v1.PullExportRequest
-	(*PullExportChunk)(nil),         // 11: mdemg.devspace.v1.PullExportChunk
-	(*AgentMessage)(nil),            // 12: mdemg.devspace.v1.AgentMessage
-	nil,                             // 13: mdemg.devspace.v1.RegisterAgentRequest.MetadataEntry
+	(PresenceStatus)(0),             // 0: mdemg.devspace.v1.PresenceStatus
+	(*RegisterAgentRequest)(nil),    // 1: mdemg.devspace.v1.RegisterAgentRequest
+	(*RegisterAgentResponse)(nil),   // 2: mdemg.devspace.v1.RegisterAgentResponse
+	(*DeregisterAgentRequest)(nil),  // 3: mdemg.devspace.v1.DeregisterAgentRequest
+	(*DeregisterAgentResponse)(nil), // 4: mdemg.devspace.v1.DeregisterAgentResponse
+	(*ListExportsRequest)(nil),      // 5: mdemg.devspace.v1.ListExportsRequest
+	(*ListExportsResponse)(nil),     // 6: mdemg.devspace.v1.ListExportsResponse
+	(*ExportEntry)(nil),             // 7: mdemg.devspace.v1.ExportEntry
+	(*PublishExportChunk)(nil),      // 8: mdemg.devspace.v1.PublishExportChunk
+	(*PublishExportHeader)(nil),     // 9: mdemg.devspace.v1.PublishExportHeader
+	(*PublishExportResponse)(nil),   // 10: mdemg.devspace.v1.PublishExportResponse
+	(*PullExportRequest)(nil),       // 11: mdemg.devspace.v1.PullExportRequest
+	(*PullExportChunk)(nil),         // 12: mdemg.devspace.v1.PullExportChunk
+	(*AgentMessage)(nil),            // 13: mdemg.devspace.v1.AgentMessage
+	(*HeartbeatRequest)(nil),        // 14: mdemg.devspace.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),       // 15: mdemg.devspace.v1.HeartbeatResponse
+	(*GetPresenceRequest)(nil),      // 16: mdemg.devspace.v1.GetPresenceRequest
+	(*GetPresenceResponse)(nil),     // 17: mdemg.devspace.v1.GetPresenceResponse
+	(*AgentPresence)(nil),           // 18: mdemg.devspace.v1.AgentPresence
+	(*SetQueueConfigRequest)(nil),   // 19: mdemg.devspace.v1.SetQueueConfigRequest
+	(*SetQueueConfigResponse)(nil),  // 20: mdemg.devspace.v1.SetQueueConfigResponse
+	nil,                             // 21: mdemg.devspace.v1.RegisterAgentRequest.MetadataEntry
+	nil,                             // 22: mdemg.devspace.v1.HeartbeatRequest.StatusEntry
+	nil,                             // 23: mdemg.devspace.v1.AgentPresence.MetadataEntry
+	nil,                             // 24: mdemg.devspace.v1.AgentPresence.LastStatusEntry
 }
 var file_api_proto_devspace_proto_depIdxs = []int32{
-	13, // 0: mdemg.devspace.v1.RegisterAgentRequest.metadata:type_name -> mdemg.devspace.v1.RegisterAgentRequest.MetadataEntry
-	6,  // 1: mdemg.devspace.v1.ListExportsResponse.exports:type_name -> mdemg.devspace.v1.ExportEntry
-	8,  // 2: mdemg.devspace.v1.PublishExportChunk.header:type_name -> mdemg.devspace.v1.PublishExportHeader
-	0,  // 3: mdemg.devspace.v1.DevSpace.RegisterAgent:input_type -> mdemg.devspace.v1.RegisterAgentRequest
-	2,  // 4: mdemg.devspace.v1.DevSpace.DeregisterAgent:input_type -> mdemg.devspace.v1.DeregisterAgentRequest
-	4,  // 5: mdemg.devspace.v1.DevSpace.ListExports:input_type -> mdemg.devspace.v1.ListExportsRequest
-	7,  // 6: mdemg.devspace.v1.DevSpace.PublishExport:input_type -> mdemg.devspace.v1.PublishExportChunk
-	10, // 7: mdemg.devspace.v1.DevSpace.PullExport:input_type -> mdemg.devspace.v1.PullExportRequest
-	12, // 8: mdemg.devspace.v1.DevSpace.Connect:input_type -> mdemg.devspace.v1.AgentMessage
-	1,  // 9: mdemg.devspace.v1.DevSpace.RegisterAgent:output_type -> mdemg.devspace.v1.RegisterAgentResponse
-	3,  // 10: mdemg.devspace.v1.DevSpace.DeregisterAgent:output_type -> mdemg.devspace.v1.DeregisterAgentResponse
-	5,  // 11: mdemg.devspace.v1.DevSpace.ListExports:output_type -> mdemg.devspace.v1.ListExportsResponse
-	9,  // 12: mdemg.devspace.v1.DevSpace.PublishExport:output_type -> mdemg.devspace.v1.PublishExportResponse
-	11, // 13: mdemg.devspace.v1.DevSpace.PullExport:output_type -> mdemg.devspace.v1.PullExportChunk
-	12, // 14: mdemg.devspace.v1.DevSpace.Connect:output_type -> mdemg.devspace.v1.AgentMessage
-	9,  // [9:15] is the sub-list for method output_type
-	3,  // [3:9] is the sub-list for method input_type
-	3,  // [3:3] is the sub-list for extension type_name
-	3,  // [3:3] is the sub-list for extension extendee
-	0,  // [0:3] is the sub-list for field type_name
+	21, // 0: mdemg.devspace.v1.RegisterAgentRequest.metadata:type_name -> mdemg.devspace.v1.RegisterAgentRequest.MetadataEntry
+	7,  // 1: mdemg.devspace.v1.ListExportsResponse.exports:type_name -> mdemg.devspace.v1.ExportEntry
+	9,  // 2: mdemg.devspace.v1.PublishExportChunk.header:type_name -> mdemg.devspace.v1.PublishExportHeader
+	22, // 3: mdemg.devspace.v1.HeartbeatRequest.status:type_name -> mdemg.devspace.v1.HeartbeatRequest.StatusEntry
+	18, // 4: mdemg.devspace.v1.GetPresenceResponse.agents:type_name -> mdemg.devspace.v1.AgentPresence
+	0,  // 5: mdemg.devspace.v1.AgentPresence.status:type_name -> mdemg.devspace.v1.PresenceStatus
+	23, // 6: mdemg.devspace.v1.AgentPresence.metadata:type_name -> mdemg.devspace.v1.AgentPresence.MetadataEntry
+	24, // 7: mdemg.devspace.v1.AgentPresence.last_status:type_name -> mdemg.devspace.v1.AgentPresence.LastStatusEntry
+	1,  // 8: mdemg.devspace.v1.DevSpace.RegisterAgent:input_type -> mdemg.devspace.v1.RegisterAgentRequest
+	3,  // 9: mdemg.devspace.v1.DevSpace.DeregisterAgent:input_type -> mdemg.devspace.v1.DeregisterAgentRequest
+	5,  // 10: mdemg.devspace.v1.DevSpace.ListExports:input_type -> mdemg.devspace.v1.ListExportsRequest
+	8,  // 11: mdemg.devspace.v1.DevSpace.PublishExport:input_type -> mdemg.devspace.v1.PublishExportChunk
+	11, // 12: mdemg.devspace.v1.DevSpace.PullExport:input_type -> mdemg.devspace.v1.PullExportRequest
+	13, // 13: mdemg.devspace.v1.DevSpace.Connect:input_type -> mdemg.devspace.v1.AgentMessage
+	14, // 14: mdemg.devspace.v1.DevSpace.Heartbeat:input_type -> mdemg.devspace.v1.HeartbeatRequest
+	16, // 15: mdemg.devspace.v1.DevSpace.GetPresence:input_type -> mdemg.devspace.v1.GetPresenceRequest
+	19, // 16: mdemg.devspace.v1.DevSpace.SetQueueConfig:input_type -> mdemg.devspace.v1.SetQueueConfigRequest
+	2,  // 17: mdemg.devspace.v1.DevSpace.RegisterAgent:output_type -> mdemg.devspace.v1.RegisterAgentResponse
+	4,  // 18: mdemg.devspace.v1.DevSpace.DeregisterAgent:output_type -> mdemg.devspace.v1.DeregisterAgentResponse
+	6,  // 19: mdemg.devspace.v1.DevSpace.ListExports:output_type -> mdemg.devspace.v1.ListExportsResponse
+	10, // 20: mdemg.devspace.v1.DevSpace.PublishExport:output_type -> mdemg.devspace.v1.PublishExportResponse
+	12, // 21: mdemg.devspace.v1.DevSpace.PullExport:output_type -> mdemg.devspace.v1.PullExportChunk
+	13, // 22: mdemg.devspace.v1.DevSpace.Connect:output_type -> mdemg.devspace.v1.AgentMessage
+	15, // 23: mdemg.devspace.v1.DevSpace.Heartbeat:output_type -> mdemg.devspace.v1.HeartbeatResponse
+	17, // 24: mdemg.devspace.v1.DevSpace.GetPresence:output_type -> mdemg.devspace.v1.GetPresenceResponse
+	20, // 25: mdemg.devspace.v1.DevSpace.SetQueueConfig:output_type -> mdemg.devspace.v1.SetQueueConfigResponse
+	17, // [17:26] is the sub-list for method output_type
+	8,  // [8:17] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_devspace_proto_init() }
@@ -928,13 +1482,14 @@ func file_api_proto_devspace_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_devspace_proto_rawDesc), len(file_api_proto_devspace_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   14,
+			NumEnums:      1,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_api_proto_devspace_proto_goTypes,
 		DependencyIndexes: file_api_proto_devspace_proto_depIdxs,
+		EnumInfos:         file_api_proto_devspace_proto_enumTypes,
 		MessageInfos:      file_api_proto_devspace_proto_msgTypes,
 	}.Build()
 	File_api_proto_devspace_proto = out.File

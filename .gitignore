@@ -22,11 +22,20 @@ bin/
 /prune
 /mdemg-server
 /mdemg-mcp
+/space-transfer
+/plugin-scaffold
+/plugin-validate
+/mcp-server
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+
+# Debug and test client files
+/check_status.go
+/debug_client.go
+/e2e_test_client.go
 
 # Go test and build artifacts
 *.test

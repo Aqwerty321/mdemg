@@ -88,6 +88,7 @@ const (
 	ConflictMode_CONFLICT_SKIP      ConflictMode = 0 // Default: skip existing nodes
 	ConflictMode_CONFLICT_OVERWRITE ConflictMode = 1 // Replace existing nodes
 	ConflictMode_CONFLICT_ERROR     ConflictMode = 2 // Abort on first collision
+	ConflictMode_CONFLICT_CRDT      ConflictMode = 3 // Phase 35: CRDT merge for learned edges (sum evidence_count, max weight)
 )
 
 // Enum value maps for ConflictMode.
@@ -96,11 +97,13 @@ var (
 		0: "CONFLICT_SKIP",
 		1: "CONFLICT_OVERWRITE",
 		2: "CONFLICT_ERROR",
+		3: "CONFLICT_CRDT",
 	}
 	ConflictMode_value = map[string]int32{
 		"CONFLICT_SKIP":      0,
 		"CONFLICT_OVERWRITE": 1,
 		"CONFLICT_ERROR":     2,
+		"CONFLICT_CRDT":      3,
 	}
 )
 
@@ -326,6 +329,7 @@ type ImportStats struct {
 	ObservationsCreated int32                  `protobuf:"varint,6,opt,name=observations_created,json=observationsCreated,proto3" json:"observations_created,omitempty"`
 	SymbolsCreated      int32                  `protobuf:"varint,7,opt,name=symbols_created,json=symbolsCreated,proto3" json:"symbols_created,omitempty"`
 	DurationMs          int64                  `protobuf:"varint,8,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	EdgesMerged         int32                  `protobuf:"varint,9,opt,name=edges_merged,json=edgesMerged,proto3" json:"edges_merged,omitempty"` // Phase 35: CRDT merged edges
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -412,6 +416,13 @@ func (x *ImportStats) GetSymbolsCreated() int32 {
 func (x *ImportStats) GetDurationMs() int64 {
 	if x != nil {
 		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *ImportStats) GetEdgesMerged() int32 {
+	if x != nil {
+		return x.EdgesMerged
 	}
 	return 0
 }
@@ -869,6 +880,7 @@ type SpaceMetadata struct {
 	TotalSymbols        int64                  `protobuf:"varint,8,opt,name=total_symbols,json=totalSymbols,proto3" json:"total_symbols,omitempty"`
 	EmbeddingDimensions int64                  `protobuf:"varint,9,opt,name=embedding_dimensions,json=embeddingDimensions,proto3" json:"embedding_dimensions,omitempty"`                      // 1536 for OpenAI, 768 for Ollama, etc.
 	Labels              map[string]string      `protobuf:"bytes,10,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Arbitrary metadata (e.g., "project": "whk-wms")
+	Lineage             *Lineage               `protobuf:"bytes,11,opt,name=lineage,proto3" json:"lineage,omitempty"`                                                                         // Phase 35: space lineage tracking for merges/transfers
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -973,6 +985,168 @@ func (x *SpaceMetadata) GetLabels() map[string]string {
 	return nil
 }
 
+func (x *SpaceMetadata) GetLineage() *Lineage {
+	if x != nil {
+		return x.Lineage
+	}
+	return nil
+}
+
+// Phase 35: Space lineage tracking
+// Records the origin and history of a space across transfers and merges.
+type Lineage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OriginSpaceId string                 `protobuf:"bytes,1,opt,name=origin_space_id,json=originSpaceId,proto3" json:"origin_space_id,omitempty"` // Original space_id this was exported from
+	OriginHost    string                 `protobuf:"bytes,2,opt,name=origin_host,json=originHost,proto3" json:"origin_host,omitempty"`            // Host where space was first created
+	CreatedAt     string                 `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`               // When the original space was created
+	History       []*LineageEvent        `protobuf:"bytes,4,rep,name=history,proto3" json:"history,omitempty"`                                    // History of exports and merges (most recent last)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Lineage) Reset() {
+	*x = Lineage{}
+	mi := &file_api_proto_space_transfer_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Lineage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Lineage) ProtoMessage() {}
+
+func (x *Lineage) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_space_transfer_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Lineage.ProtoReflect.Descriptor instead.
+func (*Lineage) Descriptor() ([]byte, []int) {
+	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *Lineage) GetOriginSpaceId() string {
+	if x != nil {
+		return x.OriginSpaceId
+	}
+	return ""
+}
+
+func (x *Lineage) GetOriginHost() string {
+	if x != nil {
+		return x.OriginHost
+	}
+	return ""
+}
+
+func (x *Lineage) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *Lineage) GetHistory() []*LineageEvent {
+	if x != nil {
+		return x.History
+	}
+	return nil
+}
+
+// Represents a single transfer/merge event in lineage history
+type LineageEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EventType     string                 `protobuf:"bytes,1,opt,name=event_type,json=eventType,proto3" json:"event_type,omitempty"`               // "export", "import", "merge"
+	Timestamp     string                 `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                                // ISO8601 when event occurred
+	SourceHost    string                 `protobuf:"bytes,3,opt,name=source_host,json=sourceHost,proto3" json:"source_host,omitempty"`            // Host that performed the operation
+	AgentId       string                 `protobuf:"bytes,4,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`                     // Agent/user who performed the operation
+	TargetSpaceId string                 `protobuf:"bytes,5,opt,name=target_space_id,json=targetSpaceId,proto3" json:"target_space_id,omitempty"` // Space ID affected (for merges)
+	Notes         string                 `protobuf:"bytes,6,opt,name=notes,proto3" json:"notes,omitempty"`                                        // Optional description
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LineageEvent) Reset() {
+	*x = LineageEvent{}
+	mi := &file_api_proto_space_transfer_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LineageEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LineageEvent) ProtoMessage() {}
+
+func (x *LineageEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_space_transfer_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LineageEvent.ProtoReflect.Descriptor instead.
+func (*LineageEvent) Descriptor() ([]byte, []int) {
+	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *LineageEvent) GetEventType() string {
+	if x != nil {
+		return x.EventType
+	}
+	return ""
+}
+
+func (x *LineageEvent) GetTimestamp() string {
+	if x != nil {
+		return x.Timestamp
+	}
+	return ""
+}
+
+func (x *LineageEvent) GetSourceHost() string {
+	if x != nil {
+		return x.SourceHost
+	}
+	return ""
+}
+
+func (x *LineageEvent) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *LineageEvent) GetTargetSpaceId() string {
+	if x != nil {
+		return x.TargetSpaceId
+	}
+	return ""
+}
+
+func (x *LineageEvent) GetNotes() string {
+	if x != nil {
+		return x.Notes
+	}
+	return ""
+}
+
 type NodeBatch struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Nodes         []*NodeData            `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
@@ -982,7 +1156,7 @@ type NodeBatch struct {
 
 func (x *NodeBatch) Reset() {
 	*x = NodeBatch{}
-	mi := &file_api_proto_space_transfer_proto_msgTypes[10]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -994,7 +1168,7 @@ func (x *NodeBatch) String() string {
 func (*NodeBatch) ProtoMessage() {}
 
 func (x *NodeBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_space_transfer_proto_msgTypes[10]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1007,7 +1181,7 @@ func (x *NodeBatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeBatch.ProtoReflect.Descriptor instead.
 func (*NodeBatch) Descriptor() ([]byte, []int) {
-	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{10}
+	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *NodeBatch) GetNodes() []*NodeData {
@@ -1062,7 +1236,7 @@ type NodeData struct {
 
 func (x *NodeData) Reset() {
 	*x = NodeData{}
-	mi := &file_api_proto_space_transfer_proto_msgTypes[11]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1074,7 +1248,7 @@ func (x *NodeData) String() string {
 func (*NodeData) ProtoMessage() {}
 
 func (x *NodeData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_space_transfer_proto_msgTypes[11]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1087,7 +1261,7 @@ func (x *NodeData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeData.ProtoReflect.Descriptor instead.
 func (*NodeData) Descriptor() ([]byte, []int) {
-	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{11}
+	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *NodeData) GetNodeId() string {
@@ -1344,7 +1518,7 @@ type EdgeBatch struct {
 
 func (x *EdgeBatch) Reset() {
 	*x = EdgeBatch{}
-	mi := &file_api_proto_space_transfer_proto_msgTypes[12]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1356,7 +1530,7 @@ func (x *EdgeBatch) String() string {
 func (*EdgeBatch) ProtoMessage() {}
 
 func (x *EdgeBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_space_transfer_proto_msgTypes[12]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1369,7 +1543,7 @@ func (x *EdgeBatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeBatch.ProtoReflect.Descriptor instead.
 func (*EdgeBatch) Descriptor() ([]byte, []int) {
-	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{12}
+	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *EdgeBatch) GetEdges() []*EdgeData {
@@ -1393,13 +1567,17 @@ type EdgeData struct {
 	UpdatedAt       string                 `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	LastActivated   string                 `protobuf:"bytes,11,opt,name=last_activated,json=lastActivated,proto3" json:"last_activated,omitempty"`
 	ExtraProperties map[string]string      `protobuf:"bytes,12,rep,name=extra_properties,json=extraProperties,proto3" json:"extra_properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Phase 35: Dimensional weights for CRDT merge
+	DimTemporal   float64 `protobuf:"fixed64,13,opt,name=dim_temporal,json=dimTemporal,proto3" json:"dim_temporal,omitempty"` // Temporal dimension weight
+	DimSemantic   float64 `protobuf:"fixed64,14,opt,name=dim_semantic,json=dimSemantic,proto3" json:"dim_semantic,omitempty"` // Semantic similarity dimension weight
+	DimCausal     float64 `protobuf:"fixed64,15,opt,name=dim_causal,json=dimCausal,proto3" json:"dim_causal,omitempty"`       // Causal relationship dimension weight
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EdgeData) Reset() {
 	*x = EdgeData{}
-	mi := &file_api_proto_space_transfer_proto_msgTypes[13]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1411,7 +1589,7 @@ func (x *EdgeData) String() string {
 func (*EdgeData) ProtoMessage() {}
 
 func (x *EdgeData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_space_transfer_proto_msgTypes[13]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1424,7 +1602,7 @@ func (x *EdgeData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeData.ProtoReflect.Descriptor instead.
 func (*EdgeData) Descriptor() ([]byte, []int) {
-	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{13}
+	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *EdgeData) GetFromNodeId() string {
@@ -1511,6 +1689,27 @@ func (x *EdgeData) GetExtraProperties() map[string]string {
 	return nil
 }
 
+func (x *EdgeData) GetDimTemporal() float64 {
+	if x != nil {
+		return x.DimTemporal
+	}
+	return 0
+}
+
+func (x *EdgeData) GetDimSemantic() float64 {
+	if x != nil {
+		return x.DimSemantic
+	}
+	return 0
+}
+
+func (x *EdgeData) GetDimCausal() float64 {
+	if x != nil {
+		return x.DimCausal
+	}
+	return 0
+}
+
 type ObservationBatch struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Observations  []*ObservationData     `protobuf:"bytes,1,rep,name=observations,proto3" json:"observations,omitempty"`
@@ -1520,7 +1719,7 @@ type ObservationBatch struct {
 
 func (x *ObservationBatch) Reset() {
 	*x = ObservationBatch{}
-	mi := &file_api_proto_space_transfer_proto_msgTypes[14]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1532,7 +1731,7 @@ func (x *ObservationBatch) String() string {
 func (*ObservationBatch) ProtoMessage() {}
 
 func (x *ObservationBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_space_transfer_proto_msgTypes[14]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1545,7 +1744,7 @@ func (x *ObservationBatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservationBatch.ProtoReflect.Descriptor instead.
 func (*ObservationBatch) Descriptor() ([]byte, []int) {
-	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{14}
+	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ObservationBatch) GetObservations() []*ObservationData {
@@ -1572,7 +1771,7 @@ type ObservationData struct {
 
 func (x *ObservationData) Reset() {
 	*x = ObservationData{}
-	mi := &file_api_proto_space_transfer_proto_msgTypes[15]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1584,7 +1783,7 @@ func (x *ObservationData) String() string {
 func (*ObservationData) ProtoMessage() {}
 
 func (x *ObservationData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_space_transfer_proto_msgTypes[15]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1597,7 +1796,7 @@ func (x *ObservationData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservationData.ProtoReflect.Descriptor instead.
 func (*ObservationData) Descriptor() ([]byte, []int) {
-	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{15}
+	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ObservationData) GetObsId() string {
@@ -1672,7 +1871,7 @@ type SymbolBatch struct {
 
 func (x *SymbolBatch) Reset() {
 	*x = SymbolBatch{}
-	mi := &file_api_proto_space_transfer_proto_msgTypes[16]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1684,7 +1883,7 @@ func (x *SymbolBatch) String() string {
 func (*SymbolBatch) ProtoMessage() {}
 
 func (x *SymbolBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_space_transfer_proto_msgTypes[16]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1697,7 +1896,7 @@ func (x *SymbolBatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SymbolBatch.ProtoReflect.Descriptor instead.
 func (*SymbolBatch) Descriptor() ([]byte, []int) {
-	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{16}
+	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *SymbolBatch) GetSymbols() []*SymbolData {
@@ -1731,7 +1930,7 @@ type SymbolData struct {
 
 func (x *SymbolData) Reset() {
 	*x = SymbolData{}
-	mi := &file_api_proto_space_transfer_proto_msgTypes[17]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1743,7 +1942,7 @@ func (x *SymbolData) String() string {
 func (*SymbolData) ProtoMessage() {}
 
 func (x *SymbolData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_space_transfer_proto_msgTypes[17]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1756,7 +1955,7 @@ func (x *SymbolData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SymbolData.ProtoReflect.Descriptor instead.
 func (*SymbolData) Descriptor() ([]byte, []int) {
-	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{17}
+	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *SymbolData) GetSymbolId() string {
@@ -1887,7 +2086,7 @@ type TransferSummary struct {
 
 func (x *TransferSummary) Reset() {
 	*x = TransferSummary{}
-	mi := &file_api_proto_space_transfer_proto_msgTypes[18]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1899,7 +2098,7 @@ func (x *TransferSummary) String() string {
 func (*TransferSummary) ProtoMessage() {}
 
 func (x *TransferSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_space_transfer_proto_msgTypes[18]
+	mi := &file_api_proto_space_transfer_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1912,7 +2111,7 @@ func (x *TransferSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferSummary.ProtoReflect.Descriptor instead.
 func (*TransferSummary) Descriptor() ([]byte, []int) {
-	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{18}
+	return file_api_proto_space_transfer_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *TransferSummary) GetNodesExported() int64 {
@@ -1993,7 +2192,7 @@ const file_api_proto_space_transfer_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x124\n" +
 	"\x05stats\x18\x02 \x01(\v2\x1e.mdemg.transfer.v1.ImportStatsR\x05stats\x12\x14\n" +
 	"\x05error\x18\x03 \x01(\tR\x05error\x12\x1a\n" +
-	"\bwarnings\x18\x04 \x03(\tR\bwarnings\"\xcb\x02\n" +
+	"\bwarnings\x18\x04 \x03(\tR\bwarnings\"\xee\x02\n" +
 	"\vImportStats\x12#\n" +
 	"\rnodes_created\x18\x01 \x01(\x05R\fnodesCreated\x12#\n" +
 	"\rnodes_skipped\x18\x02 \x01(\x05R\fnodesSkipped\x12+\n" +
@@ -2003,7 +2202,8 @@ const file_api_proto_space_transfer_proto_rawDesc = "" +
 	"\x14observations_created\x18\x06 \x01(\x05R\x13observationsCreated\x12'\n" +
 	"\x0fsymbols_created\x18\a \x01(\x05R\x0esymbolsCreated\x12\x1f\n" +
 	"\vduration_ms\x18\b \x01(\x03R\n" +
-	"durationMs\"\x13\n" +
+	"durationMs\x12!\n" +
+	"\fedges_merged\x18\t \x01(\x05R\vedgesMerged\"\x13\n" +
 	"\x11ListSpacesRequest\"M\n" +
 	"\x12ListSpacesResponse\x127\n" +
 	"\x06spaces\x18\x01 \x03(\v2\x1f.mdemg.transfer.v1.SpaceSummaryR\x06spaces\"\x9e\x02\n" +
@@ -2047,7 +2247,7 @@ const file_api_proto_space_transfer_proto_rawDesc = "" +
 	"\x05edges\x18\f \x01(\v2\x1c.mdemg.transfer.v1.EdgeBatchR\x05edges\x12G\n" +
 	"\fobservations\x18\r \x01(\v2#.mdemg.transfer.v1.ObservationBatchR\fobservations\x128\n" +
 	"\asymbols\x18\x0e \x01(\v2\x1e.mdemg.transfer.v1.SymbolBatchR\asymbols\x12<\n" +
-	"\asummary\x18\x0f \x01(\v2\".mdemg.transfer.v1.TransferSummaryR\asummary\"\xdd\x03\n" +
+	"\asummary\x18\x0f \x01(\v2\".mdemg.transfer.v1.TransferSummaryR\asummary\"\x93\x04\n" +
 	"\rSpaceMetadata\x12\x19\n" +
 	"\bspace_id\x18\x01 \x01(\tR\aspaceId\x12%\n" +
 	"\x0eschema_version\x18\x02 \x01(\x05R\rschemaVersion\x12\x1f\n" +
@@ -2063,10 +2263,27 @@ const file_api_proto_space_transfer_proto_rawDesc = "" +
 	"\rtotal_symbols\x18\b \x01(\x03R\ftotalSymbols\x121\n" +
 	"\x14embedding_dimensions\x18\t \x01(\x03R\x13embeddingDimensions\x12D\n" +
 	"\x06labels\x18\n" +
-	" \x03(\v2,.mdemg.transfer.v1.SpaceMetadata.LabelsEntryR\x06labels\x1a9\n" +
+	" \x03(\v2,.mdemg.transfer.v1.SpaceMetadata.LabelsEntryR\x06labels\x124\n" +
+	"\alineage\x18\v \x01(\v2\x1a.mdemg.transfer.v1.LineageR\alineage\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\">\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xac\x01\n" +
+	"\aLineage\x12&\n" +
+	"\x0forigin_space_id\x18\x01 \x01(\tR\roriginSpaceId\x12\x1f\n" +
+	"\vorigin_host\x18\x02 \x01(\tR\n" +
+	"originHost\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x03 \x01(\tR\tcreatedAt\x129\n" +
+	"\ahistory\x18\x04 \x03(\v2\x1f.mdemg.transfer.v1.LineageEventR\ahistory\"\xc5\x01\n" +
+	"\fLineageEvent\x12\x1d\n" +
+	"\n" +
+	"event_type\x18\x01 \x01(\tR\teventType\x12\x1c\n" +
+	"\ttimestamp\x18\x02 \x01(\tR\ttimestamp\x12\x1f\n" +
+	"\vsource_host\x18\x03 \x01(\tR\n" +
+	"sourceHost\x12\x19\n" +
+	"\bagent_id\x18\x04 \x01(\tR\aagentId\x12&\n" +
+	"\x0ftarget_space_id\x18\x05 \x01(\tR\rtargetSpaceId\x12\x14\n" +
+	"\x05notes\x18\x06 \x01(\tR\x05notes\">\n" +
 	"\tNodeBatch\x121\n" +
 	"\x05nodes\x18\x01 \x03(\v2\x1b.mdemg.transfer.v1.NodeDataR\x05nodes\"\xf2\t\n" +
 	"\bNodeData\x12\x17\n" +
@@ -2118,7 +2335,7 @@ const file_api_proto_space_transfer_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\">\n" +
 	"\tEdgeBatch\x121\n" +
-	"\x05edges\x18\x01 \x03(\v2\x1b.mdemg.transfer.v1.EdgeDataR\x05edges\"\x85\x04\n" +
+	"\x05edges\x18\x01 \x03(\v2\x1b.mdemg.transfer.v1.EdgeDataR\x05edges\"\xea\x04\n" +
 	"\bEdgeData\x12 \n" +
 	"\ffrom_node_id\x18\x01 \x01(\tR\n" +
 	"fromNodeId\x12\x1c\n" +
@@ -2136,7 +2353,11 @@ const file_api_proto_space_transfer_proto_rawDesc = "" +
 	"updated_at\x18\n" +
 	" \x01(\tR\tupdatedAt\x12%\n" +
 	"\x0elast_activated\x18\v \x01(\tR\rlastActivated\x12[\n" +
-	"\x10extra_properties\x18\f \x03(\v20.mdemg.transfer.v1.EdgeData.ExtraPropertiesEntryR\x0fextraProperties\x1aB\n" +
+	"\x10extra_properties\x18\f \x03(\v20.mdemg.transfer.v1.EdgeData.ExtraPropertiesEntryR\x0fextraProperties\x12!\n" +
+	"\fdim_temporal\x18\r \x01(\x01R\vdimTemporal\x12!\n" +
+	"\fdim_semantic\x18\x0e \x01(\x01R\vdimSemantic\x12\x1d\n" +
+	"\n" +
+	"dim_causal\x18\x0f \x01(\x01R\tdimCausal\x1aB\n" +
 	"\x14ExtraPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"Z\n" +
@@ -2201,11 +2422,12 @@ const file_api_proto_space_transfer_proto_rawDesc = "" +
 	"\x10CHUNK_TYPE_EDGES\x10\x03\x12\x1b\n" +
 	"\x17CHUNK_TYPE_OBSERVATIONS\x10\x04\x12\x16\n" +
 	"\x12CHUNK_TYPE_SYMBOLS\x10\x05\x12\x16\n" +
-	"\x12CHUNK_TYPE_SUMMARY\x10\x06*M\n" +
+	"\x12CHUNK_TYPE_SUMMARY\x10\x06*`\n" +
 	"\fConflictMode\x12\x11\n" +
 	"\rCONFLICT_SKIP\x10\x00\x12\x16\n" +
 	"\x12CONFLICT_OVERWRITE\x10\x01\x12\x12\n" +
-	"\x0eCONFLICT_ERROR\x10\x022\xdd\x02\n" +
+	"\x0eCONFLICT_ERROR\x10\x02\x12\x11\n" +
+	"\rCONFLICT_CRDT\x10\x032\xdd\x02\n" +
 	"\rSpaceTransfer\x12K\n" +
 	"\x06Export\x12 .mdemg.transfer.v1.ExportRequest\x1a\x1d.mdemg.transfer.v1.SpaceChunk0\x01\x12L\n" +
 	"\x06Import\x12\x1d.mdemg.transfer.v1.SpaceChunk\x1a!.mdemg.transfer.v1.ImportResponse(\x01\x12Y\n" +
@@ -2226,7 +2448,7 @@ func file_api_proto_space_transfer_proto_rawDescGZIP() []byte {
 }
 
 var file_api_proto_space_transfer_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_proto_space_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_api_proto_space_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_api_proto_space_transfer_proto_goTypes = []any{
 	(ChunkType)(0),             // 0: mdemg.transfer.v1.ChunkType
 	(ConflictMode)(0),          // 1: mdemg.transfer.v1.ConflictMode
@@ -2240,57 +2462,61 @@ var file_api_proto_space_transfer_proto_goTypes = []any{
 	(*SpaceInfoResponse)(nil),  // 9: mdemg.transfer.v1.SpaceInfoResponse
 	(*SpaceChunk)(nil),         // 10: mdemg.transfer.v1.SpaceChunk
 	(*SpaceMetadata)(nil),      // 11: mdemg.transfer.v1.SpaceMetadata
-	(*NodeBatch)(nil),          // 12: mdemg.transfer.v1.NodeBatch
-	(*NodeData)(nil),           // 13: mdemg.transfer.v1.NodeData
-	(*EdgeBatch)(nil),          // 14: mdemg.transfer.v1.EdgeBatch
-	(*EdgeData)(nil),           // 15: mdemg.transfer.v1.EdgeData
-	(*ObservationBatch)(nil),   // 16: mdemg.transfer.v1.ObservationBatch
-	(*ObservationData)(nil),    // 17: mdemg.transfer.v1.ObservationData
-	(*SymbolBatch)(nil),        // 18: mdemg.transfer.v1.SymbolBatch
-	(*SymbolData)(nil),         // 19: mdemg.transfer.v1.SymbolData
-	(*TransferSummary)(nil),    // 20: mdemg.transfer.v1.TransferSummary
-	nil,                        // 21: mdemg.transfer.v1.SpaceInfoResponse.NodesByLayerEntry
-	nil,                        // 22: mdemg.transfer.v1.SpaceMetadata.LabelsEntry
-	nil,                        // 23: mdemg.transfer.v1.NodeData.ExtraPropertiesEntry
-	nil,                        // 24: mdemg.transfer.v1.EdgeData.ExtraPropertiesEntry
-	nil,                        // 25: mdemg.transfer.v1.ObservationData.ExtraPropertiesEntry
-	nil,                        // 26: mdemg.transfer.v1.SymbolData.ExtraPropertiesEntry
+	(*Lineage)(nil),            // 12: mdemg.transfer.v1.Lineage
+	(*LineageEvent)(nil),       // 13: mdemg.transfer.v1.LineageEvent
+	(*NodeBatch)(nil),          // 14: mdemg.transfer.v1.NodeBatch
+	(*NodeData)(nil),           // 15: mdemg.transfer.v1.NodeData
+	(*EdgeBatch)(nil),          // 16: mdemg.transfer.v1.EdgeBatch
+	(*EdgeData)(nil),           // 17: mdemg.transfer.v1.EdgeData
+	(*ObservationBatch)(nil),   // 18: mdemg.transfer.v1.ObservationBatch
+	(*ObservationData)(nil),    // 19: mdemg.transfer.v1.ObservationData
+	(*SymbolBatch)(nil),        // 20: mdemg.transfer.v1.SymbolBatch
+	(*SymbolData)(nil),         // 21: mdemg.transfer.v1.SymbolData
+	(*TransferSummary)(nil),    // 22: mdemg.transfer.v1.TransferSummary
+	nil,                        // 23: mdemg.transfer.v1.SpaceInfoResponse.NodesByLayerEntry
+	nil,                        // 24: mdemg.transfer.v1.SpaceMetadata.LabelsEntry
+	nil,                        // 25: mdemg.transfer.v1.NodeData.ExtraPropertiesEntry
+	nil,                        // 26: mdemg.transfer.v1.EdgeData.ExtraPropertiesEntry
+	nil,                        // 27: mdemg.transfer.v1.ObservationData.ExtraPropertiesEntry
+	nil,                        // 28: mdemg.transfer.v1.SymbolData.ExtraPropertiesEntry
 }
 var file_api_proto_space_transfer_proto_depIdxs = []int32{
 	4,  // 0: mdemg.transfer.v1.ImportResponse.stats:type_name -> mdemg.transfer.v1.ImportStats
 	7,  // 1: mdemg.transfer.v1.ListSpacesResponse.spaces:type_name -> mdemg.transfer.v1.SpaceSummary
 	7,  // 2: mdemg.transfer.v1.SpaceInfoResponse.summary:type_name -> mdemg.transfer.v1.SpaceSummary
-	21, // 3: mdemg.transfer.v1.SpaceInfoResponse.nodes_by_layer:type_name -> mdemg.transfer.v1.SpaceInfoResponse.NodesByLayerEntry
+	23, // 3: mdemg.transfer.v1.SpaceInfoResponse.nodes_by_layer:type_name -> mdemg.transfer.v1.SpaceInfoResponse.NodesByLayerEntry
 	0,  // 4: mdemg.transfer.v1.SpaceChunk.chunk_type:type_name -> mdemg.transfer.v1.ChunkType
 	1,  // 5: mdemg.transfer.v1.SpaceChunk.conflict_mode:type_name -> mdemg.transfer.v1.ConflictMode
 	11, // 6: mdemg.transfer.v1.SpaceChunk.metadata:type_name -> mdemg.transfer.v1.SpaceMetadata
-	12, // 7: mdemg.transfer.v1.SpaceChunk.nodes:type_name -> mdemg.transfer.v1.NodeBatch
-	14, // 8: mdemg.transfer.v1.SpaceChunk.edges:type_name -> mdemg.transfer.v1.EdgeBatch
-	16, // 9: mdemg.transfer.v1.SpaceChunk.observations:type_name -> mdemg.transfer.v1.ObservationBatch
-	18, // 10: mdemg.transfer.v1.SpaceChunk.symbols:type_name -> mdemg.transfer.v1.SymbolBatch
-	20, // 11: mdemg.transfer.v1.SpaceChunk.summary:type_name -> mdemg.transfer.v1.TransferSummary
-	22, // 12: mdemg.transfer.v1.SpaceMetadata.labels:type_name -> mdemg.transfer.v1.SpaceMetadata.LabelsEntry
-	13, // 13: mdemg.transfer.v1.NodeBatch.nodes:type_name -> mdemg.transfer.v1.NodeData
-	23, // 14: mdemg.transfer.v1.NodeData.extra_properties:type_name -> mdemg.transfer.v1.NodeData.ExtraPropertiesEntry
-	15, // 15: mdemg.transfer.v1.EdgeBatch.edges:type_name -> mdemg.transfer.v1.EdgeData
-	24, // 16: mdemg.transfer.v1.EdgeData.extra_properties:type_name -> mdemg.transfer.v1.EdgeData.ExtraPropertiesEntry
-	17, // 17: mdemg.transfer.v1.ObservationBatch.observations:type_name -> mdemg.transfer.v1.ObservationData
-	25, // 18: mdemg.transfer.v1.ObservationData.extra_properties:type_name -> mdemg.transfer.v1.ObservationData.ExtraPropertiesEntry
-	19, // 19: mdemg.transfer.v1.SymbolBatch.symbols:type_name -> mdemg.transfer.v1.SymbolData
-	26, // 20: mdemg.transfer.v1.SymbolData.extra_properties:type_name -> mdemg.transfer.v1.SymbolData.ExtraPropertiesEntry
-	2,  // 21: mdemg.transfer.v1.SpaceTransfer.Export:input_type -> mdemg.transfer.v1.ExportRequest
-	10, // 22: mdemg.transfer.v1.SpaceTransfer.Import:input_type -> mdemg.transfer.v1.SpaceChunk
-	5,  // 23: mdemg.transfer.v1.SpaceTransfer.ListSpaces:input_type -> mdemg.transfer.v1.ListSpacesRequest
-	8,  // 24: mdemg.transfer.v1.SpaceTransfer.SpaceInfo:input_type -> mdemg.transfer.v1.SpaceInfoRequest
-	10, // 25: mdemg.transfer.v1.SpaceTransfer.Export:output_type -> mdemg.transfer.v1.SpaceChunk
-	3,  // 26: mdemg.transfer.v1.SpaceTransfer.Import:output_type -> mdemg.transfer.v1.ImportResponse
-	6,  // 27: mdemg.transfer.v1.SpaceTransfer.ListSpaces:output_type -> mdemg.transfer.v1.ListSpacesResponse
-	9,  // 28: mdemg.transfer.v1.SpaceTransfer.SpaceInfo:output_type -> mdemg.transfer.v1.SpaceInfoResponse
-	25, // [25:29] is the sub-list for method output_type
-	21, // [21:25] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	14, // 7: mdemg.transfer.v1.SpaceChunk.nodes:type_name -> mdemg.transfer.v1.NodeBatch
+	16, // 8: mdemg.transfer.v1.SpaceChunk.edges:type_name -> mdemg.transfer.v1.EdgeBatch
+	18, // 9: mdemg.transfer.v1.SpaceChunk.observations:type_name -> mdemg.transfer.v1.ObservationBatch
+	20, // 10: mdemg.transfer.v1.SpaceChunk.symbols:type_name -> mdemg.transfer.v1.SymbolBatch
+	22, // 11: mdemg.transfer.v1.SpaceChunk.summary:type_name -> mdemg.transfer.v1.TransferSummary
+	24, // 12: mdemg.transfer.v1.SpaceMetadata.labels:type_name -> mdemg.transfer.v1.SpaceMetadata.LabelsEntry
+	12, // 13: mdemg.transfer.v1.SpaceMetadata.lineage:type_name -> mdemg.transfer.v1.Lineage
+	13, // 14: mdemg.transfer.v1.Lineage.history:type_name -> mdemg.transfer.v1.LineageEvent
+	15, // 15: mdemg.transfer.v1.NodeBatch.nodes:type_name -> mdemg.transfer.v1.NodeData
+	25, // 16: mdemg.transfer.v1.NodeData.extra_properties:type_name -> mdemg.transfer.v1.NodeData.ExtraPropertiesEntry
+	17, // 17: mdemg.transfer.v1.EdgeBatch.edges:type_name -> mdemg.transfer.v1.EdgeData
+	26, // 18: mdemg.transfer.v1.EdgeData.extra_properties:type_name -> mdemg.transfer.v1.EdgeData.ExtraPropertiesEntry
+	19, // 19: mdemg.transfer.v1.ObservationBatch.observations:type_name -> mdemg.transfer.v1.ObservationData
+	27, // 20: mdemg.transfer.v1.ObservationData.extra_properties:type_name -> mdemg.transfer.v1.ObservationData.ExtraPropertiesEntry
+	21, // 21: mdemg.transfer.v1.SymbolBatch.symbols:type_name -> mdemg.transfer.v1.SymbolData
+	28, // 22: mdemg.transfer.v1.SymbolData.extra_properties:type_name -> mdemg.transfer.v1.SymbolData.ExtraPropertiesEntry
+	2,  // 23: mdemg.transfer.v1.SpaceTransfer.Export:input_type -> mdemg.transfer.v1.ExportRequest
+	10, // 24: mdemg.transfer.v1.SpaceTransfer.Import:input_type -> mdemg.transfer.v1.SpaceChunk
+	5,  // 25: mdemg.transfer.v1.SpaceTransfer.ListSpaces:input_type -> mdemg.transfer.v1.ListSpacesRequest
+	8,  // 26: mdemg.transfer.v1.SpaceTransfer.SpaceInfo:input_type -> mdemg.transfer.v1.SpaceInfoRequest
+	10, // 27: mdemg.transfer.v1.SpaceTransfer.Export:output_type -> mdemg.transfer.v1.SpaceChunk
+	3,  // 28: mdemg.transfer.v1.SpaceTransfer.Import:output_type -> mdemg.transfer.v1.ImportResponse
+	6,  // 29: mdemg.transfer.v1.SpaceTransfer.ListSpaces:output_type -> mdemg.transfer.v1.ListSpacesResponse
+	9,  // 30: mdemg.transfer.v1.SpaceTransfer.SpaceInfo:output_type -> mdemg.transfer.v1.SpaceInfoResponse
+	27, // [27:31] is the sub-list for method output_type
+	23, // [23:27] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_space_transfer_proto_init() }
@@ -2304,7 +2530,7 @@ func file_api_proto_space_transfer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_space_transfer_proto_rawDesc), len(file_api_proto_space_transfer_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   25,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

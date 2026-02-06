@@ -1,0 +1,89 @@
+{
+  "udts_version": "1.0.0",
+  "api": {
+    "name": "Space Transfer CRDT Merge",
+    "base_url": "${UDTS_TARGET}",
+    "version": "v1",
+    "proto_sha256": "to-be-computed",
+    "service": "mdemg.transfer.v1.SpaceTransfer"
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-06",
+    "description": "Phase 35: CRDT merge for CO_ACTIVATED_WITH edges + space lineage",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 30000
+  },
+  "variables": {
+    "test_space": "crdt-test-space"
+  },
+  "test_cases": [
+    {
+      "id": "export_includes_lineage",
+      "name": "Export includes lineage metadata",
+      "description": "Verify that exported SpaceMetadata contains lineage information",
+      "request": {
+        "method": "Export",
+        "params": {
+          "space_id": "{{test_space}}",
+          "chunk_size": 100
+        }
+      },
+      "expected": {
+        "stream_assertions": [
+          {
+            "chunk_index": 0,
+            "path": "$.metadata.lineage",
+            "type": "object"
+          },
+          {
+            "chunk_index": 0,
+            "path": "$.metadata.lineage.origin_space_id",
+            "operator": "equals",
+            "value": "{{test_space}}"
+          },
+          {
+            "chunk_index": 0,
+            "path": "$.metadata.lineage.history",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "id": "import_crdt_mode_available",
+      "name": "CONFLICT_CRDT mode is available",
+      "description": "Verify that CONFLICT_CRDT (3) is a valid conflict mode for import",
+      "notes": "CONFLICT_CRDT mode sums evidence_count and takes max weight for CO_ACTIVATED_WITH edges"
+    },
+    {
+      "id": "edge_data_dimensional_weights",
+      "name": "EdgeData includes dimensional weights",
+      "description": "Verify that exported edges include dim_temporal, dim_semantic, dim_causal fields",
+      "request": {
+        "method": "Export",
+        "params": {
+          "space_id": "{{test_space}}",
+          "include_learned_edges": true
+        }
+      },
+      "expected": {
+        "stream_assertions": [
+          {
+            "chunk_type": "CHUNK_TYPE_EDGES",
+            "path": "$.edges.edges[0]",
+            "fields_exist": ["dim_temporal", "dim_semantic", "dim_causal"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "import_stats_includes_merged",
+      "name": "ImportResponse includes edges_merged count",
+      "description": "Verify that ImportResponse.stats includes edges_merged field for CRDT merge tracking"
+    }
+  ]
+}

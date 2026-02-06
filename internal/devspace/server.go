@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -154,6 +155,87 @@ func (s *Server) PullExport(req *pb.PullExportRequest, stream pb.DevSpace_PullEx
 		}
 	}
 	return nil
+}
+
+// =============================================================================
+// Phase 37: Heartbeat / Presence
+// =============================================================================
+
+// Heartbeat updates the agent's last heartbeat time.
+func (s *Server) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.HeartbeatResponse, error) {
+	if req.DevSpaceId == "" || req.AgentId == "" {
+		return nil, status.Error(codes.InvalidArgument, "dev_space_id and agent_id required")
+	}
+
+	statusMap := make(map[string]string)
+	for k, v := range req.Status {
+		statusMap[k] = v
+	}
+
+	queueSize := s.catalog.UpdateHeartbeat(req.DevSpaceId, req.AgentId, statusMap)
+
+	return &pb.HeartbeatResponse{
+		Ok:         true,
+		ServerTime: time.Now().UTC().Format(time.RFC3339),
+		QueueSize:  int32(queueSize),
+	}, nil
+}
+
+// GetPresence returns the presence status of agents in a DevSpace.
+func (s *Server) GetPresence(ctx context.Context, req *pb.GetPresenceRequest) (*pb.GetPresenceResponse, error) {
+	if req.DevSpaceId == "" {
+		return nil, status.Error(codes.InvalidArgument, "dev_space_id required")
+	}
+
+	presenceList := s.catalog.GetPresence(req.DevSpaceId, req.AgentId)
+
+	agents := make([]*pb.AgentPresence, len(presenceList))
+	for i, p := range presenceList {
+		var protoStatus pb.PresenceStatus
+		switch p.Status {
+		case "online":
+			protoStatus = pb.PresenceStatus_PRESENCE_ONLINE
+		case "away":
+			protoStatus = pb.PresenceStatus_PRESENCE_AWAY
+		case "offline":
+			protoStatus = pb.PresenceStatus_PRESENCE_OFFLINE
+		default:
+			protoStatus = pb.PresenceStatus_PRESENCE_UNKNOWN
+		}
+
+		var lastHeartbeat string
+		if !p.LastHeartbeat.IsZero() {
+			lastHeartbeat = p.LastHeartbeat.Format(time.RFC3339)
+		}
+
+		agents[i] = &pb.AgentPresence{
+			AgentId:                p.AgentID,
+			Status:                 protoStatus,
+			LastHeartbeat:          lastHeartbeat,
+			SecondsSinceHeartbeat:  int32(p.SecondsSinceHeartbeat),
+			Metadata:               p.Metadata,
+			LastStatus:             p.LastStatus,
+			QueuedMessages:         int32(p.QueuedMessages),
+		}
+	}
+
+	return &pb.GetPresenceResponse{Agents: agents}, nil
+}
+
+// SetQueueConfig configures the offline message queue for an agent.
+func (s *Server) SetQueueConfig(ctx context.Context, req *pb.SetQueueConfigRequest) (*pb.SetQueueConfigResponse, error) {
+	if req.DevSpaceId == "" || req.AgentId == "" {
+		return nil, status.Error(codes.InvalidArgument, "dev_space_id and agent_id required")
+	}
+
+	if err := s.catalog.SetQueueConfig(req.DevSpaceId, req.AgentId, int(req.MaxQueueSize)); err != nil {
+		return &pb.SetQueueConfigResponse{
+			Ok:    false,
+			Error: err.Error(),
+		}, nil
+	}
+
+	return &pb.SetQueueConfigResponse{Ok: true}, nil
 }
 
 // Connect (Phase 3) handles bidirectional inter-agent messaging via the broker.

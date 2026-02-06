@@ -1,0 +1,55 @@
+{
+  "uams_version": "1.0.0",
+  "method": {
+    "name": "apikey",
+    "type": "apikey",
+    "description": "Static API key authentication with timing-attack protection",
+    "status": "stable"
+  },
+  "credentials": {
+    "extraction": [
+      { "source": "header", "name": "X-API-Key", "priority": 1 },
+      { "source": "header", "name": "Authorization", "prefix": "ApiKey ", "priority": 2 },
+      { "source": "header", "name": "Authorization", "prefix": "Bearer ", "priority": 3 },
+      { "source": "query", "name": "api_key", "priority": 4 }
+    ],
+    "format": {
+      "type": "opaque",
+      "min_length": 16,
+      "max_length": 256
+    }
+  },
+  "validation": {
+    "algorithm": "sha256-hmac-compare",
+    "timing_safe": true,
+    "checks": [],
+    "config_required": ["keys"]
+  },
+  "principal": {
+    "id_source": "key_hash",
+    "metadata_fields": []
+  },
+  "errors": [
+    {
+      "code": "missing_credentials",
+      "status": 401,
+      "message": "API key required",
+      "www_authenticate": "ApiKey realm=\"mdemg\""
+    },
+    {
+      "code": "invalid_api_key",
+      "status": 401,
+      "message": "Invalid API key",
+      "www_authenticate": "ApiKey realm=\"mdemg\""
+    }
+  ],
+  "test_fixtures": {
+    "valid": ["fixtures/valid_apikey.txt"],
+    "invalid": ["fixtures/invalid_apikey.txt"]
+  },
+  "metadata": {
+    "author": "mdemg",
+    "created": "2026-02-06",
+    "updated": "2026-02-06"
+  }
+}

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -114,4 +115,53 @@ func ExtractBearerToken(authHeader string) string {
 		return strings.TrimSpace(authHeader[7:])
 	}
 	return ""
+}
+
+// jwtAuthenticator implements the Authenticator interface for JWT tokens.
+type jwtAuthenticator struct {
+	validator *JWTValidator
+}
+
+// newJWTAuthenticator creates a JWT authenticator from config.
+func newJWTAuthenticator(cfg AuthMethodConfig) (Authenticator, error) {
+	jwtCfg, ok := cfg.(*JWTConfig)
+	if !ok {
+		return nil, errors.New("jwt: invalid config type")
+	}
+	if err := jwtCfg.Validate(); err != nil {
+		return nil, err
+	}
+	return &jwtAuthenticator{
+		validator: NewJWTValidator(jwtCfg.Secret, jwtCfg.Issuer),
+	}, nil
+}
+
+// Name returns the authenticator name.
+func (a *jwtAuthenticator) Name() string { return "jwt" }
+
+// Authenticate validates a JWT Bearer token from the request.
+func (a *jwtAuthenticator) Authenticate(r *http.Request) (*Principal, error) {
+	token := ExtractBearerToken(r.Header.Get("Authorization"))
+	if token == "" {
+		return nil, nil // No credentials provided
+	}
+
+	claims, err := a.validator.Validate(token)
+	if err != nil {
+		return nil, &AuthError{
+			Status:  http.StatusUnauthorized,
+			Code:    "invalid_token",
+			Message: err.Error(),
+		}
+	}
+
+	return &Principal{
+		ID:   claims.Subject,
+		Type: ModeBearer,
+		Metadata: map[string]any{
+			"issuer":  claims.Issuer,
+			"scopes":  claims.Scopes,
+			"expires": claims.ExpiresAt,
+		},
+	}, nil
 }

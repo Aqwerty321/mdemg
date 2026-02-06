@@ -1,0 +1,32 @@
+{
+  "uams_version": "1.0.0",
+  "method": {
+    "name": "none",
+    "type": "none",
+    "description": "No authentication - pass-through mode for development/testing",
+    "status": "stable"
+  },
+  "credentials": {
+    "extraction": []
+  },
+  "validation": {
+    "algorithm": "none",
+    "timing_safe": false,
+    "checks": [],
+    "config_required": []
+  },
+  "principal": {
+    "id_source": "anonymous",
+    "metadata_fields": []
+  },
+  "errors": [],
+  "test_fixtures": {
+    "valid": [],
+    "invalid": []
+  },
+  "metadata": {
+    "author": "mdemg",
+    "created": "2026-02-06",
+    "updated": "2026-02-06"
+  }
+}

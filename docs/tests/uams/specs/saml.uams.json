@@ -1,0 +1,78 @@
+{
+  "uams_version": "1.0.0",
+  "method": {
+    "name": "saml",
+    "type": "bearer",
+    "description": "Microsoft Entra ID SAML 2.0 Bearer assertion authentication",
+    "rfc": "RFC 7522",
+    "status": "stable"
+  },
+  "credentials": {
+    "extraction": [
+      { "source": "header", "name": "Authorization", "prefix": "SAML ", "priority": 1 },
+      { "source": "header", "name": "X-SAML-Assertion", "priority": 2 }
+    ],
+    "format": {
+      "type": "base64",
+      "pattern": "^[A-Za-z0-9+/]+=*$"
+    }
+  },
+  "validation": {
+    "algorithm": "RSA-SHA256",
+    "timing_safe": true,
+    "checks": ["signature", "expiry", "issuer", "audience"],
+    "config_required": ["idp_metadata_url", "entity_id", "certificate"]
+  },
+  "principal": {
+    "id_source": "assertion.subject.name_id",
+    "metadata_fields": ["issuer", "attributes", "session_index", "authn_instant"]
+  },
+  "errors": [
+    {
+      "code": "missing_credentials",
+      "status": 401,
+      "message": "SAML assertion required",
+      "www_authenticate": "SAML realm=\"mdemg\""
+    },
+    {
+      "code": "invalid_assertion",
+      "status": 401,
+      "message": "Invalid SAML assertion format"
+    },
+    {
+      "code": "invalid_signature",
+      "status": 401,
+      "message": "SAML assertion signature verification failed"
+    },
+    {
+      "code": "assertion_expired",
+      "status": 401,
+      "message": "SAML assertion has expired"
+    },
+    {
+      "code": "invalid_issuer",
+      "status": 401,
+      "message": "SAML assertion issuer mismatch"
+    },
+    {
+      "code": "invalid_audience",
+      "status": 401,
+      "message": "SAML assertion audience mismatch"
+    },
+    {
+      "code": "assertion_not_yet_valid",
+      "status": 401,
+      "message": "SAML assertion not yet valid"
+    }
+  ],
+  "test_fixtures": {
+    "valid": ["fixtures/valid_saml.txt"],
+    "invalid": ["fixtures/invalid_saml.txt"],
+    "expired": ["fixtures/expired_saml.txt"]
+  },
+  "metadata": {
+    "author": "mdemg",
+    "created": "2026-02-06",
+    "updated": "2026-02-06"
+  }
+}

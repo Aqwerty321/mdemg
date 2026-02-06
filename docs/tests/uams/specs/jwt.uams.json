@@ -1,0 +1,67 @@
+{
+  "uams_version": "1.0.0",
+  "method": {
+    "name": "jwt",
+    "type": "bearer",
+    "description": "JWT Bearer token authentication with HMAC-SHA256",
+    "rfc": "RFC 7519",
+    "status": "stable"
+  },
+  "credentials": {
+    "extraction": [
+      { "source": "header", "name": "Authorization", "prefix": "Bearer ", "priority": 1 }
+    ],
+    "format": {
+      "type": "jwt",
+      "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+    }
+  },
+  "validation": {
+    "algorithm": "HS256",
+    "timing_safe": true,
+    "checks": ["signature", "expiry", "issuer"],
+    "config_required": ["secret", "issuer"]
+  },
+  "principal": {
+    "id_source": "claims.sub",
+    "metadata_fields": ["iss", "exp", "scopes"]
+  },
+  "errors": [
+    {
+      "code": "missing_credentials",
+      "status": 401,
+      "message": "Bearer token required",
+      "www_authenticate": "Bearer realm=\"mdemg\""
+    },
+    {
+      "code": "invalid_token",
+      "status": 401,
+      "message": "Invalid token format"
+    },
+    {
+      "code": "invalid_signature",
+      "status": 401,
+      "message": "Token signature verification failed"
+    },
+    {
+      "code": "token_expired",
+      "status": 401,
+      "message": "Token has expired"
+    },
+    {
+      "code": "invalid_issuer",
+      "status": 401,
+      "message": "Token issuer mismatch"
+    }
+  ],
+  "test_fixtures": {
+    "valid": ["fixtures/valid_jwt.txt"],
+    "invalid": ["fixtures/invalid_jwt.txt"],
+    "expired": ["fixtures/expired_jwt.txt"]
+  },
+  "metadata": {
+    "author": "mdemg",
+    "created": "2026-02-06",
+    "updated": "2026-02-06"
+  }
+}

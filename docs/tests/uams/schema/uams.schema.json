@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/uams/v1.0.0",
+  "title": "UAMS - Universal Auth Method Specification",
+  "description": "Schema for defining authentication method contracts in MDEMG",
+  "type": "object",
+  "required": ["uams_version", "method", "credentials", "validation", "principal"],
+  "properties": {
+    "uams_version": {
+      "type": "string",
+      "description": "Version of the UAMS schema",
+      "const": "1.0.0"
+    },
+    "method": {
+      "type": "object",
+      "description": "Authentication method metadata",
+      "required": ["name", "type", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for this auth method"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["none", "apikey", "bearer", "basic", "oauth2", "mtls", "custom"],
+          "description": "Category of authentication method"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the auth method"
+        },
+        "rfc": {
+          "type": "string",
+          "description": "RFC reference if applicable"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["stable", "beta", "experimental", "deprecated"],
+          "default": "stable",
+          "description": "Maturity status of this auth method"
+        }
+      }
+    },
+    "credentials": {
+      "type": "object",
+      "description": "How credentials are extracted from requests",
+      "required": ["extraction"],
+      "properties": {
+        "extraction": {
+          "type": "array",
+          "description": "Ordered list of credential extraction sources",
+          "items": {
+            "type": "object",
+            "required": ["source", "priority"],
+            "properties": {
+              "source": {
+                "type": "string",
+                "enum": ["header", "query", "cookie", "body", "certificate"],
+                "description": "Where to extract credentials from"
+              },
+              "name": {
+                "type": "string",
+                "description": "Header name, query parameter, or cookie name"
+              },
+              "prefix": {
+                "type": "string",
+                "description": "Expected prefix to strip (e.g., 'Bearer ')"
+              },
+              "priority": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Extraction priority (lower = higher priority)"
+              }
+            }
+          }
+        },
+        "format": {
+          "type": "object",
+          "description": "Expected credential format",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["opaque", "jwt", "base64", "certificate"],
+              "description": "Credential format type"
+            },
+            "pattern": {
+              "type": "string",
+              "description": "Regex pattern for format validation"
+            },
+            "min_length": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Minimum credential length"
+            },
+            "max_length": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum credential length"
+            }
+          }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "description": "Credential validation rules",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "Cryptographic algorithm used for validation"
+        },
+        "timing_safe": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether comparison uses constant-time operations"
+        },
+        "checks": {
+          "type": "array",
+          "description": "List of validation checks performed",
+          "items": {
+            "type": "string",
+            "enum": ["signature", "expiry", "issuer", "audience", "scope", "revocation"]
+          }
+        },
+        "config_required": {
+          "type": "array",
+          "description": "Required configuration fields for this method",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "principal": {
+      "type": "object",
+      "description": "How the authenticated principal is constructed",
+      "properties": {
+        "id_source": {
+          "type": "string",
+          "description": "Source of the principal ID (e.g., 'key_hash', 'claims.sub')"
+        },
+        "metadata_fields": {
+          "type": "array",
+          "description": "Fields to include in principal metadata",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "description": "Error responses for this auth method",
+      "items": {
+        "type": "object",
+        "required": ["code", "status", "message"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Error code identifier"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599,
+            "description": "HTTP status code"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message"
+          },
+          "www_authenticate": {
+            "type": "string",
+            "description": "WWW-Authenticate header value"
+          }
+        }
+      }
+    },
+    "test_fixtures": {
+      "type": "object",
+      "description": "Test fixture file references",
+      "properties": {
+        "valid": {
+          "type": "array",
+          "description": "Paths to valid credential fixtures",
+          "items": {
+            "type": "string"
+          }
+        },
+        "invalid": {
+          "type": "array",
+          "description": "Paths to invalid credential fixtures",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expired": {
+          "type": "array",
+          "description": "Paths to expired credential fixtures",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Spec metadata",
+      "properties": {
+        "author": {
+          "type": "string",
+          "description": "Spec author"
+        },
+        "created": {
+          "type": "string",
+          "format": "date",
+          "description": "Creation date"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date",
+          "description": "Last update date"
+        }
+      }
+    }
+  }
+}

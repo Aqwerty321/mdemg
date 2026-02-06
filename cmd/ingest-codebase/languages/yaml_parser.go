@@ -24,7 +24,24 @@ func (p *YAMLParser) Extensions() []string {
 
 func (p *YAMLParser) CanParse(path string) bool {
 	pathLower := strings.ToLower(path)
-	return strings.HasSuffix(pathLower, ".yml") || strings.HasSuffix(pathLower, ".yaml")
+	if !strings.HasSuffix(pathLower, ".yml") && !strings.HasSuffix(pathLower, ".yaml") {
+		return false
+	}
+
+	// Skip OpenAPI/Swagger specs - they have their own parser
+	content, err := ReadFileContent(path)
+	if err != nil {
+		return true // Let it try if we can't read
+	}
+	contentLower := strings.ToLower(content)
+	if strings.Contains(contentLower, "openapi:") ||
+		strings.Contains(contentLower, `"openapi":`) ||
+		strings.Contains(contentLower, "swagger:") ||
+		strings.Contains(contentLower, `"swagger":`) {
+		return false // Let OpenAPI parser handle it
+	}
+
+	return true
 }
 
 func (p *YAMLParser) IsTestFile(path string) bool {

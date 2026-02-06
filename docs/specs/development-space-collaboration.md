@@ -224,9 +224,10 @@ Space lineage is included in Phase 5 above.
 
 ### Acceptance
 
-- [ ] Heartbeat updates last_seen; GetPresence returns agent list with status.
-- [ ] Optional queue: messages queued when agent offline; delivered on Connect.
-- [ ] UDTS + tests pass.
+- [x] Heartbeat updates last_seen; GetPresence returns agent list with status.
+- [x] Optional queue: messages queued when agent offline; delivered on Connect.
+- [x] UDTS + tests pass.
+- [x] **100% function coverage** for all Phase 8 functions (39 unit tests).
 
 ---
 
@@ -276,11 +277,11 @@ docs/specs/
 | 1 | Space Transfer | ✅ Complete |
 | 2 | DevSpace hub + out-of-band distribution | ✅ Complete |
 | 3 | Inter-agent communications | ✅ Complete |
-| 4 | Incremental sync | 🔄 In progress |
-| 5 | CRDT + Space lineage | 📋 Not started |
+| 4 | Incremental sync | ✅ Complete |
+| 5 | CRDT + Space lineage | ✅ Complete |
 | 7 | Selective observation forwarding | 📋 Not started |
-| 8 | Agent health / heartbeat / presence | 📋 Not started |
-| — | Hash Verification (UNTS) | 📋 Spec complete |
+| 8 | Agent health / heartbeat / presence | ✅ Complete |
+| — | Hash Verification (UNTS) | ✅ Complete |
 
 ---
 

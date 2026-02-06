@@ -25,6 +25,9 @@ const (
 	DevSpace_PublishExport_FullMethodName   = "/mdemg.devspace.v1.DevSpace/PublishExport"
 	DevSpace_PullExport_FullMethodName      = "/mdemg.devspace.v1.DevSpace/PullExport"
 	DevSpace_Connect_FullMethodName         = "/mdemg.devspace.v1.DevSpace/Connect"
+	DevSpace_Heartbeat_FullMethodName       = "/mdemg.devspace.v1.DevSpace/Heartbeat"
+	DevSpace_GetPresence_FullMethodName     = "/mdemg.devspace.v1.DevSpace/GetPresence"
+	DevSpace_SetQueueConfig_FullMethodName  = "/mdemg.devspace.v1.DevSpace/SetQueueConfig"
 )
 
 // DevSpaceClient is the client API for DevSpace service.
@@ -43,6 +46,12 @@ type DevSpaceClient interface {
 	PullExport(ctx context.Context, in *PullExportRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[PullExportChunk], error)
 	// Connect (Phase 3) opens a bidirectional stream for inter-agent messaging.
 	Connect(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AgentMessage, AgentMessage], error)
+	// Heartbeat (Phase 37) sends a periodic heartbeat to indicate the agent is alive.
+	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
+	// GetPresence (Phase 37) returns the presence status of agents in a DevSpace.
+	GetPresence(ctx context.Context, in *GetPresenceRequest, opts ...grpc.CallOption) (*GetPresenceResponse, error)
+	// SetQueueConfig (Phase 37) configures the offline message queue for an agent.
+	SetQueueConfig(ctx context.Context, in *SetQueueConfigRequest, opts ...grpc.CallOption) (*SetQueueConfigResponse, error)
 }
 
 type devSpaceClient struct {
@@ -128,6 +137,36 @@ func (c *devSpaceClient) Connect(ctx context.Context, opts ...grpc.CallOption) (
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DevSpace_ConnectClient = grpc.BidiStreamingClient[AgentMessage, AgentMessage]
 
+func (c *devSpaceClient) Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HeartbeatResponse)
+	err := c.cc.Invoke(ctx, DevSpace_Heartbeat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *devSpaceClient) GetPresence(ctx context.Context, in *GetPresenceRequest, opts ...grpc.CallOption) (*GetPresenceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPresenceResponse)
+	err := c.cc.Invoke(ctx, DevSpace_GetPresence_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *devSpaceClient) SetQueueConfig(ctx context.Context, in *SetQueueConfigRequest, opts ...grpc.CallOption) (*SetQueueConfigResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetQueueConfigResponse)
+	err := c.cc.Invoke(ctx, DevSpace_SetQueueConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DevSpaceServer is the server API for DevSpace service.
 // All implementations must embed UnimplementedDevSpaceServer
 // for forward compatibility.
@@ -144,6 +183,12 @@ type DevSpaceServer interface {
 	PullExport(*PullExportRequest, grpc.ServerStreamingServer[PullExportChunk]) error
 	// Connect (Phase 3) opens a bidirectional stream for inter-agent messaging.
 	Connect(grpc.BidiStreamingServer[AgentMessage, AgentMessage]) error
+	// Heartbeat (Phase 37) sends a periodic heartbeat to indicate the agent is alive.
+	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
+	// GetPresence (Phase 37) returns the presence status of agents in a DevSpace.
+	GetPresence(context.Context, *GetPresenceRequest) (*GetPresenceResponse, error)
+	// SetQueueConfig (Phase 37) configures the offline message queue for an agent.
+	SetQueueConfig(context.Context, *SetQueueConfigRequest) (*SetQueueConfigResponse, error)
 	mustEmbedUnimplementedDevSpaceServer()
 }
 
@@ -171,6 +216,15 @@ func (UnimplementedDevSpaceServer) PullExport(*PullExportRequest, grpc.ServerStr
 }
 func (UnimplementedDevSpaceServer) Connect(grpc.BidiStreamingServer[AgentMessage, AgentMessage]) error {
 	return status.Error(codes.Unimplemented, "method Connect not implemented")
+}
+func (UnimplementedDevSpaceServer) Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Heartbeat not implemented")
+}
+func (UnimplementedDevSpaceServer) GetPresence(context.Context, *GetPresenceRequest) (*GetPresenceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPresence not implemented")
+}
+func (UnimplementedDevSpaceServer) SetQueueConfig(context.Context, *SetQueueConfigRequest) (*SetQueueConfigResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetQueueConfig not implemented")
 }
 func (UnimplementedDevSpaceServer) mustEmbedUnimplementedDevSpaceServer() {}
 func (UnimplementedDevSpaceServer) testEmbeddedByValue()                  {}
@@ -272,6 +326,60 @@ func _DevSpace_Connect_Handler(srv interface{}, stream grpc.ServerStream) error 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DevSpace_ConnectServer = grpc.BidiStreamingServer[AgentMessage, AgentMessage]
 
+func _DevSpace_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HeartbeatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DevSpaceServer).Heartbeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DevSpace_Heartbeat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DevSpaceServer).Heartbeat(ctx, req.(*HeartbeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DevSpace_GetPresence_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPresenceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DevSpaceServer).GetPresence(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DevSpace_GetPresence_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DevSpaceServer).GetPresence(ctx, req.(*GetPresenceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DevSpace_SetQueueConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetQueueConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DevSpaceServer).SetQueueConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DevSpace_SetQueueConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DevSpaceServer).SetQueueConfig(ctx, req.(*SetQueueConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DevSpace_ServiceDesc is the grpc.ServiceDesc for DevSpace service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -290,6 +398,18 @@ var DevSpace_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListExports",
 			Handler:    _DevSpace_ListExports_Handler,
+		},
+		{
+			MethodName: "Heartbeat",
+			Handler:    _DevSpace_Heartbeat_Handler,
+		},
+		{
+			MethodName: "GetPresence",
+			Handler:    _DevSpace_GetPresence_Handler,
+		},
+		{
+			MethodName: "SetQueueConfig",
+			Handler:    _DevSpace_SetQueueConfig_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

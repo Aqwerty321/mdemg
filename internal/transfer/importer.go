@@ -31,6 +31,7 @@ type ImportResult struct {
 	NodesOverwritten    int32
 	EdgesCreated        int32
 	EdgesSkipped        int32
+	EdgesMerged         int32 // Phase 35: CRDT merged edges
 	ObservationsCreated int32
 	SymbolsCreated      int32
 	Warnings            []string
@@ -47,6 +48,7 @@ func (r *ImportResult) ToProto() *pb.ImportResponse {
 			NodesOverwritten:    r.NodesOverwritten,
 			EdgesCreated:        r.EdgesCreated,
 			EdgesSkipped:        r.EdgesSkipped,
+			EdgesMerged:         r.EdgesMerged,
 			ObservationsCreated: r.ObservationsCreated,
 			SymbolsCreated:      r.SymbolsCreated,
 			DurationMs:          r.Duration.Milliseconds(),
@@ -104,7 +106,8 @@ func (imp *Importer) Import(ctx context.Context, chunks []*pb.SpaceChunk) (*Impo
 				}
 				result.EdgesCreated += stats.created
 				result.EdgesSkipped += stats.skipped
-				log.Printf("Imported edge chunk %d: %d created, %d skipped", chunk.Sequence, stats.created, stats.skipped)
+				result.EdgesMerged += stats.merged
+				log.Printf("Imported edge chunk %d: %d created, %d skipped, %d merged", chunk.Sequence, stats.created, stats.skipped, stats.merged)
 			}
 
 		case pb.ChunkType_CHUNK_TYPE_OBSERVATIONS:
@@ -189,6 +192,7 @@ type batchStats struct {
 	created     int32
 	skipped     int32
 	overwritten int32
+	merged      int32 // Phase 35: CRDT merged edges
 }
 
 func (imp *Importer) importNodes(ctx context.Context, nodes []*pb.NodeData) (batchStats, error) {
@@ -368,32 +372,85 @@ func (imp *Importer) importEdges(ctx context.Context, edges []*pb.EdgeData) (bat
 	var stats batchStats
 
 	for _, ed := range edges {
-		_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-			// Use MERGE to avoid duplicates; APOC not required
-			cypher := fmt.Sprintf(`
+		result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			params := map[string]any{
+				"spaceId":       ed.SpaceId,
+				"fromId":        ed.FromNodeId,
+				"toId":          ed.ToNodeId,
+				"weight":        ed.Weight,
+				"evidenceCount": int64(ed.EvidenceCount),
+				"dimTemporal":   ed.DimTemporal,
+				"dimSemantic":   ed.DimSemantic,
+				"dimCausal":     ed.DimCausal,
+			}
+
+			var cypher string
+
+			// Phase 35: CRDT mode uses special merge logic for CO_ACTIVATED_WITH edges
+			if imp.conflictMode == pb.ConflictMode_CONFLICT_CRDT && ed.RelType == "CO_ACTIVATED_WITH" {
+				// CRDT merge: sum evidence_count, max weight, max dimensional weights
+				cypher = `
+MATCH (a:MemoryNode {space_id: $spaceId, node_id: $fromId})
+MATCH (b:MemoryNode {space_id: $spaceId, node_id: $toId})
+MERGE (a)-[r:CO_ACTIVATED_WITH]->(b)
+ON CREATE SET
+    r.weight = $weight,
+    r.evidence_count = $evidenceCount,
+    r.dim_temporal = $dimTemporal,
+    r.dim_semantic = $dimSemantic,
+    r.dim_causal = $dimCausal,
+    r.created_at = datetime(),
+    r.space_id = $spaceId
+ON MATCH SET
+    r.weight = CASE WHEN r.weight < $weight THEN $weight ELSE r.weight END,
+    r.evidence_count = coalesce(r.evidence_count, 0) + $evidenceCount,
+    r.dim_temporal = CASE WHEN coalesce(r.dim_temporal, 0) < $dimTemporal THEN $dimTemporal ELSE coalesce(r.dim_temporal, 0) END,
+    r.dim_semantic = CASE WHEN coalesce(r.dim_semantic, 0) < $dimSemantic THEN $dimSemantic ELSE coalesce(r.dim_semantic, 0) END,
+    r.dim_causal = CASE WHEN coalesce(r.dim_causal, 0) < $dimCausal THEN $dimCausal ELSE coalesce(r.dim_causal, 0) END,
+    r.updated_at = datetime(),
+    r.last_activated = datetime()
+RETURN CASE WHEN r.created_at = r.updated_at THEN 'created' ELSE 'merged' END AS action`
+			} else {
+				// Standard merge: max weight only
+				cypher = fmt.Sprintf(`
 MATCH (a:MemoryNode {space_id: $spaceId, node_id: $fromId})
 MATCH (b:MemoryNode {space_id: $spaceId, node_id: $toId})
 MERGE (a)-[r:%s]->(b)
 ON CREATE SET r.weight = $weight, r.created_at = datetime(), r.space_id = $spaceId
-ON MATCH SET r.weight = CASE WHEN r.weight < $weight THEN $weight ELSE r.weight END`, ed.RelType)
-
-			params := map[string]any{
-				"spaceId": ed.SpaceId,
-				"fromId":  ed.FromNodeId,
-				"toId":    ed.ToNodeId,
-				"weight":  ed.Weight,
+ON MATCH SET r.weight = CASE WHEN r.weight < $weight THEN $weight ELSE r.weight END
+RETURN 'created' AS action`, ed.RelType)
 			}
 
-			_, err := tx.Run(ctx, cypher, params)
-			return nil, err
+			res, err := tx.Run(ctx, cypher, params)
+			if err != nil {
+				return nil, err
+			}
+
+			// Determine if this was a create or merge
+			action := "created"
+			if res.Next(ctx) {
+				if a, ok := res.Record().Get("action"); ok {
+					action = a.(string)
+				}
+			}
+			return action, nil
 		})
+
 		if err != nil {
 			// Log warning but continue — missing nodes are expected if partial export
 			log.Printf("WARN: edge %s->%s (%s): %v", ed.FromNodeId, ed.ToNodeId, ed.RelType, err)
 			stats.skipped++
 			continue
 		}
-		stats.created++
+
+		switch result.(string) {
+		case "created":
+			stats.created++
+		case "merged":
+			stats.merged++
+		default:
+			stats.created++
+		}
 	}
 
 	return stats, nil

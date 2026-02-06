@@ -1,0 +1,160 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Capability Gaps Full",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "gaps",
+      "phase49"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-06",
+    "description": "Full e2e tests for capability gap detection (Phase 49.7)",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 30000
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "test_cases": [
+    {
+      "id": "gaps_list",
+      "name": "List capability gaps",
+      "request": {
+        "method": "GET",
+        "path": "/v1/system/capability-gaps",
+        "query": {
+          "space_id": "{{test_space}}"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.data.gaps",
+            "type": "array"
+          },
+          {
+            "path": "$.data.summary",
+            "type": "object"
+          },
+          {
+            "path": "$.data.summary.total",
+            "type": "number"
+          },
+          {
+            "path": "$.data.summary.by_type",
+            "type": "object"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gaps_metrics",
+      "name": "Get gap detection metrics",
+      "request": {
+        "method": "GET",
+        "path": "/v1/system/capability-gaps",
+        "query": {
+          "include_metrics": "true"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.data.metrics",
+            "type": "object"
+          }
+        ]
+      }
+    },
+    {
+      "id": "feedback_negative",
+      "name": "Submit negative feedback",
+      "request": {
+        "method": "POST",
+        "path": "/v1/feedback",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "space_id": "{{test_space}}",
+          "query_text": "how to integrate with slack",
+          "is_negative": true,
+          "comment": "No results found for Slack integration"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.data.received",
+            "operator": "equals",
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "feedback_with_gap_suggestion",
+      "name": "Submit feedback with gap type suggestion",
+      "request": {
+        "method": "POST",
+        "path": "/v1/feedback",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "space_id": "{{test_space}}",
+          "query_text": "import jira tickets",
+          "is_negative": true,
+          "comment": "Need Jira integration",
+          "suggested_gap_type": "data_source"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.data.received",
+            "operator": "equals",
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "gaps_run_analysis",
+      "name": "Trigger full gap analysis",
+      "request": {
+        "method": "POST",
+        "path": "/v1/system/capability-gaps",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "space_id": "{{test_space}}",
+          "run_analysis": true
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.data.gaps",
+            "type": "array"
+          }
+        ]
+      }
+    }
+  ]
+}

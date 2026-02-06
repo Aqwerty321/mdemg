@@ -19,9 +19,13 @@ type Catalog struct {
 }
 
 type agentInfo struct {
-	agentID  string
-	metadata map[string]string
-	seenAt   time.Time
+	agentID       string
+	metadata      map[string]string
+	seenAt        time.Time
+	lastHeartbeat time.Time
+	lastStatus    map[string]string // Status from last heartbeat
+	maxQueueSize  int               // Max offline queue size (-1 = unlimited, 0 = disabled)
+	queuedMsgs    []*QueuedMessage  // Offline message queue
 }
 
 type exportEntry struct {
@@ -123,5 +127,202 @@ func (c *Catalog) GetExport(devSpaceID, exportID string) (filePath string, err e
 		return "", fmt.Errorf("export not found: %s", exportID)
 	}
 	return e.FilePath, nil
+}
+
+// =============================================================================
+// Phase 37: Heartbeat / Presence
+// =============================================================================
+
+// Presence thresholds
+const (
+	OnlineThreshold  = 30 * time.Second  // Online if heartbeat within 30s
+	AwayThreshold    = 5 * time.Minute   // Away if heartbeat within 5min
+	DefaultQueueSize = 100               // Default max queued messages
+)
+
+// QueuedMessage represents a message waiting for an offline agent.
+type QueuedMessage struct {
+	Message   *pb.AgentMessage
+	QueuedAt  time.Time
+	ExpiresAt time.Time
+}
+
+// UpdateHeartbeat updates the last heartbeat time for an agent.
+func (c *Catalog) UpdateHeartbeat(devSpaceID, agentID string, status map[string]string) (queueSize int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.agents[devSpaceID] == nil {
+		return 0
+	}
+	agent, ok := c.agents[devSpaceID][agentID]
+	if !ok {
+		return 0
+	}
+
+	agent.lastHeartbeat = time.Now().UTC()
+	agent.lastStatus = status
+	c.agents[devSpaceID][agentID] = agent
+
+	return len(agent.queuedMsgs)
+}
+
+// AgentPresenceInfo holds presence information for an agent.
+type AgentPresenceInfo struct {
+	AgentID               string
+	Status                string // "online", "away", "offline", "unknown"
+	LastHeartbeat         time.Time
+	SecondsSinceHeartbeat int
+	Metadata              map[string]string
+	LastStatus            map[string]string
+	QueuedMessages        int
+}
+
+// GetPresence returns the presence status of agents in a DevSpace.
+func (c *Catalog) GetPresence(devSpaceID, agentID string) []AgentPresenceInfo {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	agents := c.agents[devSpaceID]
+	if agents == nil {
+		return []AgentPresenceInfo{}
+	}
+
+	now := time.Now().UTC()
+	result := make([]AgentPresenceInfo, 0)
+
+	for id, agent := range agents {
+		if agentID != "" && id != agentID {
+			continue
+		}
+
+		var status string
+		var secsSince int
+		if agent.lastHeartbeat.IsZero() {
+			status = "unknown"
+			secsSince = -1
+		} else {
+			elapsed := now.Sub(agent.lastHeartbeat)
+			secsSince = int(elapsed.Seconds())
+			if elapsed <= OnlineThreshold {
+				status = "online"
+			} else if elapsed <= AwayThreshold {
+				status = "away"
+			} else {
+				status = "offline"
+			}
+		}
+
+		result = append(result, AgentPresenceInfo{
+			AgentID:               id,
+			Status:                status,
+			LastHeartbeat:         agent.lastHeartbeat,
+			SecondsSinceHeartbeat: secsSince,
+			Metadata:              agent.metadata,
+			LastStatus:            agent.lastStatus,
+			QueuedMessages:        len(agent.queuedMsgs),
+		})
+	}
+
+	return result
+}
+
+// SetQueueConfig sets the max queue size for an agent's offline message queue.
+func (c *Catalog) SetQueueConfig(devSpaceID, agentID string, maxSize int) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.agents[devSpaceID] == nil {
+		return fmt.Errorf("agent not found: %s", agentID)
+	}
+	agent, ok := c.agents[devSpaceID][agentID]
+	if !ok {
+		return fmt.Errorf("agent not found: %s", agentID)
+	}
+
+	agent.maxQueueSize = maxSize
+	c.agents[devSpaceID][agentID] = agent
+	return nil
+}
+
+// QueueMessage adds a message to an offline agent's queue.
+// Returns true if queued, false if queue is full or disabled.
+func (c *Catalog) QueueMessage(devSpaceID, agentID string, msg *pb.AgentMessage) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.agents[devSpaceID] == nil {
+		return false
+	}
+	agent, ok := c.agents[devSpaceID][agentID]
+	if !ok {
+		return false
+	}
+
+	// Check if queueing is disabled
+	if agent.maxQueueSize == 0 {
+		return false
+	}
+
+	// Check if queue is full (if not unlimited)
+	if agent.maxQueueSize > 0 && len(agent.queuedMsgs) >= agent.maxQueueSize {
+		return false
+	}
+
+	agent.queuedMsgs = append(agent.queuedMsgs, &QueuedMessage{
+		Message:   msg,
+		QueuedAt:  time.Now().UTC(),
+		ExpiresAt: time.Now().UTC().Add(24 * time.Hour), // Messages expire after 24h
+	})
+	c.agents[devSpaceID][agentID] = agent
+	return true
+}
+
+// DrainQueue returns and clears all queued messages for an agent.
+func (c *Catalog) DrainQueue(devSpaceID, agentID string) []*pb.AgentMessage {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.agents[devSpaceID] == nil {
+		return nil
+	}
+	agent, ok := c.agents[devSpaceID][agentID]
+	if !ok {
+		return nil
+	}
+
+	now := time.Now().UTC()
+	result := make([]*pb.AgentMessage, 0, len(agent.queuedMsgs))
+	for _, qm := range agent.queuedMsgs {
+		if qm.ExpiresAt.After(now) {
+			result = append(result, qm.Message)
+		}
+	}
+
+	// Clear the queue
+	agent.queuedMsgs = nil
+	c.agents[devSpaceID][agentID] = agent
+
+	return result
+}
+
+// IsAgentOnline returns true if the agent has sent a heartbeat recently.
+func (c *Catalog) IsAgentOnline(devSpaceID, agentID string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.agents[devSpaceID] == nil {
+		return false
+	}
+	agent, ok := c.agents[devSpaceID][agentID]
+	if !ok {
+		return false
+	}
+
+	if agent.lastHeartbeat.IsZero() {
+		return false
+	}
+
+	return time.Since(agent.lastHeartbeat) <= OnlineThreshold
 }
 

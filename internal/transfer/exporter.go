@@ -166,6 +166,7 @@ func (e *Exporter) Export(ctx context.Context, cfg ExportConfig) (*ExportResult,
 	}
 	// Chunk 0: metadata
 	seq := int32(0)
+	exportedAt := time.Now().UTC().Format(time.RFC3339)
 	result.Chunks = append(result.Chunks, &pb.SpaceChunk{
 		ChunkType:     pb.ChunkType_CHUNK_TYPE_METADATA,
 		SpaceId:       cfg.SpaceID,
@@ -174,13 +175,27 @@ func (e *Exporter) Export(ctx context.Context, cfg ExportConfig) (*ExportResult,
 		Metadata: &pb.SpaceMetadata{
 			SpaceId:             cfg.SpaceID,
 			SchemaVersion:       int32(schemaVersion),
-			ExportedAt:          time.Now().UTC().Format(time.RFC3339),
+			ExportedAt:          exportedAt,
 			SourceHost:          hostname,
 			TotalNodes:          counts.Nodes,
 			TotalEdges:          counts.Edges,
 			TotalObservations:   counts.Observations,
 			TotalSymbols:        counts.Symbols,
 			EmbeddingDimensions: int64(embDims),
+			// Phase 35: Space lineage tracking
+			Lineage: &pb.Lineage{
+				OriginSpaceId: cfg.SpaceID,
+				OriginHost:    hostname,
+				CreatedAt:     exportedAt, // Use export time as creation (will be overwritten on subsequent exports)
+				History: []*pb.LineageEvent{
+					{
+						EventType:  "export",
+						Timestamp:  exportedAt,
+						SourceHost: hostname,
+						Notes:      "Initial export",
+					},
+				},
+			},
 		},
 	})
 	seq++

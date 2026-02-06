@@ -1,0 +1,255 @@
+{
+  "udts_version": "1.0.0",
+  "api": {
+    "name": "DevSpace Agent Presence",
+    "base_url": "${UDTS_TARGET}",
+    "version": "v1",
+    "proto_sha256": "85bdd1303fd40b8c4067ba4cd82d324163b8e8d6437df739171484556f6ce2d0",
+    "service": "mdemg.devspace.v1.DevSpace"
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-06",
+    "description": "Phase 37: Agent Health / Heartbeat / Presence",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000
+  },
+  "variables": {
+    "test_devspace": "udts-presence-test",
+    "test_agent": "test-agent-001"
+  },
+  "setup": {
+    "description": "Register test agent before running presence tests",
+    "request": {
+      "method": "RegisterAgent",
+      "params": {
+        "dev_space_id": "{{test_devspace}}",
+        "agent_id": "{{test_agent}}",
+        "metadata": {
+          "name": "UDTS Test Agent",
+          "version": "1.0.0"
+        }
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "id": "heartbeat_basic",
+      "name": "Heartbeat updates agent status",
+      "description": "Verify that Heartbeat RPC accepts status and returns server_time",
+      "request": {
+        "method": "Heartbeat",
+        "params": {
+          "dev_space_id": "{{test_devspace}}",
+          "agent_id": "{{test_agent}}",
+          "status": {
+            "task": "testing",
+            "load": "0.1"
+          }
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.ok",
+            "operator": "equals",
+            "value": true
+          },
+          {
+            "path": "$.server_time",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "id": "heartbeat_invalid_args",
+      "name": "Heartbeat requires dev_space_id and agent_id",
+      "description": "Verify that Heartbeat returns InvalidArgument when required fields are missing",
+      "request": {
+        "method": "Heartbeat",
+        "params": {
+          "dev_space_id": "",
+          "agent_id": ""
+        }
+      },
+      "expected": {
+        "status_code": "INVALID_ARGUMENT"
+      }
+    },
+    {
+      "id": "get_presence_all_agents",
+      "name": "GetPresence returns all agents in DevSpace",
+      "description": "Verify that GetPresence returns agent list with status",
+      "depends_on": ["heartbeat_basic"],
+      "request": {
+        "method": "GetPresence",
+        "params": {
+          "dev_space_id": "{{test_devspace}}"
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.agents",
+            "type": "array"
+          },
+          {
+            "path": "$.agents[0].agent_id",
+            "type": "string"
+          },
+          {
+            "path": "$.agents[0].status",
+            "operator": "in",
+            "value": [0, 1, 2, 3]
+          }
+        ]
+      }
+    },
+    {
+      "id": "get_presence_specific_agent",
+      "name": "GetPresence returns specific agent",
+      "description": "Verify that GetPresence with agent_id returns single agent",
+      "depends_on": ["heartbeat_basic"],
+      "request": {
+        "method": "GetPresence",
+        "params": {
+          "dev_space_id": "{{test_devspace}}",
+          "agent_id": "{{test_agent}}"
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.agents",
+            "type": "array"
+          },
+          {
+            "path": "$.agents[0].agent_id",
+            "operator": "equals",
+            "value": "{{test_agent}}"
+          },
+          {
+            "path": "$.agents[0].status",
+            "operator": "equals",
+            "value": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "get_presence_invalid_args",
+      "name": "GetPresence requires dev_space_id",
+      "description": "Verify that GetPresence returns InvalidArgument when dev_space_id is missing",
+      "request": {
+        "method": "GetPresence",
+        "params": {}
+      },
+      "expected": {
+        "status_code": "INVALID_ARGUMENT"
+      }
+    },
+    {
+      "id": "set_queue_config",
+      "name": "SetQueueConfig configures offline queue",
+      "description": "Verify that SetQueueConfig sets max_queue_size for an agent",
+      "request": {
+        "method": "SetQueueConfig",
+        "params": {
+          "dev_space_id": "{{test_devspace}}",
+          "agent_id": "{{test_agent}}",
+          "max_queue_size": 100
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.ok",
+            "operator": "equals",
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "set_queue_config_invalid_args",
+      "name": "SetQueueConfig requires dev_space_id and agent_id",
+      "description": "Verify that SetQueueConfig returns InvalidArgument when required fields are missing",
+      "request": {
+        "method": "SetQueueConfig",
+        "params": {
+          "max_queue_size": 100
+        }
+      },
+      "expected": {
+        "status_code": "INVALID_ARGUMENT"
+      }
+    },
+    {
+      "id": "set_queue_config_unknown_agent",
+      "name": "SetQueueConfig fails for unknown agent",
+      "description": "Verify that SetQueueConfig returns error for unregistered agent",
+      "request": {
+        "method": "SetQueueConfig",
+        "params": {
+          "dev_space_id": "{{test_devspace}}",
+          "agent_id": "nonexistent-agent",
+          "max_queue_size": 100
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.ok",
+            "operator": "equals",
+            "value": false
+          },
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "id": "presence_shows_heartbeat_status",
+      "name": "Presence includes last heartbeat status",
+      "description": "Verify that GetPresence includes the status from the last heartbeat",
+      "depends_on": ["heartbeat_basic"],
+      "request": {
+        "method": "GetPresence",
+        "params": {
+          "dev_space_id": "{{test_devspace}}",
+          "agent_id": "{{test_agent}}"
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.agents[0].last_status.task",
+            "operator": "equals",
+            "value": "testing"
+          },
+          {
+            "path": "$.agents[0].last_heartbeat",
+            "type": "string"
+          },
+          {
+            "path": "$.agents[0].seconds_since_heartbeat",
+            "operator": "gte",
+            "value": 0
+          }
+        ]
+      }
+    }
+  ]
+}

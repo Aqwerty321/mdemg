@@ -1,0 +1,198 @@
+// UNTS - Universal Hash Test Specification (Hash Verification Module)
+// Alias: Nash Verification module
+// Phase 38: Hash verification for UPTS, UATS, UBTS, USTS, UOTS, UAMS, UDTS frameworks
+
+syntax = "proto3";
+
+package mdemg.unts.v1;
+
+option go_package = "mdemg/api/untspb";
+
+// HashVerification provides hash verification operations for tracked files
+// across MDEMG frameworks (manifest, UDTS, UATS, etc.)
+service HashVerification {
+  // ListVerifiedFiles returns all tracked files with their current hash and status
+  rpc ListVerifiedFiles(ListVerifiedFilesRequest) returns (ListVerifiedFilesResponse);
+
+  // GetFileStatus returns the status of a single tracked file
+  rpc GetFileStatus(GetFileStatusRequest) returns (GetFileStatusResponse);
+
+  // GetHashHistory returns the current hash and last 3 historical hashes
+  rpc GetHashHistory(GetHashHistoryRequest) returns (GetHashHistoryResponse);
+
+  // RevertToPreviousHash sets the expected hash back to a previous value
+  rpc RevertToPreviousHash(RevertToPreviousHashRequest) returns (RevertToPreviousHashResponse);
+
+  // UpdateHash manually updates the expected hash for a file
+  rpc UpdateHash(UpdateHashRequest) returns (UpdateHashResponse);
+
+  // VerifyNow recomputes file hashes and compares to expected values
+  rpc VerifyNow(VerifyNowRequest) returns (VerifyNowResponse);
+
+  // RegisterTrackedFile adds a new file to the registry
+  rpc RegisterTrackedFile(RegisterTrackedFileRequest) returns (RegisterTrackedFileResponse);
+}
+
+// Framework identifies which test framework tracks the file
+enum Framework {
+  FRAMEWORK_UNSPECIFIED = 0;
+  FRAMEWORK_MANIFEST = 1;  // docs/specs/manifest.sha256
+  FRAMEWORK_UDTS = 2;      // UDTS proto_sha256 fields
+  FRAMEWORK_UATS = 3;      // UATS spec hashes (future)
+  FRAMEWORK_UBTS = 4;      // UBTS spec hashes (future)
+  FRAMEWORK_USTS = 5;      // USTS spec hashes (future)
+  FRAMEWORK_UOTS = 6;      // UOTS spec hashes (future)
+  FRAMEWORK_UAMS = 7;      // UAMS spec hashes (future)
+  FRAMEWORK_UPTS = 8;      // UPTS parser hashes (future)
+}
+
+// FileStatus represents the verification status of a tracked file
+enum FileStatus {
+  FILE_STATUS_UNSPECIFIED = 0;
+  FILE_STATUS_VERIFIED = 1;   // Hash matches expected
+  FILE_STATUS_MISMATCH = 2;   // Hash does not match expected
+  FILE_STATUS_UNKNOWN = 3;    // File not found or hash not computed
+  FILE_STATUS_REVERTED = 4;   // Hash was reverted to a previous value
+}
+
+// HashSource indicates how the hash was set
+enum HashSource {
+  HASH_SOURCE_UNSPECIFIED = 0;
+  HASH_SOURCE_MANIFEST = 1;   // From manifest.sha256
+  HASH_SOURCE_SPEC = 2;       // From UDTS/UATS spec file
+  HASH_SOURCE_REVERT = 3;     // From revert operation
+  HASH_SOURCE_MANUAL = 4;     // Manually set via API
+  HASH_SOURCE_CI = 5;         // Set by CI pipeline
+}
+
+// HashHistoryEntry represents a historical hash value
+message HashHistoryEntry {
+  string hash = 1;            // SHA-256 hex (64 chars)
+  string updated_at = 2;      // ISO8601 timestamp
+  HashSource source = 3;      // How this hash was set
+}
+
+// VerifiedFileRecord represents a tracked file's verification state
+message VerifiedFileRecord {
+  string path = 1;            // Repository-relative path
+  Framework framework = 2;    // Which framework tracks this file
+  string current_hash = 3;    // Current expected SHA-256 hash
+  FileStatus status = 4;      // Current verification status
+  string updated_at = 5;      // Last status/hash update (ISO8601)
+  repeated HashHistoryEntry history = 6;  // Last 3 hash values (newest first)
+  string source_ref = 7;      // Where hash is enforced (manifest line, spec filename)
+}
+
+// ListVerifiedFilesRequest filters the list of tracked files
+message ListVerifiedFilesRequest {
+  Framework framework = 1;    // Optional: filter by framework
+  FileStatus status = 2;      // Optional: filter by status
+}
+
+// ListVerifiedFilesResponse contains all matching tracked files
+message ListVerifiedFilesResponse {
+  repeated VerifiedFileRecord files = 1;
+  int32 total_count = 2;
+  int32 verified_count = 3;
+  int32 mismatch_count = 4;
+}
+
+// GetFileStatusRequest identifies a single file to check
+message GetFileStatusRequest {
+  string path = 1;            // Repository-relative path
+  Framework framework = 2;    // Optional: narrow by framework
+}
+
+// GetFileStatusResponse contains the file's current state
+message GetFileStatusResponse {
+  VerifiedFileRecord record = 1;
+  string actual_hash = 2;     // Current on-disk hash (if computed)
+}
+
+// GetHashHistoryRequest identifies a file for history lookup
+message GetHashHistoryRequest {
+  string path = 1;            // Repository-relative path
+}
+
+// GetHashHistoryResponse contains current hash and history
+message GetHashHistoryResponse {
+  string path = 1;
+  string current_hash = 2;
+  string updated_at = 3;
+  repeated HashHistoryEntry history = 4;  // Last 3 hashes (newest first)
+}
+
+// RevertToPreviousHashRequest specifies which previous hash to restore
+message RevertToPreviousHashRequest {
+  string path = 1;
+  oneof target {
+    string target_hash = 2;   // Revert to specific hash
+    int32 history_index = 3;  // Revert to history index (0 = most recent previous)
+  }
+  string reverted_by = 4;     // Audit: who initiated the revert
+  string reason = 5;          // Audit: why reverting
+}
+
+// RevertToPreviousHashResponse confirms the revert operation
+message RevertToPreviousHashResponse {
+  bool ok = 1;
+  string new_current_hash = 2;
+  string updated_at = 3;
+  string error = 4;           // Error message if ok=false
+}
+
+// UpdateHashRequest manually sets a new expected hash
+message UpdateHashRequest {
+  string path = 1;
+  string new_hash = 2;        // SHA-256 hex (64 chars)
+  HashSource source = 3;      // How this hash was determined
+  string source_ref = 4;      // Reference (spec file, CI job, etc.)
+  string updated_by = 5;      // Audit: who updated
+  string reason = 6;          // Audit: why updating
+}
+
+// UpdateHashResponse confirms the update
+message UpdateHashResponse {
+  bool ok = 1;
+  string updated_at = 2;
+  string error = 3;
+}
+
+// VerifyNowRequest triggers hash verification
+message VerifyNowRequest {
+  string path = 1;            // Optional: specific file (empty = all)
+  Framework framework = 2;    // Optional: filter by framework
+}
+
+// FileVerifyResult contains the result for one file
+message FileVerifyResult {
+  string path = 1;
+  FileStatus status = 2;
+  string expected_hash = 3;
+  string actual_hash = 4;
+  string updated_at = 5;
+  string error = 6;           // Error message if verification failed
+}
+
+// VerifyNowResponse contains all verification results
+message VerifyNowResponse {
+  repeated FileVerifyResult results = 1;
+  int32 verified_count = 2;
+  int32 mismatch_count = 3;
+  int32 error_count = 4;
+}
+
+// RegisterTrackedFileRequest adds a new file to the registry
+message RegisterTrackedFileRequest {
+  string path = 1;            // Repository-relative path
+  Framework framework = 2;    // Which framework tracks this file
+  string initial_hash = 3;    // Initial expected SHA-256 hash
+  string source_ref = 4;      // Where hash is enforced
+  string registered_by = 5;   // Audit: who registered
+}
+
+// RegisterTrackedFileResponse confirms registration
+message RegisterTrackedFileResponse {
+  bool ok = 1;
+  string error = 2;
+}

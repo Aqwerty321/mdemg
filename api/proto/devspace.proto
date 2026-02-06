@@ -27,6 +27,15 @@ service DevSpace {
 
   // Connect (Phase 3) opens a bidirectional stream for inter-agent messaging.
   rpc Connect(stream AgentMessage) returns (stream AgentMessage);
+
+  // Heartbeat (Phase 37) sends a periodic heartbeat to indicate the agent is alive.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // GetPresence (Phase 37) returns the presence status of agents in a DevSpace.
+  rpc GetPresence(GetPresenceRequest) returns (GetPresenceResponse);
+
+  // SetQueueConfig (Phase 37) configures the offline message queue for an agent.
+  rpc SetQueueConfig(SetQueueConfigRequest) returns (SetQueueConfigResponse);
 }
 
 // =============================================================================
@@ -122,4 +131,65 @@ message AgentMessage {
   string payload_type = 4;  // Optional: e.g. "application/json", "text/plain"
   bytes payload = 5;
   int64 sequence = 6;       // Server-assigned order for delivery
+}
+
+// =============================================================================
+// Agent Health / Heartbeat / Presence (Phase 37)
+// =============================================================================
+
+// HeartbeatRequest is sent periodically by agents to indicate they are alive.
+message HeartbeatRequest {
+  string dev_space_id = 1;   // Required: DevSpace the agent belongs to
+  string agent_id = 2;       // Required: the agent sending the heartbeat
+  map<string, string> status = 3;  // Optional: status info (e.g. "load": "0.5", "task": "indexing")
+}
+
+// HeartbeatResponse confirms the heartbeat was received.
+message HeartbeatResponse {
+  bool ok = 1;
+  string server_time = 2;    // Server timestamp for clock sync (ISO8601)
+  int32 queue_size = 3;      // Number of queued messages waiting for this agent
+}
+
+// GetPresenceRequest retrieves the presence status of agents in a DevSpace.
+message GetPresenceRequest {
+  string dev_space_id = 1;   // Required: DevSpace to query
+  string agent_id = 2;       // Optional: specific agent (empty = all agents)
+}
+
+// GetPresenceResponse returns the presence status of agents.
+message GetPresenceResponse {
+  repeated AgentPresence agents = 1;
+}
+
+// AgentPresence represents the online/offline status of an agent.
+message AgentPresence {
+  string agent_id = 1;
+  PresenceStatus status = 2;
+  string last_heartbeat = 3;     // ISO8601 timestamp of last heartbeat
+  int32 seconds_since_heartbeat = 4;  // For convenience
+  map<string, string> metadata = 5;   // Agent metadata from registration
+  map<string, string> last_status = 6; // Status from last heartbeat
+  int32 queued_messages = 7;      // Messages waiting in offline queue
+}
+
+// PresenceStatus indicates the current status of an agent.
+enum PresenceStatus {
+  PRESENCE_UNKNOWN = 0;
+  PRESENCE_ONLINE = 1;     // Heartbeat within threshold (default: 30s)
+  PRESENCE_AWAY = 2;       // Heartbeat within extended threshold (default: 5min)
+  PRESENCE_OFFLINE = 3;    // No recent heartbeat
+}
+
+// SetQueueConfigRequest configures the offline message queue for an agent.
+message SetQueueConfigRequest {
+  string dev_space_id = 1;
+  string agent_id = 2;
+  int32 max_queue_size = 3;  // Max messages to queue (0 = disable, -1 = unlimited)
+}
+
+// SetQueueConfigResponse confirms the queue configuration.
+message SetQueueConfigResponse {
+  bool ok = 1;
+  string error = 2;
 }

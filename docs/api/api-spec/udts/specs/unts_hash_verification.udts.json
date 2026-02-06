@@ -1,0 +1,247 @@
+{
+  "udts_version": "1.0.0",
+  "api": {
+    "name": "UNTS Hash Verification",
+    "base_url": "${UDTS_TARGET}",
+    "version": "v1",
+    "proto_sha256": "657c68d070647f9fb02be54b20d2f131558785ceeb7d2a23fa20bf3663bdb471",
+    "service": "mdemg.unts.v1.HashVerification"
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-06",
+    "description": "Phase 38: Universal Hash Test Specification (Nash Verification module)",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000
+  },
+  "variables": {
+    "test_path": "docs/specs/test-file.md",
+    "test_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "test_cases": [
+    {
+      "id": "list_verified_files",
+      "name": "ListVerifiedFiles returns tracked files",
+      "description": "Verify that ListVerifiedFiles returns a list of tracked files with status counts",
+      "request": {
+        "method": "ListVerifiedFiles",
+        "params": {}
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.total_count",
+            "operator": "gte",
+            "value": 0
+          },
+          {
+            "path": "$.verified_count",
+            "operator": "gte",
+            "value": 0
+          },
+          {
+            "path": "$.mismatch_count",
+            "operator": "gte",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "list_verified_files_filter_framework",
+      "name": "ListVerifiedFiles filters by framework",
+      "description": "Verify that framework filter works correctly",
+      "request": {
+        "method": "ListVerifiedFiles",
+        "params": {
+          "framework": 1
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.files",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "id": "get_file_status_not_found",
+      "name": "GetFileStatus returns NotFound for untracked file",
+      "description": "Verify that GetFileStatus returns NOT_FOUND for an untracked path",
+      "request": {
+        "method": "GetFileStatus",
+        "params": {
+          "path": "nonexistent/file.txt"
+        }
+      },
+      "expected": {
+        "status_code": "NOT_FOUND"
+      }
+    },
+    {
+      "id": "register_tracked_file",
+      "name": "RegisterTrackedFile adds new file",
+      "description": "Verify that RegisterTrackedFile successfully adds a file to the registry",
+      "request": {
+        "method": "RegisterTrackedFile",
+        "params": {
+          "path": "{{test_path}}",
+          "framework": 1,
+          "initial_hash": "{{test_hash}}",
+          "source_ref": "test",
+          "registered_by": "udts-test"
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.ok",
+            "operator": "equals",
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "verify_now_single",
+      "name": "VerifyNow checks single file",
+      "description": "Verify that VerifyNow recomputes hash and returns status",
+      "depends_on": ["register_tracked_file"],
+      "request": {
+        "method": "VerifyNow",
+        "params": {
+          "path": "{{test_path}}"
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.results",
+            "type": "array"
+          },
+          {
+            "path": "$.results[0].path",
+            "operator": "equals",
+            "value": "{{test_path}}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "verify_now_all",
+      "name": "VerifyNow checks all files",
+      "description": "Verify that VerifyNow without path checks all tracked files",
+      "request": {
+        "method": "VerifyNow",
+        "params": {}
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.results",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "id": "update_hash",
+      "name": "UpdateHash changes expected hash",
+      "description": "Verify that UpdateHash updates the expected hash for a tracked file",
+      "depends_on": ["register_tracked_file"],
+      "request": {
+        "method": "UpdateHash",
+        "params": {
+          "path": "{{test_path}}",
+          "new_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source": 4,
+          "updated_by": "udts-test",
+          "reason": "test update"
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.ok",
+            "operator": "equals",
+            "value": true
+          },
+          {
+            "path": "$.updated_at",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "id": "get_hash_history",
+      "name": "GetHashHistory returns history",
+      "description": "Verify that GetHashHistory returns current hash and history entries",
+      "depends_on": ["update_hash"],
+      "request": {
+        "method": "GetHashHistory",
+        "params": {
+          "path": "{{test_path}}"
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.path",
+            "operator": "equals",
+            "value": "{{test_path}}"
+          },
+          {
+            "path": "$.current_hash",
+            "type": "string"
+          },
+          {
+            "path": "$.history",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "id": "revert_to_previous_hash",
+      "name": "RevertToPreviousHash restores old hash",
+      "description": "Verify that RevertToPreviousHash can restore a previous hash value",
+      "depends_on": ["update_hash"],
+      "request": {
+        "method": "RevertToPreviousHash",
+        "params": {
+          "path": "{{test_path}}",
+          "history_index": 0,
+          "reverted_by": "udts-test",
+          "reason": "test revert"
+        }
+      },
+      "expected": {
+        "status_code": "OK",
+        "assertions": [
+          {
+            "path": "$.ok",
+            "operator": "equals",
+            "value": true
+          },
+          {
+            "path": "$.new_current_hash",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

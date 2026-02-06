@@ -138,9 +138,9 @@ func TestSessionTracker_Cleanup(t *testing.T) {
 
 	st.RecordResume("old-sess", "")
 
-	// Manually set last activity to past
+	// Manually set last activity to past using the safe setter
 	state := st.GetState("old-sess")
-	state.LastActivityAt = time.Now().UTC().Add(-1 * time.Hour)
+	state.SetLastActivityAt(time.Now().UTC().Add(-1 * time.Hour))
 
 	// Wait for cleanup
 	time.Sleep(200 * time.Millisecond)

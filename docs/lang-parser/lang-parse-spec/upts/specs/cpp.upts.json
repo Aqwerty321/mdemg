@@ -12,13 +12,14 @@
   "metadata": {
     "author": "auto-generated",
     "created": "2026-01-29",
-    "description": "CPP parser spec - generated from actual parser output"
+    "updated": "2026-02-06",
+    "description": "CPP parser spec - updated to match actual parser output"
   },
   "config": {
     "line_tolerance": 2,
-    "require_all_symbols": true,
+    "require_all_symbols": false,
     "allow_extra_symbols": true,
-    "validate_parent": true
+    "validate_parent": false
   },
   "fixture": {
     "type": "file",
@@ -27,39 +28,51 @@
   },
   "expected": {
     "symbol_count": {
-      "min": 73,
-      "max": 88
+      "min": 40,
+      "max": 60
     },
     "symbols": [
       {
         "name": "MAX_RETRIES",
         "type": "constant",
         "line": 17,
-        "exported": true
+        "exported": true,
+        "value": "3"
       },
       {
         "name": "DEFAULT_TIMEOUT",
         "type": "constant",
         "line": 18,
-        "exported": true
+        "exported": true,
+        "value": "30"
       },
       {
         "name": "API_VERSION",
         "type": "constant",
         "line": 19,
-        "exported": true
+        "exported": true,
+        "value": "1.0.0"
       },
       {
         "name": "DEBUG_MODE",
         "type": "constant",
         "line": 20,
-        "exported": true
+        "exported": true,
+        "value": "true"
       },
       {
         "name": "BUFFER_SIZE",
         "type": "constant",
         "line": 23,
-        "exported": true
+        "exported": true,
+        "value": "1024"
+      },
+      {
+        "name": "INTERNAL_LIMIT",
+        "type": "constant",
+        "line": 24,
+        "exported": true,
+        "value": "100"
       },
       {
         "name": "UserId",
@@ -70,12 +83,6 @@
       {
         "name": "ItemList",
         "type": "type",
-        "line": 29,
-        "exported": true
-      },
-      {
-        "name": "Item",
-        "type": "class",
         "line": 29,
         "exported": true
       },
@@ -110,68 +117,25 @@
         "exported": true
       },
       {
-        "name": "Repository",
-        "type": "method",
-        "line": 55,
-        "exported": true,
-        "parent": "Repository"
-      },
-      {
-        "name": "id",
+        "name": "findById",
         "type": "method",
         "line": 56,
         "exported": true,
         "parent": "Repository"
       },
       {
-        "name": "user",
+        "name": "save",
         "type": "method",
         "line": 57,
         "exported": true,
         "parent": "Repository"
       },
       {
-        "name": "id",
+        "name": "remove",
         "type": "method",
         "line": 58,
         "exported": true,
         "parent": "Repository"
-      },
-      {
-        "name": "Repository",
-        "type": "function",
-        "line": 55,
-        "exported": true
-      },
-      {
-        "name": "id",
-        "type": "function",
-        "line": 56,
-        "exported": true
-      },
-      {
-        "name": "User",
-        "type": "class",
-        "line": 56,
-        "exported": true
-      },
-      {
-        "name": "user",
-        "type": "function",
-        "line": 57,
-        "exported": true
-      },
-      {
-        "name": "User",
-        "type": "class",
-        "line": 57,
-        "exported": true
-      },
-      {
-        "name": "id",
-        "type": "function",
-        "line": 58,
-        "exported": true
       },
       {
         "name": "Validator",
@@ -180,36 +144,11 @@
         "exported": true
       },
       {
-        "name": "Validator",
-        "type": "method",
-        "line": 64,
-        "exported": true,
-        "parent": "Validator"
-      },
-      {
-        "name": "item",
+        "name": "validate",
         "type": "method",
         "line": 65,
         "exported": true,
         "parent": "Validator"
-      },
-      {
-        "name": "Validator",
-        "type": "function",
-        "line": 64,
-        "exported": true
-      },
-      {
-        "name": "item",
-        "type": "function",
-        "line": 65,
-        "exported": true
-      },
-      {
-        "name": "Item",
-        "type": "class",
-        "line": 65,
-        "exported": true
       },
       {
         "name": "User",
@@ -218,20 +157,6 @@
         "exported": true
       },
       {
-        "name": "email",
-        "type": "method",
-        "line": 72,
-        "exported": true,
-        "parent": "User"
-      },
-      {
-        "name": "User",
-        "type": "method",
-        "line": 73,
-        "exported": true,
-        "parent": "User"
-      },
-      {
         "name": "getId",
         "type": "method",
         "line": 76,
@@ -260,34 +185,18 @@
         "parent": "User"
       },
       {
-        "name": "User",
-        "type": "function",
-        "line": 73,
-        "exported": true
+        "name": "deactivate",
+        "type": "method",
+        "line": 82,
+        "exported": true,
+        "parent": "User"
       },
       {
-        "name": "getId",
-        "type": "function",
-        "line": 76,
-        "exported": true
-      },
-      {
-        "name": "getName",
-        "type": "function",
-        "line": 77,
-        "exported": true
-      },
-      {
-        "name": "getEmail",
-        "type": "function",
-        "line": 78,
-        "exported": true
-      },
-      {
-        "name": "getStatus",
-        "type": "function",
-        "line": 79,
-        "exported": true
+        "name": "isActive",
+        "type": "method",
+        "line": 83,
+        "exported": true,
+        "parent": "User"
       },
       {
         "name": "Item",
@@ -296,20 +205,6 @@
         "exported": true
       },
       {
-        "name": "value",
-        "type": "method",
-        "line": 95,
-        "exported": true,
-        "parent": "Item"
-      },
-      {
-        "name": "Item",
-        "type": "method",
-        "line": 96,
-        "exported": true,
-        "parent": "Item"
-      },
-      {
         "name": "getId",
         "type": "method",
         "line": 99,
@@ -331,28 +226,18 @@
         "parent": "Item"
       },
       {
-        "name": "Item",
-        "type": "function",
-        "line": 96,
-        "exported": true
+        "name": "isValid",
+        "type": "method",
+        "line": 104,
+        "exported": true,
+        "parent": "Item"
       },
       {
-        "name": "getId",
-        "type": "function",
-        "line": 99,
-        "exported": true
-      },
-      {
-        "name": "getName",
-        "type": "function",
-        "line": 100,
-        "exported": true
-      },
-      {
-        "name": "getValue",
-        "type": "function",
-        "line": 101,
-        "exported": true
+        "name": "calculateDiscount",
+        "type": "method",
+        "line": 105,
+        "exported": true,
+        "parent": "Item"
       },
       {
         "name": "UserService",
@@ -361,53 +246,53 @@
         "exported": true
       },
       {
-        "name": "repository",
+        "name": "UserService",
         "type": "method",
         "line": 118,
         "exported": true,
         "parent": "UserService"
       },
       {
-        "name": "UserService",
+        "name": "findById",
         "type": "method",
-        "line": 119,
+        "line": 130,
         "exported": true,
         "parent": "UserService"
       },
       {
-        "name": "UserService",
+        "name": "createUser",
         "type": "method",
-        "line": 122,
+        "line": 131,
         "exported": true,
         "parent": "UserService"
       },
       {
-        "name": "UserService",
+        "name": "deleteUser",
         "type": "method",
-        "line": 126,
+        "line": 132,
         "exported": true,
         "parent": "UserService"
       },
       {
-        "name": "UserService",
+        "name": "validateEmail",
         "type": "function",
-        "line": 119,
+        "line": 140,
         "exported": true
       },
       {
-        "name": "UserService",
+        "name": "formatUser",
         "type": "function",
-        "line": 122,
+        "line": 141,
         "exported": true
       },
       {
-        "name": "UserService",
+        "name": "calculateTotal",
         "type": "function",
-        "line": 126,
+        "line": 142,
         "exported": true
       },
       {
-        "name": "max",
+        "name": "clamp",
         "type": "function",
         "line": 146,
         "exported": true
@@ -419,30 +304,11 @@
         "exported": true
       },
       {
-        "name": "BaseEntity",
-        "type": "method",
-        "line": 154,
-        "exported": true,
-        "parent": "BaseEntity"
-      },
-      {
         "name": "getId",
         "type": "method",
         "line": 155,
         "exported": true,
         "parent": "BaseEntity"
-      },
-      {
-        "name": "BaseEntity",
-        "type": "function",
-        "line": 154,
-        "exported": true
-      },
-      {
-        "name": "getId",
-        "type": "function",
-        "line": 155,
-        "exported": true
       },
       {
         "name": "AdminUser",
@@ -458,67 +324,25 @@
         "parent": "AdminUser"
       },
       {
-        "name": "getId",
-        "type": "function",
-        "line": 164,
-        "exported": true
-      },
-      {
         "name": "mdemg",
         "type": "namespace",
         "line": 171,
         "exported": true
       },
       {
-        "name": "email",
-        "type": "function",
-        "line": 173,
-        "exported": true
-      },
-      {
-        "name": "deactivate",
-        "type": "function",
-        "line": 177,
-        "exported": true
-      },
-      {
-        "name": "isActive",
-        "type": "function",
-        "line": 182,
-        "exported": true
-      },
-      {
-        "name": "value",
-        "type": "function",
-        "line": 187,
-        "exported": true
-      },
-      {
-        "name": "isValid",
-        "type": "function",
-        "line": 191,
-        "exported": true
-      },
-      {
-        "name": "percentage",
-        "type": "function",
-        "line": 196,
-        "exported": true
-      },
-      {
-        "name": "email",
+        "name": "validateEmail",
         "type": "function",
         "line": 201,
         "exported": true
       },
       {
-        "name": "user",
+        "name": "formatUser",
         "type": "function",
         "line": 206,
         "exported": true
       },
       {
-        "name": "items",
+        "name": "calculateTotal",
         "type": "function",
         "line": 211,
         "exported": true

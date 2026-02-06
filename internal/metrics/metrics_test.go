@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"mdemg/internal/circuitbreaker"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -239,5 +240,272 @@ func TestStandardMetrics(t *testing.T) {
 	g.Set(1)
 	if g.Value() != 1 {
 		t.Errorf("circuit breaker state = %.1f, want 1", g.Value())
+	}
+}
+
+func TestNormalizePath(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected string
+	}{
+		{"/v1/memory", "/v1/memory"},
+		{"/short", "/short"},
+		// Long path should be truncated to 50 chars + "..."
+		{"/v1/memory/nodes/very-long-uuid-here-that-exceeds-fifty-characters-total", "/v1/memory/nodes/very-long-uuid-here-that-exceeds-..."},
+	}
+
+	for _, tt := range tests {
+		got := normalizePath(tt.path)
+		if got != tt.expected {
+			t.Errorf("normalizePath(%q) = %q, want %q", tt.path, got, tt.expected)
+		}
+	}
+}
+
+func TestCollectRateLimitMetrics(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+	m := NewStandardMetrics(r)
+
+	// Initial value
+	initial := m.RateLimitRejected.Value()
+
+	// Collect rate limit metrics (this calls ratelimit.RejectedTotal())
+	m.CollectRateLimitMetrics()
+
+	// Value should not decrease
+	if m.RateLimitRejected.Value() < initial {
+		t.Error("RateLimitRejected should not decrease")
+	}
+}
+
+func TestCollectCircuitBreakerMetrics(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+	m := NewStandardMetrics(r)
+
+	// Test with nil registry (should not panic)
+	m.CollectCircuitBreakerMetrics(nil)
+
+	// Create a circuit breaker registry and collect metrics
+	cbCfg := circuitbreaker.DefaultConfig()
+	cbCfg.FailureThreshold = 1
+	cbRegistry := circuitbreaker.NewRegistry(cbCfg)
+
+	// Create breakers in different states
+	closedBreaker := cbRegistry.Get("closed-service")
+	openBreaker := cbRegistry.Get("open-service")
+	openBreaker.RecordFailure() // This will open it
+
+	// Collect metrics
+	m.CollectCircuitBreakerMetrics(cbRegistry)
+
+	// Verify gauges were set
+	closedGauge := m.CircuitBreakerState("closed-service")
+	openGauge := m.CircuitBreakerState("open-service")
+
+	_ = closedBreaker // Verify we created it
+
+	if closedGauge.Value() != 0 {
+		t.Errorf("closed-service gauge = %.1f, want 0", closedGauge.Value())
+	}
+	if openGauge.Value() != 1 {
+		t.Errorf("open-service gauge = %.1f, want 1", openGauge.Value())
+	}
+}
+
+func TestGlobalMetrics(t *testing.T) {
+	// Reset global state for testing
+	globalMetrics = nil
+
+	// First call to Metrics() should initialize
+	m1 := Metrics()
+	if m1 == nil {
+		t.Fatal("Metrics() returned nil")
+	}
+
+	// Second call should return the same instance
+	m2 := Metrics()
+	if m1 != m2 {
+		t.Error("Metrics() should return same instance")
+	}
+
+	// InitStandardMetrics should replace
+	m3 := InitStandardMetrics()
+	if m3 == nil {
+		t.Fatal("InitStandardMetrics() returned nil")
+	}
+}
+
+func TestGlobalRegistry(t *testing.T) {
+	// Test SetGlobalRegistry and Global
+	r := NewRegistry(DefaultConfig())
+
+	SetGlobalRegistry(r)
+
+	if Global() != r {
+		t.Error("Global() should return the set registry")
+	}
+}
+
+func TestMetricsHandler_NilRegistry(t *testing.T) {
+	// MetricsHandler with nil should use global registry
+	handler := MetricsHandler(nil)
+
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestHTTPMiddleware_Write(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+
+	handler := HTTPMiddleware(r)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Write without calling WriteHeader first
+		// This should implicitly set status 200
+		w.Write([]byte("hello world"))
+	}))
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+
+	body := rec.Body.String()
+	if body != "hello world" {
+		t.Errorf("body = %q, want 'hello world'", body)
+	}
+}
+
+func TestHTTPMiddleware_NoWriteHeader(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+
+	handler := HTTPMiddleware(r)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Handler that writes body without explicitly setting status
+		w.Write([]byte("response"))
+	}))
+
+	req := httptest.NewRequest("GET", "/api/test", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	// Should get 200 OK (implicit)
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestNewGauge_WithExistingLabels(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+
+	// Create gauge with labels
+	g1 := r.NewGauge("test_gauge", "Test gauge", map[string]string{"env": "prod"})
+	g2 := r.NewGauge("test_gauge", "Test gauge", map[string]string{"env": "prod"})
+
+	g1.Set(42)
+
+	// Same labels should return same gauge
+	if g2.Value() != 42 {
+		t.Errorf("same labels should return same gauge, got %.1f want 42", g2.Value())
+	}
+}
+
+func TestNewHistogram_WithExistingLabels(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+
+	// Create histogram with labels
+	h1 := r.NewHistogram("test_hist", "Test histogram", map[string]string{"env": "prod"})
+	h2 := r.NewHistogram("test_hist", "Test histogram", map[string]string{"env": "prod"})
+
+	h1.Observe(0.5)
+
+	// Same labels should return same histogram
+	_, _, count := h2.Snapshot()
+	if count != 1 {
+		t.Errorf("same labels should return same histogram, got count %d want 1", count)
+	}
+}
+
+func TestCacheHitRatio(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+	m := NewStandardMetrics(r)
+
+	// Test the CacheHitRatio factory function
+	g := m.CacheHitRatio("query")
+	g.Set(0.85)
+
+	if g.Value() != 0.85 {
+		t.Errorf("CacheHitRatio = %.2f, want 0.85", g.Value())
+	}
+}
+
+func TestCollectCircuitBreakerMetrics_HalfOpen(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+	m := NewStandardMetrics(r)
+
+	cbCfg := circuitbreaker.DefaultConfig()
+	cbCfg.FailureThreshold = 1
+	cbCfg.Timeout = 10 * time.Millisecond
+	cbRegistry := circuitbreaker.NewRegistry(cbCfg)
+
+	// Create a breaker and put it in half-open state
+	breaker := cbRegistry.Get("halfopen-service")
+	breaker.RecordFailure() // Opens it
+
+	// Wait for half-open transition
+	time.Sleep(20 * time.Millisecond)
+	_ = breaker.State() // Force state check
+
+	// Collect metrics
+	m.CollectCircuitBreakerMetrics(cbRegistry)
+
+	gauge := m.CircuitBreakerState("halfopen-service")
+	if gauge.Value() != 2 {
+		t.Errorf("halfopen-service gauge = %.1f, want 2 (half-open)", gauge.Value())
+	}
+}
+
+func TestHTTPMiddleware_NilRegistry(t *testing.T) {
+	// HTTPMiddleware with nil should use global registry
+	handler := HTTPMiddleware(nil)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestStatusResponseWriter_WriteHeaderTwice(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+
+	handler := HTTPMiddleware(r)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Write header twice - second call should be ignored
+		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusOK) // This should be ignored
+		w.Write([]byte("created"))
+	}))
+
+	req := httptest.NewRequest("POST", "/test", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	// Should be 201 (first call), not 200
+	if rec.Code != http.StatusCreated {
+		t.Errorf("status = %d, want 201", rec.Code)
 	}
 }

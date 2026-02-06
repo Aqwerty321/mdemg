@@ -298,3 +298,289 @@ func TestPrincipal_Context(t *testing.T) {
 		t.Errorf("GetPrincipal() = %v, want %v", got, p)
 	}
 }
+
+func TestDefaultConfig(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if cfg.Enabled {
+		t.Error("default should be disabled")
+	}
+	if cfg.Mode != ModeNone {
+		t.Errorf("expected ModeNone, got %s", cfg.Mode)
+	}
+	if !cfg.SkipEndpoints["/healthz"] {
+		t.Error("default should skip /healthz")
+	}
+	if !cfg.SkipEndpoints["/readyz"] {
+		t.Error("default should skip /readyz")
+	}
+}
+
+func TestExtractBearerToken(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   string
+	}{
+		{
+			name:   "valid bearer",
+			header: "Bearer mytoken",
+			want:   "mytoken",
+		},
+		{
+			name:   "lowercase bearer",
+			header: "bearer mytoken",
+			want:   "mytoken",
+		},
+		{
+			name:   "Bearer with spaces",
+			header: "  Bearer   mytoken  ",
+			want:   "mytoken",
+		},
+		{
+			name:   "not bearer",
+			header: "ApiKey mykey",
+			want:   "",
+		},
+		{
+			name:   "empty",
+			header: "",
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ExtractBearerToken(tt.header)
+			if got != tt.want {
+				t.Errorf("ExtractBearerToken(%q) = %q, want %q", tt.header, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMiddleware_Bearer(t *testing.T) {
+	secret := "test-secret"
+	issuer := "test-issuer"
+
+	cfg := Config{
+		Enabled:   true,
+		Mode:      ModeBearer,
+		JWTSecret: secret,
+		JWTIssuer: issuer,
+	}
+	middleware := Middleware(cfg)
+
+	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := GetPrincipal(r.Context())
+		if p == nil {
+			t.Error("principal should be set")
+		}
+		if p.Type != ModeBearer {
+			t.Errorf("expected ModeBearer, got %s", p.Type)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	t.Run("valid token", func(t *testing.T) {
+		token := createTestToken(secret, JWTClaims{
+			Subject:   "user123",
+			Issuer:    issuer,
+			ExpiresAt: time.Now().Add(time.Hour).Unix(),
+			IssuedAt:  time.Now().Unix(),
+		})
+
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d", rec.Code)
+		}
+	})
+
+	t.Run("invalid token", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set("Authorization", "Bearer invalid.token.here")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401, got %d", rec.Code)
+		}
+	})
+
+	t.Run("missing token", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/test", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401, got %d", rec.Code)
+		}
+	})
+}
+
+func TestAPIKeyValidator_EmptyKeys(t *testing.T) {
+	v := NewAPIKeyValidator(nil)
+
+	// Should not validate any key
+	_, valid := v.Validate("anykey")
+	if valid {
+		t.Error("should not validate with empty key list")
+	}
+}
+
+func TestExtractAPIKey_AllSources(t *testing.T) {
+	// Test case-insensitive header check
+	tests := []struct {
+		name    string
+		headers map[string]string
+		query   map[string]string
+		want    string
+	}{
+		{
+			name:    "Authorization Basic (unsupported)",
+			headers: map[string]string{"Authorization": "Basic dXNlcjpwYXNz"},
+			query:   nil,
+			want:    "",
+		},
+		{
+			name:    "Authorization with leading spaces",
+			headers: map[string]string{"Authorization": "  ApiKey   mykey"},
+			query:   nil,
+			want:    "mykey",
+		},
+		{
+			name:    "lowercase x-api-key header",
+			headers: map[string]string{"x-api-key": "lowercasekey"},
+			query:   nil,
+			want:    "lowercasekey",
+		},
+		{
+			name:    "lowercase authorization header",
+			headers: map[string]string{"authorization": "ApiKey lowerauth"},
+			query:   nil,
+			want:    "lowerauth",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.headers == nil {
+				tt.headers = map[string]string{}
+			}
+			if tt.query == nil {
+				tt.query = map[string]string{}
+			}
+			got := ExtractAPIKey(tt.headers, tt.query)
+			if got != tt.want {
+				t.Errorf("ExtractAPIKey() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestJWTValidator_Validate_InvalidSignatureBase64(t *testing.T) {
+	v := NewJWTValidator("secret", "issuer")
+
+	// Create a token with an invalid base64 signature
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	claims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user123","iss":"issuer","exp":9999999999}`))
+	// Invalid base64: contains characters not in URL-safe base64
+	invalidSig := "!!!invalid-base64-signature!!!"
+
+	token := header + "." + claims + "." + invalidSig
+
+	_, err := v.Validate(token)
+	if err != ErrInvalidToken {
+		t.Errorf("expected ErrInvalidToken for invalid base64 signature, got %v", err)
+	}
+}
+
+func TestJWTValidator_Validate_InvalidClaimsBase64(t *testing.T) {
+	secret := "test-secret"
+	issuer := "test-issuer"
+	v := NewJWTValidator(secret, issuer)
+
+	// Create a token with invalid base64 claims
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	invalidClaims := "!!!invalid-base64-claims!!!" // Invalid base64
+
+	// Create a valid signature for this malformed token
+	signatureInput := header + "." + invalidClaims
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(signatureInput))
+	signature := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+
+	token := header + "." + invalidClaims + "." + signature
+
+	_, err := v.Validate(token)
+	if err != ErrInvalidToken {
+		t.Errorf("expected ErrInvalidToken for invalid claims base64, got %v", err)
+	}
+}
+
+func TestJWTValidator_Validate_InvalidClaimsJSON(t *testing.T) {
+	secret := "test-secret"
+	issuer := "test-issuer"
+	v := NewJWTValidator(secret, issuer)
+
+	// Create a token with invalid JSON in claims
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	invalidJSON := base64.RawURLEncoding.EncodeToString([]byte(`{invalid json`))
+
+	// Create a valid signature for this malformed token
+	signatureInput := header + "." + invalidJSON
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(signatureInput))
+	signature := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+
+	token := header + "." + invalidJSON + "." + signature
+
+	_, err := v.Validate(token)
+	if err != ErrInvalidToken {
+		t.Errorf("expected ErrInvalidToken for invalid claims JSON, got %v", err)
+	}
+}
+
+func TestJWTValidator_Validate_TokenNotYetValid(t *testing.T) {
+	secret := "test-secret"
+	issuer := "test-issuer"
+	v := NewJWTValidator(secret, issuer)
+
+	// Create a token with NotBefore in the future
+	token := createTestToken(secret, JWTClaims{
+		Subject:   "user123",
+		Issuer:    issuer,
+		ExpiresAt: time.Now().Add(time.Hour).Unix(),
+		NotBefore: time.Now().Add(time.Hour).Unix(), // Not valid until 1 hour from now
+	})
+
+	_, err := v.Validate(token)
+	if err != ErrTokenNotYetValid {
+		t.Errorf("expected ErrTokenNotYetValid, got %v", err)
+	}
+}
+
+func TestMiddleware_ModeNone(t *testing.T) {
+	cfg := Config{
+		Enabled: true,
+		Mode:    ModeNone, // None mode passes through
+	}
+	middleware := Middleware(cfg)
+
+	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	// ModeNone passes through without auth (for testing/dev)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 for ModeNone, got %d", rec.Code)
+	}
+}

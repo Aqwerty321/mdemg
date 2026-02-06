@@ -276,11 +276,16 @@ Install the post-commit hook to automatically ingest changes on every commit:
 
 MDEMG extracts code symbols during ingestion using the Unified Parser Test Schema (UPTS):
 
-**Supported Languages (30+):**
-- TypeScript, JavaScript, Python, Go, Rust, Java, C/C++, C#
-- Ruby, PHP, Swift, Kotlin, Scala, Dart
-- SQL, GraphQL, Protobuf, YAML, JSON, TOML, Dockerfile
-- And more...
+**Supported Languages (25 UPTS-validated):**
+- **Systems**: Go, Rust, C, C++, CUDA
+- **JVM**: Java, Kotlin
+- **.NET**: C#
+- **Scripting**: Python, TypeScript/JavaScript, Shell
+- **API Schemas**: Protocol Buffers, GraphQL, OpenAPI
+- **Configuration**: YAML, TOML, JSON, INI
+- **Infrastructure**: Terraform/HCL, Dockerfile, Makefile
+- **Database**: SQL, Cypher (Neo4j)
+- **Documentation**: Markdown, XML
 
 **Extracted Symbol Types:**
 - Functions, methods, classes, interfaces, types

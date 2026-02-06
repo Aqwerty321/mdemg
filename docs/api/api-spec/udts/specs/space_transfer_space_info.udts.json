@@ -1,0 +1,18 @@
+{
+  "udts_version": "1.0.0",
+  "service": "mdemg.transfer.v1.SpaceTransfer",
+  "method": "SpaceInfo",
+  "request": { "space_id": "demo" },
+  "expected": {
+    "status_code": "OK",
+    "response_has_field": "summary"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "proto_sha256": "e7731911ba1c87b37eac7ebe999dce84b95493fcfdaa389636520d447e3149b1"
+  },
+  "metadata": {
+    "description": "SpaceInfo unary RPC returns OK and summary for given space_id",
+    "tags": ["space-transfer", "contract"]
+  }
+}

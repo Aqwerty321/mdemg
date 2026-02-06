@@ -1,0 +1,20 @@
+{
+  "udts_version": "1.0.0",
+  "service": "mdemg.devspace.v1.DevSpace",
+  "method": "ListExports",
+  "request": {
+    "dev_space_id": "udts-test-space"
+  },
+  "expected": {
+    "status_code": "OK",
+    "response_has_field": "exports"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "proto_sha256": "2f6a032c2ee43db4e5c091fca4c1b033297e95d49d77bc79e771ea581e929c0a"
+  },
+  "metadata": {
+    "description": "ListExports unary RPC returns OK and an exports array",
+    "tags": ["devspace", "phase2", "contract"]
+  }
+}

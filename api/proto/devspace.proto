@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package mdemg.devspace.v1;
+
+option go_package = "mdemg/api/devspacepb";
+
+// =============================================================================
+// DevSpace Service (Phase 2: Development Space Collaboration)
+// Hub for agent registration and out-of-band export distribution.
+// =============================================================================
+
+service DevSpace {
+  // RegisterAgent registers an agent in a DevSpace (idempotent).
+  rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
+
+  // DeregisterAgent removes an agent from a DevSpace.
+  rpc DeregisterAgent(DeregisterAgentRequest) returns (DeregisterAgentResponse);
+
+  // ListExports returns the catalog of published exports for a DevSpace.
+  rpc ListExports(ListExportsRequest) returns (ListExportsResponse);
+
+  // PublishExport uploads an export to the hub and adds it to the catalog.
+  rpc PublishExport(stream PublishExportChunk) returns (PublishExportResponse);
+
+  // PullExport streams a published export by ID to the caller.
+  rpc PullExport(PullExportRequest) returns (stream PullExportChunk);
+
+  // Connect (Phase 3) opens a bidirectional stream for inter-agent messaging.
+  rpc Connect(stream AgentMessage) returns (stream AgentMessage);
+}
+
+// =============================================================================
+// Registration
+// =============================================================================
+
+message RegisterAgentRequest {
+  string dev_space_id = 1;  // Required: e.g. "my-team"
+  string agent_id = 2;      // Required: unique agent identifier
+  map<string, string> metadata = 3;  // Optional: display name, version, etc.
+}
+
+message RegisterAgentResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message DeregisterAgentRequest {
+  string dev_space_id = 1;
+  string agent_id = 2;
+}
+
+message DeregisterAgentResponse {
+  bool ok = 1;
+}
+
+// =============================================================================
+// Export catalog
+// =============================================================================
+
+message ListExportsRequest {
+  string dev_space_id = 1;
+}
+
+message ListExportsResponse {
+  repeated ExportEntry exports = 1;
+}
+
+message ExportEntry {
+  string export_id = 1;       // Hub-assigned ID for pull
+  string space_id = 2;        // MDEMG space_id that was exported
+  string published_at = 3;   // ISO8601
+  string published_by_agent_id = 4;
+  string label = 5;          // Optional label
+}
+
+// =============================================================================
+// Publish (stream upload)
+// =============================================================================
+
+message PublishExportChunk {
+  oneof payload {
+    PublishExportHeader header = 1;  // First message only
+    bytes data = 2;                  // Subsequent: raw .mdemg file bytes
+  }
+}
+
+message PublishExportHeader {
+  string dev_space_id = 1;
+  string space_id = 2;
+  string published_by_agent_id = 3;
+  string label = 4;
+}
+
+message PublishExportResponse {
+  string export_id = 1;
+  bool ok = 2;
+  string error = 3;
+}
+
+// =============================================================================
+// Pull (stream download)
+// =============================================================================
+
+message PullExportRequest {
+  string dev_space_id = 1;
+  string export_id = 2;
+}
+
+message PullExportChunk {
+  bytes data = 1;   // Raw .mdemg file bytes (chunked)
+  int64 sequence = 2;
+}
+
+// =============================================================================
+// Inter-agent messaging (Phase 3)
+// =============================================================================
+
+message AgentMessage {
+  string dev_space_id = 1;   // Required: target DevSpace
+  string agent_id = 2;       // Sender agent (should be registered)
+  string topic = 3;         // Optional: channel/topic for filtering (e.g. "bugs", "context")
+  string payload_type = 4;  // Optional: e.g. "application/json", "text/plain"
+  bytes payload = 5;
+  int64 sequence = 6;       // Server-assigned order for delivery
+}

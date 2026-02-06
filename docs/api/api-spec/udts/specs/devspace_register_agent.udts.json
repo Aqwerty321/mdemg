@@ -1,0 +1,22 @@
+{
+  "udts_version": "1.0.0",
+  "service": "mdemg.devspace.v1.DevSpace",
+  "method": "RegisterAgent",
+  "request": {
+    "dev_space_id": "udts-test-space",
+    "agent_id": "udts-agent-1",
+    "metadata": {}
+  },
+  "expected": {
+    "status_code": "OK",
+    "response_has_field": "ok"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "proto_sha256": "2f6a032c2ee43db4e5c091fca4c1b033297e95d49d77bc79e771ea581e929c0a"
+  },
+  "metadata": {
+    "description": "RegisterAgent unary RPC returns OK when agent is registered",
+    "tags": ["devspace", "phase2", "contract"]
+  }
+}

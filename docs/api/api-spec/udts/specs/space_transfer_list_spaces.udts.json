@@ -1,0 +1,18 @@
+{
+  "udts_version": "1.0.0",
+  "service": "mdemg.transfer.v1.SpaceTransfer",
+  "method": "ListSpaces",
+  "request": {},
+  "expected": {
+    "status_code": "OK",
+    "response_has_field": "spaces"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "proto_sha256": "e7731911ba1c87b37eac7ebe999dce84b95493fcfdaa389636520d447e3149b1"
+  },
+  "metadata": {
+    "description": "ListSpaces unary RPC returns OK and a spaces array",
+    "tags": ["space-transfer", "contract", "smoke"]
+  }
+}

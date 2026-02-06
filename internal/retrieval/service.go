@@ -159,6 +159,17 @@ func (s *Service) InvalidateSpaceCache(spaceID string) int {
 	return s.queryCache.InvalidateSpace(spaceID)
 }
 
+// ClearQueryCache clears all entries from the query cache.
+// Returns the number of entries that were cleared.
+func (s *Service) ClearQueryCache() int {
+	if s.queryCache == nil {
+		return 0
+	}
+	count := s.queryCache.Len()
+	s.queryCache.Clear()
+	return count
+}
+
 // UpdateTapRootFreshness updates the TapRoot node for a space with the latest
 // ingest timestamp and type. Creates the TapRoot if it doesn't exist.
 func (s *Service) UpdateTapRootFreshness(ctx context.Context, spaceID, ingestType string) error {

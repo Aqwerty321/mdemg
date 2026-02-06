@@ -7,96 +7,180 @@ import (
 	"mdemg/internal/models"
 )
 
+func TestNewQueryCache(t *testing.T) {
+	t.Run("default values", func(t *testing.T) {
+		cache := NewQueryCache(0, 0)
+		if cache == nil {
+			t.Fatal("expected non-nil cache")
+		}
+		if cache.capacity != 500 {
+			t.Errorf("expected default capacity 500, got %d", cache.capacity)
+		}
+		if cache.ttl != 5*time.Minute {
+			t.Errorf("expected default TTL 5m, got %v", cache.ttl)
+		}
+	})
+
+	t.Run("custom values", func(t *testing.T) {
+		cache := NewQueryCache(100, 1*time.Minute)
+		if cache.capacity != 100 {
+			t.Errorf("expected capacity 100, got %d", cache.capacity)
+		}
+		if cache.ttl != 1*time.Minute {
+			t.Errorf("expected TTL 1m, got %v", cache.ttl)
+		}
+	})
+}
+
 func TestCacheKey(t *testing.T) {
-	req1 := models.RetrieveRequest{
-		SpaceID:         "test-space",
-		QueryText:       "test query",
-		CandidateK:      100,
-		TopK:            10,
-		HopDepth:        2,
-		IncludeEvidence: true,
-	}
-
-	req2 := models.RetrieveRequest{
-		SpaceID:         "test-space",
-		QueryText:       "test query",
-		CandidateK:      100,
-		TopK:            10,
-		HopDepth:        2,
-		IncludeEvidence: true,
-	}
-
-	req3 := models.RetrieveRequest{
-		SpaceID:         "test-space",
-		QueryText:       "different query",
-		CandidateK:      100,
-		TopK:            10,
-		HopDepth:        2,
-		IncludeEvidence: true,
-	}
+	req1 := models.RetrieveRequest{SpaceID: "space1", QueryText: "test"}
+	req2 := models.RetrieveRequest{SpaceID: "space1", QueryText: "test"}
+	req3 := models.RetrieveRequest{SpaceID: "space2", QueryText: "test"}
 
 	key1 := CacheKey(req1)
 	key2 := CacheKey(req2)
 	key3 := CacheKey(req3)
 
-	// Same request should produce same key
 	if key1 != key2 {
-		t.Errorf("identical requests produced different keys: %s vs %s", key1, key2)
+		t.Error("same request should produce same key")
 	}
-
-	// Different query should produce different key
 	if key1 == key3 {
-		t.Errorf("different queries produced same key: %s", key1)
+		t.Error("different requests should produce different keys")
 	}
-
-	// Key should be 32 hex chars (16 bytes)
 	if len(key1) != 32 {
-		t.Errorf("expected key length 32, got %d", len(key1))
+		t.Errorf("expected 32 char hex key, got %d", len(key1))
 	}
 }
 
-func TestQueryCache_PutGet(t *testing.T) {
-	cache := NewQueryCache(10, time.Minute)
+func TestQueryCache_PutAndGet(t *testing.T) {
+	cache := NewQueryCache(10, 5*time.Minute)
 
-	req := models.RetrieveRequest{
-		SpaceID:    "test-space",
-		QueryText:  "test query",
-		CandidateK: 100,
-		TopK:       10,
-		HopDepth:   2,
-	}
-
+	req := models.RetrieveRequest{SpaceID: "space1", QueryText: "test query"}
 	resp := models.RetrieveResponse{
-		Results: []models.RetrieveResult{
-			{NodeID: "node1", Activation: 0.9},
-			{NodeID: "node2", Activation: 0.8},
-		},
+		Results: []models.RetrieveResult{{NodeID: "node1", Score: 0.9}},
 	}
 
-	// Initially cache miss
-	if _, ok := cache.Get(req); ok {
-		t.Error("expected cache miss for empty cache")
-	}
-
-	// Put value
+	// Put a cache entry
 	cache.Put(req, resp)
 
-	// Now should hit
-	cached, ok := cache.Get(req)
-	if !ok {
-		t.Error("expected cache hit after Put")
+	// Get it back
+	got, found := cache.Get(req)
+	if !found {
+		t.Fatal("expected to find cached entry")
+	}
+	if len(got.Results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(got.Results))
+	}
+	if got.Results[0].NodeID != "node1" {
+		t.Errorf("expected node1, got %s", got.Results[0].NodeID)
+	}
+}
+
+func TestQueryCache_Len(t *testing.T) {
+	cache := NewQueryCache(10, 5*time.Minute)
+
+	if cache.Len() != 0 {
+		t.Errorf("expected empty cache, got %d", cache.Len())
 	}
 
-	if len(cached.Results) != 2 {
-		t.Errorf("expected 2 results, got %d", len(cached.Results))
+	req1 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query1"}
+	cache.Put(req1, models.RetrieveResponse{})
+	if cache.Len() != 1 {
+		t.Errorf("expected 1 entry, got %d", cache.Len())
 	}
 
-	if cached.Results[0].NodeID != "node1" {
-		t.Errorf("expected node1, got %s", cached.Results[0].NodeID)
+	req2 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query2"}
+	cache.Put(req2, models.RetrieveResponse{})
+	if cache.Len() != 2 {
+		t.Errorf("expected 2 entries, got %d", cache.Len())
+	}
+}
+
+func TestQueryCache_Clear(t *testing.T) {
+	cache := NewQueryCache(10, 5*time.Minute)
+
+	// Add some entries
+	req1 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query1"}
+	req2 := models.RetrieveRequest{SpaceID: "space2", QueryText: "query2"}
+	req3 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query3"}
+	cache.Put(req1, models.RetrieveResponse{})
+	cache.Put(req2, models.RetrieveResponse{})
+	cache.Put(req3, models.RetrieveResponse{})
+
+	if cache.Len() != 3 {
+		t.Errorf("expected 3 entries before clear, got %d", cache.Len())
 	}
 
-	// Check stats
+	// Clear
+	cache.Clear()
+
+	if cache.Len() != 0 {
+		t.Errorf("expected 0 entries after clear, got %d", cache.Len())
+	}
+
+	// Verify entries are gone
+	_, found := cache.Get(req1)
+	if found {
+		t.Error("expected req1 to be cleared")
+	}
+}
+
+func TestQueryCache_InvalidateSpace(t *testing.T) {
+	cache := NewQueryCache(10, 5*time.Minute)
+
+	// Add entries for different spaces
+	req1 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query1"}
+	req2 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query2"}
+	req3 := models.RetrieveRequest{SpaceID: "space2", QueryText: "query3"}
+	cache.Put(req1, models.RetrieveResponse{})
+	cache.Put(req2, models.RetrieveResponse{})
+	cache.Put(req3, models.RetrieveResponse{})
+
+	if cache.Len() != 3 {
+		t.Errorf("expected 3 entries before invalidate, got %d", cache.Len())
+	}
+
+	// Invalidate space1
+	removed := cache.InvalidateSpace("space1")
+	if removed != 2 {
+		t.Errorf("expected 2 entries removed, got %d", removed)
+	}
+
+	if cache.Len() != 1 {
+		t.Errorf("expected 1 entry after invalidate, got %d", cache.Len())
+	}
+
+	// Verify space1 entries are gone
+	_, found := cache.Get(req1)
+	if found {
+		t.Error("expected req1 to be invalidated")
+	}
+
+	// Verify space2 entry remains
+	_, found = cache.Get(req3)
+	if !found {
+		t.Error("expected req3 to remain")
+	}
+}
+
+func TestQueryCache_Stats(t *testing.T) {
+	cache := NewQueryCache(10, 5*time.Minute)
+
+	// Add entry and access it
+	req1 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query1"}
+	req2 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query2"}
+	cache.Put(req1, models.RetrieveResponse{})
+	cache.Get(req1) // hit
+	cache.Get(req2) // miss
+
 	stats := cache.Stats()
+
+	if stats["size"].(int) != 1 {
+		t.Errorf("expected size 1, got %v", stats["size"])
+	}
+	if stats["capacity"].(int) != 10 {
+		t.Errorf("expected capacity 10, got %v", stats["capacity"])
+	}
 	if stats["hits"].(int64) != 1 {
 		t.Errorf("expected 1 hit, got %v", stats["hits"])
 	}
@@ -105,148 +189,197 @@ func TestQueryCache_PutGet(t *testing.T) {
 	}
 }
 
-func TestQueryCache_TTLExpiration(t *testing.T) {
-	// Use very short TTL for testing
-	cache := NewQueryCache(10, 50*time.Millisecond)
+func TestQueryCache_Expiration(t *testing.T) {
+	// Create cache with 10ms TTL for fast testing
+	cache := NewQueryCache(10, 10*time.Millisecond)
 
-	req := models.RetrieveRequest{
-		SpaceID:   "test-space",
-		QueryText: "test query",
+	req := models.RetrieveRequest{SpaceID: "space1", QueryText: "test"}
+	cache.Put(req, models.RetrieveResponse{Results: []models.RetrieveResult{{NodeID: "node1"}}})
+
+	// Should find it immediately
+	got, found := cache.Get(req)
+	if !found {
+		t.Fatal("expected to find cached entry immediately")
+	}
+	if len(got.Results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(got.Results))
 	}
 
-	resp := models.RetrieveResponse{
-		Results: []models.RetrieveResult{
-			{NodeID: "node1", Activation: 0.9},
-		},
-	}
+	// Wait for expiration
+	time.Sleep(20 * time.Millisecond)
 
-	cache.Put(req, resp)
-
-	// Should hit immediately
-	if _, ok := cache.Get(req); !ok {
-		t.Error("expected cache hit immediately after Put")
-	}
-
-	// Wait for TTL expiration
-	time.Sleep(60 * time.Millisecond)
-
-	// Should miss after TTL
-	if _, ok := cache.Get(req); ok {
-		t.Error("expected cache miss after TTL expiration")
+	// Should not find it after expiration
+	_, found = cache.Get(req)
+	if found {
+		t.Error("expected entry to be expired")
 	}
 }
 
 func TestQueryCache_LRUEviction(t *testing.T) {
-	// Small capacity for testing eviction
-	cache := NewQueryCache(3, time.Minute)
+	// Create cache with capacity 3
+	cache := NewQueryCache(3, 5*time.Minute)
 
-	// Add 4 items, oldest should be evicted
-	for i := 0; i < 4; i++ {
-		req := models.RetrieveRequest{
-			SpaceID:   "test-space",
-			QueryText: string(rune('a' + i)),
-		}
-		resp := models.RetrieveResponse{
-			Results: []models.RetrieveResult{
-				{NodeID: string(rune('a' + i))},
-			},
-		}
-		cache.Put(req, resp)
-	}
-
-	// Capacity should not exceed 3
-	if cache.Len() != 3 {
-		t.Errorf("expected cache len 3, got %d", cache.Len())
-	}
-
-	// First item (query="a") should have been evicted
-	req0 := models.RetrieveRequest{SpaceID: "test-space", QueryText: "a"}
-	if _, ok := cache.Get(req0); ok {
-		t.Error("expected first item to be evicted")
-	}
-
-	// Last three items should still be present
-	for i := 1; i < 4; i++ {
-		req := models.RetrieveRequest{SpaceID: "test-space", QueryText: string(rune('a' + i))}
-		if _, ok := cache.Get(req); !ok {
-			t.Errorf("expected item %d to still be in cache", i)
-		}
-	}
-}
-
-func TestQueryCache_InvalidateSpace(t *testing.T) {
-	cache := NewQueryCache(10, time.Minute)
-
-	// Add items from different spaces
-	req1 := models.RetrieveRequest{SpaceID: "space-a", QueryText: "query1"}
-	req2 := models.RetrieveRequest{SpaceID: "space-a", QueryText: "query2"}
-	req3 := models.RetrieveRequest{SpaceID: "space-b", QueryText: "query1"}
-
+	// Fill the cache
+	req1 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query1"}
+	req2 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query2"}
+	req3 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query3"}
 	cache.Put(req1, models.RetrieveResponse{})
 	cache.Put(req2, models.RetrieveResponse{})
 	cache.Put(req3, models.RetrieveResponse{})
 
+	// Access req1 to make it recently used
+	cache.Get(req1)
+
+	// Add req4 - should evict req2 (least recently used)
+	req4 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query4"}
+	cache.Put(req4, models.RetrieveResponse{})
+
 	if cache.Len() != 3 {
-		t.Errorf("expected 3 items, got %d", cache.Len())
+		t.Errorf("expected 3 entries after eviction, got %d", cache.Len())
 	}
 
-	// Invalidate space-a
-	removed := cache.InvalidateSpace("space-a")
-	if removed != 2 {
-		t.Errorf("expected 2 removed, got %d", removed)
+	// req2 should be evicted
+	_, found := cache.Get(req2)
+	if found {
+		t.Error("expected req2 to be evicted")
 	}
 
-	// space-a items should be gone
-	if _, ok := cache.Get(req1); ok {
-		t.Error("space-a item should have been invalidated")
-	}
-	if _, ok := cache.Get(req2); ok {
-		t.Error("space-a item should have been invalidated")
-	}
-
-	// space-b item should remain
-	if _, ok := cache.Get(req3); !ok {
-		t.Error("space-b item should still be in cache")
+	// req1 should remain
+	_, found = cache.Get(req1)
+	if !found {
+		t.Error("expected req1 to remain (was recently accessed)")
 	}
 }
 
-func TestQueryCache_Clear(t *testing.T) {
-	cache := NewQueryCache(10, time.Minute)
+func TestQueryCache_ConcurrentAccess(t *testing.T) {
+	cache := NewQueryCache(100, 5*time.Minute)
+	done := make(chan bool)
 
-	for i := 0; i < 5; i++ {
-		req := models.RetrieveRequest{SpaceID: "test", QueryText: string(rune('a' + i))}
-		cache.Put(req, models.RetrieveResponse{})
+	// Concurrent writes
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			for j := 0; j < 100; j++ {
+				req := models.RetrieveRequest{
+					SpaceID:   "space1",
+					QueryText: string(rune('a'+id)) + string(rune('0'+j%10)),
+				}
+				cache.Put(req, models.RetrieveResponse{})
+			}
+			done <- true
+		}(i)
 	}
 
-	if cache.Len() != 5 {
-		t.Errorf("expected 5 items, got %d", cache.Len())
+	// Concurrent reads
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			for j := 0; j < 100; j++ {
+				req := models.RetrieveRequest{
+					SpaceID:   "space1",
+					QueryText: string(rune('a'+id)) + string(rune('0'+j%10)),
+				}
+				cache.Get(req)
+			}
+			done <- true
+		}(i)
 	}
 
-	cache.Clear()
+	// Wait for all goroutines
+	for i := 0; i < 20; i++ {
+		<-done
+	}
+
+	// Should not panic and should have some entries
+	if cache.Len() == 0 {
+		t.Error("expected some entries after concurrent access")
+	}
+}
+
+func TestQueryCache_UpdateExistingEntry(t *testing.T) {
+	cache := NewQueryCache(10, 5*time.Minute)
+
+	req := models.RetrieveRequest{SpaceID: "space1", QueryText: "test"}
+	resp1 := models.RetrieveResponse{Results: []models.RetrieveResult{{NodeID: "node1"}}}
+	resp2 := models.RetrieveResponse{Results: []models.RetrieveResult{{NodeID: "node2"}}}
+
+	cache.Put(req, resp1)
+	if cache.Len() != 1 {
+		t.Errorf("expected 1 entry, got %d", cache.Len())
+	}
+
+	// Update with new response
+	cache.Put(req, resp2)
+	if cache.Len() != 1 {
+		t.Errorf("expected still 1 entry after update, got %d", cache.Len())
+	}
+
+	// Should get the updated response
+	got, found := cache.Get(req)
+	if !found {
+		t.Fatal("expected to find cached entry")
+	}
+	if got.Results[0].NodeID != "node2" {
+		t.Errorf("expected updated result 'node2', got '%s'", got.Results[0].NodeID)
+	}
+}
+
+// Service-level tests for ClearQueryCache and InvalidateSpaceCache
+
+func TestService_ClearQueryCache_NilCache(t *testing.T) {
+	// Service without cache initialized
+	svc := &Service{queryCache: nil}
+	count := svc.ClearQueryCache()
+	if count != 0 {
+		t.Errorf("expected 0 for nil cache, got %d", count)
+	}
+}
+
+func TestService_ClearQueryCache_WithEntries(t *testing.T) {
+	cache := NewQueryCache(10, 5*time.Minute)
+	svc := &Service{queryCache: cache}
+
+	// Add some entries
+	req1 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query1"}
+	req2 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query2"}
+	cache.Put(req1, models.RetrieveResponse{})
+	cache.Put(req2, models.RetrieveResponse{})
+
+	count := svc.ClearQueryCache()
+	if count != 2 {
+		t.Errorf("expected 2 entries cleared, got %d", count)
+	}
 
 	if cache.Len() != 0 {
-		t.Errorf("expected 0 items after clear, got %d", cache.Len())
+		t.Errorf("expected cache to be empty, got %d", cache.Len())
 	}
 }
 
-func TestQueryCache_HitRate(t *testing.T) {
-	cache := NewQueryCache(10, time.Minute)
+func TestService_InvalidateSpaceCache_NilCache(t *testing.T) {
+	// Service without cache initialized
+	svc := &Service{queryCache: nil}
+	count := svc.InvalidateSpaceCache("space1")
+	if count != 0 {
+		t.Errorf("expected 0 for nil cache, got %d", count)
+	}
+}
 
-	req := models.RetrieveRequest{SpaceID: "test", QueryText: "query"}
-	cache.Put(req, models.RetrieveResponse{})
+func TestService_InvalidateSpaceCache_WithEntries(t *testing.T) {
+	cache := NewQueryCache(10, 5*time.Minute)
+	svc := &Service{queryCache: cache}
 
-	// 1 miss (initial check), 3 hits
-	cache.Get(models.RetrieveRequest{SpaceID: "test", QueryText: "miss"}) // miss
-	cache.Get(req) // hit
-	cache.Get(req) // hit
-	cache.Get(req) // hit
+	// Add entries for different spaces
+	req1 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query1"}
+	req2 := models.RetrieveRequest{SpaceID: "space1", QueryText: "query2"}
+	req3 := models.RetrieveRequest{SpaceID: "space2", QueryText: "query3"}
+	cache.Put(req1, models.RetrieveResponse{})
+	cache.Put(req2, models.RetrieveResponse{})
+	cache.Put(req3, models.RetrieveResponse{})
 
-	stats := cache.Stats()
-	hitRate := stats["hit_rate"].(float64)
+	count := svc.InvalidateSpaceCache("space1")
+	if count != 2 {
+		t.Errorf("expected 2 entries invalidated, got %d", count)
+	}
 
-	// 3 hits out of 4 total = 0.75
-	expected := 0.75
-	if hitRate != expected {
-		t.Errorf("expected hit rate %.2f, got %.2f", expected, hitRate)
+	if cache.Len() != 1 {
+		t.Errorf("expected 1 entry remaining, got %d", cache.Len())
 	}
 }

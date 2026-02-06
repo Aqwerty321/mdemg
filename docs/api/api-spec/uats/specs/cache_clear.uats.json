@@ -1,0 +1,114 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Cache Clear",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "cache",
+      "admin",
+      "destructive"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-06",
+    "description": "Validates Cache Clear endpoint for clearing query cache entries",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": ""
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "tests": [
+    {
+      "name": "cache_clear_requires_confirmation",
+      "description": "Cache clear requires confirm=true parameter",
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/memory/cache"
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "operator": "equals",
+            "value": "confirmation required"
+          },
+          {
+            "path": "$.message",
+            "operator": "contains",
+            "value": "confirm=true"
+          }
+        ]
+      }
+    },
+    {
+      "name": "cache_clear_all",
+      "description": "Clear all cache entries with confirmation",
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/memory/cache?confirm=true"
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.message",
+            "operator": "equals",
+            "value": "All cache entries cleared"
+          },
+          {
+            "path": "$.entries_cleared",
+            "operator": "exists"
+          }
+        ]
+      }
+    },
+    {
+      "name": "cache_clear_by_space",
+      "description": "Clear cache entries for a specific space",
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/memory/cache?confirm=true&space_id=${test_space}"
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.message",
+            "operator": "equals",
+            "value": "Cache cleared for space"
+          },
+          {
+            "path": "$.space_id",
+            "operator": "equals",
+            "value": "${test_space}"
+          },
+          {
+            "path": "$.entries_cleared",
+            "operator": "exists"
+          }
+        ]
+      }
+    },
+    {
+      "name": "cache_clear_method_not_allowed",
+      "description": "Non-DELETE methods are rejected",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/cache?confirm=true"
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}

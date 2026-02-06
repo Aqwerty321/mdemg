@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/db"
 	"mdemg/internal/ratelimit"
 )
 
@@ -28,6 +29,20 @@ type StandardMetrics struct {
 	// Embedding metrics
 	EmbeddingLatency *Histogram
 	EmbeddingBatches *Counter
+
+	// Neo4j pool metrics (Phase 48.4.1)
+	// Note: Using gauges for all metrics since we read absolute values from driver
+	Neo4jPoolActive   *Gauge // Current active connections
+	Neo4jPoolIdle     *Gauge // Current idle connections
+	Neo4jPoolWaiting  *Gauge // Waiting requests
+	Neo4jPoolAcquired *Gauge // Total connections acquired (absolute value from driver)
+	Neo4jPoolCreated  *Gauge // Total connections created (absolute value from driver)
+	Neo4jPoolClosed   *Gauge // Total connections closed (absolute value from driver)
+	Neo4jPoolFailed   *Gauge // Total failed acquire attempts (absolute value from driver)
+
+	// Memory pressure metrics (Phase 48.4.4)
+	MemoryPressureRejected *Gauge // Requests rejected due to memory pressure (cumulative)
+	MemoryHeapBytes        *Gauge // Current heap allocation in bytes
 }
 
 // NewStandardMetrics creates and registers all standard MDEMG metrics.
@@ -72,6 +87,19 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	// Embedding metrics
 	m.EmbeddingLatency = r.NewHistogram("embedding_latency_seconds", "Embedding operation latency", nil)
 	m.EmbeddingBatches = r.NewCounter("embedding_batches_total", "Total embedding batch operations", nil)
+
+	// Neo4j pool metrics (Phase 48.4.1)
+	m.Neo4jPoolActive = r.NewGauge("neo4j_pool_active_connections", "Current active Neo4j connections", nil)
+	m.Neo4jPoolIdle = r.NewGauge("neo4j_pool_idle_connections", "Current idle Neo4j connections", nil)
+	m.Neo4jPoolWaiting = r.NewGauge("neo4j_pool_waiting_requests", "Requests waiting for Neo4j connection", nil)
+	m.Neo4jPoolAcquired = r.NewGauge("neo4j_pool_acquired_total", "Total Neo4j connections acquired", nil)
+	m.Neo4jPoolCreated = r.NewGauge("neo4j_pool_created_total", "Total Neo4j connections created", nil)
+	m.Neo4jPoolClosed = r.NewGauge("neo4j_pool_closed_total", "Total Neo4j connections closed", nil)
+	m.Neo4jPoolFailed = r.NewGauge("neo4j_pool_failed_acquire_total", "Total failed Neo4j connection acquire attempts", nil)
+
+	// Memory pressure metrics (Phase 48.4.4)
+	m.MemoryPressureRejected = r.NewGauge("memory_pressure_rejected_total", "Requests rejected due to memory pressure", nil)
+	m.MemoryHeapBytes = r.NewGauge("memory_heap_bytes", "Current heap allocation in bytes", nil)
 
 	return m
 }
@@ -123,6 +151,25 @@ func (m *StandardMetrics) CollectCacheMetrics(cacheStats map[string]map[string]a
 			gauge.Set(hitRate)
 		}
 	}
+}
+
+// CollectNeo4jPoolMetrics updates Neo4j connection pool metrics.
+func (m *StandardMetrics) CollectNeo4jPoolMetrics() {
+	poolMetrics := db.GetPoolMetrics()
+
+	m.Neo4jPoolActive.Set(float64(poolMetrics.ActiveConnections))
+	m.Neo4jPoolIdle.Set(float64(poolMetrics.IdleConnections))
+	m.Neo4jPoolWaiting.Set(float64(poolMetrics.WaitingRequests))
+	m.Neo4jPoolAcquired.Set(float64(poolMetrics.TotalAcquired))
+	m.Neo4jPoolCreated.Set(float64(poolMetrics.TotalCreated))
+	m.Neo4jPoolClosed.Set(float64(poolMetrics.TotalClosed))
+	m.Neo4jPoolFailed.Set(float64(poolMetrics.TotalFailedAcquire))
+}
+
+// CollectMemoryMetrics updates memory metrics from runtime stats.
+func (m *StandardMetrics) CollectMemoryMetrics(heapBytes uint64, rejectedCount int64) {
+	m.MemoryHeapBytes.Set(float64(heapBytes))
+	m.MemoryPressureRejected.Set(float64(rejectedCount))
 }
 
 // global standard metrics instance

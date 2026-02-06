@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - 'cmd/ingest-codebase/**'
+      - 'cmd/extract-symbols/**'
       - 'docs/lang-parser/**'
   pull_request:
     branches: [main]
     paths:
       - 'cmd/ingest-codebase/**'
+      - 'cmd/extract-symbols/**'
       - 'docs/lang-parser/**'
 
 env:

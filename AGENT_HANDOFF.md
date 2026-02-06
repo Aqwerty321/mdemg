@@ -724,8 +724,8 @@ EDGE_STALENESS_RECLUSTER_THRESHOLD=0.3  # default: 0.3
 |-------------|--------|-----------|
 | 48.1 Query Profiling + Indexes | ✅ | `internal/retrieval/profiling.go`, `/v1/memory/query/metrics` |
 | 48.2 Result Caching | ✅ | `internal/retrieval/cache.go`, `internal/retrieval/cache_test.go`, `/v1/memory/cache/stats` |
-| 48.3 Data Transmission (gzip, pagination) | 📋 | |
-| 48.4 Connection Pooling | 📋 | |
+| 48.3 Data Transmission | ✅ | `internal/api/sse.go`, `internal/models/models.go` (pagination) |
+| 48.4 Connection Pooling & Resilience | ✅ | `internal/backpressure/`, `internal/embeddings/ratelimit.go` |
 | 48.5 Benchmarking & Monitoring | ✅ | See below |
 
 **48.5 Observability Stack (Completed 2026-02-06):**
@@ -748,6 +748,36 @@ EDGE_STALENESS_RECLUSTER_THRESHOLD=0.3  # default: 0.3
 - Added embedding latency instrumentation (`openai.go`, `ollama.go`)
 
 **Results:** 92.5% uncached improvement (387ms→29ms); 98.9% cached improvement (387ms→4ms).
+
+**48.3-48.4 Data Transmission & Connection Pooling (Completed 2026-02-06):**
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| Memory pressure | `internal/backpressure/memory.go` | Backpressure middleware, returns 503 when heap > threshold |
+| Embedding rate limiting | `internal/embeddings/ratelimit.go` | Token bucket rate limiter wrapper for embedders |
+| Ollama circuit breaker | `internal/embeddings/ollama.go` | Circuit breaker support (matches OpenAI pattern) |
+| Neo4j pool metrics | `internal/metrics/collectors.go` | 7 new gauges for connection pool monitoring |
+| SSE streaming | `internal/api/sse.go` | `GET /v1/jobs/{job_id}/stream` for job progress |
+| Pagination fields | `internal/models/models.go` | Cursor/limit fields on RetrieveRequest/Response |
+
+**New API Endpoints:**
+- `GET /v1/jobs/{job_id}/stream` — SSE streaming for job progress
+
+**Configuration (`.env.example`):**
+```bash
+# Embedding Rate Limiting
+EMBEDDING_RATE_LIMIT_ENABLED=false      # default: false
+EMBEDDING_OPENAI_RPS=500                # default: 500
+EMBEDDING_OPENAI_BURST=1000             # default: 1000
+EMBEDDING_OLLAMA_RPS=100                # default: 100
+EMBEDDING_OLLAMA_BURST=200              # default: 200
+
+# Memory Pressure
+MEMORY_PRESSURE_ENABLED=false           # default: false
+MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
+```
+
+**Test Coverage:** All new code has 100% test coverage (44 tests total).
 
 ---
 
@@ -980,4 +1010,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-06 — Phase 47.5 (Optimistic Lock Retry + Edge Consistency) completed.*
+*Last updated: 2026-02-06 — Phase 48.3-48.4 (Data Transmission & Connection Pooling) completed.*

@@ -2076,6 +2076,49 @@ func (s *Server) handleCacheStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, stats)
 }
 
+// handleCacheClear handles DELETE /v1/memory/cache
+// Clears all entries from the query cache, or clears entries for a specific space if space_id is provided.
+// Query params:
+//   - space_id (optional): Clear cache only for this space
+//   - confirm (required): Must be "true" to confirm the operation
+func (s *Server) handleCacheClear(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Require confirmation
+	confirm := r.URL.Query().Get("confirm")
+	if confirm != "true" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error":   "confirmation required",
+			"message": "Add ?confirm=true to confirm cache clear operation",
+		})
+		return
+	}
+
+	spaceID := r.URL.Query().Get("space_id")
+
+	var cleared int
+	var message string
+
+	if spaceID != "" {
+		// Clear cache for specific space
+		cleared = s.retriever.InvalidateSpaceCache(spaceID)
+		message = "Cache cleared for space"
+	} else {
+		// Clear all cache entries
+		cleared = s.retriever.ClearQueryCache()
+		message = "All cache entries cleared"
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"message":         message,
+		"entries_cleared": cleared,
+		"space_id":        spaceID,
+	})
+}
+
 // handleQueryMetrics handles GET /v1/memory/query/metrics
 // Returns Neo4j query execution statistics for performance monitoring.
 func (s *Server) handleQueryMetrics(w http.ResponseWriter, r *http.Request) {

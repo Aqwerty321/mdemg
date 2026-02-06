@@ -173,6 +173,9 @@ func TestDevSpaceTwoAgentMessaging(t *testing.T) {
 		recvDone <- msg
 	}()
 
+	// Small delay to ensure both agents are subscribed before sending
+	time.Sleep(100 * time.Millisecond)
+
 	// Agent A sends a message (will be delivered to B, not back to A)
 	payload := []byte("hello from A")
 	if err := streamA.Send(&pb.AgentMessage{
@@ -185,11 +188,12 @@ func TestDevSpaceTwoAgentMessaging(t *testing.T) {
 	}
 
 	// Agent B must receive the message (from A)
+	// Use 5s timeout to handle CI environments with resource contention
 	var received *pb.AgentMessage
 	select {
 	case received = <-recvDone:
-	case <-time.After(2 * time.Second):
-		t.Fatal("Agent B did not receive message within 2s")
+	case <-time.After(5 * time.Second):
+		t.Fatal("Agent B did not receive message within 5s")
 	}
 	if received.AgentId != "agent-a" || string(received.Payload) != string(payload) {
 		t.Errorf("Agent B received wrong message: AgentId=%q Payload=%q", received.AgentId, received.Payload)

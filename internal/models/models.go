@@ -768,10 +768,12 @@ type ContextRetrieveRequest struct {
 // Detects and optionally acts on orphaned L0 nodes that were not included
 // in the most recent re-ingestion (last_ingested_at < TapRoot.last_ingest_at).
 type OrphanCleanupRequest struct {
-	SpaceID string `json:"space_id" validate:"required,min=1,max=256"`
-	Action  string `json:"action" validate:"required,oneof=archive delete list"`
-	Limit   int    `json:"limit,omitempty"`   // default: 100, max: 1000
-	DryRun  bool   `json:"dry_run,omitempty"` // preview without acting
+	SpaceID       string `json:"space_id" validate:"required,min=1,max=256"`
+	Action        string `json:"action" validate:"required,oneof=archive delete list count"`
+	Limit         int    `json:"limit,omitempty"`           // default: 100, max: 1000
+	DryRun        bool   `json:"dry_run,omitempty"`         // preview without acting
+	OlderThanDays int    `json:"older_than_days,omitempty"` // Additional staleness filter (days since last_ingested_at)
+	PathPrefix    string `json:"path_prefix,omitempty"`     // Filter by path prefix
 }
 
 // OrphanCleanupResponse - response from POST /v1/memory/cleanup/orphans
@@ -791,4 +793,24 @@ type OrphanNode struct {
 	Name           string `json:"name"`
 	LastIngestedAt string `json:"last_ingested_at"`
 	Status         string `json:"status"` // "archived", "deleted", "listed"
+}
+
+// ScheduleCleanupRequest - request for POST /v1/memory/cleanup/schedule
+// Sets up scheduled orphan cleanup for a space.
+type ScheduleCleanupRequest struct {
+	SpaceID       string `json:"space_id" validate:"required,min=1,max=256"`
+	IntervalHours int    `json:"interval_hours" validate:"required,min=1,max=720"` // 1 hour to 30 days
+	Action        string `json:"action" validate:"required,oneof=archive delete"`
+	Limit         int    `json:"limit,omitempty"`           // default: 100, max: 1000
+	OlderThanDays int    `json:"older_than_days,omitempty"` // Only clean orphans older than N days
+}
+
+// ScheduleCleanupResponse - response from POST /v1/memory/cleanup/schedule
+type ScheduleCleanupResponse struct {
+	SpaceID       string `json:"space_id"`
+	ScheduleID    string `json:"schedule_id"`
+	IntervalHours int    `json:"interval_hours"`
+	Action        string `json:"action"`
+	Status        string `json:"status"` // "enabled", "disabled"
+	NextRunAt     string `json:"next_run_at,omitempty"`
 }

@@ -3,8 +3,11 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,6 +20,7 @@ import (
 	"mdemg/internal/consulting"
 	"mdemg/internal/conversation"
 	"mdemg/internal/embeddings"
+	"mdemg/internal/filewatcher"
 	"mdemg/internal/gaps"
 	"mdemg/internal/hidden"
 	"mdemg/internal/jobs"
@@ -25,6 +29,7 @@ import (
 	"mdemg/internal/plugins"
 	"mdemg/internal/ratelimit"
 	"mdemg/internal/retrieval"
+	"mdemg/internal/models"
 	"mdemg/internal/symbols"
 	"mdemg/internal/validation"
 )
@@ -47,8 +52,10 @@ type Server struct {
 	contextCooler   *conversation.ContextCooler
 	sessionTracker  *conversation.SessionTracker
 	hiddenSvc       *hidden.Service // alias for handleConversationConsolidate
-	webhookDebouncer   *linearWebhookDebouncer
-	stopConsolidate    chan struct{}
+	webhookDebouncer        *linearWebhookDebouncer
+	genericWebhookDebouncer *webhookDebouncer
+	fileWatcherMgr          *filewatcher.Manager
+	stopConsolidate         chan struct{}
 	stopCooler         chan struct{}
 	stopInterviewer    chan struct{}
 	stopScheduledSync  chan struct{}
@@ -235,9 +242,11 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		conversationSvc: convSvc,
 		contextCooler:   ctxCooler,
 		sessionTracker:  sessTracker,
-		webhookDebouncer: newLinearWebhookDebouncer(),
-		cbRegistry:      cbRegistry,
-		metricsRegistry: metricsRegistry,
+		webhookDebouncer:        newLinearWebhookDebouncer(),
+		genericWebhookDebouncer: newWebhookDebouncer(),
+		fileWatcherMgr:          filewatcher.NewManager(),
+		cbRegistry:              cbRegistry,
+		metricsRegistry:         metricsRegistry,
 	}
 }
 
@@ -249,10 +258,113 @@ func (s *Server) Shutdown() {
 	if s.sessionTracker != nil {
 		s.sessionTracker.Stop()
 	}
+	if s.fileWatcherMgr != nil {
+		s.fileWatcherMgr.StopAll()
+	}
 	s.StopPeriodicConsolidation()
 	s.StopContextCoolerProcessing()
 	s.StopWeeklyGapInterviews()
 	s.StopScheduledSync()
+}
+
+// StartFileWatchers starts file watchers based on configuration.
+// Called during server startup if FILE_WATCHER_ENABLED=true.
+func (s *Server) StartFileWatchers() {
+	if !s.cfg.FileWatcherEnabled {
+		log.Println("file watcher disabled (FILE_WATCHER_ENABLED=false)")
+		return
+	}
+
+	if s.cfg.FileWatcherConfigs == "" {
+		log.Println("file watcher enabled but no configs (FILE_WATCHER_CONFIGS empty)")
+		return
+	}
+
+	configs := filewatcher.ParseConfigs(s.cfg.FileWatcherConfigs)
+	if len(configs) == 0 {
+		log.Println("file watcher: no valid configs found")
+		return
+	}
+
+	for _, cfg := range configs {
+		cfg.OnChange = s.handleFileWatcherChange
+		if err := s.fileWatcherMgr.AddWatcher(cfg); err != nil {
+			log.Printf("file watcher: failed to start watcher for space %s: %v", cfg.SpaceID, err)
+		}
+	}
+
+	log.Printf("file watcher: started %d watchers", len(configs))
+}
+
+// handleFileWatcherChange handles file changes from the file watcher.
+func (s *Server) handleFileWatcherChange(ctx context.Context, spaceID string, files []string) {
+	log.Printf("[filewatcher] %d files changed in space %s", len(files), spaceID)
+
+	// Call the internal file ingest API
+	resp, err := s.ingestFilesInternal(ctx, spaceID, files)
+	if err != nil {
+		log.Printf("[filewatcher] ingest failed for space %s: %v", spaceID, err)
+		return
+	}
+
+	log.Printf("[filewatcher] ingested %d/%d files for space %s",
+		resp.SuccessCount, resp.TotalFiles, spaceID)
+
+	// Trigger APE event
+	s.TriggerAPEEventWithContext("source_changed", map[string]string{
+		"space_id":    spaceID,
+		"ingest_type": "file-watcher",
+	})
+}
+
+// ingestFilesInternal is the internal version of file ingestion that doesn't require HTTP.
+func (s *Server) ingestFilesInternal(ctx context.Context, spaceID string, files []string) (*models.IngestFilesResponse, error) {
+	resp := &models.IngestFilesResponse{
+		SpaceID:    spaceID,
+		TotalFiles: len(files),
+	}
+
+	results := make([]models.IngestFileResult, 0, len(files))
+	for _, filePath := range files {
+		result := models.IngestFileResult{File: filePath}
+
+		// Check if file exists and is readable
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			result.Status = "error"
+			result.Error = fmt.Sprintf("failed to read file: %v", err)
+			resp.ErrorCount++
+			results = append(results, result)
+			continue
+		}
+
+		// Build ingest request
+		req := models.IngestRequest{
+			SpaceID:   spaceID,
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Source:    "file-watcher",
+			Content:   string(content),
+			Path:      filePath,
+			Name:      filepath.Base(filePath),
+		}
+
+		// Ingest the file
+		ingestResp, err := s.retriever.IngestObservation(ctx, req)
+		if err != nil {
+			result.Status = "error"
+			result.Error = fmt.Sprintf("ingest failed: %v", err)
+			resp.ErrorCount++
+		} else {
+			result.Status = "success"
+			result.NodeID = ingestResp.NodeID
+			resp.SuccessCount++
+		}
+		results = append(results, result)
+	}
+
+	resp.Results = results
+
+	return resp, nil
 }
 
 // StartPeriodicConsolidation starts a background goroutine that consolidates conversation memory
@@ -616,12 +728,17 @@ func (s *Server) Routes() http.Handler {
 
 	// Cleanup endpoints (Phase 9.5)
 	mux.HandleFunc("/v1/memory/cleanup/orphans", s.handleCleanupOrphans)
+	mux.HandleFunc("/v1/memory/cleanup/schedule", s.handleScheduleCleanup)
+	mux.HandleFunc("/v1/memory/cleanup/schedules", s.handleListCleanupSchedules)
+	mux.HandleFunc("/v1/memory/cleanup/stats", s.handleCleanupStats)
 
 	// Webhook endpoints (Phase 9.4)
 	mux.HandleFunc("/v1/webhooks/linear", s.handleLinearWebhook)
+	mux.HandleFunc("/v1/webhooks/", s.handleGenericWebhook)
 
-	// Space freshness endpoint (Phase 9.2)
+	// Space freshness endpoints (Phase 9.2)
 	mux.HandleFunc("/v1/memory/spaces/", s.handleSpacesRoute)
+	mux.HandleFunc("/v1/memory/freshness", s.handleBatchFreshness)
 
 	// Codebase ingestion endpoint
 	mux.HandleFunc("/v1/memory/ingest-codebase", s.handleIngestCodebaseRoute)

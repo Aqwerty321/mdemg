@@ -1,0 +1,17 @@
+{
+  "id": "ingest-scheduler",
+  "name": "Scheduled Ingest Module",
+  "version": "1.0.0",
+  "type": "APE",
+  "binary": "ingest-scheduler",
+  "capabilities": {
+    "event_triggers": ["source_changed", "manual_sync", "schedule"]
+  },
+  "health_check_interval_ms": 5000,
+  "startup_timeout_ms": 10000,
+  "config": {
+    "cron_expression": "0 */6 * * *",
+    "stale_threshold_hours": "24",
+    "mdemg_endpoint": "http://localhost:9999"
+  }
+}

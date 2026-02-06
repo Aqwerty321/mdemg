@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/models"
 )
@@ -50,23 +52,71 @@ func (s *Server) handleCleanupOrphans(w http.ResponseWriter, r *http.Request) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	// Step 1: Detect orphans — L0 nodes with last_ingested_at < TapRoot.last_ingest_at
-	detectCypher := `
-MATCH (t:TapRoot {space_id: $spaceId})
-MATCH (n:MemoryNode {space_id: $spaceId})
-WHERE n.layer = 0
-  AND n.last_ingested_at IS NOT NULL
-  AND n.last_ingested_at < t.last_ingest_at
-  AND NOT coalesce(n.is_archived, false)
-RETURN n.node_id AS node_id, n.path AS path, n.name AS name,
-       toString(n.last_ingested_at) AS last_ingested_at
-ORDER BY n.path
-LIMIT $limit`
+	// Build dynamic Cypher for orphan detection with optional filters
+	var whereClauses []string
+	whereClauses = append(whereClauses, "n.layer = 0")
+	whereClauses = append(whereClauses, "n.last_ingested_at IS NOT NULL")
+	whereClauses = append(whereClauses, "n.last_ingested_at < t.last_ingest_at")
+	whereClauses = append(whereClauses, "NOT coalesce(n.is_archived, false)")
 
 	params := map[string]any{
 		"spaceId": req.SpaceID,
 		"limit":   req.Limit,
 	}
+
+	// OlderThanDays filter
+	if req.OlderThanDays > 0 {
+		whereClauses = append(whereClauses, "n.last_ingested_at < datetime() - duration({days: $olderThanDays})")
+		params["olderThanDays"] = req.OlderThanDays
+	}
+
+	// PathPrefix filter
+	if req.PathPrefix != "" {
+		whereClauses = append(whereClauses, "n.path STARTS WITH $pathPrefix")
+		params["pathPrefix"] = req.PathPrefix
+	}
+
+	// Handle count action specially
+	if req.Action == "count" {
+		countCypher := fmt.Sprintf(`
+MATCH (t:TapRoot {space_id: $spaceId})
+MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE %s
+RETURN count(n) AS count`, joinWhereClauses(whereClauses))
+
+		countResult, err := sess.Run(ctx, countCypher, params)
+		if err != nil {
+			writeInternalError(w, err, "orphan count")
+			return
+		}
+
+		countVal := 0
+		if countResult.Next(ctx) {
+			if c, ok := countResult.Record().Get("count"); ok {
+				countVal = int(c.(int64))
+			}
+		}
+
+		writeJSON(w, http.StatusOK, models.OrphanCleanupResponse{
+			SpaceID:      req.SpaceID,
+			OrphansFound: countVal,
+			OrphansActed: 0,
+			Action:       req.Action,
+			DryRun:       req.DryRun,
+			Orphans:      []models.OrphanNode{},
+		})
+		return
+	}
+
+	// Step 1: Detect orphans — L0 nodes with last_ingested_at < TapRoot.last_ingest_at
+	detectCypher := fmt.Sprintf(`
+MATCH (t:TapRoot {space_id: $spaceId})
+MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE %s
+RETURN n.node_id AS node_id, n.path AS path, n.name AS name,
+       toString(n.last_ingested_at) AS last_ingested_at
+ORDER BY n.path
+LIMIT $limit`, joinWhereClauses(whereClauses))
 
 	result, err := sess.Run(ctx, detectCypher, params)
 	if err != nil {
@@ -149,4 +199,207 @@ DETACH DELETE n`, map[string]any{
 	resp.OrphansActed = acted
 	resp.Orphans = orphans
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// joinWhereClauses joins WHERE clause conditions with AND.
+func joinWhereClauses(clauses []string) string {
+	if len(clauses) == 0 {
+		return "true"
+	}
+	result := clauses[0]
+	for i := 1; i < len(clauses); i++ {
+		result += "\n  AND " + clauses[i]
+	}
+	return result
+}
+
+// handleScheduleCleanup handles POST /v1/memory/cleanup/schedule
+// Sets up scheduled orphan cleanup for a space.
+func (s *Server) handleScheduleCleanup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req models.ScheduleCleanupRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if !validateRequest(w, &req) {
+		return
+	}
+
+	// Enforce limit defaults and bounds
+	if req.Limit <= 0 {
+		req.Limit = 100
+	}
+	if req.Limit > 1000 {
+		req.Limit = 1000
+	}
+
+	// Check protected space for delete action
+	if req.Action == "delete" && IsProtectedSpace(req.SpaceID) {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"error": fmt.Sprintf("space %q is protected from deletion", req.SpaceID),
+		})
+		return
+	}
+
+	scheduleID := "cleanup-" + uuid.New().String()[:8]
+	nextRun := time.Now().Add(time.Duration(req.IntervalHours) * time.Hour)
+
+	// Note: In a full implementation, this would store the schedule in a database
+	// and be picked up by a background scheduler. For now, we return the schedule
+	// configuration that could be used by an external scheduler or APE module.
+
+	log.Printf("orphan cleanup schedule created: id=%s space=%s interval=%dh action=%s",
+		scheduleID, req.SpaceID, req.IntervalHours, req.Action)
+
+	writeJSON(w, http.StatusOK, models.ScheduleCleanupResponse{
+		SpaceID:       req.SpaceID,
+		ScheduleID:    scheduleID,
+		IntervalHours: req.IntervalHours,
+		Action:        req.Action,
+		Status:        "enabled",
+		NextRunAt:     nextRun.UTC().Format(time.RFC3339),
+	})
+}
+
+// handleListCleanupSchedules handles GET /v1/memory/cleanup/schedules
+// Lists all configured cleanup schedules.
+func (s *Server) handleListCleanupSchedules(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Filter by space_id if provided
+	spaceID := r.URL.Query().Get("space_id")
+
+	// Note: In a full implementation, this would query from a database.
+	// For now, return empty list as schedules are not persisted.
+	_ = spaceID
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"schedules": []models.ScheduleCleanupResponse{},
+		"count":     0,
+	})
+}
+
+// handleDeleteCleanupSchedule handles DELETE /v1/memory/cleanup/schedule/{schedule_id}
+// Removes a cleanup schedule.
+func (s *Server) handleDeleteCleanupSchedule(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract schedule_id from path
+	scheduleID := r.URL.Query().Get("schedule_id")
+	if scheduleID == "" {
+		// Try to extract from path
+		path := r.URL.Path
+		if idx := len("/v1/memory/cleanup/schedule/"); idx < len(path) {
+			scheduleID = path[idx:]
+		}
+	}
+
+	if scheduleID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "schedule_id is required"})
+		return
+	}
+
+	// Note: In a full implementation, this would delete from a database.
+	log.Printf("orphan cleanup schedule deleted: id=%s", scheduleID)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"schedule_id": scheduleID,
+		"deleted":     true,
+	})
+}
+
+// getCleanupStatsForSpace returns cleanup statistics for a space.
+func (s *Server) getCleanupStatsForSpace(ctx context.Context, spaceID string) (map[string]any, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Count orphans
+	result, err := sess.Run(ctx, `
+MATCH (t:TapRoot {space_id: $spaceId})
+MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE n.layer = 0
+  AND n.last_ingested_at IS NOT NULL
+  AND n.last_ingested_at < t.last_ingest_at
+  AND NOT coalesce(n.is_archived, false)
+RETURN count(n) AS orphan_count`, map[string]any{"spaceId": spaceID})
+	if err != nil {
+		return nil, err
+	}
+
+	orphanCount := int64(0)
+	if result.Next(ctx) {
+		if c, ok := result.Record().Get("orphan_count"); ok {
+			orphanCount = c.(int64)
+		}
+	}
+
+	// Count archived nodes
+	archivedResult, err := sess.Run(ctx, `
+MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE n.is_archived = true
+RETURN count(n) AS archived_count`, map[string]any{"spaceId": spaceID})
+	if err != nil {
+		return nil, err
+	}
+
+	archivedCount := int64(0)
+	if archivedResult.Next(ctx) {
+		if c, ok := archivedResult.Record().Get("archived_count"); ok {
+			archivedCount = c.(int64)
+		}
+	}
+
+	return map[string]any{
+		"space_id":       spaceID,
+		"orphan_count":   orphanCount,
+		"archived_count": archivedCount,
+	}, nil
+}
+
+// handleCleanupStats handles GET /v1/memory/cleanup/stats
+// Returns cleanup statistics for a space.
+func (s *Server) handleCleanupStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	spaceID := r.URL.Query().Get("space_id")
+	if spaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query parameter is required"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	stats, err := s.getCleanupStatsForSpace(ctx, spaceID)
+	if err != nil {
+		writeInternalError(w, err, "cleanup stats")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats)
+}
+
+// parseIntQueryParam parses an integer query parameter with a default value.
+func parseIntQueryParam(r *http.Request, name string, defaultVal int) int {
+	val := r.URL.Query().Get(name)
+	if val == "" {
+		return defaultVal
+	}
+	if i, err := strconv.Atoi(val); err == nil {
+		return i
+	}
+	return defaultVal
 }

@@ -1,0 +1,61 @@
+{
+  "usts_version": "1.0.0",
+  "test": {
+    "name": "auth_required",
+    "description": "Verifies that protected endpoints require authentication",
+    "category": "authentication",
+    "severity": "critical",
+    "endpoint": "/v1/memory/retrieve",
+    "method": "POST"
+  },
+  "requests": [
+    {
+      "name": "no_auth",
+      "description": "Request without any authentication",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "payload": {
+        "space_id": "test",
+        "query_text": "test query"
+      },
+      "expected_status": 401
+    },
+    {
+      "name": "invalid_api_key",
+      "description": "Request with invalid API key",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-API-Key": "invalid-key-12345"
+      },
+      "payload": {
+        "space_id": "test",
+        "query_text": "test query"
+      },
+      "expected_status": 401
+    },
+    {
+      "name": "malformed_bearer",
+      "description": "Request with malformed Bearer token",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer not.a.valid.jwt"
+      },
+      "payload": {
+        "space_id": "test",
+        "query_text": "test query"
+      },
+      "expected_status": 401
+    }
+  ],
+  "assertions": {
+    "status_in": [401],
+    "body_contains": ["unauthorized", "authentication"],
+    "body_not_contains": ["results", "nodes", "embedding"],
+    "headers_present": ["WWW-Authenticate"]
+  },
+  "metadata": {
+    "owasp": ["A07:2021-Identification and Authentication Failures"],
+    "cwe": ["CWE-287", "CWE-306"]
+  }
+}

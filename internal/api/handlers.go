@@ -35,24 +35,141 @@ func IsProtectedSpace(spaceID string) bool {
 	return ProtectedSpaces[spaceID]
 }
 
+// HealthCheck represents the status of a single health check component.
+type HealthCheck struct {
+	Status  string `json:"status"`            // "healthy", "unhealthy", "degraded"
+	Message string `json:"message,omitempty"` // Additional details
+	Latency string `json:"latency,omitempty"` // Check latency
+}
+
+// ReadinessStatus represents the complete readiness response.
+type ReadinessStatus struct {
+	Status  string                 `json:"status"`  // "ready", "not_ready", "degraded"
+	Checks  map[string]HealthCheck `json:"checks"`  // Individual component checks
+	Version string                 `json:"version"` // MDEMG version
+}
+
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	// Basic liveness check - just confirms the process is running
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":  "ok",
+		"version": s.cfg.MdemgVersion,
+	})
 }
 
 func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+
+	status := ReadinessStatus{
+		Status:  "ready",
+		Checks:  make(map[string]HealthCheck),
+		Version: s.cfg.MdemgVersion,
+	}
+
+	overallHealthy := true
+
+	// Check 1: Neo4j database connectivity and schema version
+	neo4jStart := time.Now()
 	if err := db.AssertSchemaVersion(ctx, s.driver, s.cfg.RequiredSchemaVersion); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "not_ready", "error": err.Error()})
+		status.Checks["neo4j"] = HealthCheck{
+			Status:  "unhealthy",
+			Message: err.Error(),
+			Latency: time.Since(neo4jStart).String(),
+		}
+		overallHealthy = false
+	} else {
+		status.Checks["neo4j"] = HealthCheck{
+			Status:  "healthy",
+			Message: fmt.Sprintf("schema version %d", s.cfg.RequiredSchemaVersion),
+			Latency: time.Since(neo4jStart).String(),
+		}
+	}
+
+	// Check 2: Embedding provider
+	if s.embedder != nil {
+		status.Checks["embeddings"] = HealthCheck{
+			Status:  "healthy",
+			Message: fmt.Sprintf("%s (%d dimensions)", s.embedder.Name(), s.embedder.Dimensions()),
+		}
+	} else {
+		status.Checks["embeddings"] = HealthCheck{
+			Status:  "degraded",
+			Message: "no embedding provider configured",
+		}
+	}
+
+	// Check 3: Plugin manager
+	if s.pluginMgr != nil {
+		modules := s.pluginMgr.ListModules()
+		activeCount := 0
+		for _, m := range modules {
+			if m.State == "running" {
+				activeCount++
+			}
+		}
+		status.Checks["plugins"] = HealthCheck{
+			Status:  "healthy",
+			Message: fmt.Sprintf("%d/%d modules active", activeCount, len(modules)),
+		}
+	} else {
+		status.Checks["plugins"] = HealthCheck{
+			Status:  "degraded",
+			Message: "plugin manager disabled",
+		}
+	}
+
+	// Check 4: Circuit breaker states
+	if s.cbRegistry != nil {
+		cbStates := s.cbRegistry.States()
+		openCount := 0
+		for _, state := range cbStates {
+			if state.String() == "open" {
+				openCount++
+			}
+		}
+		if openCount > 0 {
+			status.Checks["circuit_breakers"] = HealthCheck{
+				Status:  "degraded",
+				Message: fmt.Sprintf("%d/%d circuits open", openCount, len(cbStates)),
+			}
+		} else {
+			status.Checks["circuit_breakers"] = HealthCheck{
+				Status:  "healthy",
+				Message: fmt.Sprintf("%d circuits monitored", len(cbStates)),
+			}
+		}
+	}
+
+	// Check 5: Conversation service
+	if s.conversationSvc != nil {
+		status.Checks["conversation"] = HealthCheck{
+			Status:  "healthy",
+			Message: "CMS available",
+		}
+	} else {
+		status.Checks["conversation"] = HealthCheck{
+			Status:  "degraded",
+			Message: "conversation service unavailable",
+		}
+	}
+
+	// Determine overall status
+	if !overallHealthy {
+		status.Status = "not_ready"
+		writeJSON(w, http.StatusServiceUnavailable, status)
 		return
 	}
 
-	resp := map[string]any{"status": "ready"}
-	if s.embedder != nil {
-		resp["embedding_provider"] = s.embedder.Name()
-		resp["embedding_dimensions"] = s.embedder.Dimensions()
+	// Check for degraded components
+	for _, check := range status.Checks {
+		if check.Status == "degraded" {
+			status.Status = "degraded"
+			break
+		}
 	}
-	writeJSON(w, http.StatusOK, resp)
+
+	writeJSON(w, http.StatusOK, status)
 }
 
 func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {

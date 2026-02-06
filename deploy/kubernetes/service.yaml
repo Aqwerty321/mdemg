@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mdemg
+  labels:
+    app: mdemg
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: mdemg
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mdemg-headless
+  labels:
+    app: mdemg
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: mdemg

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
 	"mdemg/internal/models"
 )
@@ -21,6 +22,7 @@ type Service struct {
 	reasoningProvider ReasoningProvider
 	queryCache        *QueryCache
 	embeddingCache    *NodeEmbeddingCache // Cache for node embeddings (query-aware expansion)
+	cbRegistry        *circuitbreaker.Registry // Circuit breaker registry for external API calls
 }
 
 // FileFilter specifies file extension filtering for retrieval queries.
@@ -119,6 +121,12 @@ func (s *Service) SetReasoningProvider(provider ReasoningProvider) {
 	if provider != nil {
 		s.reasoningProvider = provider
 	}
+}
+
+// SetCircuitBreakerRegistry sets the circuit breaker registry for external API calls.
+// This allows the service to use circuit breakers for rerank and other LLM calls.
+func (s *Service) SetCircuitBreakerRegistry(registry *circuitbreaker.Registry) {
+	s.cbRegistry = registry
 }
 
 // QueryCacheStats returns query cache statistics.

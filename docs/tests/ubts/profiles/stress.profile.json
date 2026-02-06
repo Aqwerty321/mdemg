@@ -1,0 +1,29 @@
+{
+  "profile_name": "stress",
+  "description": "High-load stress test to find system breaking points",
+  "parameters": {
+    "total_requests": 10000,
+    "concurrent_users": 100,
+    "ramp_up_seconds": 60,
+    "duration_seconds": 600,
+    "think_time_ms": 100
+  },
+  "query_variations": [
+    {"query_text": "complex architectural query about system design patterns"},
+    {"query_text": "simple word"},
+    {"query_text": "medium length query about code implementation"},
+    {"query_text": "very long query text that contains multiple sentences and should exercise the embedding generation and retrieval pipeline with a significant amount of input data to process"},
+    {"query_text": "special characters: @#$% &*()"},
+    {"query_text": "unicode: \u4e2d\u6587 \u65e5\u672c\u8a9e \ud55c\uad6d\uc5b4"},
+    {"query_text": "code snippet: function foo() { return bar; }"},
+    {"query_text": "numeric: 12345 67890 0.123"},
+    {"query_text": "mixed: user123 config_v2 API-KEY"},
+    {"query_text": "empty-ish query"}
+  ],
+  "assertions": {
+    "all_requests_succeed": false,
+    "check_thresholds": true,
+    "min_success_rate": 95.0,
+    "max_p99_degradation_pct": 200
+  }
+}

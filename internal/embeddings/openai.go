@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"mdemg/internal/circuitbreaker"
 )
 
 const (
@@ -22,6 +24,7 @@ type OpenAI struct {
 	model    string
 	endpoint string
 	client   *http.Client
+	cb       *circuitbreaker.Breaker
 }
 
 // NewOpenAI creates a new OpenAI embedder.
@@ -43,6 +46,12 @@ func NewOpenAI(cfg Config) (*OpenAI, error) {
 			Timeout: 30 * time.Second,
 		},
 	}, nil
+}
+
+// SetCircuitBreaker sets a circuit breaker for the embedder.
+// When set, API calls will be protected by the circuit breaker.
+func (o *OpenAI) SetCircuitBreaker(cb *circuitbreaker.Breaker) {
+	o.cb = cb
 }
 
 func (o *OpenAI) Name() string {
@@ -71,6 +80,22 @@ func (o *OpenAI) EmbedBatch(ctx context.Context, texts []string) ([][]float32, e
 		return nil, nil
 	}
 
+	// Use circuit breaker if configured
+	if o.cb != nil {
+		var result [][]float32
+		err := o.cb.Execute(ctx, func(ctx context.Context) error {
+			var innerErr error
+			result, innerErr = o.doEmbedBatch(ctx, texts)
+			return innerErr
+		})
+		return result, err
+	}
+
+	return o.doEmbedBatch(ctx, texts)
+}
+
+// doEmbedBatch performs the actual API call without circuit breaker protection.
+func (o *OpenAI) doEmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
 	reqBody := openAIEmbeddingRequest{
 		Model: o.model,
 		Input: texts,

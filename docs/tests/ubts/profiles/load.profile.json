@@ -1,0 +1,28 @@
+{
+  "profile_name": "load",
+  "description": "Standard load test simulating normal production traffic",
+  "parameters": {
+    "total_requests": 1000,
+    "concurrent_users": 10,
+    "ramp_up_seconds": 30,
+    "duration_seconds": 300,
+    "think_time_ms": 500
+  },
+  "query_variations": [
+    {"query_text": "how does the retrieval system work"},
+    {"query_text": "explain hidden layer clustering"},
+    {"query_text": "what is Hebbian learning"},
+    {"query_text": "database schema migration"},
+    {"query_text": "API authentication flow"},
+    {"query_text": "circuit breaker pattern"},
+    {"query_text": "rate limiting configuration"},
+    {"query_text": "embedding cache implementation"},
+    {"query_text": "conversation memory system"},
+    {"query_text": "plugin architecture design"}
+  ],
+  "assertions": {
+    "all_requests_succeed": false,
+    "check_thresholds": true,
+    "min_success_rate": 99.0
+  }
+}

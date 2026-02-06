@@ -1,0 +1,26 @@
+{
+  "uobs_version": "1.0.0",
+  "test": {
+    "name": "health_endpoints",
+    "description": "Validates health check endpoints response format and timing",
+    "type": "health"
+  },
+  "health": {
+    "endpoints": [
+      {
+        "path": "/healthz",
+        "method": "GET",
+        "expected_status": 200,
+        "required_fields": ["status"],
+        "max_response_time_ms": 100
+      },
+      {
+        "path": "/readyz",
+        "method": "GET",
+        "expected_status": 200,
+        "required_fields": ["status", "checks", "version"],
+        "max_response_time_ms": 5000
+      }
+    ]
+  }
+}

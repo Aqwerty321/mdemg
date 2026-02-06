@@ -1,0 +1,33 @@
+{
+  "ubts_version": "1.0.0",
+  "benchmark": {
+    "name": "retrieve_latency",
+    "description": "Measures retrieval endpoint latency under various query loads",
+    "endpoint": "/v1/memory/retrieve",
+    "method": "POST",
+    "payload_template": {
+      "space_id": "{{space_id}}",
+      "query_text": "{{query_text}}",
+      "top_k": 10
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "thresholds": {
+    "p50_ms": 50,
+    "p95_ms": 250,
+    "p99_ms": 500,
+    "max_ms": 2000,
+    "error_rate_pct": 0.1
+  },
+  "setup": {
+    "seed_data": "test_data/retrieve_seed.json",
+    "warmup_requests": 20
+  },
+  "metadata": {
+    "tags": ["retrieval", "latency", "core"],
+    "owner": "mdemg-team",
+    "created": "2026-02-05"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "usts_version": "1.0.0",
+  "test": {
+    "name": "rate_limit_enforcement",
+    "description": "Verifies that rate limiting is properly enforced",
+    "category": "rate_limiting",
+    "severity": "high",
+    "endpoint": "/v1/memory/retrieve",
+    "method": "POST"
+  },
+  "requests": [
+    {
+      "name": "burst_requests",
+      "description": "Send requests exceeding burst limit",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-API-Key": "{{valid_api_key}}"
+      },
+      "payload": {
+        "space_id": "test",
+        "query_text": "rate limit test"
+      },
+      "expected_status_range": [200, 429]
+    }
+  ],
+  "assertions": {
+    "headers_present": ["X-RateLimit-Limit", "X-RateLimit-Remaining"],
+    "body_not_contains": ["internal error", "stack trace", "panic"]
+  },
+  "metadata": {
+    "owasp": ["A04:2021-Insecure Design"],
+    "cwe": ["CWE-770"]
+  }
+}

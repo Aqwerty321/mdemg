@@ -1,7 +1,8 @@
 # Parser Implementation Issues
 
 **Generated:** 2026-01-29
-**Status:** Phase 1 Complete - Fallback parsers integrated
+**Last Updated:** 2026-02-05
+**Status:** All Issues Resolved - 20/20 UPTS-validated parsers passing
 
 ---
 
@@ -9,121 +10,87 @@
 
 | Language | Status | Match Rate | Category |
 |----------|--------|------------|----------|
-| JSON | **PASS** | 100% (14/14) | Fallback |
-| Go | PARTIAL | 82.4% (14/17) | Tree-sitter |
-| YAML | PARTIAL | 81% (17/21) | Fallback |
-| Python | PARTIAL | 62.9% (22/35) | Tree-sitter |
-| Shell | PARTIAL | ~65% | Fallback |
-| INI | PARTIAL | 60% (9/15) | Fallback |
-| Cypher | PARTIAL | 57.1% (8/14) | Fallback |
-| TypeScript | PARTIAL | 53.8% (7/13) | Tree-sitter |
-| SQL | PARTIAL | ~60% | Fallback |
-| TOML | PARTIAL | 40% (6/15) | Fallback |
-| Dockerfile | PARTIAL | 31.2% (5/16) | Fallback |
-| Rust | ERROR | 0% | No grammar |
-| C | ERROR | 0% | No grammar |
-| C++ | ERROR | 0% | No grammar |
-| CUDA | ERROR | 0% | No grammar |
-| Java | ERROR | 0% | No grammar |
+| Go | **PASS** | 100% | Regex |
+| Rust | **PASS** | 100% | Regex |
+| Python | **PASS** | 100% | Regex |
+| TypeScript | **PASS** | 100% | Regex |
+| Java | **PASS** | 100% | Regex |
+| C# | **PASS** | 100% | Regex |
+| Kotlin | **PASS** | 100% | Regex |
+| C++ | **PASS** | 100% | Regex |
+| C | **PASS** | 100% | Regex |
+| CUDA | **PASS** | 100% | Regex |
+| SQL | **PASS** | 100% | Regex |
+| Cypher | **PASS** | 100% | Regex |
+| Terraform | **PASS** | 100% | Regex |
+| YAML | **PASS** | 100% | Regex |
+| TOML | **PASS** | 100% | Regex |
+| JSON | **PASS** | 100% | Regex |
+| INI | **PASS** | 100% | Regex |
+| Makefile | **PASS** | 100% | Regex |
+| Dockerfile | **PASS** | 100% | Regex |
+| Shell | **PASS** | 100% | Regex |
 
-**Current Pass Rate:** 6.25% (1/16 languages at 100%)
-**Average Match Rate (working parsers):** ~60%
-
----
-
-## Completed Work
-
-### Fallback Parser Integration ✓
-
-Added `cmd/extract-symbols/fallback_parsers.go` with support for:
-- YAML (.yml, .yaml)
-- TOML (.toml)
-- JSON (.json, .jsonc)
-- INI/dotenv (.env, .ini, .cfg, .properties)
-- Shell (.sh, .bash, .zsh)
-- Dockerfile (Dockerfile, *.dockerfile)
-- SQL (.sql)
-- Cypher (.cypher, .cql)
-
-### Main.go Integration ✓
-
-Modified `cmd/extract-symbols/main.go` to call `TryFallbackParser()` when:
-- Tree-sitter fails
-- Tree-sitter returns no symbols
-- File extension not supported by tree-sitter
+**Current Pass Rate:** 100% (20/20 UPTS-validated languages)
+**Additional parsers without UPTS specs:** Markdown, XML (total: 22 parsers)
 
 ---
 
-## Remaining Work
+## Resolved Issues (2026-02-05)
 
-### Priority 1: Align Specs with Parser Output
+### Parser Fixes Applied
 
-Most partial failures are due to spec expectations not matching parser output:
+All parsers now use regex-based extraction in `cmd/ingest-codebase/languages/`. Major fixes applied:
 
-| Issue Type | Languages Affected |
-|------------|-------------------|
-| Line number mismatch | Go, YAML, TOML, Dockerfile |
-| Symbol name format | Shell, INI, Cypher |
-| Parent field | Python, TypeScript, TOML |
-| Signature validation | TypeScript |
-| Type classification | YAML, Dockerfile |
+| Parser | Issue | Resolution |
+|--------|-------|------------|
+| Cypher | Type mismatch ("class" vs "label") | Changed parser to emit correct types: `label`, `relationship_type`, `constraint`, `index` |
+| Cypher | Relationship regex missed properties `{...}` | Updated regex to allow content between type and `]` |
+| Dockerfile | ARG/ENV had "ARG:" prefix in name | Removed prefix from symbol names |
+| Dockerfile | Missing VOLUME extraction | Added VOLUME parsing with `VOLUME:` prefix |
+| JSON | Sibling sections incorrectly nested | Fixed brace depth tracking to correctly pop sections |
+| SQL | Only extracted columns, no tables/indexes/etc | Complete rewrite to extract tables, columns, indexes, views, functions, triggers, enums, sequences with line numbers |
+| SQL | Missing line numbers on symbols | Added line-by-line scanning with proper lineNum tracking |
+| C | Typedef struct pointer parsing | Added patterns for `typedef struct X* Y;` and `typedef struct X X;` |
+| C | Enum value extraction | Fixed pattern to not require trailing punctuation |
+| C++ | Inline method parent tracking | Moved brace depth update to END of loop |
+| C++ | `std::` return types filtered | Removed incorrect `::` check |
+| CUDA | Negative lookahead panic | Replaced `(?!...)` with code-based filtering |
+| CUDA | Multi-line kernel declarations | Changed pattern to not require closing paren on same line |
+| Python | String value escaping | Fixed `"\"1.0.0\""` to `"1.0.0"` in spec |
 
-**Action:** Update UPTS specs to match actual parser output by running parser and adjusting expected values.
+### Spec Fixes Applied
 
-### Priority 2: Tree-sitter Grammar Loading
+Some specs had genuine bugs (semantic impossibilities, incorrect auto-generation):
 
-Add grammars for Rust, C, C++, CUDA, Java in `internal/symbols/parser.go`:
-
-```go
-import (
-    "github.com/smacker/go-tree-sitter/rust"
-    "github.com/smacker/go-tree-sitter/c"
-    "github.com/smacker/go-tree-sitter/cpp"
-    "github.com/smacker/go-tree-sitter/java"
-)
-```
-
-**Dependencies:**
-```bash
-go get github.com/smacker/go-tree-sitter/rust
-go get github.com/smacker/go-tree-sitter/c
-go get github.com/smacker/go-tree-sitter/cpp
-go get github.com/smacker/go-tree-sitter/java
-```
-
----
-
-## Files Modified
-
-| File | Change |
-|------|--------|
-| `cmd/extract-symbols/main.go` | Added fallback parser integration |
-| `cmd/extract-symbols/fallback_parsers.go` | New file with 8 config parsers |
-| `upts/runners/upts_runner.py` | Fixed shlex command parsing |
-| `upts/specs/*.upts.json` | Fixed fixture paths |
+| Spec | Issue | Resolution |
+|------|-------|------------|
+| c.upts.json | Function names were parameter names | Fixed: `user` → `user_create`, etc. |
+| cpp.upts.json | Duplicate method+function entries | Removed duplicates, corrected names |
+| cuda.upts.json | Wrong shared variable exported flag | Changed from `true` to `false` |
+| python.upts.json | String value had escaped quotes | Changed `"\"1.0.0\""` to `"1.0.0"` |
 
 ---
 
 ## Verification
 
 ```bash
-# Run full validation
-cd /Users/reh3376/mdemg
-python3 docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py validate-all \
-    --spec-dir docs/lang-parser/lang-parse-spec/upts/specs/ \
-    --parser "./bin/extract-symbols --json"
+# Run all UPTS tests (Go-native harness)
+go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
 
-# Test single parser
-./bin/extract-symbols --json docs/lang-parser/lang-parse-spec/upts/fixtures/yaml_test_fixture.yaml | \
-    python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{len(d[\"symbols\"])} symbols')"
+# Expected output:
+# --- PASS: TestUPTS (0.02s)
+#     --- PASS: TestUPTS/c (0.00s)
+#     --- PASS: TestUPTS/cpp (0.00s)
+#     ... (20 languages)
+# PASS
 ```
 
 ---
 
-## Next Steps
+## All Issues Resolved
 
-1. **Spec Alignment** - Update expected values in UPTS specs to match parser output
-2. **Grammar Loading** - Add tree-sitter grammars for Rust, C, C++, CUDA, Java
-3. **Signature Extraction** - Improve TypeScript signature extraction
-4. **Parent Tracking** - Fix parent field for methods in Python/TypeScript
+All previously documented issues have been fixed. The parser suite now achieves:
+- **20/20 UPTS-validated languages passing (100%)**
+- **22 total parsers (including Markdown, XML without UPTS specs)**
 

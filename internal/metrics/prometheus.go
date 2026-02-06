@@ -211,14 +211,16 @@ func (h *Histogram) ObserveDuration(start time.Time) {
 	h.Observe(time.Since(start).Seconds())
 }
 
-// Snapshot returns a copy of the histogram data.
+// Snapshot returns a copy of the histogram data with cumulative bucket counts.
 func (h *Histogram) Snapshot() (buckets map[float64]int64, sum float64, count int64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	buckets = make(map[float64]int64, len(h.buckets))
+	cumulative := int64(0)
 	for i, bound := range h.buckets {
-		buckets[bound] = h.bucketCounts[i]
+		cumulative += h.bucketCounts[i]
+		buckets[bound] = cumulative
 	}
 	return buckets, h.sum, h.count
 }

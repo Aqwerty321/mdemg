@@ -7,9 +7,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	pb "mdemg/api/transferpb"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
+
+// ProgressFunc is called during export/import to report progress. Phase is a label
+// (e.g. "nodes", "edges"); done and total are counts. If total is 0, it is unknown.
+type ProgressFunc func(phase string, done, total int64)
 
 // ExportConfig controls what gets exported.
 type ExportConfig struct {
@@ -19,8 +24,14 @@ type ExportConfig struct {
 	IncludeObservations bool
 	IncludeSymbols      bool
 	IncludeLearnedEdges bool
+	OnlyLearnedEdges    bool // when true, export only CO_ACTIVATED_WITH edges
+	MetadataOnly        bool // when true, export only metadata + summary chunks (no node/edge/obs/symbol data)
 	MinLayer            int
 	MaxLayer            int // 0 = no max
+	ProgressFunc        ProgressFunc
+	// Phase 4: incremental sync — export only entities modified after this timestamp (ISO8601)
+	SinceTimestamp string // from ExportRequest.since_timestamp or resolved from since_cursor
+	SinceCursor    string // opaque cursor from prior export; resolved to SinceTimestamp when empty
 }
 
 // DefaultExportConfig returns an ExportConfig with sensible defaults.
@@ -34,6 +45,49 @@ func DefaultExportConfig(spaceID string) ExportConfig {
 		IncludeLearnedEdges: true,
 		MinLayer:            0,
 		MaxLayer:            0,
+	}
+}
+
+// ExportProfile names for -profile flag.
+const (
+	ProfileFull     = "full"
+	ProfileCodebase = "codebase"
+	ProfileCMS      = "cms"
+	ProfileLearned  = "learned"
+	ProfileMetadata = "metadata"
+)
+
+// ExportConfigForProfile returns an ExportConfig for a named profile.
+// Use DefaultExportConfig and override flags when profile is "" or "full".
+func ExportConfigForProfile(spaceID, profile string) (ExportConfig, error) {
+	base := DefaultExportConfig(spaceID)
+	switch profile {
+	case "", ProfileFull:
+		return base, nil
+	case ProfileCodebase:
+		base.IncludeObservations = false
+		base.IncludeSymbols = true
+		base.IncludeLearnedEdges = true
+		return base, nil
+	case ProfileCMS:
+		base.IncludeObservations = true
+		base.IncludeSymbols = false
+		base.IncludeLearnedEdges = true
+		return base, nil
+	case ProfileLearned:
+		base.IncludeObservations = false
+		base.IncludeSymbols = false
+		base.IncludeLearnedEdges = true
+		base.OnlyLearnedEdges = true
+		return base, nil
+	case ProfileMetadata:
+		base.MetadataOnly = true
+		base.IncludeObservations = false
+		base.IncludeSymbols = false
+		base.IncludeLearnedEdges = false
+		return base, nil
+	default:
+		return ExportConfig{}, fmt.Errorf("unknown profile %q (use: full, codebase, cms, learned, metadata)", profile)
 	}
 }
 
@@ -57,6 +111,11 @@ func ExportFromRequest(req *pb.ExportRequest) ExportConfig {
 	}
 	cfg.MinLayer = int(req.MinLayer)
 	cfg.MaxLayer = int(req.MaxLayer)
+	cfg.SinceTimestamp = req.SinceTimestamp
+	cfg.SinceCursor = req.SinceCursor
+	if cfg.SinceTimestamp == "" && cfg.SinceCursor != "" {
+		cfg.SinceTimestamp = cfg.SinceCursor // MVP: cursor is the timestamp for next delta
+	}
 	return cfg
 }
 
@@ -87,8 +146,8 @@ func (e *Exporter) Export(ctx context.Context, cfg ExportConfig) (*ExportResult,
 		return nil, fmt.Errorf("get schema version: %w", err)
 	}
 
-	// Count totals for metadata
-	counts, err := e.countEntities(ctx, cfg.SpaceID)
+	// Count totals for metadata (filtered by since when incremental)
+	counts, err := e.countEntities(ctx, cfg.SpaceID, cfg.SinceTimestamp)
 	if err != nil {
 		return nil, fmt.Errorf("count entities: %w", err)
 	}
@@ -101,6 +160,9 @@ func (e *Exporter) Export(ctx context.Context, cfg ExportConfig) (*ExportResult,
 
 	hostname, _ := os.Hostname()
 
+	if cfg.ProgressFunc != nil {
+		cfg.ProgressFunc("metadata", 1, 1)
+	}
 	// Chunk 0: metadata
 	seq := int32(0)
 	result.Chunks = append(result.Chunks, &pb.SpaceChunk{
@@ -122,12 +184,42 @@ func (e *Exporter) Export(ctx context.Context, cfg ExportConfig) (*ExportResult,
 	})
 	seq++
 
+	if cfg.MetadataOnly {
+		if cfg.ProgressFunc != nil {
+			cfg.ProgressFunc("summary", 1, 1)
+		}
+		duration := time.Since(start)
+		completedAt := time.Now().UTC().Format(time.RFC3339)
+		sum := &pb.TransferSummary{
+			NodesExported:        counts.Nodes,
+			EdgesExported:        counts.Edges,
+			ObservationsExported: counts.Observations,
+			SymbolsExported:      counts.Symbols,
+			DurationMs:           duration.Milliseconds(),
+			CompletedAt:          completedAt,
+		}
+		if cfg.SinceTimestamp != "" {
+			sum.NextCursor = completedAt
+		}
+		result.Chunks = append(result.Chunks, &pb.SpaceChunk{
+			ChunkType:     pb.ChunkType_CHUNK_TYPE_SUMMARY,
+			SpaceId:       cfg.SpaceID,
+			SchemaVersion: int32(schemaVersion),
+			Sequence:      seq,
+			Summary:       sum,
+		})
+		return result, nil
+	}
+
 	// Export nodes in batches
 	nodeChunks, err := e.exportNodes(ctx, cfg, schemaVersion, &seq)
 	if err != nil {
 		return nil, fmt.Errorf("export nodes: %w", err)
 	}
 	result.Chunks = append(result.Chunks, nodeChunks...)
+	if cfg.ProgressFunc != nil {
+		cfg.ProgressFunc("nodes", counts.Nodes, counts.Nodes)
+	}
 
 	// Export edges in batches
 	edgeChunks, err := e.exportEdges(ctx, cfg, schemaVersion, &seq)
@@ -135,6 +227,9 @@ func (e *Exporter) Export(ctx context.Context, cfg ExportConfig) (*ExportResult,
 		return nil, fmt.Errorf("export edges: %w", err)
 	}
 	result.Chunks = append(result.Chunks, edgeChunks...)
+	if cfg.ProgressFunc != nil {
+		cfg.ProgressFunc("edges", counts.Edges, counts.Edges)
+	}
 
 	// Export observations (if requested)
 	if cfg.IncludeObservations {
@@ -143,6 +238,9 @@ func (e *Exporter) Export(ctx context.Context, cfg ExportConfig) (*ExportResult,
 			return nil, fmt.Errorf("export observations: %w", err)
 		}
 		result.Chunks = append(result.Chunks, obsChunks...)
+		if cfg.ProgressFunc != nil {
+			cfg.ProgressFunc("observations", counts.Observations, counts.Observations)
+		}
 	}
 
 	// Export symbols (if requested)
@@ -152,23 +250,34 @@ func (e *Exporter) Export(ctx context.Context, cfg ExportConfig) (*ExportResult,
 			return nil, fmt.Errorf("export symbols: %w", err)
 		}
 		result.Chunks = append(result.Chunks, symChunks...)
+		if cfg.ProgressFunc != nil {
+			cfg.ProgressFunc("symbols", counts.Symbols, counts.Symbols)
+		}
 	}
 
+	if cfg.ProgressFunc != nil {
+		cfg.ProgressFunc("summary", 1, 1)
+	}
 	// Final chunk: summary
 	duration := time.Since(start)
+	completedAt := time.Now().UTC().Format(time.RFC3339)
+	sum := &pb.TransferSummary{
+		NodesExported:        counts.Nodes,
+		EdgesExported:        counts.Edges,
+		ObservationsExported: counts.Observations,
+		SymbolsExported:      counts.Symbols,
+		DurationMs:           duration.Milliseconds(),
+		CompletedAt:          completedAt,
+	}
+	if cfg.SinceTimestamp != "" {
+		sum.NextCursor = completedAt // Client uses as since_cursor/since_timestamp for next delta
+	}
 	result.Chunks = append(result.Chunks, &pb.SpaceChunk{
 		ChunkType:     pb.ChunkType_CHUNK_TYPE_SUMMARY,
 		SpaceId:       cfg.SpaceID,
 		SchemaVersion: int32(schemaVersion),
 		Sequence:      seq,
-		Summary: &pb.TransferSummary{
-			NodesExported:        counts.Nodes,
-			EdgesExported:        counts.Edges,
-			ObservationsExported: counts.Observations,
-			SymbolsExported:      counts.Symbols,
-			DurationMs:           duration.Milliseconds(),
-			CompletedAt:          time.Now().UTC().Format(time.RFC3339),
-		},
+		Summary:       sum,
 	})
 
 	return result, nil
@@ -201,21 +310,23 @@ func (e *Exporter) getSchemaVersion(ctx context.Context) (int, error) {
 	return int(result.(int64)), nil
 }
 
-func (e *Exporter) countEntities(ctx context.Context, spaceID string) (entityCounts, error) {
+func (e *Exporter) countEntities(ctx context.Context, spaceID, since string) (entityCounts, error) {
 	sess := e.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
 	var counts entityCounts
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		params := map[string]any{"spaceId": spaceID, "since": since}
+		// When since != "", filter to entities modified after since (Phase 4 delta)
 		cypher := `
-MATCH (n:MemoryNode {space_id: $spaceId})
+MATCH (n:MemoryNode {space_id: $spaceId}) WHERE NOT coalesce(n.is_archived, false) AND ($since = '' OR n.updated_at > $since)
 WITH count(n) AS nodeCount
-OPTIONAL MATCH (o:Observation {space_id: $spaceId})
+OPTIONAL MATCH (o:Observation {space_id: $spaceId}) WHERE ($since = '' OR o.created_at > $since OR o.timestamp > $since)
 WITH nodeCount, count(o) AS obsCount
-OPTIONAL MATCH (s:SymbolNode {space_id: $spaceId})
+OPTIONAL MATCH (s:SymbolNode {space_id: $spaceId}) WHERE ($since = '' OR s.created_at > $since)
 WITH nodeCount, obsCount, count(s) AS symCount
 RETURN nodeCount, obsCount, symCount`
-		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {
 			return nil, err
 		}
@@ -237,9 +348,11 @@ RETURN nodeCount, obsCount, symCount`
 	}
 	counts = result.(entityCounts)
 
-	// Count edges separately (more efficient)
+	// Count edges separately (more efficient); when since set, only edges with updated_at > since
+	edgeParams := map[string]any{"spaceId": spaceID, "since": since}
+	edgeCypher := `MATCH (a:MemoryNode {space_id: $spaceId})-[r]->(b:MemoryNode {space_id: $spaceId}) WHERE ($since = '' OR r.updated_at > $since) RETURN count(r) AS edgeCount`
 	edgeResult, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, `MATCH (a:MemoryNode {space_id: $spaceId})-[r]->(b:MemoryNode {space_id: $spaceId}) RETURN count(r) AS edgeCount`, map[string]any{"spaceId": spaceID})
+		res, err := tx.Run(ctx, edgeCypher, edgeParams)
 		if err != nil {
 			return nil, err
 		}
@@ -315,13 +428,15 @@ func (e *Exporter) exportNodes(ctx context.Context, cfg ExportConfig, schemaVers
 }
 
 func (e *Exporter) fetchNodeBatch(ctx context.Context, sess neo4j.SessionWithContext, cfg ExportConfig, skip int) ([]*pb.NodeData, error) {
+	since := cfg.SinceTimestamp
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		cypher := `MATCH (n:MemoryNode {space_id: $spaceId})
-WHERE NOT coalesce(n.is_archived, false)
+WHERE NOT coalesce(n.is_archived, false) AND ($since = '' OR n.updated_at > $since)
 RETURN n ORDER BY n.node_id SKIP $skip LIMIT $limit`
 
 		res, err := tx.Run(ctx, cypher, map[string]any{
 			"spaceId": cfg.SpaceID,
+			"since":   since,
 			"skip":    skip,
 			"limit":   cfg.ChunkSize,
 		})
@@ -337,34 +452,34 @@ RETURN n ORDER BY n.node_id SKIP $skip LIMIT $limit`
 			props := node.Props
 
 			nd := &pb.NodeData{
-				NodeId:     getStr(props, "node_id"),
-				SpaceId:    getStr(props, "space_id"),
-				Path:       getStr(props, "path"),
-				Name:       getStr(props, "name"),
-				Layer:      int32(getInt(props, "layer")),
-				RoleType:   getStr(props, "role_type"),
-				Version:    int32(getInt(props, "version")),
-				Description: getStr(props, "description"),
-				Summary:    getStr(props, "summary"),
-				Confidence: getFloat(props, "confidence"),
-				Sensitivity: getStr(props, "sensitivity"),
-				Tags:       getStrSlice(props, "tags"),
-				UserId:     getStr(props, "user_id"),
-				Visibility: getStr(props, "visibility"),
-				Volatile:   getBool(props, "volatile"),
-				IsArchived: getBool(props, "is_archived"),
-				Content:    getStr(props, "content"),
-				ObsType:    getStr(props, "obs_type"),
-				SurpriseScore: getFloat(props, "surprise_score"),
-				SessionId:  getStr(props, "session_id"),
-				AgentId:    getStr(props, "agent_id"),
-				MemberCount: int32(getInt(props, "member_count")),
-				DominantObsType: getStr(props, "dominant_obs_type"),
+				NodeId:           getStr(props, "node_id"),
+				SpaceId:          getStr(props, "space_id"),
+				Path:             getStr(props, "path"),
+				Name:             getStr(props, "name"),
+				Layer:            int32(getInt(props, "layer")),
+				RoleType:         getStr(props, "role_type"),
+				Version:          int32(getInt(props, "version")),
+				Description:      getStr(props, "description"),
+				Summary:          getStr(props, "summary"),
+				Confidence:       getFloat(props, "confidence"),
+				Sensitivity:      getStr(props, "sensitivity"),
+				Tags:             getStrSlice(props, "tags"),
+				UserId:           getStr(props, "user_id"),
+				Visibility:       getStr(props, "visibility"),
+				Volatile:         getBool(props, "volatile"),
+				IsArchived:       getBool(props, "is_archived"),
+				Content:          getStr(props, "content"),
+				ObsType:          getStr(props, "obs_type"),
+				SurpriseScore:    getFloat(props, "surprise_score"),
+				SessionId:        getStr(props, "session_id"),
+				AgentId:          getStr(props, "agent_id"),
+				MemberCount:      int32(getInt(props, "member_count")),
+				DominantObsType:  getStr(props, "dominant_obs_type"),
 				AvgSurpriseScore: getFloat(props, "avg_surprise_score"),
-				Keywords:   getStrSlice(props, "keywords"),
-				SessionCount: int32(getInt(props, "session_count")),
+				Keywords:         getStrSlice(props, "keywords"),
+				SessionCount:     int32(getInt(props, "session_count")),
 				AggregationCount: int32(getInt(props, "aggregation_count")),
-				StabilityScore: getFloat(props, "stability_score"),
+				StabilityScore:   getFloat(props, "stability_score"),
 			}
 
 			if t := getTime(props, "created_at"); t != "" {
@@ -430,13 +545,23 @@ func (e *Exporter) exportEdges(ctx context.Context, cfg ExportConfig, schemaVers
 }
 
 func (e *Exporter) fetchEdgeBatch(ctx context.Context, sess neo4j.SessionWithContext, cfg ExportConfig, skip int) ([]*pb.EdgeData, error) {
+	since := cfg.SinceTimestamp
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		cypher := `MATCH (a:MemoryNode {space_id: $spaceId})-[r]->(b:MemoryNode {space_id: $spaceId})
+		var cypher string
+		if cfg.OnlyLearnedEdges {
+			cypher = `MATCH (a:MemoryNode {space_id: $spaceId})-[r:CO_ACTIVATED_WITH]->(b:MemoryNode {space_id: $spaceId})
+WHERE ($since = '' OR r.updated_at > $since)
 RETURN a.node_id AS fromId, b.node_id AS toId, type(r) AS relType, properties(r) AS props
 ORDER BY a.node_id, b.node_id SKIP $skip LIMIT $limit`
-
+		} else {
+			cypher = `MATCH (a:MemoryNode {space_id: $spaceId})-[r]->(b:MemoryNode {space_id: $spaceId})
+WHERE ($since = '' OR r.updated_at > $since)
+RETURN a.node_id AS fromId, b.node_id AS toId, type(r) AS relType, properties(r) AS props
+ORDER BY a.node_id, b.node_id SKIP $skip LIMIT $limit`
+		}
 		res, err := tx.Run(ctx, cypher, map[string]any{
 			"spaceId": cfg.SpaceID,
+			"since":   since,
 			"skip":    skip,
 			"limit":   cfg.ChunkSize,
 		})
@@ -456,9 +581,7 @@ ORDER BY a.node_id, b.node_id SKIP $skip LIMIT $limit`
 			if p, ok := propsVal.(map[string]any); ok {
 				props = p
 			}
-
-			// Skip learned edges if not requested
-			if !cfg.IncludeLearnedEdges && relType.(string) == "CO_ACTIVATED_WITH" {
+			if !cfg.OnlyLearnedEdges && !cfg.IncludeLearnedEdges && relType.(string) == "CO_ACTIVATED_WITH" {
 				continue
 			}
 
@@ -520,14 +643,17 @@ func (e *Exporter) exportObservations(ctx context.Context, cfg ExportConfig, sch
 }
 
 func (e *Exporter) fetchObservationBatch(ctx context.Context, sess neo4j.SessionWithContext, cfg ExportConfig, skip int) ([]*pb.ObservationData, error) {
+	since := cfg.SinceTimestamp
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		cypher := `MATCH (o:Observation {space_id: $spaceId})
+WHERE ($since = '' OR o.created_at > $since OR o.timestamp > $since)
 OPTIONAL MATCH (n:MemoryNode)-[:HAS_OBSERVATION]->(o)
 RETURN o, n.node_id AS parentNodeId
 ORDER BY o.obs_id SKIP $skip LIMIT $limit`
 
 		res, err := tx.Run(ctx, cypher, map[string]any{
 			"spaceId": cfg.SpaceID,
+			"since":   since,
 			"skip":    skip,
 			"limit":   cfg.ChunkSize,
 		})
@@ -544,10 +670,10 @@ ORDER BY o.obs_id SKIP $skip LIMIT $limit`
 			props := node.Props
 
 			od := &pb.ObservationData{
-				ObsId:    getStr(props, "obs_id"),
-				SpaceId:  getStr(props, "space_id"),
-				Content:  getStr(props, "content"),
-				Source:   getStr(props, "source"),
+				ObsId:     getStr(props, "obs_id"),
+				SpaceId:   getStr(props, "space_id"),
+				Content:   getStr(props, "content"),
+				Source:    getStr(props, "source"),
 				Timestamp: getTime(props, "timestamp"),
 				CreatedAt: getTime(props, "created_at"),
 			}
@@ -605,14 +731,17 @@ func (e *Exporter) exportSymbols(ctx context.Context, cfg ExportConfig, schemaVe
 }
 
 func (e *Exporter) fetchSymbolBatch(ctx context.Context, sess neo4j.SessionWithContext, cfg ExportConfig, skip int) ([]*pb.SymbolData, error) {
+	since := cfg.SinceTimestamp
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		cypher := `MATCH (s:SymbolNode {space_id: $spaceId})
+WHERE ($since = '' OR s.created_at > $since)
 OPTIONAL MATCH (n:MemoryNode)-[:HAS_SYMBOL]->(s)
 RETURN s, n.node_id AS parentNodeId
 ORDER BY s.symbol_id SKIP $skip LIMIT $limit`
 
 		res, err := tx.Run(ctx, cypher, map[string]any{
 			"spaceId": cfg.SpaceID,
+			"since":   since,
 			"skip":    skip,
 			"limit":   cfg.ChunkSize,
 		})

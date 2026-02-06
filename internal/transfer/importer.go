@@ -7,14 +7,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	pb "mdemg/api/transferpb"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 // Importer writes SpaceChunks into Neo4j.
 type Importer struct {
 	driver       neo4j.DriverWithContext
 	conflictMode pb.ConflictMode
+	ProgressFunc ProgressFunc // optional progress callback
 }
 
 // NewImporter creates a new Importer with the specified conflict handling mode.
@@ -77,7 +79,10 @@ func (imp *Importer) Import(ctx context.Context, chunks []*pb.SpaceChunk) (*Impo
 	}
 
 	// Process chunks in order
-	for _, chunk := range chunks {
+	for i, chunk := range chunks {
+		if imp.ProgressFunc != nil {
+			imp.ProgressFunc("chunks", int64(i+1), int64(len(chunks)))
+		}
 		switch chunk.ChunkType {
 		case pb.ChunkType_CHUNK_TYPE_NODES:
 			if chunk.Nodes != nil {

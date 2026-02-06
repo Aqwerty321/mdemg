@@ -38,6 +38,8 @@ space-transfer export -space-id <space_id> [-output <path>] [options]
 - **-no-symbols**: Omit symbol nodes.
 - **-no-learned-edges**: Omit CO_ACTIVATED_WITH edges.
 - **-min-layer**, **-max-layer**: Layer range (0 = no limit).
+- **-since-timestamp**: Phase 4 incremental: export only entities updated after this (ISO8601).
+- **-since-cursor**: Phase 4 incremental: use as cursor from prior export’s `next_cursor` (printed after delta export).
 
 ### import
 

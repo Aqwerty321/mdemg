@@ -15,8 +15,8 @@ import (
 	"strconv"
 	"strings"
 
-	pb "mdemg/api/transferpb"
 	devspacepb "mdemg/api/devspacepb"
+	pb "mdemg/api/transferpb"
 	"mdemg/internal/devspace"
 	"mdemg/internal/transfer"
 
@@ -92,6 +92,8 @@ func runExport(ctx context.Context, args []string) {
 	noLearnedEdges := fs.Bool("no-learned-edges", false, "Exclude CO_ACTIVATED_WITH edges")
 	minLayer := fs.Int("min-layer", 0, "Minimum layer to export (0 = all)")
 	maxLayer := fs.Int("max-layer", 0, "Maximum layer to export (0 = all)")
+	sinceTimestamp := fs.String("since-timestamp", "", "Phase 4: export only entities updated after this (ISO8601)")
+	sinceCursor := fs.String("since-cursor", "", "Phase 4: opaque cursor from prior export next_cursor (used if -since-timestamp empty)")
 	_ = fs.Parse(args)
 
 	if *spaceID == "" {
@@ -144,6 +146,11 @@ func runExport(ctx context.Context, args []string) {
 			cfg.OnlyLearnedEdges = false
 		}
 	}
+	cfg.SinceTimestamp = *sinceTimestamp
+	cfg.SinceCursor = *sinceCursor
+	if cfg.SinceTimestamp == "" && cfg.SinceCursor != "" {
+		cfg.SinceTimestamp = cfg.SinceCursor
+	}
 	cfg.ProgressFunc = func(phase string, done, total int64) {
 		if total > 0 {
 			fmt.Fprintf(os.Stderr, "  %s: %d/%d\n", phase, done, total)
@@ -160,6 +167,11 @@ func runExport(ctx context.Context, args []string) {
 		log.Fatalf("Write file failed: %v", err)
 	}
 	fmt.Printf("Exported %s to %s (%d chunks)\n", *spaceID, outPath, len(result.Chunks))
+	if len(result.Chunks) > 0 {
+		if sum := result.Chunks[len(result.Chunks)-1].GetSummary(); sum != nil && sum.NextCursor != "" {
+			fmt.Fprintf(os.Stderr, "Next cursor for delta: %s\n", sum.NextCursor)
+		}
+	}
 }
 
 func runImport(ctx context.Context, args []string) {

@@ -146,6 +146,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **File watcher**: Standalone `mdemg-watch` binary for automatic re-ingestion on file changes
 - **Orphan detection**: Timestamp-based detection of nodes missing from re-ingestion with archive/delete/list actions
 - **Edge consistency**: Automatic staleness tracking and edge weight refresh during consolidation
+- **Space Transfer & DevSpace**: Export/import space graphs as `.mdemg` files or via gRPC; optional DevSpace hub for agent registration, publish/pull exports, and inter-agent messaging (see `cmd/space-transfer/README.md` and `docs/specs/development-space-collaboration.md`)
 
 ## Architecture
 

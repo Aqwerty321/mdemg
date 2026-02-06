@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"errors"
+	"net/http"
 	"strings"
 )
 
@@ -94,4 +96,55 @@ func extractFromAuthorization(auth string) string {
 	}
 
 	return ""
+}
+
+// apiKeyAuthenticator implements the Authenticator interface for API keys.
+type apiKeyAuthenticator struct {
+	validator *APIKeyValidator
+}
+
+// newAPIKeyAuthenticator creates an API key authenticator from config.
+func newAPIKeyAuthenticator(cfg AuthMethodConfig) (Authenticator, error) {
+	apiCfg, ok := cfg.(*APIKeyConfig)
+	if !ok {
+		return nil, errors.New("apikey: invalid config type")
+	}
+	if err := apiCfg.Validate(); err != nil {
+		return nil, err
+	}
+	return &apiKeyAuthenticator{
+		validator: NewAPIKeyValidator(apiCfg.Keys),
+	}, nil
+}
+
+// Name returns the authenticator name.
+func (a *apiKeyAuthenticator) Name() string { return "apikey" }
+
+// Authenticate validates an API key from the request.
+func (a *apiKeyAuthenticator) Authenticate(r *http.Request) (*Principal, error) {
+	headers := make(map[string]string)
+	headers["X-API-Key"] = r.Header.Get("X-API-Key")
+	headers["Authorization"] = r.Header.Get("Authorization")
+
+	query := make(map[string]string)
+	query["api_key"] = r.URL.Query().Get("api_key")
+
+	key := ExtractAPIKey(headers, query)
+	if key == "" {
+		return nil, nil // No credentials provided
+	}
+
+	id, valid := a.validator.Validate(key)
+	if !valid {
+		return nil, &AuthError{
+			Status:  http.StatusUnauthorized,
+			Code:    "invalid_api_key",
+			Message: "invalid API key",
+		}
+	}
+
+	return &Principal{
+		ID:   id,
+		Type: ModeAPIKey,
+	}, nil
 }

@@ -39,6 +39,9 @@ message ExportRequest {
     bool include_learned_edges = 6;         // Include CO_ACTIVATED_WITH edges (default: true)
     int32 min_layer = 7;                    // Minimum layer to export (default: 0 = all)
     int32 max_layer = 8;                    // Maximum layer to export (default: 0 = all)
+    // Phase 4: incremental sync — export only entities modified after this point
+    string since_timestamp = 9;            // ISO8601 or empty for full export
+    string since_cursor = 10;                // Opaque cursor from prior Export (next_cursor); used if since_timestamp empty
 }
 
 // =============================================================================
@@ -265,4 +268,5 @@ message TransferSummary {
     int64 bytes_total = 5;                  // Approximate total bytes transferred
     int64 duration_ms = 6;
     string completed_at = 7;                // ISO8601
+    string next_cursor = 8;                 // Phase 4: use as since_cursor or since_timestamp for next delta export
 }

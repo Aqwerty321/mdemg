@@ -6,6 +6,9 @@ tags:
   - mdemg
   - upts
   - uats
+  - ubts
+  - usts
+  - uobs
   - testing
   - training
 aliases:
@@ -62,6 +65,14 @@ aliases:
 - JSONPath assertions for response validation
 - Variants for error cases baked into each spec
 
+### Production Readiness Frameworks (Phase 3)
+
+| Framework | Purpose | Location |
+|-----------|---------|----------|
+| **UBTS** | Universal Benchmark Test Specification — performance & latency thresholds | `docs/tests/ubts/` |
+| **USTS** | Universal Security Test Specification — auth, rate limiting, injection tests | `docs/tests/usts/` |
+| **UOBS** | Universal Observability Specification — metrics, health checks, log format | `docs/tests/uobs/` |
+
 ---
 
 ## Commands to Demo
@@ -114,6 +125,14 @@ curl -s -X POST http://localhost:9999/v1/conversation/resume \
 | Specs (45+ endpoints) | `docs/api/api-spec/uats/specs/` |
 | Runner | `docs/api/api-spec/uats/runners/uats_runner.py` |
 | Documentation | `docs/api/api-spec/uats/README.md` |
+
+### Production Test Frameworks (Phase 3)
+
+| Framework | Specs | Runner | Documentation |
+|-----------|-------|--------|---------------|
+| **UBTS** | `docs/tests/ubts/specs/` | `docs/tests/ubts/runners/ubts_runner.py` | `docs/tests/ubts/README.md` |
+| **USTS** | `docs/tests/usts/specs/` | `docs/tests/usts/runners/usts_runner.py` | `docs/tests/usts/README.md` |
+| **UOBS** | `docs/tests/uobs/specs/` | `docs/tests/uobs/runners/uobs_runner.py` | `docs/tests/uobs/README.md` |
 
 ---
 

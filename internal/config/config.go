@@ -181,6 +181,19 @@ type Config struct {
 	LinearWebhookSecret  string // LINEAR_WEBHOOK_SECRET — HMAC-SHA256 signing secret
 	LinearWebhookSpaceID string // LINEAR_WEBHOOK_SPACE_ID — space for webhook observations
 
+	// Generic webhook settings (Phase 9.4)
+	WebhookConfigs string // WEBHOOK_CONFIGS — format: "source:secret:space_id,source2:secret2:space_id2"
+
+	// File watcher settings (Phase 9.4)
+	FileWatcherEnabled bool   // FILE_WATCHER_ENABLED — enable in-process file watching (default: false)
+	FileWatcherConfigs string // FILE_WATCHER_CONFIGS — format: "space_id:/path:extensions:debounce_ms,..."
+
+	// Conflict logging settings (Phase 9.5)
+	ConflictLogEnabled bool // CONFLICT_LOG_ENABLED — enable structured conflict logging (default: true)
+
+	// Scheduled orphan cleanup settings (Phase 9.5)
+	OrphanCleanupIntervalHours int // ORPHAN_CLEANUP_INTERVAL_HOURS — scheduled cleanup interval (0=disabled)
+
 	// Capability gap detection settings (Task #23)
 	GapLowScoreThreshold   float64 // Queries below this avg score are considered poor (default: 0.5)
 	GapMinOccurrences      int     // Min occurrences to create a gap (default: 3)
@@ -916,6 +929,25 @@ func FromEnv() (Config, error) {
 	linearWebhookSecret := get("LINEAR_WEBHOOK_SECRET", "")
 	linearWebhookSpaceID := get("LINEAR_WEBHOOK_SPACE_ID", "")
 
+	// Generic webhook settings (Phase 9.4)
+	webhookConfigs := get("WEBHOOK_CONFIGS", "")
+
+	// File watcher settings (Phase 9.4)
+	fileWatcherEnabled := getBool("FILE_WATCHER_ENABLED", false)
+	fileWatcherConfigs := get("FILE_WATCHER_CONFIGS", "")
+
+	// Conflict logging settings (Phase 9.5)
+	conflictLogEnabled := getBool("CONFLICT_LOG_ENABLED", true)
+
+	// Scheduled orphan cleanup settings (Phase 9.5)
+	orphanCleanupIntervalHours, err := atoi("ORPHAN_CLEANUP_INTERVAL_HOURS", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	if orphanCleanupIntervalHours < 0 {
+		return Config{}, errors.New("ORPHAN_CLEANUP_INTERVAL_HOURS must be >= 0")
+	}
+
 	// LLM Summary settings (semantic summaries for ingest)
 	llmSummaryEnabled := getBool("LLM_SUMMARY_ENABLED", false)
 	llmSummaryProvider := get("LLM_SUMMARY_PROVIDER", "openai")
@@ -1298,9 +1330,14 @@ func FromEnv() (Config, error) {
 		MdemgVersion:              mdemgVersion,
 		LinearTeamID:              linearTeamID,
 		LinearWorkspaceID:         linearWorkspaceID,
-		LinearWebhookSecret:      linearWebhookSecret,
-		LinearWebhookSpaceID:     linearWebhookSpaceID,
-		LLMSummaryEnabled:         llmSummaryEnabled,
+		LinearWebhookSecret:         linearWebhookSecret,
+		LinearWebhookSpaceID:        linearWebhookSpaceID,
+		WebhookConfigs:              webhookConfigs,
+		FileWatcherEnabled:          fileWatcherEnabled,
+		FileWatcherConfigs:          fileWatcherConfigs,
+		ConflictLogEnabled:          conflictLogEnabled,
+		OrphanCleanupIntervalHours:  orphanCleanupIntervalHours,
+		LLMSummaryEnabled:           llmSummaryEnabled,
 		LLMSummaryProvider:        llmSummaryProvider,
 		LLMSummaryModel:           llmSummaryModel,
 		LLMSummaryMaxTokens:       llmSummaryMaxTokens,

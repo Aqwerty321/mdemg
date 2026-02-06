@@ -7,14 +7,29 @@ import (
 
 // SessionState tracks the CMS usage state for an agent session.
 type SessionState struct {
-	SessionID            string    `json:"session_id"`
-	SpaceID              string    `json:"space_id,omitempty"`
-	Resumed              bool      `json:"resumed"`
-	LastResumeAt         time.Time `json:"last_resume_at,omitempty"`
-	ObservationsSinceResume int    `json:"observations_since_resume"`
-	LastObserveAt        time.Time `json:"last_observe_at,omitempty"`
-	LastActivityAt       time.Time `json:"last_activity_at"`
-	CreatedAt            time.Time `json:"created_at"`
+	mu                      sync.RWMutex `json:"-"`
+	SessionID               string       `json:"session_id"`
+	SpaceID                 string       `json:"space_id,omitempty"`
+	Resumed                 bool         `json:"resumed"`
+	LastResumeAt            time.Time    `json:"last_resume_at,omitempty"`
+	ObservationsSinceResume int          `json:"observations_since_resume"`
+	LastObserveAt           time.Time    `json:"last_observe_at,omitempty"`
+	LastActivityAt          time.Time    `json:"last_activity_at"`
+	CreatedAt               time.Time    `json:"created_at"`
+}
+
+// SetLastActivityAt safely sets the LastActivityAt field.
+func (s *SessionState) SetLastActivityAt(t time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.LastActivityAt = t
+}
+
+// GetLastActivityAt safely gets the LastActivityAt field.
+func (s *SessionState) GetLastActivityAt() time.Time {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.LastActivityAt
 }
 
 // HealthScore computes a session health score (0.0 - 1.0).
@@ -86,12 +101,14 @@ func (st *SessionTracker) RecordResume(sessionID, spaceID string) {
 	})
 	if loaded {
 		state := val.(*SessionState)
+		state.mu.Lock()
 		state.Resumed = true
 		state.LastResumeAt = now
 		state.LastActivityAt = now
 		if spaceID != "" {
 			state.SpaceID = spaceID
 		}
+		state.mu.Unlock()
 	}
 }
 
@@ -107,9 +124,11 @@ func (st *SessionTracker) RecordObserve(sessionID string) {
 	})
 	if loaded {
 		state := val.(*SessionState)
+		state.mu.Lock()
 		state.ObservationsSinceResume++
 		state.LastObserveAt = now
 		state.LastActivityAt = now
+		state.mu.Unlock()
 	}
 }
 
@@ -123,7 +142,9 @@ func (st *SessionTracker) RecordActivity(sessionID string) {
 	})
 	if loaded {
 		state := val.(*SessionState)
+		state.mu.Lock()
 		state.LastActivityAt = now
+		state.mu.Unlock()
 	}
 }
 
@@ -168,7 +189,10 @@ func (st *SessionTracker) cleanup() {
 	cutoff := time.Now().UTC().Add(-st.ttl)
 	st.sessions.Range(func(key, value any) bool {
 		state := value.(*SessionState)
-		if state.LastActivityAt.Before(cutoff) {
+		state.mu.RLock()
+		expired := state.LastActivityAt.Before(cutoff)
+		state.mu.RUnlock()
+		if expired {
 			st.sessions.Delete(key)
 		}
 		return true

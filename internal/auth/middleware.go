@@ -149,6 +149,12 @@ func writeAuthError(w http.ResponseWriter, err error) {
 		message = ae.message
 	}
 
+	if ae, ok := err.(*AuthError); ok {
+		status = ae.Status
+		code = ae.Code
+		message = ae.Message
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("WWW-Authenticate", `ApiKey realm="mdemg"`)
 	w.WriteHeader(status)
@@ -156,4 +162,54 @@ func writeAuthError(w http.ResponseWriter, err error) {
 		"error":   code,
 		"message": message,
 	})
+}
+
+// MiddlewareWithRegistry creates middleware using the registry pattern.
+// This enables pluggable authentication methods.
+func MiddlewareWithRegistry(cfg Config, registry *Registry) func(http.Handler) http.Handler {
+	if !cfg.Enabled {
+		return func(next http.Handler) http.Handler {
+			return next
+		}
+	}
+
+	if cfg.Mode == ModeNone {
+		return func(next http.Handler) http.Handler {
+			return next
+		}
+	}
+
+	// Build authenticator from registry
+	methodCfg := cfg.GetMethodConfig()
+	auth, err := registry.Build(string(cfg.Mode), methodCfg)
+	if err != nil {
+		log.Fatalf("failed to build authenticator: %v", err)
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip authentication for configured endpoints
+			if cfg.SkipEndpoints != nil && cfg.SkipEndpoints[r.URL.Path] {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			principal, err := auth.Authenticate(r)
+			if err != nil {
+				log.Printf("auth failed: %v (path=%s, remote=%s)", err, r.URL.Path, r.RemoteAddr)
+				writeAuthError(w, err)
+				return
+			}
+
+			if principal == nil {
+				log.Printf("auth missing (path=%s, remote=%s)", r.URL.Path, r.RemoteAddr)
+				writeAuthError(w, errMissingCredentials)
+				return
+			}
+
+			// Add principal to context and continue
+			ctx := WithPrincipal(r.Context(), principal)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }

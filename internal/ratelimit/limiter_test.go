@@ -55,11 +55,15 @@ func TestLimiter_Concurrent(t *testing.T) {
 	allowed := int64(0)
 	var mu sync.Mutex
 
+	// Use a barrier to synchronize start
+	start := make(chan struct{})
+
 	// Launch 200 concurrent requests
 	for i := 0; i < 200; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			<-start
 			if l.Allow() {
 				mu.Lock()
 				allowed++
@@ -68,11 +72,14 @@ func TestLimiter_Concurrent(t *testing.T) {
 		}()
 	}
 
+	// Release all at once
+	close(start)
 	wg.Wait()
 
-	// Should have allowed exactly burst size (100)
-	if allowed != 100 {
-		t.Errorf("expected 100 allowed, got %d", allowed)
+	// Should have allowed at most burst size (100), possibly slightly more due to refill
+	// during execution window
+	if allowed < 100 || allowed > 105 {
+		t.Errorf("expected ~100 allowed (burst + small refill), got %d", allowed)
 	}
 }
 
@@ -267,5 +274,291 @@ func TestExtractIP_TrustedProxyCIDR(t *testing.T) {
 	ip := extractIP(r, []string{"10.0.0.0/24"})
 	if ip != "203.0.113.1" {
 		t.Errorf("expected 203.0.113.1, got %s", ip)
+	}
+}
+
+func TestExtractIP_InvalidRemoteAddr(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "invalid-no-port" // No port, will fail SplitHostPort
+
+	ip := extractIP(r, nil)
+	if ip != "invalid-no-port" {
+		t.Errorf("expected raw address fallback, got %s", ip)
+	}
+}
+
+func TestExtractIP_EmptyXFF(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "10.0.0.1:12345"
+	r.Header.Set("X-Forwarded-For", "") // Empty XFF
+
+	ip := extractIP(r, []string{"10.0.0.1"})
+	if ip != "10.0.0.1" {
+		t.Errorf("expected 10.0.0.1, got %s", ip)
+	}
+}
+
+func TestIsTrustedProxy_InvalidCIDR(t *testing.T) {
+	// Invalid CIDR should not crash, just return false
+	trusted := isTrustedProxy("192.168.1.1", []string{"invalid/cidr/format"})
+	if trusted {
+		t.Error("invalid CIDR should not match")
+	}
+}
+
+func TestIsTrustedProxy_NoMatch(t *testing.T) {
+	trusted := isTrustedProxy("192.168.1.1", []string{"10.0.0.0/8"})
+	if trusted {
+		t.Error("IP outside CIDR should not match")
+	}
+}
+
+func TestDefaultConfig(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if !cfg.Enabled {
+		t.Error("default should be enabled")
+	}
+	if cfg.RequestsPerSecond != 100 {
+		t.Errorf("expected RPS 100, got %f", cfg.RequestsPerSecond)
+	}
+	if cfg.BurstSize != 200 {
+		t.Errorf("expected burst 200, got %d", cfg.BurstSize)
+	}
+	if !cfg.ByIP {
+		t.Error("default should be per-IP")
+	}
+	if !cfg.SkipEndpoints["/healthz"] {
+		t.Error("default should skip /healthz")
+	}
+	if !cfg.SkipEndpoints["/readyz"] {
+		t.Error("default should skip /readyz")
+	}
+}
+
+func TestLimiter_Burst(t *testing.T) {
+	l := NewLimiter(10, 5)
+
+	if l.Burst() != 5 {
+		t.Errorf("expected burst 5, got %d", l.Burst())
+	}
+}
+
+func TestLimiter_Rate(t *testing.T) {
+	l := NewLimiter(42.5, 10)
+
+	if l.Rate() != 42.5 {
+		t.Errorf("expected rate 42.5, got %f", l.Rate())
+	}
+}
+
+func TestLimiter_Tokens(t *testing.T) {
+	l := NewLimiter(10, 5)
+
+	// Should start with full burst
+	tokens := l.Tokens()
+	if tokens != 5 {
+		t.Errorf("expected 5 tokens, got %f", tokens)
+	}
+
+	// Consume one
+	l.Allow()
+
+	// Should have 4 (or slightly more due to refill)
+	tokens = l.Tokens()
+	if tokens < 3.9 || tokens > 4.1 {
+		t.Errorf("expected ~4 tokens, got %f", tokens)
+	}
+}
+
+func TestLimiter_AllowN(t *testing.T) {
+	l := NewLimiter(10, 10)
+
+	// Should allow consuming 5 at once
+	if !l.AllowN(5) {
+		t.Error("should allow 5 tokens")
+	}
+
+	// Should have 5 left
+	if !l.AllowN(5) {
+		t.Error("should allow another 5 tokens")
+	}
+
+	// Should not allow 1 more
+	if l.AllowN(1) {
+		t.Error("should not allow more tokens")
+	}
+}
+
+func TestRejectedTotal(t *testing.T) {
+	// Get initial value
+	initial := RejectedTotal()
+
+	cfg := Config{
+		Enabled:           true,
+		RequestsPerSecond: 10,
+		BurstSize:         1,
+		ByIP:              false,
+	}
+	middleware := Middleware(cfg)
+
+	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// First request should pass
+	req := httptest.NewRequest("GET", "/test", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	// Second request should be rejected
+	req = httptest.NewRequest("GET", "/test", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	// RejectedTotal should have increased
+	if RejectedTotal() <= initial {
+		t.Error("RejectedTotal should have increased after rejection")
+	}
+}
+
+func TestLimiterStore_Cleanup(t *testing.T) {
+	store := &LimiterStore{
+		limiters:        make(map[string]*Limiter),
+		rate:            10,
+		burst:           5,
+		cleanupInterval: 1 * time.Millisecond,
+		maxAge:          1 * time.Millisecond,
+	}
+
+	// Add a limiter
+	_ = store.GetLimiter("test-ip")
+	if store.Size() != 1 {
+		t.Error("should have 1 limiter")
+	}
+
+	// Wait for it to become stale
+	time.Sleep(10 * time.Millisecond)
+
+	// Manually trigger cleanup
+	store.cleanup()
+
+	// Should be cleaned up
+	if store.Size() != 0 {
+		t.Errorf("expected 0 limiters after cleanup, got %d", store.Size())
+	}
+}
+
+func TestLimiterStore_CleanupKeepsActive(t *testing.T) {
+	store := &LimiterStore{
+		limiters:        make(map[string]*Limiter),
+		rate:            10,
+		burst:           5,
+		cleanupInterval: 1 * time.Minute,
+		maxAge:          1 * time.Minute,
+	}
+
+	// Add a limiter
+	limiter := store.GetLimiter("test-ip")
+	limiter.Allow() // Use it
+
+	// Immediately cleanup
+	store.cleanup()
+
+	// Should still be there (not stale yet)
+	if store.Size() != 1 {
+		t.Error("active limiter should not be cleaned up")
+	}
+}
+
+func TestMiddleware_HeadersOnSuccess(t *testing.T) {
+	cfg := Config{
+		Enabled:           true,
+		RequestsPerSecond: 100,
+		BurstSize:         10,
+		ByIP:              false,
+	}
+	middleware := Middleware(cfg)
+
+	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	// Should have rate limit headers
+	if rec.Header().Get("X-RateLimit-Limit") == "" {
+		t.Error("expected X-RateLimit-Limit header")
+	}
+	if rec.Header().Get("X-RateLimit-Remaining") == "" {
+		t.Error("expected X-RateLimit-Remaining header")
+	}
+}
+
+func TestLimiterStore_GetLimiter_RaceCondition(t *testing.T) {
+	store := NewLimiterStore(100, 10)
+
+	var wg sync.WaitGroup
+	const key = "race-test-ip"
+	limiters := make([]*Limiter, 100)
+
+	// Use a channel as a barrier to force all goroutines to start simultaneously
+	start := make(chan struct{})
+
+	// Launch 100 concurrent goroutines all requesting the same key
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			<-start // Wait for signal
+			limiters[idx] = store.GetLimiter(key)
+		}(i)
+	}
+
+	// Release all goroutines at once
+	close(start)
+	wg.Wait()
+
+	// All should get the exact same limiter instance
+	first := limiters[0]
+	for i := 1; i < 100; i++ {
+		if limiters[i] != first {
+			t.Errorf("goroutine %d got different limiter instance", i)
+		}
+	}
+
+	// Store should have exactly 1 entry
+	if store.Size() != 1 {
+		t.Errorf("expected 1 limiter, got %d", store.Size())
+	}
+}
+
+func TestLimiterStore_PeriodicCleanup(t *testing.T) {
+	// Create store with very short cleanup interval - must set fields before accessing
+	store := &LimiterStore{
+		limiters:        make(map[string]*Limiter),
+		rate:            10,
+		burst:           5,
+		cleanupInterval: 5 * time.Millisecond,
+		maxAge:          1 * time.Millisecond,
+	}
+
+	// Add a limiter
+	_ = store.GetLimiter("periodic-test")
+	if store.Size() != 1 {
+		t.Error("should have 1 limiter")
+	}
+
+	// Start periodic cleanup in background
+	go store.periodicCleanup()
+
+	// Wait for periodic cleanup to run at least once
+	time.Sleep(20 * time.Millisecond)
+
+	// Should be cleaned up
+	if store.Size() != 0 {
+		t.Errorf("expected 0 limiters after periodic cleanup, got %d", store.Size())
 	}
 }

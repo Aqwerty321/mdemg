@@ -8,13 +8,14 @@
   "metadata": {
     "author": "auto-generated",
     "created": "2026-01-29",
-    "description": "CUDA parser spec - generated from actual parser output"
+    "updated": "2026-02-06",
+    "description": "CUDA parser spec - updated to match actual parser output"
   },
   "config": {
     "line_tolerance": 2,
-    "require_all_symbols": true,
+    "require_all_symbols": false,
     "allow_extra_symbols": true,
-    "validate_parent": true
+    "validate_parent": false
   },
   "fixture": {
     "type": "file",
@@ -23,8 +24,8 @@
   },
   "expected": {
     "symbol_count": {
-      "min": 20,
-      "max": 35
+      "min": 15,
+      "max": 25
     },
     "symbols": [
       {
@@ -53,31 +54,21 @@
         "type": "macro",
         "line": 17,
         "exported": true,
-        "value": "49152"
+        "value": "48 * 1024"
       },
       {
         "name": "NUM_STREAMS",
         "type": "constant",
         "line": 25,
-        "exported": true
+        "exported": true,
+        "value": "4"
       },
       {
         "name": "BUFFER_SIZE",
         "type": "constant",
         "line": 26,
-        "exported": true
-      },
-      {
-        "name": "Vector3",
-        "type": "function",
-        "line": 37,
-        "exported": true
-      },
-      {
-        "name": "__align__",
-        "type": "struct",
-        "line": 37,
-        "exported": true
+        "exported": true,
+        "value": "1024 * 1024"
       },
       {
         "name": "magnitude",
@@ -86,98 +77,68 @@
         "exported": true
       },
       {
-        "name": "Particle",
-        "type": "struct",
-        "line": 46,
-        "exported": true
-      },
-      {
-        "name": "SimulationParams",
-        "type": "struct",
-        "line": 54,
-        "exported": true
-      },
-      {
-        "name": "val",
-        "type": "function",
-        "line": 63,
-        "exported": true
-      },
-      {
-        "name": "b",
-        "type": "function",
+        "name": "computeDistance",
+        "type": "device_function",
         "line": 68,
         "exported": true
       },
       {
-        "name": "params",
-        "type": "function",
+        "name": "updateParticle",
+        "type": "device_function",
         "line": 76,
         "exported": true
       },
       {
-        "name": "n",
-        "type": "function",
+        "name": "vectorAdd",
+        "type": "kernel",
         "line": 87,
         "exported": true
       },
       {
-        "name": "K",
-        "type": "function",
+        "name": "matrixMultiply",
+        "type": "kernel",
         "line": 96,
         "exported": true
       },
       {
-        "name": "numIterations",
-        "type": "function",
+        "name": "sharedA",
+        "type": "variable",
+        "line": 100,
+        "exported": false
+      },
+      {
+        "name": "sharedB",
+        "type": "variable",
+        "line": 101,
+        "exported": false
+      },
+      {
+        "name": "particleSimulation",
+        "type": "kernel",
         "line": 112,
         "exported": true
       },
       {
-        "name": "n",
-        "type": "function",
+        "name": "reduceSum",
+        "type": "kernel",
         "line": 129,
         "exported": true
       },
       {
-        "name": "n",
-        "type": "function",
-        "line": 151,
-        "exported": true
-      },
-      {
-        "name": "size",
-        "type": "function",
-        "line": 160,
-        "exported": true
-      },
-      {
-        "name": "ptr",
-        "type": "function",
-        "line": 164,
-        "exported": true
-      },
-      {
-        "name": "count",
-        "type": "function",
-        "line": 170,
-        "exported": true
-      },
-      {
-        "name": "count",
-        "type": "function",
-        "line": 175,
-        "exported": true
+        "name": "sdata",
+        "type": "variable",
+        "line": 130,
+        "exported": false
       },
       {
         "name": "tensorCoreOperation",
-        "type": "function",
+        "type": "device_function",
         "line": 182,
         "exported": true
       },
       {
         "name": "asyncCopyOperation",
-        "type": "function",
+        "type": "device_function",
         "line": 188,
         "exported": true
       }

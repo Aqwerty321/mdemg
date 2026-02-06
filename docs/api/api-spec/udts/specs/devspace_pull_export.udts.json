@@ -1,0 +1,20 @@
+{
+  "udts_version": "1.0.0",
+  "service": "mdemg.devspace.v1.DevSpace",
+  "method": "PullExport",
+  "request": {
+    "dev_space_id": "udts-test-space",
+    "export_id": "nonexistent-id"
+  },
+  "expected": {
+    "status_code": "NotFound"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "proto_sha256": "2f6a032c2ee43db4e5c091fca4c1b033297e95d49d77bc79e771ea581e929c0a"
+  },
+  "metadata": {
+    "description": "PullExport returns NOT_FOUND for unknown export_id (contract for streaming RPC)",
+    "tags": ["devspace", "phase2", "contract"]
+  }
+}

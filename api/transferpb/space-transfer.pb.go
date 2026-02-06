@@ -141,8 +141,11 @@ type ExportRequest struct {
 	IncludeLearnedEdges bool                   `protobuf:"varint,6,opt,name=include_learned_edges,json=includeLearnedEdges,proto3" json:"include_learned_edges,omitempty"` // Include CO_ACTIVATED_WITH edges (default: true)
 	MinLayer            int32                  `protobuf:"varint,7,opt,name=min_layer,json=minLayer,proto3" json:"min_layer,omitempty"`                                    // Minimum layer to export (default: 0 = all)
 	MaxLayer            int32                  `protobuf:"varint,8,opt,name=max_layer,json=maxLayer,proto3" json:"max_layer,omitempty"`                                    // Maximum layer to export (default: 0 = all)
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Phase 4: incremental sync — export only entities modified after this point
+	SinceTimestamp string `protobuf:"bytes,9,opt,name=since_timestamp,json=sinceTimestamp,proto3" json:"since_timestamp,omitempty"` // ISO8601 or empty for full export
+	SinceCursor    string `protobuf:"bytes,10,opt,name=since_cursor,json=sinceCursor,proto3" json:"since_cursor,omitempty"`         // Opaque cursor from prior Export (next_cursor); used if since_timestamp empty
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ExportRequest) Reset() {
@@ -229,6 +232,20 @@ func (x *ExportRequest) GetMaxLayer() int32 {
 		return x.MaxLayer
 	}
 	return 0
+}
+
+func (x *ExportRequest) GetSinceTimestamp() string {
+	if x != nil {
+		return x.SinceTimestamp
+	}
+	return ""
+}
+
+func (x *ExportRequest) GetSinceCursor() string {
+	if x != nil {
+		return x.SinceCursor
+	}
+	return ""
 }
 
 type ImportResponse struct {
@@ -1863,6 +1880,7 @@ type TransferSummary struct {
 	BytesTotal           int64                  `protobuf:"varint,5,opt,name=bytes_total,json=bytesTotal,proto3" json:"bytes_total,omitempty"` // Approximate total bytes transferred
 	DurationMs           int64                  `protobuf:"varint,6,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
 	CompletedAt          string                 `protobuf:"bytes,7,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"` // ISO8601
+	NextCursor           string                 `protobuf:"bytes,8,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`    // Phase 4: use as since_cursor or since_timestamp for next delta export
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -1946,11 +1964,18 @@ func (x *TransferSummary) GetCompletedAt() string {
 	return ""
 }
 
+func (x *TransferSummary) GetNextCursor() string {
+	if x != nil {
+		return x.NextCursor
+	}
+	return ""
+}
+
 var File_api_proto_space_transfer_proto protoreflect.FileDescriptor
 
 const file_api_proto_space_transfer_proto_rawDesc = "" +
 	"\n" +
-	"\x1eapi/proto/space-transfer.proto\x12\x11mdemg.transfer.v1\"\xc2\x02\n" +
+	"\x1eapi/proto/space-transfer.proto\x12\x11mdemg.transfer.v1\"\x8e\x03\n" +
 	"\rExportRequest\x12\x19\n" +
 	"\bspace_id\x18\x01 \x01(\tR\aspaceId\x12\x1d\n" +
 	"\n" +
@@ -1960,7 +1985,10 @@ const file_api_proto_space_transfer_proto_rawDesc = "" +
 	"\x0finclude_symbols\x18\x05 \x01(\bR\x0eincludeSymbols\x122\n" +
 	"\x15include_learned_edges\x18\x06 \x01(\bR\x13includeLearnedEdges\x12\x1b\n" +
 	"\tmin_layer\x18\a \x01(\x05R\bminLayer\x12\x1b\n" +
-	"\tmax_layer\x18\b \x01(\x05R\bmaxLayer\"\x92\x01\n" +
+	"\tmax_layer\x18\b \x01(\x05R\bmaxLayer\x12'\n" +
+	"\x0fsince_timestamp\x18\t \x01(\tR\x0esinceTimestamp\x12!\n" +
+	"\fsince_cursor\x18\n" +
+	" \x01(\tR\vsinceCursor\"\x92\x01\n" +
 	"\x0eImportResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x124\n" +
 	"\x05stats\x18\x02 \x01(\v2\x1e.mdemg.transfer.v1.ImportStatsR\x05stats\x12\x14\n" +
@@ -2153,7 +2181,7 @@ const file_api_proto_space_transfer_proto_rawDesc = "" +
 	"\x10extra_properties\x18\x10 \x03(\v22.mdemg.transfer.v1.SymbolData.ExtraPropertiesEntryR\x0fextraProperties\x1aB\n" +
 	"\x14ExtraPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa4\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc5\x02\n" +
 	"\x0fTransferSummary\x12%\n" +
 	"\x0enodes_exported\x18\x01 \x01(\x03R\rnodesExported\x12%\n" +
 	"\x0eedges_exported\x18\x02 \x01(\x03R\redgesExported\x123\n" +
@@ -2163,7 +2191,9 @@ const file_api_proto_space_transfer_proto_rawDesc = "" +
 	"bytesTotal\x12\x1f\n" +
 	"\vduration_ms\x18\x06 \x01(\x03R\n" +
 	"durationMs\x12!\n" +
-	"\fcompleted_at\x18\a \x01(\tR\vcompletedAt*\xb9\x01\n" +
+	"\fcompleted_at\x18\a \x01(\tR\vcompletedAt\x12\x1f\n" +
+	"\vnext_cursor\x18\b \x01(\tR\n" +
+	"nextCursor*\xb9\x01\n" +
 	"\tChunkType\x12\x1a\n" +
 	"\x16CHUNK_TYPE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13CHUNK_TYPE_METADATA\x10\x01\x12\x14\n" +

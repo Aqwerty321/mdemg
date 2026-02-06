@@ -1,0 +1,17 @@
+{
+  "udts_version": "1.0.0",
+  "service": "mdemg.devspace.v1.DevSpace",
+  "method": "Connect",
+  "request": {},
+  "expected": {
+    "status_code": "OK"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "proto_sha256": "2f6a032c2ee43db4e5c091fca4c1b033297e95d49d77bc79e771ea581e929c0a"
+  },
+  "metadata": {
+    "description": "Connect bidi stream: open stream, send one message with dev_space_id and agent_id, expect no error (Phase 3)",
+    "tags": ["devspace", "phase3", "contract", "streaming"]
+  }
+}

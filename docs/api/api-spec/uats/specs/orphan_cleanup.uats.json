@@ -1,0 +1,291 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Orphan Cleanup",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "cleanup",
+      "maintenance",
+      "write",
+      "phase-9.5"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-06",
+    "description": "Validates orphan node cleanup endpoints with enhanced filtering",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 60000
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "endpoints": [
+    {
+      "name": "list_orphans",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/cleanup/orphans",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "space_id": "${test_space}",
+          "action": "list",
+          "limit": 10
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.space_id",
+            "type": "string",
+            "equals": "${test_space}"
+          },
+          {
+            "path": "$.orphans_found",
+            "type": "number"
+          },
+          {
+            "path": "$.orphans_acted",
+            "type": "number",
+            "equals": 0
+          },
+          {
+            "path": "$.action",
+            "type": "string",
+            "equals": "list"
+          },
+          {
+            "path": "$.orphans",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "count_orphans",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/cleanup/orphans",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "space_id": "${test_space}",
+          "action": "count"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.orphans_found",
+            "type": "number"
+          },
+          {
+            "path": "$.action",
+            "type": "string",
+            "equals": "count"
+          }
+        ]
+      }
+    },
+    {
+      "name": "list_orphans_with_filters",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/cleanup/orphans",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "space_id": "${test_space}",
+          "action": "list",
+          "limit": 10,
+          "older_than_days": 7,
+          "path_prefix": "/src/"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.space_id",
+            "type": "string"
+          },
+          {
+            "path": "$.orphans",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "dry_run_archive",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/cleanup/orphans",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "space_id": "${test_space}",
+          "action": "archive",
+          "limit": 5,
+          "dry_run": true
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.dry_run",
+            "type": "boolean",
+            "equals": true
+          },
+          {
+            "path": "$.orphans_acted",
+            "type": "number",
+            "equals": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "schedule_cleanup",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/cleanup/schedule",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "space_id": "${test_space}",
+          "interval_hours": 24,
+          "action": "archive",
+          "limit": 100
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.space_id",
+            "type": "string"
+          },
+          {
+            "path": "$.schedule_id",
+            "type": "string"
+          },
+          {
+            "path": "$.interval_hours",
+            "type": "number",
+            "equals": 24
+          },
+          {
+            "path": "$.status",
+            "type": "string",
+            "equals": "enabled"
+          },
+          {
+            "path": "$.next_run_at",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "cleanup_stats",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/cleanup/stats",
+        "query_params": {
+          "space_id": "${test_space}"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.space_id",
+            "type": "string"
+          },
+          {
+            "path": "$.orphan_count",
+            "type": "number"
+          },
+          {
+            "path": "$.archived_count",
+            "type": "number"
+          }
+        ]
+      }
+    }
+  ],
+  "error_cases": [
+    {
+      "name": "missing_space_id",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/cleanup/orphans",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "action": "list"
+        }
+      },
+      "expected": {
+        "status": 400
+      }
+    },
+    {
+      "name": "invalid_action",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/cleanup/orphans",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "space_id": "${test_space}",
+          "action": "invalid"
+        }
+      },
+      "expected": {
+        "status": 400
+      }
+    },
+    {
+      "name": "protected_space_delete",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/cleanup/orphans",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "space_id": "mdemg-dev",
+          "action": "delete"
+        }
+      },
+      "expected": {
+        "status": 403,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string",
+            "contains": "protected"
+          }
+        ]
+      }
+    }
+  ]
+}

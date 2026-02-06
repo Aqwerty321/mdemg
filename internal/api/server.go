@@ -15,6 +15,7 @@ import (
 	"mdemg/internal/anomaly"
 	"mdemg/internal/ape"
 	"mdemg/internal/auth"
+	"mdemg/internal/backpressure"
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
 	"mdemg/internal/consulting"
@@ -63,6 +64,9 @@ type Server struct {
 	// Phase 3: Production readiness components
 	cbRegistry     *circuitbreaker.Registry
 	metricsRegistry *metrics.Registry
+
+	// Phase 48.4: Connection pooling components
+	memoryPressure *backpressure.MemoryPressure
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -204,11 +208,29 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	// Wire circuit breaker registry to services that make external API calls
 	ret.SetCircuitBreakerRegistry(cbRegistry)
 
-	// Wire circuit breaker to embedder if it supports it (OpenAI)
+	// Wire circuit breaker to embedder if it supports it (OpenAI and Ollama)
 	if emb != nil {
 		if openAIEmb, ok := emb.(*embeddings.OpenAI); ok {
 			openAIEmb.SetCircuitBreaker(cbRegistry.Get("openai-embeddings"))
 			log.Printf("Circuit breaker wired to OpenAI embedder")
+		} else if ollamaEmb, ok := emb.(*embeddings.Ollama); ok {
+			ollamaEmb.SetCircuitBreaker(cbRegistry.Get("ollama-embeddings"))
+			log.Printf("Circuit breaker wired to Ollama embedder")
+		}
+
+		// Wrap embedder with rate limiting if enabled (Phase 48.4.3)
+		if cfg.EmbeddingRateLimitEnabled {
+			var rps float64
+			var burst int
+			if cfg.EmbeddingProvider == "openai" {
+				rps = cfg.EmbeddingOpenAIRPS
+				burst = cfg.EmbeddingOpenAIBurst
+			} else {
+				rps = cfg.EmbeddingOllamaRPS
+				burst = cfg.EmbeddingOllamaBurst
+			}
+			emb = embeddings.NewRateLimitedEmbedder(emb, rps, burst, true)
+			log.Printf("Embedding rate limiting enabled (%.0f rps, burst: %d)", rps, burst)
 		}
 	}
 
@@ -224,6 +246,12 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	if cfg.MetricsEnabled {
 		metrics.InitStandardMetrics()
 		log.Printf("Prometheus metrics enabled (namespace: %s)", cfg.MetricsNamespace)
+	}
+
+	// Phase 48.4.4: Initialize memory pressure monitor
+	memPressure := backpressure.NewMemoryPressure(uint64(cfg.MemoryPressureThresholdMB), cfg.MemoryPressureEnabled)
+	if cfg.MemoryPressureEnabled {
+		log.Printf("Memory pressure monitoring enabled (threshold: %dMB)", cfg.MemoryPressureThresholdMB)
 	}
 
 	return &Server{
@@ -249,6 +277,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		fileWatcherMgr:          filewatcher.NewManager(),
 		cbRegistry:              cbRegistry,
 		metricsRegistry:         metricsRegistry,
+		memoryPressure:          memPressure,
 	}
 }
 
@@ -749,6 +778,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/ingest-codebase", s.handleIngestCodebaseRoute)
 	mux.HandleFunc("/v1/memory/ingest-codebase/", s.handleIngestCodebaseRoute)
 
+	// SSE streaming endpoint for job progress (Phase 48.3.3)
+	mux.HandleFunc("/v1/jobs/", s.handleJobStream)
+
 	// Wrap mux with middleware stack
 	// Order (outermost to innermost):
 	// 1. Compression (outermost)
@@ -826,6 +858,11 @@ func (s *Server) Routes() http.Handler {
 	// Enable gzip compression for responses > 1KB when CompressionEnabled (outermost)
 	if s.cfg.CompressionEnabled {
 		handler = CompressionMiddleware(handler, s.cfg.CompressionMinSize)
+	}
+
+	// Memory pressure monitoring middleware (Phase 48.4.4) - outermost
+	if s.memoryPressure != nil && s.cfg.MemoryPressureEnabled {
+		handler = s.memoryPressure.Middleware(handler)
 	}
 
 	return handler
@@ -922,6 +959,7 @@ func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request)
 			_ = s.cbRegistry.Get("openai-embeddings")
 			_ = s.cbRegistry.Get("openai-rerank")
 			_ = s.cbRegistry.Get("ollama-rerank")
+			_ = s.cbRegistry.Get("ollama-embeddings")
 			m.CollectCircuitBreakerMetrics(s.cbRegistry)
 		}
 
@@ -932,6 +970,14 @@ func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request)
 				"embedding": s.retriever.EmbeddingCacheStats(),
 			}
 			m.CollectCacheMetrics(cacheStats)
+		}
+
+		// Collect Neo4j pool metrics (Phase 48.4.1)
+		m.CollectNeo4jPoolMetrics()
+
+		// Collect memory metrics (Phase 48.4.4)
+		if s.memoryPressure != nil {
+			m.CollectMemoryMetrics(s.memoryPressure.HeapUsageMB()*1024*1024, s.memoryPressure.RejectedCount())
 		}
 	}
 

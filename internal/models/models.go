@@ -24,6 +24,10 @@ type RetrieveRequest struct {
 	// When set, these override the parsed temporal intent with a hard-mode constraint.
 	TemporalAfter  string `json:"temporal_after,omitempty"`  // ISO8601: force hard filter after this time
 	TemporalBefore string `json:"temporal_before,omitempty"` // ISO8601: force hard filter before this time
+
+	// Pagination fields (Phase 48.3)
+	Cursor string `json:"cursor,omitempty"` // Node ID to start after for cursor pagination
+	Limit  int    `json:"limit,omitempty"`  // Max results per page (default: 50, max: 500)
 }
 
 type RetrieveResult struct {
@@ -74,6 +78,11 @@ type RetrieveResponse struct {
 	Results          []RetrieveResult  `json:"results"`
 	EvidenceMetrics  *EvidenceMetrics  `json:"evidence_metrics,omitempty"` // Evidence compliance tracking
 	Debug            map[string]any    `json:"debug,omitempty"`
+
+	// Pagination fields (Phase 48.3)
+	NextCursor string `json:"next_cursor,omitempty"` // Cursor for next page (empty if no more results)
+	HasMore    bool   `json:"has_more"`              // True if more results are available
+	TotalCount int    `json:"total_count,omitempty"` // Total matching results (optional, may be expensive)
 }
 
 // EvidenceMetrics tracks evidence compliance for retrieval quality measurement.

@@ -274,6 +274,19 @@ type Config struct {
 
 	// Graceful shutdown settings (Phase 3.4)
 	GracefulShutdownTimeoutSec int // Shutdown timeout in seconds (default: 30)
+
+	// ===== Phase 48.3-48.4: Data Transmission & Connection Pooling =====
+
+	// Embedding rate limiting (Phase 48.4.3)
+	EmbeddingRateLimitEnabled bool    // EMBEDDING_RATE_LIMIT_ENABLED — enable embedding rate limiting (default: false)
+	EmbeddingOpenAIRPS        float64 // EMBEDDING_OPENAI_RPS — OpenAI requests per second (default: 500)
+	EmbeddingOpenAIBurst      int     // EMBEDDING_OPENAI_BURST — OpenAI burst allowance (default: 1000)
+	EmbeddingOllamaRPS        float64 // EMBEDDING_OLLAMA_RPS — Ollama requests per second (default: 100)
+	EmbeddingOllamaBurst      int     // EMBEDDING_OLLAMA_BURST — Ollama burst allowance (default: 200)
+
+	// Memory pressure monitoring (Phase 48.4.4)
+	MemoryPressureEnabled     bool // MEMORY_PRESSURE_ENABLED — enable memory backpressure (default: false)
+	MemoryPressureThresholdMB int  // MEMORY_PRESSURE_THRESHOLD_MB — heap threshold for rejection (default: 4096)
 }
 
 func FromEnv() (Config, error) {
@@ -1276,6 +1289,48 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("GRACEFUL_SHUTDOWN_TIMEOUT must be >= 1")
 	}
 
+	// Phase 48.3-48.4: Data Transmission & Connection Pooling
+	// Embedding rate limiting
+	embeddingRateLimitEnabled := getBool("EMBEDDING_RATE_LIMIT_ENABLED", false)
+	embeddingOpenAIRPS, err := atof("EMBEDDING_OPENAI_RPS", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	if embeddingOpenAIRPS <= 0 {
+		return Config{}, errors.New("EMBEDDING_OPENAI_RPS must be > 0")
+	}
+	embeddingOpenAIBurst, err := atoi("EMBEDDING_OPENAI_BURST", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	if embeddingOpenAIBurst <= 0 {
+		return Config{}, errors.New("EMBEDDING_OPENAI_BURST must be > 0")
+	}
+	embeddingOllamaRPS, err := atof("EMBEDDING_OLLAMA_RPS", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	if embeddingOllamaRPS <= 0 {
+		return Config{}, errors.New("EMBEDDING_OLLAMA_RPS must be > 0")
+	}
+	embeddingOllamaBurst, err := atoi("EMBEDDING_OLLAMA_BURST", 200)
+	if err != nil {
+		return Config{}, err
+	}
+	if embeddingOllamaBurst <= 0 {
+		return Config{}, errors.New("EMBEDDING_OLLAMA_BURST must be > 0")
+	}
+
+	// Memory pressure monitoring
+	memoryPressureEnabled := getBool("MEMORY_PRESSURE_ENABLED", false)
+	memoryPressureThresholdMB, err := atoi("MEMORY_PRESSURE_THRESHOLD_MB", 4096)
+	if err != nil {
+		return Config{}, err
+	}
+	if memoryPressureThresholdMB < 256 {
+		return Config{}, errors.New("MEMORY_PRESSURE_THRESHOLD_MB must be >= 256")
+	}
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -1460,6 +1515,15 @@ func FromEnv() (Config, error) {
 		MetricsEnabled:             metricsEnabled,
 		MetricsNamespace:           metricsNamespace,
 		GracefulShutdownTimeoutSec: gracefulShutdownTimeout,
+
+		// Phase 48.3-48.4: Data Transmission & Connection Pooling
+		EmbeddingRateLimitEnabled: embeddingRateLimitEnabled,
+		EmbeddingOpenAIRPS:        embeddingOpenAIRPS,
+		EmbeddingOpenAIBurst:      embeddingOpenAIBurst,
+		EmbeddingOllamaRPS:        embeddingOllamaRPS,
+		EmbeddingOllamaBurst:      embeddingOllamaBurst,
+		MemoryPressureEnabled:     memoryPressureEnabled,
+		MemoryPressureThresholdMB: memoryPressureThresholdMB,
 	}, nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/metrics"
 )
 
@@ -26,6 +27,7 @@ type Ollama struct {
 	model      string
 	client     *http.Client
 	dimensions int
+	cb         *circuitbreaker.Breaker
 }
 
 // NewOllama creates a new Ollama embedder.
@@ -69,8 +71,34 @@ func (o *Ollama) Dimensions() int {
 	return o.dimensions
 }
 
+// SetCircuitBreaker sets the circuit breaker for API calls.
+func (o *Ollama) SetCircuitBreaker(cb *circuitbreaker.Breaker) {
+	o.cb = cb
+}
+
 // Embed generates an embedding for a single text.
 func (o *Ollama) Embed(ctx context.Context, text string) ([]float32, error) {
+	// If circuit breaker is set, check if we should allow the request
+	if o.cb != nil && !o.cb.Allow() {
+		return nil, circuitbreaker.ErrCircuitOpen
+	}
+
+	result, err := o.doEmbed(ctx, text)
+
+	// Record result with circuit breaker
+	if o.cb != nil {
+		if err != nil {
+			o.cb.RecordFailure()
+		} else {
+			o.cb.RecordSuccess()
+		}
+	}
+
+	return result, err
+}
+
+// doEmbed performs the actual embedding request.
+func (o *Ollama) doEmbed(ctx context.Context, text string) ([]float32, error) {
 	reqBody := ollamaEmbeddingRequest{
 		Model:  o.model,
 		Prompt: text,

@@ -122,7 +122,8 @@ func TestSessionState_HealthScore(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for i := range tests {
+		tt := &tests[i] // Use pointer to avoid copying mutex
 		t.Run(tt.name, func(t *testing.T) {
 			score := tt.state.HealthScore()
 			if score < tt.wantMin || score > tt.wantMax {

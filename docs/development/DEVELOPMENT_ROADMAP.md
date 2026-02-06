@@ -1040,10 +1040,14 @@ RETURN m.node_id, m.file_path
 - [ ] Options: archive, delete, or flag for review
 - [ ] `POST /v1/memory/cleanup/orphans` endpoint
 
-#### 9.5.3 Edge Consistency
-- [ ] Refresh edges when connected nodes change
-- [ ] Re-run Hebbian learning for updated nodes
-- [ ] Invalidate stale hidden nodes if inputs changed
+#### 9.5.3 Edge Consistency ✅ COMPLETE
+- [x] Refresh edges when connected nodes change (`RefreshStaleCoactivationEdges`)
+- [x] Re-run Hebbian learning for updated nodes (staleness cascade via `PropagateEdgeStaleness`)
+- [x] Invalidate stale hidden nodes if inputs changed (cache invalidation on edge changes)
+- [x] `GET /v1/memory/edges/stale/stats` endpoint
+- [x] `POST /v1/memory/edges/stale/refresh` endpoint
+- [x] Optimistic lock retry with exponential backoff (`internal/optimistic/`)
+- [x] Versioned node/edge updates with version mismatch detection
 
 ---
 

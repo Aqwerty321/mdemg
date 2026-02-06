@@ -692,6 +692,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/query/metrics", s.handleQueryMetrics)
 	mux.HandleFunc("/v1/memory/distribution", s.handleDistributionStats)
 	mux.HandleFunc("/v1/memory/symbols", s.handleSymbolSearch)
+	mux.HandleFunc("/v1/memory/edges/stale/stats", s.handleStaleEdgeStats)
+	mux.HandleFunc("/v1/memory/edges/stale/refresh", s.handleRefreshStaleEdges)
 
 	// Ingestion job management endpoints
 	mux.HandleFunc("/v1/memory/ingest/trigger", s.handleIngestTrigger)

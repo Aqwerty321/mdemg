@@ -194,6 +194,18 @@ type Config struct {
 	// Scheduled orphan cleanup settings (Phase 9.5)
 	OrphanCleanupIntervalHours int // ORPHAN_CLEANUP_INTERVAL_HOURS — scheduled cleanup interval (0=disabled)
 
+	// Optimistic retry settings (Phase 47)
+	OptimisticRetryEnabled     bool    // OPTIMISTIC_RETRY_ENABLED — enable optimistic locking with retry (default: true)
+	OptimisticRetryMaxAttempts int     // OPTIMISTIC_RETRY_MAX_ATTEMPTS — max retry attempts (default: 5)
+	OptimisticRetryBaseDelayMs int     // OPTIMISTIC_RETRY_BASE_DELAY_MS — initial delay in ms (default: 10)
+	OptimisticRetryMaxDelayMs  int     // OPTIMISTIC_RETRY_MAX_DELAY_MS — max delay in ms (default: 1000)
+	OptimisticRetryMultiplier  float64 // OPTIMISTIC_RETRY_MULTIPLIER — exponential backoff multiplier (default: 2.0)
+
+	// Edge staleness settings (Phase 47)
+	EdgeStalenessCascadeEnabled   bool    // EDGE_STALENESS_CASCADE_ENABLED — enable edge staleness cascade (default: true)
+	EdgeStalenessRefreshBatchSize int     // EDGE_STALENESS_REFRESH_BATCH_SIZE — edges per refresh call (default: 100)
+	EdgeStalenessReclusterThresh  float64 // EDGE_STALENESS_RECLUSTER_THRESHOLD — centroid drift threshold (default: 0.3)
+
 	// Capability gap detection settings (Task #23)
 	GapLowScoreThreshold   float64 // Queries below this avg score are considered poor (default: 0.5)
 	GapMinOccurrences      int     // Min occurrences to create a gap (default: 3)
@@ -948,6 +960,54 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("ORPHAN_CLEANUP_INTERVAL_HOURS must be >= 0")
 	}
 
+	// Optimistic retry settings (Phase 47)
+	optimisticRetryEnabled := getBool("OPTIMISTIC_RETRY_ENABLED", true)
+	optimisticRetryMaxAttempts, err := atoi("OPTIMISTIC_RETRY_MAX_ATTEMPTS", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	if optimisticRetryMaxAttempts < 0 {
+		return Config{}, errors.New("OPTIMISTIC_RETRY_MAX_ATTEMPTS must be >= 0")
+	}
+	optimisticRetryBaseDelayMs, err := atoi("OPTIMISTIC_RETRY_BASE_DELAY_MS", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	if optimisticRetryBaseDelayMs < 0 {
+		return Config{}, errors.New("OPTIMISTIC_RETRY_BASE_DELAY_MS must be >= 0")
+	}
+	optimisticRetryMaxDelayMs, err := atoi("OPTIMISTIC_RETRY_MAX_DELAY_MS", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	if optimisticRetryMaxDelayMs < optimisticRetryBaseDelayMs {
+		return Config{}, errors.New("OPTIMISTIC_RETRY_MAX_DELAY_MS must be >= OPTIMISTIC_RETRY_BASE_DELAY_MS")
+	}
+	optimisticRetryMultiplier, err := atof("OPTIMISTIC_RETRY_MULTIPLIER", 2.0)
+	if err != nil {
+		return Config{}, err
+	}
+	if optimisticRetryMultiplier < 1.0 {
+		return Config{}, errors.New("OPTIMISTIC_RETRY_MULTIPLIER must be >= 1.0")
+	}
+
+	// Edge staleness settings (Phase 47)
+	edgeStalenessCascadeEnabled := getBool("EDGE_STALENESS_CASCADE_ENABLED", true)
+	edgeStalenessRefreshBatchSize, err := atoi("EDGE_STALENESS_REFRESH_BATCH_SIZE", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeStalenessRefreshBatchSize < 1 {
+		return Config{}, errors.New("EDGE_STALENESS_REFRESH_BATCH_SIZE must be >= 1")
+	}
+	edgeStalenessReclusterThresh, err := atof("EDGE_STALENESS_RECLUSTER_THRESHOLD", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	if edgeStalenessReclusterThresh < 0 || edgeStalenessReclusterThresh > 1 {
+		return Config{}, errors.New("EDGE_STALENESS_RECLUSTER_THRESHOLD must be in range [0, 1]")
+	}
+
 	// LLM Summary settings (semantic summaries for ingest)
 	llmSummaryEnabled := getBool("LLM_SUMMARY_ENABLED", false)
 	llmSummaryProvider := get("LLM_SUMMARY_PROVIDER", "openai")
@@ -1337,6 +1397,17 @@ func FromEnv() (Config, error) {
 		FileWatcherConfigs:          fileWatcherConfigs,
 		ConflictLogEnabled:          conflictLogEnabled,
 		OrphanCleanupIntervalHours:  orphanCleanupIntervalHours,
+
+		// Phase 47: Optimistic Retry + Edge Consistency
+		OptimisticRetryEnabled:       optimisticRetryEnabled,
+		OptimisticRetryMaxAttempts:   optimisticRetryMaxAttempts,
+		OptimisticRetryBaseDelayMs:   optimisticRetryBaseDelayMs,
+		OptimisticRetryMaxDelayMs:    optimisticRetryMaxDelayMs,
+		OptimisticRetryMultiplier:    optimisticRetryMultiplier,
+		EdgeStalenessCascadeEnabled:  edgeStalenessCascadeEnabled,
+		EdgeStalenessRefreshBatchSize: edgeStalenessRefreshBatchSize,
+		EdgeStalenessReclusterThresh: edgeStalenessReclusterThresh,
+
 		LLMSummaryEnabled:           llmSummaryEnabled,
 		LLMSummaryProvider:        llmSummaryProvider,
 		LLMSummaryModel:           llmSummaryModel,

@@ -1142,6 +1142,47 @@ Get query result cache statistics.
 
 Get Neo4j query execution statistics.
 
+### GET /v1/memory/edges/stale/stats?space_id={space_id}
+
+Get statistics about stale edges in a space. Edges become stale when their connected nodes' embeddings change.
+
+**Query Parameters**:
+- `space_id` (required): The space to query
+
+**Response**:
+```json
+{
+  "space_id": "my-project",
+  "total_stale_coactivation": 15,
+  "total_stale_associated": 8,
+  "total_stale": 23,
+  "oldest_stale_at": "2026-02-05T10:30:00Z",
+  "staleness_reasons": {
+    "content_changed": 20,
+    "embedding_updated": 3
+  }
+}
+```
+
+### POST /v1/memory/edges/stale/refresh
+
+Trigger a refresh of stale edges in a space. Recalculates semantic similarity scores for edges marked as stale.
+
+**Request Body**:
+```json
+{
+  "space_id": "my-project"
+}
+```
+
+**Response**:
+```json
+{
+  "space_id": "my-project",
+  "edges_refreshed": 23
+}
+```
+
 ### GET /v1/ape/status
 
 Get APE (Autonomous Pattern Extraction) scheduler status.

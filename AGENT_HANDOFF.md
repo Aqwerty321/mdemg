@@ -685,7 +685,34 @@ relevanceScore = 0.40 * recencyScore + 0.25 * surpriseScore + 0.20 * typePriorit
 | 47.2 Time-Based Scheduled Sync | 🔄 | Freshness tracking done (TapRoot properties, `GET /v1/memory/spaces/{space_id}/freshness`); APE INGEST action pending |
 | 47.3 User-Triggered Updates | ✅ | `POST /v1/memory/ingest/trigger`, `/status/{job_id}`, `/cancel/{job_id}`, `/jobs`; file-level re-ingest at `POST /v1/memory/ingest/files` |
 | 47.4 Plugin-Specific Triggers | 📋 | Linear webhook, file watcher (fsnotify), event-driven module updates |
-| 47.5 Conflict Resolution | 📋 | Optimistic locking, orphan detection, edge consistency |
+| 47.5 Conflict Resolution | ✅ | Optimistic locking with retry, edge consistency cascade |
+
+**47.5 Optimistic Lock Retry + Edge Consistency (Completed 2026-02-06):**
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| Retry package | `internal/optimistic/lock.go` | Exponential backoff with jitter, `WithRetry()`, error types |
+| Versioned updates | `internal/retrieval/versioned_update.go` | `UpdateNodeWithVersion()`, `UpdateEdgeWithVersion()` |
+| Edge consistency | `internal/retrieval/edge_consistency.go` | `PropagateEdgeStaleness()`, `RefreshStaleCoactivationEdges()` |
+| Retry helpers | `internal/retrieval/ingest_retry.go` | `IngestWithRetry()`, `PropagateEdgeStalenessAfterIngest()` |
+| Learning retry | `internal/learning/edge_retry.go` | `UpdateEdgeWithRetry()` for CO_ACTIVATED_WITH edges |
+| API handlers | `internal/api/handlers_edge_consistency.go` | Stale edge stats and refresh endpoints |
+
+**New API Endpoints:**
+- `GET /v1/memory/edges/stale/stats?space_id=xxx` — Stale edge statistics
+- `POST /v1/memory/edges/stale/refresh` — Trigger stale edge refresh
+
+**Configuration (`.env.example`):**
+```bash
+OPTIMISTIC_RETRY_ENABLED=true           # default: true
+OPTIMISTIC_RETRY_MAX_ATTEMPTS=5         # default: 5
+OPTIMISTIC_RETRY_BASE_DELAY_MS=10       # default: 10
+OPTIMISTIC_RETRY_MAX_DELAY_MS=1000      # default: 1000
+OPTIMISTIC_RETRY_MULTIPLIER=2.0         # default: 2.0
+EDGE_STALENESS_CASCADE_ENABLED=true     # default: true
+EDGE_STALENESS_REFRESH_BATCH_SIZE=100   # default: 100
+EDGE_STALENESS_RECLUSTER_THRESHOLD=0.3  # default: 0.3
+```
 
 ---
 
@@ -953,4 +980,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-06 — Phase 34 completed, UOBS Embedding Health Monitor added.*
+*Last updated: 2026-02-06 — Phase 47.5 (Optimistic Lock Retry + Edge Consistency) completed.*

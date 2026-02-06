@@ -1310,6 +1310,10 @@ RETURN n.node_id AS node_id, n.version AS version, n.update_count AS update_coun
 				}
 			}
 		}
+
+		// Phase 47: Propagate edge staleness when embedding changes
+		// This marks connected CO_ACTIVATED_WITH and ASSOCIATED_WITH edges as stale
+		s.PropagateEdgeStalenessAfterIngest(ctx, req.SpaceID, nodeID)
 	}
 
 	return models.IngestResponse{SpaceID: req.SpaceID, NodeID: nodeID, ObsID: obsID}, nil

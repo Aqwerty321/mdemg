@@ -74,12 +74,14 @@ func TestScoringGolden(t *testing.T) {
 	})
 
 	// --- Step 1: Define the test graph ---
+	// Note: All target similarities should be above retrieval threshold (~0.25)
+	// to ensure all nodes are returned in results
 	nodes := []goldenNode{
-		{name: "node-A", path: "/test/golden/A", targetSim: 0.90, perpIndex: 1, confidence: 0.7},
-		{name: "node-B", path: "/test/golden/B", targetSim: 0.80, perpIndex: 2, confidence: 0.7},
-		{name: "node-C", path: "/test/golden/C", targetSim: 0.40, perpIndex: 3, confidence: 0.7},
-		{name: "node-D", path: "/test/golden/D", targetSim: 0.20, perpIndex: 4, confidence: 0.7},
-		{name: "node-E", path: "/test/golden/E", targetSim: 0.10, perpIndex: 5, confidence: 0.7},
+		{name: "node-A", path: "/test/golden/A", targetSim: 0.95, perpIndex: 1, confidence: 0.7},
+		{name: "node-B", path: "/test/golden/B", targetSim: 0.85, perpIndex: 2, confidence: 0.7},
+		{name: "node-C", path: "/test/golden/C", targetSim: 0.65, perpIndex: 3, confidence: 0.7},
+		{name: "node-D", path: "/test/golden/D", targetSim: 0.45, perpIndex: 4, confidence: 0.7},
+		{name: "node-E", path: "/test/golden/E", targetSim: 0.35, perpIndex: 5, confidence: 0.7},
 	}
 
 	edges := []goldenEdge{
@@ -99,11 +101,11 @@ func TestScoringGolden(t *testing.T) {
 	// The key validation is: ranking order should be A > B > C > D > E
 	// because A has highest target similarity and others progressively lower.
 	_ = map[string]goldenExpected{
-		"node-A": {vectorSim: 0.90, activation: 0.65, score: 0.77, tolerance: 0.10},
-		"node-B": {vectorSim: 0.80, activation: 0.58, score: 0.66, tolerance: 0.10},
-		"node-C": {vectorSim: 0.40, activation: 1.00, score: 0.53, tolerance: 0.15},
-		"node-D": {vectorSim: 0.20, activation: 0.22, score: 0.20, tolerance: 0.10},
-		"node-E": {vectorSim: 0.10, activation: 0.16, score: 0.15, tolerance: 0.10},
+		"node-A": {vectorSim: 0.95, activation: 0.70, score: 0.85, tolerance: 0.10},
+		"node-B": {vectorSim: 0.85, activation: 0.60, score: 0.75, tolerance: 0.10},
+		"node-C": {vectorSim: 0.65, activation: 0.80, score: 0.65, tolerance: 0.15},
+		"node-D": {vectorSim: 0.45, activation: 0.35, score: 0.45, tolerance: 0.10},
+		"node-E": {vectorSim: 0.35, activation: 0.25, score: 0.35, tolerance: 0.10},
 	}
 
 	// --- Step 2: Ingest nodes with controlled embeddings ---
@@ -220,13 +222,13 @@ func TestScoringGoldenDeterminism(t *testing.T) {
 		CleanupSpaceWithTest(t, driver, spaceID)
 	})
 
-	// Setup the same golden graph
+	// Setup the same golden graph (same values as TestScoringGolden)
 	nodes := []goldenNode{
-		{name: "node-A", path: "/test/golden-det/A", targetSim: 0.90, perpIndex: 1, confidence: 0.7},
-		{name: "node-B", path: "/test/golden-det/B", targetSim: 0.80, perpIndex: 2, confidence: 0.7},
-		{name: "node-C", path: "/test/golden-det/C", targetSim: 0.40, perpIndex: 3, confidence: 0.7},
-		{name: "node-D", path: "/test/golden-det/D", targetSim: 0.20, perpIndex: 4, confidence: 0.7},
-		{name: "node-E", path: "/test/golden-det/E", targetSim: 0.10, perpIndex: 5, confidence: 0.7},
+		{name: "node-A", path: "/test/golden-det/A", targetSim: 0.95, perpIndex: 1, confidence: 0.7},
+		{name: "node-B", path: "/test/golden-det/B", targetSim: 0.85, perpIndex: 2, confidence: 0.7},
+		{name: "node-C", path: "/test/golden-det/C", targetSim: 0.65, perpIndex: 3, confidence: 0.7},
+		{name: "node-D", path: "/test/golden-det/D", targetSim: 0.45, perpIndex: 4, confidence: 0.7},
+		{name: "node-E", path: "/test/golden-det/E", targetSim: 0.35, perpIndex: 5, confidence: 0.7},
 	}
 
 	edges := []goldenEdge{

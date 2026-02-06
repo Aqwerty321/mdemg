@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"mdemg/internal/metrics"
 )
 
 const (
@@ -121,6 +123,13 @@ func (o *Ollama) Embed(ctx context.Context, text string) ([]float32, error) {
 // EmbedBatch generates embeddings for multiple texts.
 // Ollama doesn't have native batch support, so we call sequentially.
 func (o *Ollama) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+	// Instrument embedding latency for Prometheus metrics
+	start := time.Now()
+	defer func() {
+		metrics.Metrics().EmbeddingLatency.Observe(time.Since(start).Seconds())
+		metrics.Metrics().EmbeddingBatches.Inc()
+	}()
+
 	results := make([][]float32, len(texts))
 	for i, text := range texts {
 		emb, err := o.Embed(ctx, text)

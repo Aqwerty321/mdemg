@@ -1,0 +1,63 @@
+{
+  "uobs_version": "1.1.0",
+  "test": {
+    "name": "embedding_health",
+    "description": "Validates embedding model health, latency, and configuration",
+    "type": "dependency"
+  },
+  "dependency": {
+    "service": "embedding",
+    "endpoint": "/v1/embedding/health",
+    "active_check": {
+      "enabled": true,
+      "test_input": "health check test embedding",
+      "expected_output_schema": {
+        "type": "object",
+        "required": ["status", "provider", "dimensions", "latency_ms"],
+        "properties": {
+          "status": { "type": "string", "enum": ["healthy", "degraded", "unhealthy"] },
+          "provider": { "type": "string" },
+          "model": { "type": "string" },
+          "dimensions": { "type": "integer", "minimum": 1 },
+          "latency_ms": { "type": "number" },
+          "cache_enabled": { "type": "boolean" },
+          "cache_hit_rate": { "type": "number" },
+          "error_count_24h": { "type": "integer" },
+          "success_rate_24h": { "type": "number" }
+        }
+      }
+    },
+    "thresholds": {
+      "max_latency_ms": 2000,
+      "max_error_rate_percent": 1.0,
+      "min_success_rate_percent": 99.0
+    },
+    "required_capabilities": [
+      "dimensions",
+      "provider_name",
+      "generate_embedding"
+    ],
+    "configuration_validation": {
+      "required_env_vars": [
+        "EMBEDDING_PROVIDER"
+      ],
+      "expected_values": {
+        "dimensions": [384, 768, 1024, 1536, 3072],
+        "provider": ["openai", "ollama", "cohere", "local"]
+      }
+    },
+    "circuit_breaker": {
+      "check_state": true,
+      "expected_state": "closed"
+    }
+  },
+  "metadata": {
+    "author": "mdemg",
+    "created": "2026-02-06",
+    "tags": ["embedding", "openai", "ollama", "health", "dependency"],
+    "slo": {
+      "availability": 99.9,
+      "latency_p99_ms": 1500
+    }
+  }
+}

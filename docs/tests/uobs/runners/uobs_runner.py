@@ -101,8 +101,20 @@ def check_metric_exists(content: str, metric_name: str, metric_type: Optional[st
     has_type = type_pattern in content
 
     # Check for actual metric values
-    metric_pattern = f"^{metric_name}(\\{{|\\s)"
-    has_values = any(re.match(metric_pattern, line) for line in content.split("\n"))
+    # For histograms/summaries, also check for _bucket, _sum, _count suffixes
+    metric_patterns = [f"^{metric_name}(\\{{|\\s)"]
+    if metric_type in ("histogram", "summary"):
+        metric_patterns.extend([
+            f"^{metric_name}_bucket(\\{{|\\s)",
+            f"^{metric_name}_sum(\\{{|\\s)",
+            f"^{metric_name}_count(\\{{|\\s)",
+        ])
+
+    has_values = False
+    for pattern in metric_patterns:
+        if any(re.match(pattern, line) for line in content.split("\n")):
+            has_values = True
+            break
 
     if not has_values:
         return False, f"Metric {metric_name} not found"
@@ -348,6 +360,245 @@ def run_tracing_test(spec: Dict[str, Any], base_url: str) -> ObservabilityTestRe
     return result
 
 
+def run_dependency_test(spec: Dict[str, Any], base_url: str) -> ObservabilityTestResult:
+    """Run dependency health validation (embedding, database, cache, etc.)."""
+    dep_config = spec.get("dependency", {})
+    service = dep_config.get("service", "unknown")
+    endpoint = dep_config.get("endpoint", f"/v1/{service}/health")
+    thresholds = dep_config.get("thresholds", {})
+    active_check = dep_config.get("active_check", {})
+    config_validation = dep_config.get("configuration_validation", {})
+    circuit_breaker = dep_config.get("circuit_breaker", {})
+
+    total_checks = 2  # Basic checks: connectivity + response format
+    if active_check.get("enabled", False):
+        total_checks += 1
+    if thresholds:
+        total_checks += len(thresholds)
+    if config_validation:
+        total_checks += 1
+    if circuit_breaker.get("check_state", False):
+        total_checks += 1
+
+    result = ObservabilityTestResult(
+        spec_name=spec["test"]["name"],
+        test_type="dependency",
+        total_checks=total_checks,
+        passed_checks=0,
+        failed_checks=0,
+    )
+
+    # Fetch health endpoint
+    try:
+        url = urljoin(base_url, endpoint)
+        start = time.perf_counter()
+        resp = requests.get(url, timeout=10)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+
+        # Check 1: Connectivity
+        if resp.status_code == 200:
+            result.results.append(CheckResult(
+                name=f"{service}_connectivity",
+                passed=True,
+                message=f"Endpoint reachable ({elapsed_ms:.0f}ms)",
+            ))
+            result.passed_checks += 1
+        else:
+            result.results.append(CheckResult(
+                name=f"{service}_connectivity",
+                passed=False,
+                message=f"HTTP {resp.status_code}",
+            ))
+            result.failed_checks += 1
+            result.end_time = datetime.now()
+            return result
+
+        # Parse response
+        try:
+            body = resp.json()
+        except json.JSONDecodeError:
+            result.results.append(CheckResult(
+                name=f"{service}_response_format",
+                passed=False,
+                message="Response is not valid JSON",
+            ))
+            result.failed_checks += 1
+            result.end_time = datetime.now()
+            return result
+
+        # Check 2: Status field
+        status = body.get("status", "unknown")
+        if status == "healthy":
+            result.results.append(CheckResult(
+                name=f"{service}_status",
+                passed=True,
+                message=f"Status: {status}",
+            ))
+            result.passed_checks += 1
+        elif status == "degraded":
+            result.results.append(CheckResult(
+                name=f"{service}_status",
+                passed=True,  # Degraded is acceptable
+                message=f"Status: {status} (warning)",
+                details=body,
+            ))
+            result.passed_checks += 1
+        else:
+            result.results.append(CheckResult(
+                name=f"{service}_status",
+                passed=False,
+                message=f"Status: {status}",
+                details=body,
+            ))
+            result.failed_checks += 1
+
+        # Check 3: Active health check - verify service actually works
+        if active_check.get("enabled", False):
+            latency_ms = body.get("latency_ms", -1)
+            # Accept latency >= 0 (cache hits report 0ms, which is valid)
+            if latency_ms >= 0 and status in ("healthy", "degraded"):
+                cache_note = " (cached)" if latency_ms == 0 else ""
+                result.results.append(CheckResult(
+                    name=f"{service}_active_probe",
+                    passed=True,
+                    message=f"Active probe succeeded ({latency_ms:.0f}ms{cache_note})",
+                ))
+                result.passed_checks += 1
+            else:
+                result.results.append(CheckResult(
+                    name=f"{service}_active_probe",
+                    passed=False,
+                    message="Active probe failed or did not report latency",
+                ))
+                result.failed_checks += 1
+
+        # Check 4: Thresholds
+        if "max_latency_ms" in thresholds:
+            max_latency = thresholds["max_latency_ms"]
+            actual_latency = body.get("latency_ms", 0)
+            if actual_latency <= max_latency:
+                result.results.append(CheckResult(
+                    name=f"{service}_latency_threshold",
+                    passed=True,
+                    message=f"Latency {actual_latency:.0f}ms <= {max_latency}ms",
+                ))
+                result.passed_checks += 1
+            else:
+                result.results.append(CheckResult(
+                    name=f"{service}_latency_threshold",
+                    passed=False,
+                    message=f"Latency {actual_latency:.0f}ms > {max_latency}ms",
+                ))
+                result.failed_checks += 1
+
+        if "min_success_rate_percent" in thresholds:
+            min_rate = thresholds["min_success_rate_percent"]
+            actual_rate = body.get("success_rate_24h", 100)
+            if actual_rate >= min_rate:
+                result.results.append(CheckResult(
+                    name=f"{service}_success_rate",
+                    passed=True,
+                    message=f"Success rate {actual_rate:.1f}% >= {min_rate}%",
+                ))
+                result.passed_checks += 1
+            else:
+                result.results.append(CheckResult(
+                    name=f"{service}_success_rate",
+                    passed=False,
+                    message=f"Success rate {actual_rate:.1f}% < {min_rate}%",
+                ))
+                result.failed_checks += 1
+
+        if "max_error_rate_percent" in thresholds:
+            max_error = thresholds["max_error_rate_percent"]
+            error_count = body.get("error_count_24h", 0)
+            # Calculate error rate (assuming some baseline)
+            actual_error_rate = 100 - body.get("success_rate_24h", 100)
+            if actual_error_rate <= max_error:
+                result.results.append(CheckResult(
+                    name=f"{service}_error_rate",
+                    passed=True,
+                    message=f"Error rate {actual_error_rate:.1f}% <= {max_error}%",
+                ))
+                result.passed_checks += 1
+            else:
+                result.results.append(CheckResult(
+                    name=f"{service}_error_rate",
+                    passed=False,
+                    message=f"Error rate {actual_error_rate:.1f}% > {max_error}%",
+                ))
+                result.failed_checks += 1
+
+        # Check 5: Configuration validation
+        if config_validation:
+            config_passed = True
+            config_messages = []
+
+            # Check env vars
+            required_env = config_validation.get("required_env_vars", [])
+            if required_env:
+                env_configured = body.get("configured_env_var", False)
+                if not env_configured:
+                    config_passed = False
+                    config_messages.append("Required env vars not configured")
+
+            # Check expected values
+            expected_values = config_validation.get("expected_values", {})
+            if "dimensions" in expected_values:
+                dims = body.get("dimensions", 0)
+                valid_dims = expected_values["dimensions"]
+                if dims not in valid_dims:
+                    config_passed = False
+                    config_messages.append(f"Dimensions {dims} not in {valid_dims}")
+
+            if "provider" in expected_values:
+                provider = body.get("provider", "")
+                valid_providers = expected_values["provider"]
+                if provider not in valid_providers:
+                    config_passed = False
+                    config_messages.append(f"Provider {provider} not in {valid_providers}")
+
+            result.results.append(CheckResult(
+                name=f"{service}_configuration",
+                passed=config_passed,
+                message="; ".join(config_messages) if config_messages else "Configuration valid",
+            ))
+            if config_passed:
+                result.passed_checks += 1
+            else:
+                result.failed_checks += 1
+
+        # Check 6: Circuit breaker state
+        if circuit_breaker.get("check_state", False):
+            expected_state = circuit_breaker.get("expected_state", "closed")
+            actual_state = body.get("circuit_breaker", "closed")
+            if actual_state == expected_state:
+                result.results.append(CheckResult(
+                    name=f"{service}_circuit_breaker",
+                    passed=True,
+                    message=f"Circuit breaker: {actual_state}",
+                ))
+                result.passed_checks += 1
+            else:
+                result.results.append(CheckResult(
+                    name=f"{service}_circuit_breaker",
+                    passed=False,
+                    message=f"Circuit breaker: {actual_state} (expected {expected_state})",
+                ))
+                result.failed_checks += 1
+
+    except requests.RequestException as e:
+        result.results.append(CheckResult(
+            name=f"{service}_connectivity",
+            passed=False,
+            message=f"Request failed: {e}",
+        ))
+        result.failed_checks = result.total_checks
+
+    result.end_time = datetime.now()
+    return result
+
+
 def run_observability_test(spec: Dict[str, Any], base_url: str) -> ObservabilityTestResult:
     """Run the appropriate test based on spec type."""
     test_type = spec["test"]["type"]
@@ -356,6 +607,8 @@ def run_observability_test(spec: Dict[str, Any], base_url: str) -> Observability
         return run_metrics_test(spec, base_url)
     elif test_type == "health":
         return run_health_test(spec, base_url)
+    elif test_type == "dependency":
+        return run_dependency_test(spec, base_url)
     elif test_type == "logging":
         # Logging tests require access to log output - skip for now
         return ObservabilityTestResult(

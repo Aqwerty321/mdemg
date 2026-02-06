@@ -93,6 +93,7 @@ func ExportConfigForProfile(spaceID, profile string) (ExportConfig, error) {
 
 // ExportFromRequest builds an ExportConfig from a protobuf ExportRequest.
 func ExportFromRequest(req *pb.ExportRequest) ExportConfig {
+	log.Printf("[DEBUG] ExportFromRequest: SpaceId=%q SinceTimestamp=%q SinceCursor=%q", req.SpaceId, req.SinceTimestamp, req.SinceCursor)
 	cfg := DefaultExportConfig(req.SpaceId)
 	if req.ChunkSize > 0 {
 		cfg.ChunkSize = int(req.ChunkSize)

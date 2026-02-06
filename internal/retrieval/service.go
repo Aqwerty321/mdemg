@@ -13,6 +13,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
+	"mdemg/internal/metrics"
 	"mdemg/internal/models"
 )
 
@@ -244,6 +245,12 @@ func (s *Service) GetAllTapRootFreshness(ctx context.Context) ([]map[string]any,
 // 3) spreading activation in memory
 // 4) scoring + topK selection
 func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (models.RetrieveResponse, error) {
+	// Instrument retrieval latency for Prometheus metrics
+	start := time.Now()
+	defer func() {
+		metrics.Metrics().RetrievalLatency.Observe(time.Since(start).Seconds())
+	}()
+
 	if req.SpaceID == "" {
 		return models.RetrieveResponse{}, errors.New("space_id is required")
 	}

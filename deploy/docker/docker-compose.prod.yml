@@ -104,13 +104,17 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts:/etc/prometheus/alerts:ro
       - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
     networks:
       - mdemg-net
+    depends_on:
+      - mdemg
 
   grafana:
     image: grafana/grafana:10.2.2
@@ -120,10 +124,16 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD}"
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/var/lib/grafana/dashboards/mdemg-overview.json"
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - mdemg-net
+    depends_on:
+      - prometheus
 
 volumes:
   neo4j-data:

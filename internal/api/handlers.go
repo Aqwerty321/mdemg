@@ -172,6 +172,101 @@ func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, status)
 }
 
+// EmbeddingHealthResponse represents the response for the embedding health endpoint.
+type EmbeddingHealthResponse struct {
+	Status           string  `json:"status"`                      // "healthy", "degraded", "unhealthy"
+	Provider         string  `json:"provider"`                    // e.g., "openai", "ollama"
+	Model            string  `json:"model,omitempty"`             // e.g., "text-embedding-ada-002"
+	Dimensions       int     `json:"dimensions"`                  // e.g., 1536
+	LatencyMs        float64 `json:"latency_ms"`                  // Last probe latency
+	CacheEnabled     bool    `json:"cache_enabled"`               // Whether caching is enabled
+	CacheHitRate     float64 `json:"cache_hit_rate,omitempty"`    // Cache hit percentage
+	ErrorCount24h    int     `json:"error_count_24h,omitempty"`   // Errors in last 24h
+	SuccessRate24h   float64 `json:"success_rate_24h,omitempty"`  // Success rate in last 24h
+	CircuitBreaker   string  `json:"circuit_breaker,omitempty"`   // "closed", "open", "half-open"
+	LastError        string  `json:"last_error,omitempty"`        // Last error message
+	LastErrorAt      string  `json:"last_error_at,omitempty"`     // Last error timestamp
+	ConfiguredEnvVar bool    `json:"configured_env_var"`          // Whether env vars are set
+}
+
+func (s *Server) handleEmbeddingHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	resp := EmbeddingHealthResponse{
+		Status:           "unhealthy",
+		ConfiguredEnvVar: os.Getenv("EMBEDDING_PROVIDER") != "",
+	}
+
+	// Check if embedder is configured
+	if s.embedder == nil {
+		resp.Status = "unhealthy"
+		resp.LastError = "no embedding provider configured"
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
+
+	// Get basic info from embedder
+	resp.Provider = s.embedder.Name()
+	resp.Dimensions = s.embedder.Dimensions()
+
+	// Parse provider and model from name (format: "provider:model" or "provider:model+cache")
+	parts := strings.Split(resp.Provider, ":")
+	if len(parts) >= 1 {
+		resp.Provider = parts[0]
+	}
+	if len(parts) >= 2 {
+		modelPart := parts[1]
+		// Remove cache suffix if present
+		if idx := strings.Index(modelPart, "+"); idx > 0 {
+			resp.Model = modelPart[:idx]
+			resp.CacheEnabled = strings.Contains(modelPart, "+cache")
+		} else {
+			resp.Model = modelPart
+		}
+	}
+
+	// Active health check: actually generate an embedding
+	testStart := time.Now()
+	_, err := s.embedder.Embed(r.Context(), "health check test")
+	resp.LatencyMs = float64(time.Since(testStart).Milliseconds())
+
+	if err != nil {
+		resp.Status = "unhealthy"
+		resp.LastError = err.Error()
+		resp.LastErrorAt = time.Now().UTC().Format(time.RFC3339)
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
+
+	// Check circuit breaker state if available
+	if s.cbRegistry != nil {
+		cbStates := s.cbRegistry.States()
+		for name, state := range cbStates {
+			if strings.Contains(strings.ToLower(name), "embed") {
+				resp.CircuitBreaker = state.String()
+				if state.String() == "open" {
+					resp.Status = "degraded"
+				}
+				break
+			}
+		}
+	}
+
+	// If we got here and not degraded, we're healthy
+	if resp.Status != "degraded" {
+		resp.Status = "healthy"
+	}
+
+	// Set success rate (would come from metrics in production)
+	resp.SuccessRate24h = 100.0 // Placeholder - integrate with metrics
+	resp.ErrorCount24h = 0      // Placeholder - integrate with metrics
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
 func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)

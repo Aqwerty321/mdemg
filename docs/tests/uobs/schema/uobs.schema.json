@@ -24,7 +24,7 @@
         },
         "type": {
           "type": "string",
-          "enum": ["metrics", "health", "logging", "tracing"],
+          "enum": ["metrics", "health", "logging", "tracing", "dependency"],
           "description": "Type of observability test"
         }
       }
@@ -131,6 +131,89 @@
         "propagation_check": {
           "type": "boolean",
           "default": true
+        }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "description": "External dependency health validation (embedding, database, cache, etc.)",
+      "properties": {
+        "service": {
+          "type": "string",
+          "enum": ["embedding", "neo4j", "redis", "openai", "ollama", "custom"],
+          "description": "The dependency service type"
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "Health check endpoint path"
+        },
+        "active_check": {
+          "type": "object",
+          "description": "Active probe configuration (actually call the service)",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "test_input": {
+              "type": "string",
+              "description": "Test input for active validation"
+            },
+            "expected_output_schema": {
+              "type": "object",
+              "description": "JSON schema for expected output"
+            }
+          }
+        },
+        "thresholds": {
+          "type": "object",
+          "properties": {
+            "max_latency_ms": {
+              "type": "number",
+              "description": "Maximum acceptable latency in milliseconds"
+            },
+            "max_error_rate_percent": {
+              "type": "number",
+              "description": "Maximum acceptable error rate percentage"
+            },
+            "min_success_rate_percent": {
+              "type": "number",
+              "description": "Minimum required success rate percentage"
+            }
+          }
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Required capabilities (e.g., dimensions, model_name)"
+        },
+        "configuration_validation": {
+          "type": "object",
+          "description": "Validate service configuration",
+          "properties": {
+            "required_env_vars": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "expected_values": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "circuit_breaker": {
+          "type": "object",
+          "description": "Circuit breaker state validation",
+          "properties": {
+            "check_state": {
+              "type": "boolean",
+              "default": true
+            },
+            "expected_state": {
+              "type": "string",
+              "enum": ["closed", "open", "half-open"]
+            }
+          }
         }
       }
     }

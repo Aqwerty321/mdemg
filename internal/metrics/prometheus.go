@@ -187,6 +187,8 @@ func (r *Registry) NewHistogram(name, help string, labels map[string]string) *Hi
 }
 
 // Observe records a value in the histogram.
+// Increments the first bucket where v <= bound.
+// The Render function accumulates to produce proper cumulative histogram.
 func (h *Histogram) Observe(v float64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -194,11 +196,14 @@ func (h *Histogram) Observe(v float64) {
 	h.sum += v
 	h.count++
 
+	// Find the first bucket that can contain this value
 	for i, bound := range h.buckets {
 		if v <= bound {
 			h.bucketCounts[i]++
+			return // Only increment one bucket; Render accumulates
 		}
 	}
+	// Value exceeds all defined buckets; it will only appear in +Inf
 }
 
 // ObserveDuration observes a duration since the given start time.

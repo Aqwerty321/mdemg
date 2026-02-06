@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/metrics"
 )
 
 const (
@@ -76,6 +77,13 @@ func (o *OpenAI) Embed(ctx context.Context, text string) ([]float32, error) {
 
 // EmbedBatch generates embeddings for multiple texts.
 func (o *OpenAI) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+	// Instrument embedding latency for Prometheus metrics
+	start := time.Now()
+	defer func() {
+		metrics.Metrics().EmbeddingLatency.Observe(time.Since(start).Seconds())
+		metrics.Metrics().EmbeddingBatches.Inc()
+	}()
+
 	if len(texts) == 0 {
 		return nil, nil
 	}

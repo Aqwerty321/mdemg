@@ -115,6 +115,16 @@ func (m *StandardMetrics) CollectCircuitBreakerMetrics(cbRegistry *circuitbreake
 	}
 }
 
+// CollectCacheMetrics updates cache hit ratio metrics from cache stats.
+func (m *StandardMetrics) CollectCacheMetrics(cacheStats map[string]map[string]any) {
+	for cacheName, stats := range cacheStats {
+		if hitRate, ok := stats["hit_rate"].(float64); ok {
+			gauge := m.CacheHitRatio(cacheName)
+			gauge.Set(hitRate)
+		}
+	}
+}
+
 // global standard metrics instance
 var globalMetrics *StandardMetrics
 

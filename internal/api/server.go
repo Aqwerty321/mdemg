@@ -213,9 +213,11 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	}
 
 	// Phase 3: Initialize metrics registry
-	metricsCfg := metrics.Config{
-		Enabled:   cfg.MetricsEnabled,
-		Namespace: cfg.MetricsNamespace,
+	// Start with defaults (includes histogram buckets) and override specific fields
+	metricsCfg := metrics.DefaultConfig()
+	metricsCfg.Enabled = cfg.MetricsEnabled
+	if cfg.MetricsNamespace != "" {
+		metricsCfg.Namespace = cfg.MetricsNamespace
 	}
 	metricsRegistry := metrics.NewRegistry(metricsCfg)
 	metrics.SetGlobalRegistry(metricsRegistry)
@@ -662,6 +664,7 @@ func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.handleHealthz)
 	mux.HandleFunc("/readyz", s.handleReadyz)
+	mux.HandleFunc("/v1/embedding/health", s.handleEmbeddingHealth)
 	mux.HandleFunc("/v1/memory/retrieve", s.handleRetrieve)
 	mux.HandleFunc("/v1/memory/ingest", s.handleIngest)
 	mux.HandleFunc("/v1/memory/ingest/batch", s.handleBatchIngest)
@@ -907,10 +910,27 @@ func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Collect circuit breaker metrics
-	if s.cbRegistry != nil && s.cfg.MetricsEnabled {
+	if s.cfg.MetricsEnabled {
 		m := metrics.Metrics()
-		m.CollectCircuitBreakerMetrics(s.cbRegistry)
+
+		// Collect circuit breaker metrics
+		if s.cbRegistry != nil {
+			// Ensure known circuit breakers are registered (they're created on-demand)
+			// This ensures metrics are emitted even if services haven't been called yet
+			_ = s.cbRegistry.Get("openai-embeddings")
+			_ = s.cbRegistry.Get("openai-rerank")
+			_ = s.cbRegistry.Get("ollama-rerank")
+			m.CollectCircuitBreakerMetrics(s.cbRegistry)
+		}
+
+		// Collect cache hit ratio metrics
+		if s.retriever != nil {
+			cacheStats := map[string]map[string]any{
+				"query":     s.retriever.QueryCacheStats(),
+				"embedding": s.retriever.EmbeddingCacheStats(),
+			}
+			m.CollectCacheMetrics(cacheStats)
+		}
 	}
 
 	metrics.MetricsHandler(s.metricsRegistry)(w, r)

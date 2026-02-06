@@ -699,7 +699,26 @@ relevanceScore = 0.40 * recencyScore + 0.25 * surpriseScore + 0.20 * typePriorit
 | 48.2 Result Caching | ✅ | `internal/retrieval/cache.go`, `internal/retrieval/cache_test.go`, `/v1/memory/cache/stats` |
 | 48.3 Data Transmission (gzip, pagination) | 📋 | |
 | 48.4 Connection Pooling | 📋 | |
-| 48.5 Benchmarking & Monitoring | 📋 | |
+| 48.5 Benchmarking & Monitoring | ✅ | See below |
+
+**48.5 Observability Stack (Completed 2026-02-06):**
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| Prometheus config | `deploy/docker/prometheus.yml` | Scrape jobs for MDEMG, service health, TCP probes |
+| Grafana provisioning | `deploy/docker/grafana/` | Auto-import datasources and dashboards |
+| Blackbox exporter | `deploy/docker/blackbox/` | HTTP/TCP health monitoring |
+| Alert rules | `deploy/docker/prometheus/alerts/latency_slo.yaml` | 7 SLO alerts |
+| Dev compose | `deploy/docker/docker-compose.observability.yml` | Local testing stack |
+| Dashboard | `deploy/docker/grafana/dashboards/mdemg-overview.json` | 10-panel overview |
+
+**Dashboard Panels:** Request Rate, P95 Latency, Error Rate, Circuit Breakers, Request Latency Distribution, Requests by Status, Cache Hit Ratios, Retrieval Latency, Rate Limit Rejections, Embedding Latency.
+
+**Metrics Fixes:**
+- Fixed histogram bucket initialization (`server.go` - use `DefaultConfig()`)
+- Fixed histogram Observe() double-counting (`prometheus.go`)
+- Added retrieval latency instrumentation (`retrieval/service.go`)
+- Added embedding latency instrumentation (`openai.go`, `ollama.go`)
 
 **Results:** 92.5% uncached improvement (387ms→29ms); 98.9% cached improvement (387ms→4ms).
 

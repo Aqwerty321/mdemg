@@ -1,0 +1,70 @@
+{
+  "uvts_version": "1.0.0",
+  "validation": {
+    "name": "lnl_demo_validation",
+    "description": "Abbreviated 40-question validation test for LnL-01 demo (5 per category)",
+    "codebase": "/Users/reh3376/whk-wms",
+    "space_id": "lnl-demo-whk",
+    "model": "sonnet",
+    "top_k": 5
+  },
+  "thresholds": {
+    "mean_score": 0.795,
+    "strong_evidence_pct": 60.0,
+    "high_score_rate_pct": 70.0,
+    "min_category_score": 0.6,
+    "max_token_usage": 500000
+  },
+  "categories": [
+    {"name": "architecture_structure", "count": 5, "weight": 1.0},
+    {"name": "business_logic_constraints", "count": 5, "weight": 1.0},
+    {"name": "computed_value", "count": 5, "weight": 1.0},
+    {"name": "cross_cutting_concerns", "count": 5, "weight": 1.0},
+    {"name": "data_flow_integration", "count": 5, "weight": 1.0},
+    {"name": "disambiguation", "count": 5, "weight": 1.0},
+    {"name": "relationship", "count": 5, "weight": 1.0},
+    {"name": "service_relationships", "count": 5, "weight": 1.0}
+  ],
+  "questions": {
+    "source_file": "docs/benchmarks/whk-wms/test_questions_120.json",
+    "agent_file": "demo-test/lnl_demo_questions_agent.json",
+    "total_questions": 40,
+    "sampling": "stratified",
+    "seed": 42
+  },
+  "profiles": {
+    "quick": {
+      "questions_per_category": 2,
+      "timeout_minutes": 10,
+      "description": "Quick smoke test (16 questions)"
+    },
+    "standard": {
+      "questions_per_category": 5,
+      "timeout_minutes": 30,
+      "description": "Standard validation (40 questions)"
+    },
+    "full": {
+      "questions_per_category": -1,
+      "timeout_minutes": 120,
+      "description": "Full benchmark (120 questions)"
+    }
+  },
+  "scoring": {
+    "evidence_weight": 0.70,
+    "semantic_weight": 0.15,
+    "concept_weight": 0.15,
+    "line_tolerance": 10
+  },
+  "output": {
+    "format": "json",
+    "include_answers": true,
+    "include_evidence": true,
+    "include_tokens": true
+  },
+  "metadata": {
+    "tags": ["lnl", "demo", "validation", "whk-wms"],
+    "owner": "mdemg-team",
+    "created": "2026-02-06",
+    "baseline_run": "temporal_validation_20260203"
+  }
+}

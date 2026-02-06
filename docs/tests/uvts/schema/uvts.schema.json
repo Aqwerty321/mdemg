@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/uvts/v1.0.0",
+  "title": "UVTS - Universal Validation Test Specification",
+  "description": "Schema for defining semantic accuracy validation benchmarks in MDEMG",
+  "type": "object",
+  "required": ["uvts_version", "validation", "thresholds", "questions"],
+  "properties": {
+    "uvts_version": {
+      "type": "string",
+      "description": "Version of the UVTS schema",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "validation": {
+      "type": "object",
+      "required": ["name", "description", "codebase", "space_id"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for this validation test"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this validation tests"
+        },
+        "codebase": {
+          "type": "string",
+          "description": "Path to the codebase being validated"
+        },
+        "space_id": {
+          "type": "string",
+          "description": "MDEMG space ID for the codebase"
+        },
+        "model": {
+          "type": "string",
+          "description": "LLM model to use for answer synthesis",
+          "enum": ["haiku", "sonnet", "opus"],
+          "default": "sonnet"
+        },
+        "top_k": {
+          "type": "integer",
+          "description": "Number of MDEMG results to retrieve per query",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20
+        }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "description": "Quality thresholds that must be met for pass",
+      "properties": {
+        "mean_score": {
+          "type": "number",
+          "description": "Minimum mean score (0.0-1.0)",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "strong_evidence_pct": {
+          "type": "number",
+          "description": "Minimum percentage of strong evidence answers",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "high_score_rate_pct": {
+          "type": "number",
+          "description": "Minimum percentage of answers scoring >= 0.8",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "min_category_score": {
+          "type": "number",
+          "description": "Minimum score for any single category",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_token_usage": {
+          "type": "integer",
+          "description": "Maximum total tokens allowed (input + output)"
+        }
+      }
+    },
+    "categories": {
+      "type": "array",
+      "description": "List of question categories with sample sizes",
+      "items": {
+        "type": "object",
+        "required": ["name", "count"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Category name"
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of questions to sample from this category",
+            "minimum": 1
+          },
+          "weight": {
+            "type": "number",
+            "description": "Weight for this category in overall score (default 1.0)",
+            "default": 1.0
+          }
+        }
+      }
+    },
+    "questions": {
+      "type": "object",
+      "description": "Question set configuration",
+      "required": ["source_file"],
+      "properties": {
+        "source_file": {
+          "type": "string",
+          "description": "Path to master questions file (with answers)"
+        },
+        "agent_file": {
+          "type": "string",
+          "description": "Path to agent questions file (without answers)"
+        },
+        "total_questions": {
+          "type": "integer",
+          "description": "Total number of questions in validation"
+        },
+        "sampling": {
+          "type": "string",
+          "description": "Sampling strategy",
+          "enum": ["all", "random", "stratified"],
+          "default": "stratified"
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Random seed for reproducible sampling"
+        }
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "description": "Named profiles for different test intensities",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "questions_per_category": {
+            "type": "integer",
+            "description": "Questions per category for this profile"
+          },
+          "timeout_minutes": {
+            "type": "integer",
+            "description": "Maximum time for entire validation"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "scoring": {
+      "type": "object",
+      "description": "Scoring configuration",
+      "properties": {
+        "evidence_weight": {
+          "type": "number",
+          "description": "Weight for evidence score (0-1)",
+          "default": 0.7
+        },
+        "semantic_weight": {
+          "type": "number",
+          "description": "Weight for semantic similarity score (0-1)",
+          "default": 0.15
+        },
+        "concept_weight": {
+          "type": "number",
+          "description": "Weight for concept overlap score (0-1)",
+          "default": 0.15
+        },
+        "line_tolerance": {
+          "type": "integer",
+          "description": "Line number tolerance for file:line citations",
+          "default": 10
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "description": "Output configuration",
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": ["json", "jsonl", "markdown"],
+          "default": "json"
+        },
+        "include_answers": {
+          "type": "boolean",
+          "description": "Include full answers in output",
+          "default": true
+        },
+        "include_evidence": {
+          "type": "boolean",
+          "description": "Include evidence details in output",
+          "default": true
+        },
+        "include_tokens": {
+          "type": "boolean",
+          "description": "Include token usage in output",
+          "default": true
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about this validation",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "owner": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        },
+        "baseline_run": {
+          "type": "string",
+          "description": "Reference to baseline run for comparison"
+        }
+      }
+    }
+  }
+}

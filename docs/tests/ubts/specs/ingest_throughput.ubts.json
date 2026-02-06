@@ -1,0 +1,33 @@
+{
+  "ubts_version": "1.0.0",
+  "benchmark": {
+    "name": "ingest_throughput",
+    "description": "Measures ingest endpoint throughput for batch operations",
+    "endpoint": "/v1/memory/ingest/batch",
+    "method": "POST",
+    "payload_template": {
+      "space_id": "{{space_id}}",
+      "items": "{{items}}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "thresholds": {
+    "p50_ms": 100,
+    "p95_ms": 500,
+    "p99_ms": 1000,
+    "max_ms": 5000,
+    "error_rate_pct": 0.5,
+    "throughput_rps": 50
+  },
+  "setup": {
+    "seed_data": "test_data/ingest_seed.json",
+    "warmup_requests": 5
+  },
+  "metadata": {
+    "tags": ["ingest", "throughput", "batch"],
+    "owner": "mdemg-team",
+    "created": "2026-02-05"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "usts_version": "1.0.0",
+  "test": {
+    "name": "input_injection",
+    "description": "Tests for injection vulnerabilities (SQL, Cypher, command)",
+    "category": "injection",
+    "severity": "critical",
+    "endpoint": "/v1/memory/retrieve",
+    "method": "POST"
+  },
+  "requests": [
+    {
+      "name": "cypher_injection_single_quote",
+      "description": "Attempt Cypher injection via single quote",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-API-Key": "{{valid_api_key}}"
+      },
+      "payload": {
+        "space_id": "test' OR 1=1 //",
+        "query_text": "normal query"
+      },
+      "expected_status_range": [400, 499]
+    },
+    {
+      "name": "cypher_injection_union",
+      "description": "Attempt Cypher injection via UNION",
+      "payload": {
+        "space_id": "test",
+        "query_text": "test' UNION MATCH (n) RETURN n //"
+      }
+    },
+    {
+      "name": "cypher_injection_delete",
+      "description": "Attempt Cypher injection via DELETE",
+      "payload": {
+        "space_id": "test",
+        "query_text": "'; MATCH (n) DETACH DELETE n; //"
+      }
+    },
+    {
+      "name": "command_injection_semicolon",
+      "description": "Attempt command injection via semicolon",
+      "payload": {
+        "space_id": "test; rm -rf /",
+        "query_text": "normal"
+      }
+    },
+    {
+      "name": "command_injection_backtick",
+      "description": "Attempt command injection via backticks",
+      "payload": {
+        "space_id": "`cat /etc/passwd`",
+        "query_text": "normal"
+      }
+    },
+    {
+      "name": "xss_script_tag",
+      "description": "Attempt XSS via script tag in response",
+      "payload": {
+        "space_id": "test",
+        "query_text": "<script>alert('xss')</script>"
+      }
+    }
+  ],
+  "assertions": {
+    "body_not_contains": [
+      "/etc/passwd",
+      "root:",
+      "DETACH DELETE",
+      "syntax error",
+      "Neo4jError",
+      "DatabaseError",
+      "<script>",
+      "javascript:",
+      "onerror="
+    ]
+  },
+  "metadata": {
+    "owasp": ["A03:2021-Injection"],
+    "cwe": ["CWE-89", "CWE-943", "CWE-78", "CWE-79"]
+  }
+}

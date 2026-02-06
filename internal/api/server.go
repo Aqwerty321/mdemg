@@ -11,6 +11,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/anomaly"
 	"mdemg/internal/ape"
+	"mdemg/internal/auth"
+	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
 	"mdemg/internal/consulting"
 	"mdemg/internal/conversation"
@@ -19,7 +21,9 @@ import (
 	"mdemg/internal/hidden"
 	"mdemg/internal/jobs"
 	"mdemg/internal/learning"
+	"mdemg/internal/metrics"
 	"mdemg/internal/plugins"
+	"mdemg/internal/ratelimit"
 	"mdemg/internal/retrieval"
 	"mdemg/internal/symbols"
 	"mdemg/internal/validation"
@@ -48,6 +52,10 @@ type Server struct {
 	stopCooler         chan struct{}
 	stopInterviewer    chan struct{}
 	stopScheduledSync  chan struct{}
+
+	// Phase 3: Production readiness components
+	cbRegistry     *circuitbreaker.Registry
+	metricsRegistry *metrics.Registry
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -172,7 +180,65 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	sessTracker := conversation.NewSessionTracker(2 * time.Hour)
 	log.Printf("Session tracker initialized (TTL: 2h)")
 
-	return &Server{cfg: cfg, driver: driver, retriever: ret, learner: lea, embedder: emb, anomalyDetector: anom, hiddenLayer: hid, hiddenSvc: hid, pluginMgr: pluginMgr, apeScheduler: apeSched, symbolStore: symStore, consultant: cons, gapDetector: gapDet, gapInterviewer: gapInt, conversationSvc: convSvc, contextCooler: ctxCooler, sessionTracker: sessTracker, webhookDebouncer: newLinearWebhookDebouncer()}
+	// Phase 3: Initialize circuit breaker registry
+	cbCfg := circuitbreaker.Config{
+		Enabled:          cfg.CircuitBreakerEnabled,
+		FailureThreshold: cfg.CircuitBreakerThreshold,
+		SuccessThreshold: 2,
+		Timeout:          time.Duration(cfg.CircuitBreakerTimeoutSec) * time.Second,
+		MaxConcurrent:    1,
+	}
+	cbRegistry := circuitbreaker.NewRegistry(cbCfg)
+	if cfg.CircuitBreakerEnabled {
+		log.Printf("Circuit breaker enabled (threshold: %d, timeout: %ds)",
+			cfg.CircuitBreakerThreshold, cfg.CircuitBreakerTimeoutSec)
+	}
+
+	// Wire circuit breaker registry to services that make external API calls
+	ret.SetCircuitBreakerRegistry(cbRegistry)
+
+	// Wire circuit breaker to embedder if it supports it (OpenAI)
+	if emb != nil {
+		if openAIEmb, ok := emb.(*embeddings.OpenAI); ok {
+			openAIEmb.SetCircuitBreaker(cbRegistry.Get("openai-embeddings"))
+			log.Printf("Circuit breaker wired to OpenAI embedder")
+		}
+	}
+
+	// Phase 3: Initialize metrics registry
+	metricsCfg := metrics.Config{
+		Enabled:   cfg.MetricsEnabled,
+		Namespace: cfg.MetricsNamespace,
+	}
+	metricsRegistry := metrics.NewRegistry(metricsCfg)
+	metrics.SetGlobalRegistry(metricsRegistry)
+	if cfg.MetricsEnabled {
+		metrics.InitStandardMetrics()
+		log.Printf("Prometheus metrics enabled (namespace: %s)", cfg.MetricsNamespace)
+	}
+
+	return &Server{
+		cfg:             cfg,
+		driver:          driver,
+		retriever:       ret,
+		learner:         lea,
+		embedder:        emb,
+		anomalyDetector: anom,
+		hiddenLayer:     hid,
+		hiddenSvc:       hid,
+		pluginMgr:       pluginMgr,
+		apeScheduler:    apeSched,
+		symbolStore:     symStore,
+		consultant:      cons,
+		gapDetector:     gapDet,
+		gapInterviewer:  gapInt,
+		conversationSvc: convSvc,
+		contextCooler:   ctxCooler,
+		sessionTracker:  sessTracker,
+		webhookDebouncer: newLinearWebhookDebouncer(),
+		cbRegistry:      cbRegistry,
+		metricsRegistry: metricsRegistry,
+	}
 }
 
 // Shutdown gracefully stops background services
@@ -490,6 +556,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/reflect", s.handleReflect)
 	mux.HandleFunc("/v1/memory/stats", s.handleStats)
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
+	mux.HandleFunc("/v1/prometheus", s.handlePrometheusMetrics)
 	mux.HandleFunc("/v1/memory/archive/bulk", s.handleBulkArchive)
 	mux.HandleFunc("/v1/memory/nodes/", s.handleNodeOperation)
 	mux.HandleFunc("/v1/memory/consolidate", s.handleConsolidate)
@@ -561,18 +628,80 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/ingest-codebase/", s.handleIngestCodebaseRoute)
 
 	// Wrap mux with middleware stack
-	// Order: compression (outermost) -> logging (innermost)
+	// Order (outermost to innermost):
+	// 1. Compression (outermost)
+	// 2. Logging
+	// 3. Metrics
+	// 4. CORS
+	// 5. Auth
+	// 6. Rate Limit
+	// 7. Session Warning (innermost before handler)
+
+	var handler http.Handler = mux
+
+	// Session-not-resumed warning middleware (Phase 3A: CMS enforcement) - innermost
+	handler = SessionResumeWarningMiddleware(handler, s.sessionTracker)
+
+	// Rate limiting middleware (Phase 3.1)
+	if s.cfg.RateLimitEnabled {
+		rlSkip := map[string]bool{"/healthz": true, "/readyz": true, "/v1/metrics": true}
+		rlCfg := ratelimit.Config{
+			Enabled:           true,
+			RequestsPerSecond: s.cfg.RateLimitRPS,
+			BurstSize:         s.cfg.RateLimitBurst,
+			ByIP:              s.cfg.RateLimitByIP,
+			SkipEndpoints:     rlSkip,
+		}
+		handler = ratelimit.Middleware(rlCfg)(handler)
+		log.Printf("Rate limiting enabled (%.0f rps, burst: %d, by_ip: %v)",
+			s.cfg.RateLimitRPS, s.cfg.RateLimitBurst, s.cfg.RateLimitByIP)
+	}
+
+	// Authentication middleware (Phase 3.2)
+	if s.cfg.AuthEnabled {
+		authSkip := make(map[string]bool)
+		for _, ep := range s.cfg.AuthSkipEndpoints {
+			authSkip[ep] = true
+		}
+		authCfg := auth.Config{
+			Enabled:       true,
+			Mode:          auth.AuthMode(s.cfg.AuthMode),
+			APIKeys:       s.cfg.AuthAPIKeys,
+			JWTSecret:     s.cfg.AuthJWTSecret,
+			JWTIssuer:     s.cfg.AuthJWTIssuer,
+			SkipEndpoints: authSkip,
+		}
+		handler = auth.Middleware(authCfg)(handler)
+		log.Printf("Authentication enabled (mode: %s)", s.cfg.AuthMode)
+	}
+
+	// CORS middleware (Phase 3.2)
+	if s.cfg.CORSEnabled {
+		corsCfg := CORSConfig{
+			Enabled:          true,
+			AllowedOrigins:   s.cfg.CORSAllowedOrigins,
+			AllowedMethods:   s.cfg.CORSAllowedMethods,
+			AllowedHeaders:   s.cfg.CORSAllowedHeaders,
+			AllowCredentials: s.cfg.CORSAllowCredentials,
+			MaxAge:           86400,
+		}
+		handler = CORSMiddleware(corsCfg)(handler)
+		log.Printf("CORS enabled (origins: %v)", s.cfg.CORSAllowedOrigins)
+	}
+
+	// Prometheus metrics middleware (Phase 3.3)
+	if s.cfg.MetricsEnabled {
+		handler = metrics.HTTPMiddleware(s.metricsRegistry)(handler)
+	}
+
+	// Logging middleware
 	logCfg := LogConfig{
 		Format:     s.cfg.LogFormat,
 		SkipHealth: s.cfg.LogSkipHealth,
 	}
+	handler = LoggingMiddleware(handler, logCfg)
 
-	handler := LoggingMiddleware(mux, logCfg)
-
-	// Session-not-resumed warning middleware (Phase 3A: CMS enforcement)
-	handler = SessionResumeWarningMiddleware(handler, s.sessionTracker)
-
-	// Enable gzip compression for responses > 1KB when CompressionEnabled
+	// Enable gzip compression for responses > 1KB when CompressionEnabled (outermost)
 	if s.cfg.CompressionEnabled {
 		handler = CompressionMiddleware(handler, s.cfg.CompressionMinSize)
 	}
@@ -652,4 +781,29 @@ func validateRequest(w http.ResponseWriter, v any) bool {
 		return false
 	}
 	return true
+}
+
+// handlePrometheusMetrics serves Prometheus-format metrics.
+func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Collect circuit breaker metrics
+	if s.cbRegistry != nil && s.cfg.MetricsEnabled {
+		m := metrics.Metrics()
+		m.CollectCircuitBreakerMetrics(s.cbRegistry)
+	}
+
+	metrics.MetricsHandler(s.metricsRegistry)(w, r)
+}
+
+// CircuitBreaker returns the circuit breaker for a given service name.
+// Used by embeddings and other packages to wrap external API calls.
+func (s *Server) CircuitBreaker(service string) *circuitbreaker.Breaker {
+	if s.cbRegistry == nil {
+		return nil
+	}
+	return s.cbRegistry.Get(service)
 }

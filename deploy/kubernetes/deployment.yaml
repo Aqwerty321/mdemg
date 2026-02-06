@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mdemg
+  labels:
+    app: mdemg
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mdemg
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: mdemg
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/v1/prometheus"
+    spec:
+      serviceAccountName: mdemg
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: mdemg
+          image: mdemg:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: LISTEN_ADDR
+              value: ":8080"
+            - name: LOG_FORMAT
+              value: "json"
+            - name: LOG_SKIP_HEALTH
+              value: "true"
+            - name: NEO4J_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mdemg-secrets
+                  key: neo4j-uri
+            - name: NEO4J_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mdemg-secrets
+                  key: neo4j-user
+            - name: NEO4J_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mdemg-secrets
+                  key: neo4j-pass
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mdemg-secrets
+                  key: openai-api-key
+            - name: AUTH_API_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: mdemg-secrets
+                  key: api-keys
+          envFrom:
+            - configMapRef:
+                name: mdemg-config
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: mdemg
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: mdemg

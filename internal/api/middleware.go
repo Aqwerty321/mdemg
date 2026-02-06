@@ -3,16 +3,20 @@ package api
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"mdemg/internal/auth"
 	"mdemg/internal/conversation"
 )
 
@@ -66,11 +70,51 @@ func isHealthEndpoint(path string) bool {
 // logEntry represents a structured log entry for JSON format.
 type logEntry struct {
 	Timestamp string `json:"timestamp"`
+	Level     string `json:"level"`
 	Method    string `json:"method"`
 	Path      string `json:"path"`
 	Status    int    `json:"status"`
 	Duration  int64  `json:"duration_ms"`
 	RequestID string `json:"request_id"`
+	TraceID   string `json:"trace_id,omitempty"`
+	UserID    string `json:"user_id,omitempty"`
+	RemoteIP  string `json:"remote_ip,omitempty"`
+	UserAgent string `json:"user_agent,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// traceIDContextKey is the context key for trace IDs.
+type traceIDContextKey struct{}
+
+// GetTraceID retrieves the trace ID from context.
+func GetTraceID(ctx context.Context) string {
+	if id, ok := ctx.Value(traceIDContextKey{}).(string); ok {
+		return id
+	}
+	return ""
+}
+
+// WithTraceID adds a trace ID to the context.
+func WithTraceID(ctx context.Context, traceID string) context.Context {
+	return context.WithValue(ctx, traceIDContextKey{}, traceID)
+}
+
+// extractClientIP extracts the client IP from the request.
+func extractClientIP(r *http.Request) string {
+	// Check X-Forwarded-For first
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+	// Check X-Real-IP
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+	// Fall back to RemoteAddr
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return ip
 }
 
 // LoggingMiddleware returns middleware that logs HTTP requests.
@@ -78,9 +122,20 @@ func LoggingMiddleware(next http.Handler, cfg LogConfig) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		// Generate and set request ID
+		// Generate request ID
 		requestID := generateRequestID()
 		w.Header().Set("X-Request-ID", requestID)
+
+		// Extract or generate trace ID for distributed tracing
+		traceID := r.Header.Get("X-Trace-ID")
+		if traceID == "" {
+			traceID = generateRequestID() // Generate new trace if not provided
+		}
+		w.Header().Set("X-Trace-ID", traceID)
+
+		// Add trace ID to context for downstream use
+		ctx := WithTraceID(r.Context(), traceID)
+		r = r.WithContext(ctx)
 
 		// Wrap response writer to capture status
 		wrapped := &responseWriter{
@@ -98,24 +153,47 @@ func LoggingMiddleware(next http.Handler, cfg LogConfig) http.Handler {
 
 		duration := time.Since(start)
 
+		// Extract user ID from auth context if available
+		userID := ""
+		if principal := auth.GetPrincipal(r.Context()); principal != nil {
+			userID = principal.ID
+		}
+
+		// Determine log level based on status
+		level := "info"
+		if wrapped.status >= 500 {
+			level = "error"
+		} else if wrapped.status >= 400 {
+			level = "warn"
+		}
+
 		// Log based on format
 		if strings.ToLower(cfg.Format) == "json" {
 			entry := logEntry{
 				Timestamp: start.UTC().Format(time.RFC3339),
+				Level:     level,
 				Method:    r.Method,
 				Path:      r.URL.Path,
 				Status:    wrapped.status,
 				Duration:  duration.Milliseconds(),
 				RequestID: requestID,
+				TraceID:   traceID,
+				UserID:    userID,
+				RemoteIP:  extractClientIP(r),
+				UserAgent: r.UserAgent(),
 			}
 			b, err := json.Marshal(entry)
 			if err == nil {
 				log.Println(string(b))
 			}
 		} else {
-			// Default text format
-			log.Printf("method=%s path=%s status=%d duration=%dms request_id=%s",
-				r.Method, r.URL.Path, wrapped.status, duration.Milliseconds(), requestID)
+			// Default text format with trace ID
+			logLine := fmt.Sprintf("level=%s method=%s path=%s status=%d duration=%dms request_id=%s trace_id=%s",
+				level, r.Method, r.URL.Path, wrapped.status, duration.Milliseconds(), requestID, traceID)
+			if userID != "" {
+				logLine += fmt.Sprintf(" user_id=%s", userID)
+			}
+			log.Println(logLine)
 		}
 	})
 }

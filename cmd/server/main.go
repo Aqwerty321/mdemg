@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log"
@@ -69,6 +70,25 @@ func main() {
 		WriteTimeout:      time.Duration(cfg.HTTPWriteTimeout) * time.Second,
 	}
 
+	// Configure TLS if enabled
+	if cfg.TLSEnabled {
+		tlsCfg := &tls.Config{
+			MinVersion:               tls.VersionTLS12,
+			CurvePreferences:         []tls.CurveID{tls.CurveP256, tls.X25519},
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			},
+		}
+		h.TLSConfig = tlsCfg
+		log.Printf("TLS enabled (cert: %s, key: %s)", cfg.TLSCertFile, cfg.TLSKeyFile)
+	}
+
 	// Dynamic port allocation: try preferred port, then scan range
 	listener, err := listenWithFallback(cfg)
 	if err != nil {
@@ -89,39 +109,64 @@ func main() {
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("MDEMG server started on http://localhost:%s", portStr)
-		if err := h.Serve(listener); err != nil && err != http.ErrServerClosed {
-			log.Printf("server error: %v", err)
+		var serveErr error
+		if cfg.TLSEnabled {
+			log.Printf("MDEMG server started on https://localhost:%s", portStr)
+			serveErr = h.ServeTLS(listener, cfg.TLSCertFile, cfg.TLSKeyFile)
+		} else {
+			log.Printf("MDEMG server started on http://localhost:%s", portStr)
+			serveErr = h.Serve(listener)
+		}
+		if serveErr != nil && serveErr != http.ErrServerClosed {
+			log.Printf("server error: %v", serveErr)
 		}
 	}()
 
 	// Wait for shutdown signal
 	<-shutdown
-	log.Println("shutdown signal received")
+	log.Println("shutdown signal received, starting graceful shutdown...")
 
-	// Remove port file
-	os.Remove(portFile)
-
-	// Create shutdown context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Use configurable graceful shutdown timeout
+	shutdownTimeout := time.Duration(cfg.GracefulShutdownTimeoutSec) * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
-	// Stop plugin manager first
-	if pluginMgr != nil {
-		log.Println("stopping plugin manager...")
-		if err := pluginMgr.Stop(); err != nil {
-			log.Printf("error stopping plugin manager: %v", err)
-		}
-	}
+	// Create a channel to track shutdown completion
+	shutdownComplete := make(chan struct{})
 
-	// Shutdown HTTP server
-	log.Println("shutting down HTTP server...")
-	if err := h.Shutdown(ctx); err != nil {
-		log.Printf("error shutting down HTTP server: %v", err)
+	go func() {
+		defer close(shutdownComplete)
+
+		// Step 1: Stop accepting new connections and drain in-flight requests
+		log.Printf("draining in-flight requests (timeout: %ds)...", cfg.GracefulShutdownTimeoutSec)
+		if err := h.Shutdown(ctx); err != nil {
+			log.Printf("error shutting down HTTP server: %v", err)
+		}
+
+		// Step 2: Stop background services
+		log.Println("stopping background services...")
+		srv.Shutdown()
+
+		// Step 3: Stop plugin manager
+		if pluginMgr != nil {
+			log.Println("stopping plugin manager...")
+			if err := pluginMgr.Stop(); err != nil {
+				log.Printf("error stopping plugin manager: %v", err)
+			}
+		}
+
+		// Step 4: Remove port file
+		os.Remove(portFile)
+	}()
+
+	// Wait for shutdown to complete or timeout
+	select {
+	case <-shutdownComplete:
+		log.Println("graceful shutdown complete")
+	case <-ctx.Done():
+		log.Println("shutdown timeout exceeded, forcing exit")
 		os.Exit(1)
 	}
-
-	log.Println("shutdown complete")
 }
 
 // listenWithFallback tries the preferred address first, then scans the port range.

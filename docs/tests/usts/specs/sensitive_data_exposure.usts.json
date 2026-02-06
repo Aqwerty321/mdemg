@@ -1,0 +1,58 @@
+{
+  "usts_version": "1.0.0",
+  "test": {
+    "name": "sensitive_data_exposure",
+    "description": "Verifies that sensitive data is not exposed in responses",
+    "category": "data_exposure",
+    "severity": "high",
+    "endpoint": "/v1/memory/retrieve",
+    "method": "POST"
+  },
+  "requests": [
+    {
+      "name": "error_response_check",
+      "description": "Check error responses don't leak sensitive info",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-API-Key": "{{valid_api_key}}"
+      },
+      "payload": {
+        "space_id": "nonexistent-space-id-12345",
+        "query_text": "test"
+      }
+    },
+    {
+      "name": "invalid_payload_check",
+      "description": "Check invalid payload responses",
+      "payload": {
+        "invalid_field": "test"
+      },
+      "expected_status": 400
+    }
+  ],
+  "assertions": {
+    "body_not_contains": [
+      "neo4j://",
+      "bolt://",
+      "password",
+      "secret",
+      "api_key",
+      "OPENAI_API_KEY",
+      "/Users/",
+      "/home/",
+      "stack trace",
+      "goroutine",
+      ".go:",
+      "panic:",
+      "runtime error"
+    ],
+    "headers_not_present": [
+      "X-Powered-By",
+      "Server"
+    ]
+  },
+  "metadata": {
+    "owasp": ["A01:2021-Broken Access Control", "A02:2021-Cryptographic Failures"],
+    "cwe": ["CWE-200", "CWE-209", "CWE-532"]
+  }
+}

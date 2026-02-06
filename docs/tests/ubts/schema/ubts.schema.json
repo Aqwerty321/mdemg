@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/ubts/v1.0.0",
+  "title": "UBTS - Universal Benchmark Test Specification",
+  "description": "Schema for defining performance benchmarks in MDEMG",
+  "type": "object",
+  "required": ["ubts_version", "benchmark", "thresholds"],
+  "properties": {
+    "ubts_version": {
+      "type": "string",
+      "description": "Version of the UBTS schema",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "benchmark": {
+      "type": "object",
+      "required": ["name", "endpoint"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for this benchmark"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this benchmark tests"
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "API endpoint to test",
+          "pattern": "^/v1/"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "DELETE"],
+          "default": "POST"
+        },
+        "payload_template": {
+          "type": "object",
+          "description": "Request payload template with {{variable}} placeholders"
+        },
+        "headers": {
+          "type": "object",
+          "description": "Additional headers to send with requests",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "description": "Performance thresholds that must be met",
+      "properties": {
+        "p50_ms": {
+          "type": "number",
+          "description": "50th percentile latency threshold in milliseconds"
+        },
+        "p95_ms": {
+          "type": "number",
+          "description": "95th percentile latency threshold in milliseconds"
+        },
+        "p99_ms": {
+          "type": "number",
+          "description": "99th percentile latency threshold in milliseconds"
+        },
+        "max_ms": {
+          "type": "number",
+          "description": "Maximum allowed latency in milliseconds"
+        },
+        "error_rate_pct": {
+          "type": "number",
+          "description": "Maximum allowed error rate as percentage (0-100)",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "throughput_rps": {
+          "type": "number",
+          "description": "Minimum required throughput in requests per second"
+        }
+      }
+    },
+    "setup": {
+      "type": "object",
+      "description": "Setup steps to run before the benchmark",
+      "properties": {
+        "seed_data": {
+          "type": "string",
+          "description": "Path to seed data file"
+        },
+        "warmup_requests": {
+          "type": "integer",
+          "description": "Number of warmup requests before measurement",
+          "default": 10
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata for the benchmark",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "owner": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    }
+  }
+}

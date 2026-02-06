@@ -1,0 +1,34 @@
+{
+  "ubts_version": "1.0.0",
+  "benchmark": {
+    "name": "concurrent_load",
+    "description": "Tests system behavior under concurrent request load",
+    "endpoint": "/v1/memory/retrieve",
+    "method": "POST",
+    "payload_template": {
+      "space_id": "{{space_id}}",
+      "query_text": "{{query_text}}",
+      "top_k": 5
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "thresholds": {
+    "p50_ms": 100,
+    "p95_ms": 500,
+    "p99_ms": 1000,
+    "max_ms": 3000,
+    "error_rate_pct": 1.0,
+    "throughput_rps": 100
+  },
+  "setup": {
+    "seed_data": "test_data/concurrent_seed.json",
+    "warmup_requests": 50
+  },
+  "metadata": {
+    "tags": ["concurrent", "load", "stress"],
+    "owner": "mdemg-team",
+    "created": "2026-02-05"
+  }
+}

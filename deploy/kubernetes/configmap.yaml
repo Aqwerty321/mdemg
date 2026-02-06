@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mdemg-config
+  labels:
+    app: mdemg
+data:
+  # Schema version
+  REQUIRED_SCHEMA_VERSION: "15"
+
+  # Embedding provider
+  EMBEDDING_PROVIDER: "openai"
+  EMBEDDING_CACHE_ENABLED: "true"
+  EMBEDDING_CACHE_SIZE: "1000"
+
+  # Query cache
+  QUERY_CACHE_ENABLED: "true"
+  QUERY_CACHE_CAPACITY: "500"
+  QUERY_CACHE_TTL_SECONDS: "300"
+
+  # Rate limiting
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_RPS: "100"
+  RATE_LIMIT_BURST: "200"
+  RATE_LIMIT_BY_IP: "true"
+
+  # Circuit breaker
+  CIRCUIT_BREAKER_ENABLED: "true"
+  CIRCUIT_BREAKER_THRESHOLD: "5"
+  CIRCUIT_BREAKER_TIMEOUT: "30"
+
+  # Authentication
+  AUTH_ENABLED: "true"
+  AUTH_MODE: "apikey"
+  AUTH_SKIP_ENDPOINTS: "/healthz,/readyz,/v1/prometheus"
+
+  # Metrics
+  METRICS_ENABLED: "true"
+  METRICS_NAMESPACE: "mdemg"
+
+  # Compression
+  COMPRESSION_ENABLED: "true"
+  COMPRESSION_MIN_SIZE: "1024"
+
+  # Connection pool
+  NEO4J_MAX_POOL_SIZE: "100"
+  NEO4J_ACQUIRE_TIMEOUT_SEC: "60"
+  NEO4J_MAX_CONN_LIFETIME_SEC: "3600"
+
+  # Graceful shutdown
+  GRACEFUL_SHUTDOWN_TIMEOUT: "30"
+
+  # Scoring parameters
+  SCORING_ALPHA: "0.55"
+  SCORING_BETA: "0.30"
+  SCORING_GAMMA: "0.10"
+  SCORING_DELTA: "0.05"
+
+  # Hidden layer
+  HIDDEN_LAYER_ENABLED: "true"
+  HIDDEN_LAYER_CLUSTER_EPS: "0.1"
+  HIDDEN_LAYER_MIN_SAMPLES: "3"
+
+  # Anomaly detection
+  ANOMALY_DETECTION_ENABLED: "true"
+  ANOMALY_DUPLICATE_THRESHOLD: "0.95"
+
+  # Plugin system
+  PLUGINS_ENABLED: "false"

@@ -1,0 +1,19 @@
+# SQL Injection Payloads (for future SQL-based backends)
+# Each line is a test payload
+
+' OR '1'='1
+" OR "1"="1
+' OR 1=1 --
+" OR 1=1 --
+1'; DROP TABLE users; --
+1" OR "1"="1" --
+' UNION SELECT null, null, null --
+' UNION SELECT username, password FROM users --
+admin'--
+' AND 1=0 UNION SELECT null, table_name FROM information_schema.tables --
+1; SELECT * FROM users
+1) OR (1=1
+' AND SLEEP(5) --
+' OR BENCHMARK(10000000,SHA1('test')) --
+'; EXEC xp_cmdshell('whoami'); --
+' WAITFOR DELAY '0:0:5' --

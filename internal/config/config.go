@@ -209,6 +209,46 @@ type Config struct {
 	SyncSpaceIDs            []string          // Comma-separated space IDs to monitor (empty = all)
 	SyncStaleThresholdHours int               // Hours before a space is considered stale (default: 24)
 	SyncRepoPathMap         map[string]string // space_id -> repo_path mapping for auto-ingest
+
+	// ===== Phase 3: Production Readiness =====
+
+	// Rate limiting settings (Phase 3.1)
+	RateLimitEnabled bool    // Feature toggle for rate limiting (default: true)
+	RateLimitRPS     float64 // Requests per second limit (default: 100)
+	RateLimitBurst   int     // Burst allowance (default: 200)
+	RateLimitByIP    bool    // Per-IP rate limiting vs global (default: true)
+
+	// Circuit breaker settings (Phase 3.1)
+	CircuitBreakerEnabled   bool // Feature toggle for circuit breaking (default: true)
+	CircuitBreakerThreshold int  // Failures before opening circuit (default: 5)
+	CircuitBreakerTimeoutSec int // Seconds before half-open (default: 30)
+
+	// Authentication settings (Phase 3.2)
+	AuthEnabled      bool     // Feature toggle for authentication (default: false for dev)
+	AuthMode         string   // Auth mode: "none", "apikey", "bearer" (default: "none")
+	AuthAPIKeys      []string // Comma-separated valid API keys
+	AuthJWTSecret    string   // JWT secret for bearer mode
+	AuthJWTIssuer    string   // Expected JWT issuer
+	AuthSkipEndpoints []string // Endpoints that bypass auth (default: /healthz,/readyz)
+
+	// CORS settings (Phase 3.2)
+	CORSEnabled          bool     // Feature toggle for CORS (default: false)
+	CORSAllowedOrigins   []string // Allowed origins (comma-separated, or "*" for all)
+	CORSAllowedMethods   []string // Allowed methods (default: GET,POST,PUT,DELETE)
+	CORSAllowedHeaders   []string // Allowed headers
+	CORSAllowCredentials bool     // Allow credentials (default: false)
+
+	// TLS settings (Phase 3.2)
+	TLSEnabled  bool   // Feature toggle for HTTPS (default: false)
+	TLSCertFile string // Path to TLS certificate file
+	TLSKeyFile  string // Path to TLS key file
+
+	// Prometheus metrics settings (Phase 3.3)
+	MetricsEnabled   bool   // Feature toggle for Prometheus metrics (default: true)
+	MetricsNamespace string // Metrics namespace prefix (default: "mdemg")
+
+	// Graceful shutdown settings (Phase 3.4)
+	GracefulShutdownTimeoutSec int // Shutdown timeout in seconds (default: 30)
 }
 
 func FromEnv() (Config, error) {
@@ -1028,6 +1068,122 @@ func FromEnv() (Config, error) {
 		}
 	}
 
+	// ===== Phase 3: Production Readiness =====
+
+	// Rate limiting settings
+	rateLimitEnabled := getBool("RATE_LIMIT_ENABLED", true)
+	rateLimitRPS, err := atof("RATE_LIMIT_RPS", 100.0)
+	if err != nil {
+		return Config{}, err
+	}
+	if rateLimitRPS <= 0 {
+		return Config{}, errors.New("RATE_LIMIT_RPS must be > 0")
+	}
+	rateLimitBurst, err := atoi("RATE_LIMIT_BURST", 200)
+	if err != nil {
+		return Config{}, err
+	}
+	if rateLimitBurst <= 0 {
+		return Config{}, errors.New("RATE_LIMIT_BURST must be > 0")
+	}
+	rateLimitByIP := getBool("RATE_LIMIT_BY_IP", true)
+
+	// Circuit breaker settings
+	cbEnabled := getBool("CIRCUIT_BREAKER_ENABLED", true)
+	cbThreshold, err := atoi("CIRCUIT_BREAKER_THRESHOLD", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	if cbThreshold < 1 {
+		return Config{}, errors.New("CIRCUIT_BREAKER_THRESHOLD must be >= 1")
+	}
+	cbTimeout, err := atoi("CIRCUIT_BREAKER_TIMEOUT", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	if cbTimeout < 1 {
+		return Config{}, errors.New("CIRCUIT_BREAKER_TIMEOUT must be >= 1")
+	}
+
+	// Authentication settings
+	authEnabled := getBool("AUTH_ENABLED", false)
+	authMode := get("AUTH_MODE", "none")
+	if authMode != "none" && authMode != "apikey" && authMode != "bearer" {
+		return Config{}, errors.New("AUTH_MODE must be one of: none, apikey, bearer")
+	}
+	var authAPIKeys []string
+	if v := get("AUTH_API_KEYS", ""); v != "" {
+		for _, k := range strings.Split(v, ",") {
+			k = strings.TrimSpace(k)
+			if k != "" {
+				authAPIKeys = append(authAPIKeys, k)
+			}
+		}
+	}
+	authJWTSecret := get("AUTH_JWT_SECRET", "")
+	authJWTIssuer := get("AUTH_JWT_ISSUER", "")
+	var authSkipEndpoints []string
+	if v := get("AUTH_SKIP_ENDPOINTS", "/healthz,/readyz"); v != "" {
+		for _, ep := range strings.Split(v, ",") {
+			ep = strings.TrimSpace(ep)
+			if ep != "" {
+				authSkipEndpoints = append(authSkipEndpoints, ep)
+			}
+		}
+	}
+
+	// CORS settings
+	corsEnabled := getBool("CORS_ENABLED", false)
+	var corsAllowedOrigins []string
+	if v := get("CORS_ALLOWED_ORIGINS", ""); v != "" {
+		for _, o := range strings.Split(v, ",") {
+			o = strings.TrimSpace(o)
+			if o != "" {
+				corsAllowedOrigins = append(corsAllowedOrigins, o)
+			}
+		}
+	}
+	var corsAllowedMethods []string
+	if v := get("CORS_ALLOWED_METHODS", "GET,POST,PUT,DELETE,OPTIONS"); v != "" {
+		for _, m := range strings.Split(v, ",") {
+			m = strings.TrimSpace(m)
+			if m != "" {
+				corsAllowedMethods = append(corsAllowedMethods, m)
+			}
+		}
+	}
+	var corsAllowedHeaders []string
+	if v := get("CORS_ALLOWED_HEADERS", "Accept,Authorization,Content-Type,X-API-Key,X-Request-ID"); v != "" {
+		for _, h := range strings.Split(v, ",") {
+			h = strings.TrimSpace(h)
+			if h != "" {
+				corsAllowedHeaders = append(corsAllowedHeaders, h)
+			}
+		}
+	}
+	corsAllowCredentials := getBool("CORS_ALLOW_CREDENTIALS", false)
+
+	// TLS settings
+	tlsEnabled := getBool("TLS_ENABLED", false)
+	tlsCertFile := get("TLS_CERT_FILE", "")
+	tlsKeyFile := get("TLS_KEY_FILE", "")
+	if tlsEnabled && (tlsCertFile == "" || tlsKeyFile == "") {
+		return Config{}, errors.New("TLS_CERT_FILE and TLS_KEY_FILE are required when TLS_ENABLED=true")
+	}
+
+	// Prometheus metrics settings
+	metricsEnabled := getBool("METRICS_ENABLED", true)
+	metricsNamespace := get("METRICS_NAMESPACE", "mdemg")
+
+	// Graceful shutdown settings
+	gracefulShutdownTimeout, err := atoi("GRACEFUL_SHUTDOWN_TIMEOUT", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	if gracefulShutdownTimeout < 1 {
+		return Config{}, errors.New("GRACEFUL_SHUTDOWN_TIMEOUT must be >= 1")
+	}
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -1170,6 +1326,32 @@ func FromEnv() (Config, error) {
 		SyncSpaceIDs:              syncSpaceIDs,
 		SyncStaleThresholdHours:   syncStaleThresholdHours,
 		SyncRepoPathMap:           syncRepoPathMap,
+
+		// Phase 3: Production Readiness
+		RateLimitEnabled:           rateLimitEnabled,
+		RateLimitRPS:               rateLimitRPS,
+		RateLimitBurst:             rateLimitBurst,
+		RateLimitByIP:              rateLimitByIP,
+		CircuitBreakerEnabled:      cbEnabled,
+		CircuitBreakerThreshold:    cbThreshold,
+		CircuitBreakerTimeoutSec:   cbTimeout,
+		AuthEnabled:                authEnabled,
+		AuthMode:                   authMode,
+		AuthAPIKeys:                authAPIKeys,
+		AuthJWTSecret:              authJWTSecret,
+		AuthJWTIssuer:              authJWTIssuer,
+		AuthSkipEndpoints:          authSkipEndpoints,
+		CORSEnabled:                corsEnabled,
+		CORSAllowedOrigins:         corsAllowedOrigins,
+		CORSAllowedMethods:         corsAllowedMethods,
+		CORSAllowedHeaders:         corsAllowedHeaders,
+		CORSAllowCredentials:       corsAllowCredentials,
+		TLSEnabled:                 tlsEnabled,
+		TLSCertFile:                tlsCertFile,
+		TLSKeyFile:                 tlsKeyFile,
+		MetricsEnabled:             metricsEnabled,
+		MetricsNamespace:           metricsNamespace,
+		GracefulShutdownTimeoutSec: gracefulShutdownTimeout,
 	}, nil
 }
 

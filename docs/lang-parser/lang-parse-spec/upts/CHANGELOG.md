@@ -1,5 +1,31 @@
 # UPTS Changelog
 
+## [1.2.1] - 2026-02-05
+
+### Fixed
+- **Cypher parser**: Changed symbol types from generic ("class", "constant") to Cypher-specific ("label", "relationship_type", "constraint", "index")
+- **Cypher parser**: Fixed relationship regex to handle properties `{...}` and path patterns `*1..3`
+- **Dockerfile parser**: Removed `ARG:` and `ENV:` prefixes from symbol names (now just variable names)
+- **Dockerfile parser**: Added VOLUME instruction extraction with `VOLUME:` prefix
+- **Dockerfile parser**: Added doc_comment to stage symbols showing FROM image
+- **JSON parser**: Fixed brace depth tracking - sibling sections no longer incorrectly nested
+- **SQL parser**: Complete rewrite - now extracts tables, columns, indexes, views, functions, triggers, enums, sequences with proper line numbers
+- **SQL parser**: Added PRIMARY KEY to doc_comment for column symbols
+
+### Spec Bug Fixes
+- **c.upts.json**: Fixed function names (were showing parameter names from auto-generation bug)
+- **cpp.upts.json**: Removed duplicate method+function entries, corrected symbol names
+- **cuda.upts.json**: Fixed shared variable exported flag (true → false)
+- **python.upts.json**: Fixed string value escaping (`"\"1.0.0\""` → `"1.0.0"`)
+
+### Status After v1.2.1
+
+| Category | Passing | Total |
+|----------|---------|-------|
+| All parsers | 20 | 20 |
+
+---
+
 ## [1.2.0] - 2026-02-05
 
 ### Added

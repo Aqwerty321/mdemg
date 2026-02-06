@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/models"
 )
 
@@ -204,6 +205,27 @@ type openAIChatResponse struct {
 }
 
 func (s *Service) rerankWithOpenAI(ctx context.Context, prompt string) ([]float64, int, error) {
+	// Use circuit breaker if available
+	if s.cbRegistry != nil {
+		cb := s.cbRegistry.Get("openai-rerank")
+		var scores []float64
+		var tokens int
+		err := cb.Execute(ctx, func(ctx context.Context) error {
+			var innerErr error
+			scores, tokens, innerErr = s.doRerankWithOpenAI(ctx, prompt)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			return nil, 0, fmt.Errorf("openai rerank circuit breaker open")
+		}
+		return scores, tokens, err
+	}
+
+	return s.doRerankWithOpenAI(ctx, prompt)
+}
+
+// doRerankWithOpenAI performs the actual OpenAI rerank API call.
+func (s *Service) doRerankWithOpenAI(ctx context.Context, prompt string) ([]float64, int, error) {
 	reqBody := openAIChatRequest{
 		Model: s.cfg.RerankModel,
 		Messages: []openAIMessage{
@@ -269,6 +291,27 @@ type ollamaGenerateResponse struct {
 }
 
 func (s *Service) rerankWithOllama(ctx context.Context, prompt string) ([]float64, int, error) {
+	// Use circuit breaker if available
+	if s.cbRegistry != nil {
+		cb := s.cbRegistry.Get("ollama-rerank")
+		var scores []float64
+		var tokens int
+		err := cb.Execute(ctx, func(ctx context.Context) error {
+			var innerErr error
+			scores, tokens, innerErr = s.doRerankWithOllama(ctx, prompt)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			return nil, 0, fmt.Errorf("ollama rerank circuit breaker open")
+		}
+		return scores, tokens, err
+	}
+
+	return s.doRerankWithOllama(ctx, prompt)
+}
+
+// doRerankWithOllama performs the actual Ollama rerank API call.
+func (s *Service) doRerankWithOllama(ctx context.Context, prompt string) ([]float64, int, error) {
 	reqBody := ollamaGenerateRequest{
 		Model:  s.cfg.RerankModel,
 		Prompt: prompt,

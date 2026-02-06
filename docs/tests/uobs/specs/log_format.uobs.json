@@ -1,0 +1,27 @@
+{
+  "uobs_version": "1.0.0",
+  "test": {
+    "name": "log_format",
+    "description": "Validates structured logging format and required fields",
+    "type": "logging"
+  },
+  "logging": {
+    "format": "json",
+    "required_fields": [
+      "timestamp",
+      "level",
+      "method",
+      "path",
+      "status",
+      "duration_ms",
+      "request_id",
+      "trace_id"
+    ],
+    "timestamp_format": "RFC3339"
+  },
+  "tracing": {
+    "trace_header": "X-Trace-ID",
+    "request_id_header": "X-Request-ID",
+    "propagation_check": true
+  }
+}

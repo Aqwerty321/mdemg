@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/uobs/v1.0.0",
+  "title": "UOBS - Universal Observability Specification",
+  "description": "Schema for defining observability tests in MDEMG",
+  "type": "object",
+  "required": ["uobs_version", "test"],
+  "properties": {
+    "uobs_version": {
+      "type": "string",
+      "description": "Version of the UOBS schema",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "test": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for this test"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["metrics", "health", "logging", "tracing"],
+          "description": "Type of observability test"
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Prometheus metrics validation",
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "default": "/v1/prometheus"
+        },
+        "required_metrics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["counter", "gauge", "histogram", "summary"]
+              },
+              "labels": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "format_validation": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "health": {
+      "type": "object",
+      "description": "Health endpoint validation",
+      "properties": {
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "default": "GET"
+              },
+              "expected_status": {
+                "type": "integer",
+                "default": 200
+              },
+              "required_fields": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "max_response_time_ms": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "description": "Log format validation",
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": ["json", "text"]
+        },
+        "required_fields": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "timestamp_format": {
+          "type": "string"
+        }
+      }
+    },
+    "tracing": {
+      "type": "object",
+      "description": "Distributed tracing validation",
+      "properties": {
+        "trace_header": {
+          "type": "string",
+          "default": "X-Trace-ID"
+        },
+        "request_id_header": {
+          "type": "string",
+          "default": "X-Request-ID"
+        },
+        "propagation_check": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  }
+}

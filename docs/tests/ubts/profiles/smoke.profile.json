@@ -1,0 +1,20 @@
+{
+  "profile_name": "smoke",
+  "description": "Quick smoke test with minimal requests to verify basic functionality",
+  "parameters": {
+    "total_requests": 10,
+    "concurrent_users": 1,
+    "ramp_up_seconds": 0,
+    "duration_seconds": null,
+    "think_time_ms": 100
+  },
+  "query_variations": [
+    {"query_text": "database connection pooling"},
+    {"query_text": "error handling patterns"},
+    {"query_text": "authentication middleware"}
+  ],
+  "assertions": {
+    "all_requests_succeed": true,
+    "check_thresholds": false
+  }
+}

@@ -1,9 +1,9 @@
 # Parser Implementation Status
 
 **Generated:** 2026-01-29
-**Last Updated:** 2026-02-05
-**Schema Version:** 1.4 (added Protocol Buffers, GraphQL, and OpenAPI parsers)
-**Status:** 25/25 UPTS-validated languages passing (100%)
+**Last Updated:** 2026-02-07
+**Schema Version:** 1.5 (added Lua and Scraper Markdown parsers)
+**Status:** 27/27 UPTS-validated languages passing (100%)
 
 ---
 
@@ -59,7 +59,7 @@ if validate_parent and exp_parent and actual_parent != exp_parent:
 
 ## Current Status
 
-All 25 UPTS-validated parsers pass via `go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v`:
+All 27 UPTS-validated parsers pass via `go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v`:
 
 | Language | Parser Type | Status | Notes |
 |----------|-------------|--------|-------|
@@ -86,14 +86,27 @@ All 25 UPTS-validated parsers pass via `go test ./cmd/ingest-codebase/languages/
 | Makefile | Regex | ✅ PASS | Targets, variables, .PHONY |
 | Dockerfile | Regex | ✅ PASS | |
 | Shell | Regex | ✅ PASS | |
+| Lua | Regex | ✅ PASS | Functions, local variables, tables |
+| Scraper Markdown | Regex (delegates to Markdown) | ✅ PASS | **NEW** - Web-scraped content; headings, code blocks, links |
 
-**Pass Rate:** 100% (25/25)
+**Pass Rate:** 100% (27/27)
 
-All 25 parsers now have UPTS validation specs.
+All 27 parsers now have UPTS validation specs.
 
 ---
 
-## Recent Changes (2026-02-05)
+## Recent Changes (2026-02-07)
+
+### New Parsers (Phase 51: Web Scraper)
+
+| Parser | Features |
+|--------|----------|
+| Scraper Markdown | Delegates to MarkdownParser.ExtractSymbols(); used by web scraper for section chunking with UPTS-validated symbol extraction |
+| Lua | Functions, local variables, module tables, metatables |
+
+---
+
+## Previous Changes (2026-02-05)
 
 ### New Parsers (Phase 5: API Schemas)
 

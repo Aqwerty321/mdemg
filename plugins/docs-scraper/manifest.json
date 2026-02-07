@@ -1,0 +1,20 @@
+{
+  "id": "docs-scraper",
+  "name": "Documentation Scraper",
+  "version": "1.0.0",
+  "type": "INGESTION",
+  "binary": "docs-scraper",
+  "capabilities": {
+    "ingestion_sources": ["https://", "http://"],
+    "content_types": ["text/html"]
+  },
+  "health_check_interval_ms": 10000,
+  "startup_timeout_ms": 15000,
+  "config": {
+    "default_profile": "documentation",
+    "rate_limit_ms": "1000",
+    "respect_robots_txt": "true",
+    "max_content_length_kb": "500",
+    "user_agent": "MDEMG-Scraper/1.0"
+  }
+}

@@ -1,5 +1,23 @@
 # UPTS Changelog
 
+## [1.5.0] - 2026-02-07
+
+### Added
+- **Scraper Markdown Parser**: `scraper_markdown_parser.go` — delegates symbol extraction to `MarkdownParser.ExtractSymbols()` for UPTS validation of the web scraper's symbol extraction path
+- **Scraper Markdown UPTS Spec**: `scraper_markdown.upts.json` — 24 expected symbols (headings, code blocks, links) from a web-scraped documentation fixture
+- **Lua Parser**: `lua_parser.go` — functions, local variables, module tables, metatables
+
+### Changed
+- **MarkdownParser.ExtractSymbols()**: Exported (was `extractSymbols`) so `internal/scraper` can reuse the UPTS-validated extraction
+
+### Status After v1.5
+
+| Category | Passing | Total |
+|----------|---------|-------|
+| All parsers | 27 | 27 |
+
+---
+
 ## [1.2.1] - 2026-02-05
 
 ### Fixed

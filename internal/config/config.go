@@ -241,6 +241,16 @@ type Config struct {
 	ConstraintMinConfidence    float64 // CONSTRAINT_MIN_CONFIDENCE — minimum confidence to tag as constraint (default: 0.6)
 	ConstraintProtectFromDecay bool    // CONSTRAINT_PROTECT_FROM_DECAY — protect constraint-tagged obs from tombstoning (default: true)
 
+	// Web Scraper Module (Phase 51)
+	ScraperEnabled            bool   // SCRAPER_ENABLED — enable web scraper module (default: false)
+	ScraperDefaultSpaceID     string // SCRAPER_DEFAULT_SPACE_ID — default target space for scraped content (default: "web-scraper")
+	ScraperMaxConcurrentJobs  int    // SCRAPER_MAX_CONCURRENT_JOBS — max concurrent scrape jobs (default: 3)
+	ScraperDefaultDelayMs     int    // SCRAPER_DEFAULT_DELAY_MS — default delay between requests in ms (default: 1000)
+	ScraperDefaultTimeoutMs   int    // SCRAPER_DEFAULT_TIMEOUT_MS — default HTTP timeout in ms (default: 30000)
+	ScraperCacheTTLSeconds    int    // SCRAPER_CACHE_TTL_SECONDS — robots.txt cache TTL in seconds (default: 3600)
+	ScraperRespectRobotsTxt   bool   // SCRAPER_RESPECT_ROBOTS_TXT — respect robots.txt (default: true)
+	ScraperMaxContentLengthKB int    // SCRAPER_MAX_CONTENT_LENGTH_KB — max content length in KB (default: 500)
+
 	// Deterministic consolidation trigger (Phase 45.5)
 	ConsolidateOnWatchdogEnabled bool // CONSOLIDATE_ON_WATCHDOG_ENABLED — trigger consolidation alongside RSIC force (default: true)
 
@@ -1199,6 +1209,43 @@ func FromEnv() (Config, error) {
 	}
 	constraintProtectFromDecay := getBool("CONSTRAINT_PROTECT_FROM_DECAY", true)
 
+	// Web Scraper Module (Phase 51)
+	scraperEnabled := getBool("SCRAPER_ENABLED", false)
+	scraperDefaultSpaceID := get("SCRAPER_DEFAULT_SPACE_ID", "web-scraper")
+	scraperMaxConcurrentJobs, err := atoi("SCRAPER_MAX_CONCURRENT_JOBS", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if scraperMaxConcurrentJobs < 1 {
+		return Config{}, errors.New("SCRAPER_MAX_CONCURRENT_JOBS must be >= 1")
+	}
+	scraperDefaultDelayMs, err := atoi("SCRAPER_DEFAULT_DELAY_MS", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	if scraperDefaultDelayMs < 0 {
+		return Config{}, errors.New("SCRAPER_DEFAULT_DELAY_MS must be >= 0")
+	}
+	scraperDefaultTimeoutMs, err := atoi("SCRAPER_DEFAULT_TIMEOUT_MS", 30000)
+	if err != nil {
+		return Config{}, err
+	}
+	if scraperDefaultTimeoutMs < 1000 {
+		return Config{}, errors.New("SCRAPER_DEFAULT_TIMEOUT_MS must be >= 1000")
+	}
+	scraperCacheTTL, err := atoi("SCRAPER_CACHE_TTL_SECONDS", 3600)
+	if err != nil {
+		return Config{}, err
+	}
+	scraperRespectRobots := getBool("SCRAPER_RESPECT_ROBOTS_TXT", true)
+	scraperMaxContentKB, err := atoi("SCRAPER_MAX_CONTENT_LENGTH_KB", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	if scraperMaxContentKB < 10 {
+		return Config{}, errors.New("SCRAPER_MAX_CONTENT_LENGTH_KB must be >= 10")
+	}
+
 	// Deterministic consolidation trigger
 	consolidateOnWatchdog := getBool("CONSOLIDATE_ON_WATCHDOG_ENABLED", true)
 
@@ -1671,6 +1718,16 @@ func FromEnv() (Config, error) {
 		ConstraintProtectFromDecay: constraintProtectFromDecay,
 
 		ConsolidateOnWatchdogEnabled: consolidateOnWatchdog,
+
+		// Phase 51: Web Scraper
+		ScraperEnabled:            scraperEnabled,
+		ScraperDefaultSpaceID:     scraperDefaultSpaceID,
+		ScraperMaxConcurrentJobs:  scraperMaxConcurrentJobs,
+		ScraperDefaultDelayMs:     scraperDefaultDelayMs,
+		ScraperDefaultTimeoutMs:   scraperDefaultTimeoutMs,
+		ScraperCacheTTLSeconds:    scraperCacheTTL,
+		ScraperRespectRobotsTxt:   scraperRespectRobots,
+		ScraperMaxContentLengthKB: scraperMaxContentKB,
 	}, nil
 }
 

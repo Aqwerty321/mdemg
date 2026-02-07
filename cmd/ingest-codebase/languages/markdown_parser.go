@@ -60,7 +60,7 @@ func (p *MarkdownParser) ParseFile(root, path string, extractSymbols bool) ([]Co
 	// Extract symbols
 	var symbols []Symbol
 	if extractSymbols {
-		symbols = p.extractSymbols(content)
+		symbols = p.ExtractSymbols(content)
 	}
 
 	element := CodeElement{
@@ -94,7 +94,9 @@ var (
 	mdFrontmatterPattern = regexp.MustCompile(`(?s)^---\n(.+?)\n---`)
 )
 
-func (p *MarkdownParser) extractSymbols(content string) []Symbol {
+// ExtractSymbols parses markdown content and returns UPTS-validated symbols.
+// Exported so that internal/scraper can reuse the same UPTS-validated extraction.
+func (p *MarkdownParser) ExtractSymbols(content string) []Symbol {
 	var symbols []Symbol
 	lines := strings.Split(content, "\n")
 

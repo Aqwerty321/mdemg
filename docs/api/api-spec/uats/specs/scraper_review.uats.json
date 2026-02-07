@@ -1,0 +1,50 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Review Scraped Content",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "scraper",
+      "review",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates POST /v1/scraper/jobs/{id}/review processes approve/reject/edit decisions (Phase 51)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "0da78b626c93510c3003bfd68c8043dec95cd392abdb09e40cc391b2f0b7d717"
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/scraper/jobs/test-job-id/review",
+    "body": {
+      "decisions": [
+        {
+          "content_id": "test-content-id",
+          "action": "approve"
+        }
+      ]
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 503,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  }
+}

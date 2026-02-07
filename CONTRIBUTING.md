@@ -90,7 +90,7 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 
 ### Test Frameworks
 
-**UPTS (Universal Parser Test Specification)** validates 26 language parsers against JSON spec files with SHA256 fixture verification. There are two runners:
+**UPTS (Universal Parser Test Specification)** validates 27 language parsers against JSON spec files with SHA256 fixture verification. There are two runners:
 
 1. **Go-native test harness** (`cmd/ingest-codebase/languages/upts_test.go`): Loads UPTS specs, parses fixtures through the actual Go parser, and validates output against expected symbols. No external dependencies — runs via standard `go test`. This is the primary validation method.
 
@@ -239,6 +239,39 @@ Core capabilities: `ListVerifiedFiles`, `GetFileStatus`, `GetHashHistory`, `Veri
 ### Dynamic Port Allocation
 
 The MDEMG server uses dynamic port allocation. When started, it writes the actual bound port to `.mdemg.port`. All test commands (`make test-api`, `make test-smoke`) read this file automatically. If the file doesn't exist, port `9999` is used as the fallback default.
+
+## Claude Code Hooks (Local-Only)
+
+The `.claude/` directory is gitignored and contains local-only configuration for the Claude Code CLI. These hooks are **not committed to the repository** and must be set up per-developer.
+
+### Available Hooks
+
+| Hook | Trigger | Purpose |
+|------|---------|---------|
+| `post-tool-observe.py` | After tool use | Auto-captures CMS observations (build results, errors, config changes); triggers codebase re-ingest on `git push` |
+| `pre-bash-check.py` | Before Bash | Blocks destructive commands (reset-db, rm -rf, force push, DROP TABLE) |
+| `session-start.sh` | Session start | Restores CMS context via `/v1/conversation/resume` |
+| `pre-compact.sh` | Before compaction | Saves context snapshot to CMS before auto-compaction |
+
+### Re-Ingest on Push
+
+The `post-tool-observe.py` hook detects `git push` commands targeting the mdemg repo and automatically triggers an incremental codebase re-ingest + consolidation via `bin/ingest-codebase`. This keeps the `mdemg-dev` CMS space in sync with the latest code.
+
+If this hook is missing or the binary is not built, re-ingest must be triggered manually:
+
+```bash
+# Manual re-ingest
+curl -X POST http://localhost:9999/v1/memory/ingest/trigger \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"mdemg-dev","path":"/Users/reh3376/mdemg","incremental":true}'
+
+# Check status
+curl http://localhost:9999/v1/memory/ingest/status/<job_id>
+```
+
+### Setting Up Hooks
+
+Hooks are stored in `.claude/hooks/` and configured in `.claude/settings.json`. Since these are gitignored, new developers must copy them from a team member or recreate them. See `CLAUDE.md` for the full hook specification.
 
 ## Submitting Changes
 

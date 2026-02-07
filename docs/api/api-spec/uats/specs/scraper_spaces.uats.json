@@ -1,0 +1,42 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "List Scraper Target Spaces",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "scraper",
+      "spaces",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates GET /v1/scraper/spaces returns available target spaces (Phase 51)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "3ec82e6fe21a935834e446fb798478da3d5356b1baf95759a844ddee896b4673"
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/scraper/spaces",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 503,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  }
+}

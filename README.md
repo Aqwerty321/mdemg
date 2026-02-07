@@ -134,7 +134,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Multi-layer graph architecture**: Base observations (L0) → Hidden concepts (L1) → Abstract concepts (L2+)
 - **Hybrid search**: Combines vector similarity with graph traversal
 - **Conversation Memory System (CMS)**: Persistent memory across agent sessions with surprise-weighted learning
-- **Symbol extraction (UPTS)**: Unified Parser Test Schema supporting 26 languages with file:line evidence and SHA256 fixture verification
+- **Symbol extraction (UPTS)**: Unified Parser Test Schema supporting 27 languages with file:line evidence and SHA256 fixture verification
 - **Plugin system**: Extensible via ingestion, reasoning, and APE (Autonomous Pattern Extraction) modules
 - **Evidence-based retrieval**: Returns symbol-level citations (file:line references) with results
 - **Capability gap detection**: Identifies missing knowledge areas for targeted improvement
@@ -254,6 +254,17 @@ Install the post-commit hook to automatically ingest changes on every commit:
 | `/v1/memory/spaces/{id}/freshness` | GET | Space freshness and staleness status |
 | `/v1/webhooks/linear` | POST | Linear webhook receiver with HMAC verification |
 
+### Web Scraper
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/scraper/jobs` | POST | Create a new scrape job |
+| `/v1/scraper/jobs` | GET | List all scrape jobs |
+| `/v1/scraper/jobs/{id}` | GET | Get job status and scraped content |
+| `/v1/scraper/jobs/{id}` | DELETE | Cancel a running job |
+| `/v1/scraper/jobs/{id}/review` | POST | Approve/reject/edit scraped content |
+| `/v1/scraper/spaces` | GET | List available target spaces |
+
 ### Conversation Memory System (CMS)
 
 | Endpoint | Method | Description |
@@ -287,7 +298,7 @@ Install the post-commit hook to automatically ingest changes on every commit:
 
 MDEMG extracts code symbols during ingestion using the Unified Parser Test Schema (UPTS):
 
-**Supported Languages (26 UPTS-validated, 100% pass rate):**
+**Supported Languages (27 UPTS-validated, 100% pass rate):**
 - **Systems**: Go, Rust, C, C++, CUDA
 - **JVM**: Java, Kotlin
 - **.NET**: C#
@@ -296,7 +307,7 @@ MDEMG extracts code symbols during ingestion using the Unified Parser Test Schem
 - **Configuration**: YAML, TOML, JSON, INI
 - **Infrastructure**: Terraform/HCL, Dockerfile, Makefile
 - **Database**: SQL, Cypher (Neo4j)
-- **Documentation**: Markdown, XML
+- **Documentation**: Markdown, XML, Scraper Markdown (web-scraped content with section chunking)
 
 **Extracted Symbol Types:**
 - Functions, methods, classes, interfaces, types
@@ -432,7 +443,7 @@ Exposes all MDEMG metrics in Prometheus format.
 |----------|-------|------|-------------|
 | 1 | 45.5 | APE Context Cooler | Volatile → long-term memory graduation |
 | 2 | 45.5 | APE Constraint Module | Priority/deadline enforcement |
-| 3 | 51 | Web Scraper Ingestion | Browser automation for web content |
+| 3 | 51 | Web Scraper Ingestion | Web content ingestion with section chunking |
 | 4 | 50 | Public Readiness | Open source hardening |
 
 ### Planned

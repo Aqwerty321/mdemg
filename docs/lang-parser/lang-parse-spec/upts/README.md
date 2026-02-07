@@ -25,7 +25,7 @@ UPTS provides:
 
 ## Current Status
 
-**20 UPTS-validated parsers** — all pass via `go test`:
+**27 UPTS-validated parsers** — all pass via `go test`:
 
 | Language | Spec | Fixture | Parser |
 |----------|------|---------|--------|
@@ -49,8 +49,13 @@ UPTS provides:
 | Makefile | [`makefile.upts.json`](specs/makefile.upts.json) | [`makefile_test_fixture.mk`](fixtures/makefile_test_fixture.mk) | [`makefile_parser.go`](../../../../cmd/ingest-codebase/languages/makefile_parser.go) |
 | Dockerfile | [`dockerfile.upts.json`](specs/dockerfile.upts.json) | [`dockerfile_test_fixture.Dockerfile`](fixtures/dockerfile_test_fixture.Dockerfile) | [`dockerfile_parser.go`](../../../../cmd/ingest-codebase/languages/dockerfile_parser.go) |
 | Shell | [`shell.upts.json`](specs/shell.upts.json) | [`shell_test_fixture.sh`](fixtures/shell_test_fixture.sh) | [`shell_parser.go`](../../../../cmd/ingest-codebase/languages/shell_parser.go) |
-
-2 additional parsers without UPTS specs: Markdown, XML.
+| Protocol Buffers | [`protobuf.upts.json`](specs/protobuf.upts.json) | [`protobuf_test_fixture.proto`](fixtures/protobuf_test_fixture.proto) | [`protobuf_parser.go`](../../../../cmd/ingest-codebase/languages/protobuf_parser.go) |
+| GraphQL | [`graphql.upts.json`](specs/graphql.upts.json) | [`graphql_test_fixture.graphql`](fixtures/graphql_test_fixture.graphql) | [`graphql_parser.go`](../../../../cmd/ingest-codebase/languages/graphql_parser.go) |
+| OpenAPI | [`openapi.upts.json`](specs/openapi.upts.json) | [`openapi_test_fixture.yaml`](fixtures/openapi_test_fixture.yaml) | [`openapi_parser.go`](../../../../cmd/ingest-codebase/languages/openapi_parser.go) |
+| Markdown | [`markdown.upts.json`](specs/markdown.upts.json) | [`markdown_test_fixture.md`](fixtures/markdown_test_fixture.md) | [`markdown_parser.go`](../../../../cmd/ingest-codebase/languages/markdown_parser.go) |
+| XML | [`xml.upts.json`](specs/xml.upts.json) | [`xml_test_fixture.xml`](fixtures/xml_test_fixture.xml) | [`xml_parser.go`](../../../../cmd/ingest-codebase/languages/xml_parser.go) |
+| Lua | [`lua.upts.json`](specs/lua.upts.json) | [`lua_test_fixture.lua`](fixtures/lua_test_fixture.lua) | [`lua_parser.go`](../../../../cmd/ingest-codebase/languages/lua_parser.go) |
+| Scraper Markdown | [`scraper_markdown.upts.json`](specs/scraper_markdown.upts.json) | [`scraper_markdown_test_fixture.md`](fixtures/scraper_markdown_test_fixture.md) | [`scraper_markdown_parser.go`](../../../../cmd/ingest-codebase/languages/scraper_markdown_parser.go) |
 
 ---
 
@@ -61,7 +66,7 @@ upts/
 ├── schema/
 │   └── upts.schema.json             # JSON Schema (canonical definition)
 │
-├── specs/                            # 20 UPTS spec files
+├── specs/                            # 27 UPTS spec files
 │   ├── go.upts.json
 │   ├── rust.upts.json
 │   ├── python.upts.json
@@ -81,9 +86,16 @@ upts/
 │   ├── ini.upts.json
 │   ├── makefile.upts.json
 │   ├── dockerfile.upts.json
-│   └── shell.upts.json
+│   ├── shell.upts.json
+│   ├── protobuf.upts.json
+│   ├── graphql.upts.json
+│   ├── openapi.upts.json
+│   ├── markdown.upts.json
+│   ├── xml.upts.json
+│   ├── lua.upts.json
+│   └── scraper_markdown.upts.json
 │
-├── fixtures/                         # 20 test fixture files
+├── fixtures/                         # 27 test fixture files
 │   ├── go_test_fixture.go
 │   ├── rust_test_fixture.rs
 │   ├── python_test_fixture.py
@@ -113,7 +125,7 @@ The primary validation method is the Go-native test harness in the parser direct
 ### 1. Run All UPTS Tests (Go-Native — Recommended)
 
 ```bash
-# All 20 UPTS-validated parsers
+# All 27 UPTS-validated parsers
 go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
 
 # Single language

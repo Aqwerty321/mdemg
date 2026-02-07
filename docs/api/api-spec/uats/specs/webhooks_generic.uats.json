@@ -51,7 +51,8 @@
       {
         "path": "$.status",
         "type": "string",
-        "one_of": ["accepted", "ignored"]
+        "in": ["accepted", "ignored"],
+        "optional": true
       }
     ],
     "notes": "Returns 404 if source not configured, 200 with accepted/ignored status otherwise"

@@ -256,12 +256,12 @@ func normalizeType(t string) string {
 
 // runJSONMode parses a single file and outputs UPTS-compatible JSON to stdout
 func runJSONMode(filePath string) {
-	// For C/C++/CUDA files, prefer the ingest-codebase parser over tree-sitter
+	// For C/C++/CUDA/Rust files, prefer the ingest-codebase parser over tree-sitter
 	// because the ingest-codebase parser has better accuracy for these languages
 	ext := strings.ToLower(filepath.Ext(filePath))
 	preferIngestParser := ext == ".c" || ext == ".h" || ext == ".cpp" || ext == ".cc" ||
 		ext == ".cxx" || ext == ".hpp" || ext == ".hh" || ext == ".hxx" ||
-		ext == ".cu" || ext == ".cuh"
+		ext == ".cu" || ext == ".cuh" || ext == ".rs"
 
 	// Try ingest-codebase parser first for C/C++/CUDA
 	if preferIngestParser {

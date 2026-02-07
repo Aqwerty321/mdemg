@@ -1,0 +1,67 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Constraints List",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "constraints",
+      "conversation",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates constraint node listing endpoint (Phase 45.5)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "b4e76adc71f2d3ec9c29a65ae7a292dff0fc538ae2d5087597670ca150260930"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/constraints",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.constraints",
+        "type": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "Missing space_id",
+      "request": {
+        "query": {
+          "space_id": null
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

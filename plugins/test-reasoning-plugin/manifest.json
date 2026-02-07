@@ -1,0 +1,15 @@
+{
+  "id": "test-reasoning-plugin",
+  "name": "Test Reasoning Plugin",
+  "version": "1.0.0",
+  "type": "REASONING",
+  "binary": "test-reasoning-plugin",
+  "capabilities": {
+    "pattern_detectors": ["custom_ranking"]
+  },
+  "health_check_interval_ms": 5000,
+  "startup_timeout_ms": 10000,
+  "config": {
+    "boost_factor": "0.2"
+  }
+}

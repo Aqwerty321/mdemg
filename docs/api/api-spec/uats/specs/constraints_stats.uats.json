@@ -1,0 +1,75 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Constraints Stats",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "constraints",
+      "conversation",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates constraint statistics endpoint (Phase 45.5)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "7c58c51c91cf4d1c95ef0936cc9dab362c1520ba02dc9451664cdd3c7793fcbd"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/constraints/stats",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.total_constraint_nodes",
+        "type": "number"
+      },
+      {
+        "path": "$.by_type",
+        "type": "array"
+      },
+      {
+        "path": "$.tagged_observation_count",
+        "type": "number"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "Missing space_id",
+      "request": {
+        "query": {
+          "space_id": null
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

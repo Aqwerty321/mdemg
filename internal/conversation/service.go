@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/config"
 )
 
 // LearningService defines the interface for the learning service
@@ -21,20 +22,22 @@ type LearningService interface {
 
 // Service handles conversation observation capture and surprise detection
 type Service struct {
-	driver           neo4j.DriverWithContext
-	embedder         Embedder
-	surpriseDetector *SurpriseDetector
-	learningService  LearningService
-	vectorIndexName  string
+	driver               neo4j.DriverWithContext
+	embedder             Embedder
+	surpriseDetector     *SurpriseDetector
+	learningService      LearningService
+	vectorIndexName      string
+	constraintDetector   *ConstraintDetector
+	constraintDetEnabled bool
 }
 
 // NewService creates a new conversation service
 func NewService(driver neo4j.DriverWithContext, embedder Embedder) *Service {
-	return NewServiceWithConfig(driver, embedder, "memNodeEmbedding")
+	return NewServiceWithConfig(driver, embedder, "memNodeEmbedding", config.Config{ConstraintDetectionEnabled: true, ConstraintMinConfidence: 0.6})
 }
 
 // NewServiceWithConfig creates a new conversation service with configurable index name
-func NewServiceWithConfig(driver neo4j.DriverWithContext, embedder Embedder, vectorIndexName string) *Service {
+func NewServiceWithConfig(driver neo4j.DriverWithContext, embedder Embedder, vectorIndexName string, cfg ...config.Config) *Service {
 	var surpriseDet *SurpriseDetector
 	if embedder != nil {
 		surpriseDet = NewSurpriseDetector(embedder, driver)
@@ -44,13 +47,21 @@ func NewServiceWithConfig(driver neo4j.DriverWithContext, embedder Embedder, vec
 		vectorIndexName = "memNodeEmbedding"
 	}
 
-	return &Service{
+	svc := &Service{
 		driver:           driver,
 		embedder:         embedder,
 		surpriseDetector: surpriseDet,
 		learningService:  nil, // Set via SetLearningService to avoid circular dependency
 		vectorIndexName:  vectorIndexName,
 	}
+
+	// Initialize constraint detection if config is provided
+	if len(cfg) > 0 && cfg[0].ConstraintDetectionEnabled {
+		svc.constraintDetEnabled = true
+		svc.constraintDetector = NewConstraintDetector(cfg[0].ConstraintMinConfidence)
+	}
+
+	return svc
 }
 
 // SetLearningService injects the learning service (to avoid circular imports)
@@ -84,11 +95,12 @@ type ObserveRequest struct {
 
 // ObserveResponse is the response from capturing an observation
 type ObserveResponse struct {
-	ObsID           string             `json:"obs_id"`
-	NodeID          string             `json:"node_id"`
-	SurpriseScore   float64            `json:"surprise_score"`
-	SurpriseFactors map[string]float64 `json:"surprise_factors"`
-	Summary         string             `json:"summary,omitempty"`
+	ObsID               string               `json:"obs_id"`
+	NodeID              string               `json:"node_id"`
+	SurpriseScore       float64              `json:"surprise_score"`
+	SurpriseFactors     map[string]float64   `json:"surprise_factors"`
+	Summary             string               `json:"summary,omitempty"`
+	DetectedConstraints []DetectedConstraint `json:"detected_constraints,omitempty"`
 }
 
 // CorrectRequest is the request for capturing an explicit correction
@@ -266,6 +278,47 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 	// Build tags
 	tags := buildObservationTags(req, obsType)
 
+	// Constraint detection (Phase 45.5)
+	var detectedConstraints []DetectedConstraint
+	if s.constraintDetEnabled && s.constraintDetector != nil {
+		detectedConstraints = s.constraintDetector.Detect(req.Content, obsType)
+		if len(detectedConstraints) > 0 {
+			for _, dc := range detectedConstraints {
+				tags = append(tags, "constraint:"+dc.ConstraintType)
+			}
+			// Boost importance for constraint-tagged observations
+			if obs.ImportanceScore < 0.8 {
+				obs.ImportanceScore = 0.8
+			}
+			// Set tier based on constraint type
+			for _, dc := range detectedConstraints {
+				if dc.ConstraintType == "must" || dc.ConstraintType == "must_not" {
+					obs.Tier = "critical"
+					break
+				}
+				if dc.ConstraintType == "should" || dc.ConstraintType == "should_not" {
+					if obs.Tier != "critical" {
+						obs.Tier = "important"
+					}
+				}
+			}
+			// Store constraint metadata in structured data
+			if obs.StructuredData == nil {
+				obs.StructuredData = make(map[string]any)
+			}
+			constraintMeta := make([]map[string]any, len(detectedConstraints))
+			for i, dc := range detectedConstraints {
+				constraintMeta[i] = map[string]any{
+					"constraint_type": dc.ConstraintType,
+					"name":            dc.Name,
+					"confidence":      dc.Confidence,
+				}
+			}
+			obs.StructuredData["detected_constraints"] = constraintMeta
+			log.Printf("Constraint detection: %d constraint(s) detected in observation %s", len(detectedConstraints), obsID)
+		}
+	}
+
 	// Create MemoryNode in Neo4j
 	err = s.createObservationNode(ctx, nodeID, obs, tags)
 	if err != nil {
@@ -296,7 +349,7 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 		}
 	}
 
-	return &ObserveResponse{
+	resp := &ObserveResponse{
 		ObsID:         obsID,
 		NodeID:        nodeID,
 		SurpriseScore: surpriseScore,
@@ -307,7 +360,11 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 			"embedding_novelty":   factors.EmbeddingNovelty,
 		},
 		Summary: obs.Summary,
-	}, nil
+	}
+	if len(detectedConstraints) > 0 {
+		resp.DetectedConstraints = detectedConstraints
+	}
+	return resp, nil
 }
 
 // Correct captures an explicit correction (sets high surprise)

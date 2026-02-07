@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/conversation"
 	"mdemg/internal/models"
 )
@@ -68,6 +69,18 @@ func (s *Server) handleObserve(w http.ResponseWriter, r *http.Request) {
 		SurpriseScore:   resp.SurpriseScore,
 		SurpriseFactors: resp.SurpriseFactors,
 		Summary:         resp.Summary,
+	}
+
+	// Include detected constraints if any (Phase 45.5)
+	if len(resp.DetectedConstraints) > 0 {
+		apiResp.DetectedConstraints = make([]models.DetectedConstraintInfo, len(resp.DetectedConstraints))
+		for i, dc := range resp.DetectedConstraints {
+			apiResp.DetectedConstraints[i] = models.DetectedConstraintInfo{
+				ConstraintType: dc.ConstraintType,
+				Name:           dc.Name,
+				Confidence:     dc.Confidence,
+			}
+		}
 	}
 
 	writeJSON(w, http.StatusOK, apiResp)
@@ -509,4 +522,152 @@ func (s *Server) handleSessionHealth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleConstraintsList lists constraint nodes for a space
+// GET /v1/constraints?space_id=...
+func (s *Server) handleConstraintsList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	spaceID := r.URL.Query().Get("space_id")
+	if spaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query parameter is required"})
+		return
+	}
+
+	sess := s.driver.NewSession(r.Context(), neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(r.Context())
+
+	result, err := sess.ExecuteRead(r.Context(), func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})
+			WHERE NOT coalesce(c.is_archived, false)
+			OPTIONAL MATCH (c)<-[:IMPLEMENTS_CONSTRAINT]-(obs)
+			RETURN c.node_id AS node_id,
+			       c.name AS name,
+			       c.constraint_type AS constraint_type,
+			       c.content AS content,
+			       c.confidence AS confidence,
+			       c.created_at AS created_at,
+			       c.updated_at AS updated_at,
+			       count(obs) AS source_count
+			ORDER BY c.confidence DESC
+		`
+		res, err := tx.Run(r.Context(), cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+
+		var constraints []map[string]any
+		for res.Next(r.Context()) {
+			rec := res.Record()
+			entry := make(map[string]any)
+			for _, key := range rec.Keys {
+				val, _ := rec.Get(key)
+				entry[key] = val
+			}
+			constraints = append(constraints, entry)
+		}
+		if constraints == nil {
+			constraints = []map[string]any{}
+		}
+		return constraints, res.Err()
+	})
+
+	if err != nil {
+		writeInternalError(w, err, "list constraints")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"space_id":    spaceID,
+		"constraints": result,
+	})
+}
+
+// handleConstraintStats returns summary statistics about constraint nodes
+// GET /v1/constraints/stats?space_id=...
+func (s *Server) handleConstraintStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	spaceID := r.URL.Query().Get("space_id")
+	if spaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query parameter is required"})
+		return
+	}
+
+	sess := s.driver.NewSession(r.Context(), neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(r.Context())
+
+	result, err := sess.ExecuteRead(r.Context(), func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})
+			WHERE NOT coalesce(c.is_archived, false)
+			RETURN c.constraint_type AS constraint_type,
+			       count(c) AS count,
+			       avg(c.confidence) AS avg_confidence
+			ORDER BY count DESC
+		`
+		res, err := tx.Run(r.Context(), cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+
+		var byType []map[string]any
+		total := 0
+		for res.Next(r.Context()) {
+			rec := res.Record()
+			entry := make(map[string]any)
+			for _, key := range rec.Keys {
+				val, _ := rec.Get(key)
+				entry[key] = val
+			}
+			byType = append(byType, entry)
+			if cnt, ok := entry["count"]; ok {
+				if n, ok := cnt.(int64); ok {
+					total += int(n)
+				}
+			}
+		}
+		if byType == nil {
+			byType = []map[string]any{}
+		}
+
+		// Count constraint-tagged observations
+		obsCypher := `
+			MATCH (obs:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})
+			WHERE any(tag IN coalesce(obs.tags, []) WHERE tag STARTS WITH 'constraint:')
+			RETURN count(obs) AS tagged_observation_count
+		`
+		obsRes, err := tx.Run(r.Context(), obsCypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		taggedCount := 0
+		if obsRes.Next(r.Context()) {
+			if v, ok := obsRes.Record().Get("tagged_observation_count"); ok && v != nil {
+				taggedCount = int(v.(int64))
+			}
+		}
+
+		return map[string]any{
+			"space_id":                 spaceID,
+			"total_constraint_nodes":   total,
+			"by_type":                  byType,
+			"tagged_observation_count": taggedCount,
+		}, res.Err()
+	})
+
+	if err != nil {
+		writeInternalError(w, err, "constraint stats")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }

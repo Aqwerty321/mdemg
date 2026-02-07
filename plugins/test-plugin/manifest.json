@@ -1,0 +1,13 @@
+{
+  "id": "test-plugin",
+  "name": "Test Plugin",
+  "version": "1.0.0",
+  "type": "INGESTION",
+  "binary": "test-plugin",
+  "capabilities": {
+    "ingestion_sources": ["test-plugin://"],
+    "content_types": ["application/x-test-plugin"]
+  },
+  "health_check_interval_ms": 5000,
+  "startup_timeout_ms": 10000
+}

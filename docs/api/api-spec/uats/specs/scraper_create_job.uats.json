@@ -1,0 +1,66 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Create Scrape Job",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "scraper",
+      "create",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates POST /v1/scraper/jobs creates a new scraping job (Phase 51)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "5f1b4e139d095c56b92323e1af06a3000729b1924c80b36f46d3b5a46f569c93"
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/scraper/jobs",
+    "body": {
+      "urls": [
+        "https://example.com"
+      ],
+      "target_space_id": "uats-scraper-test"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 503,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "Method not allowed (GET)",
+      "request": {
+        "method": "GET",
+        "path": "/v1/scraper/jobs"
+      },
+      "expected": {
+        "status": 503,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

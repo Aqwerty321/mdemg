@@ -1,0 +1,216 @@
+{
+  "upts_version": "1.0.0",
+  "language": "scraper-markdown",
+  "variants": [".scraped.md"],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Scraper markdown parser for web-scraped documentation content",
+    "parser_status": "functional",
+    "tags": ["web-scraper", "documentation"]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_parent": true,
+    "validate_value": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/scraper_markdown_test_fixture.md",
+    "sha256": "42bb9961b460071df787d82194d639ddcc2933b464ebb50eb7e18dc4a0818634"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 20,
+      "max": 28
+    },
+    "symbols": [
+      {
+        "name": "net/http — Go Standard Library",
+        "type": "section",
+        "line": 1,
+        "exported": true,
+        "doc_comment": "#",
+        "pattern": "P_HEADING_H1"
+      },
+      {
+        "name": "Overview",
+        "type": "heading",
+        "line": 5,
+        "parent": "net/http — Go Standard Library",
+        "exported": true,
+        "pattern": "P_HEADING_H2"
+      },
+      {
+        "name": "Types",
+        "type": "heading",
+        "line": 14,
+        "exported": true,
+        "pattern": "P_HEADING_H2"
+      },
+      {
+        "name": "Handler",
+        "type": "heading",
+        "line": 16,
+        "parent": "Types",
+        "exported": true,
+        "pattern": "P_HEADING_H3"
+      },
+      {
+        "name": "go",
+        "type": "code_block",
+        "line": 21,
+        "exported": true,
+        "pattern": "P_CODE_BLOCK"
+      },
+      {
+        "name": "Request",
+        "type": "heading",
+        "line": 27,
+        "exported": true,
+        "pattern": "P_HEADING_H3"
+      },
+      {
+        "name": "go",
+        "type": "code_block",
+        "line": 31,
+        "exported": true,
+        "pattern": "P_CODE_BLOCK"
+      },
+      {
+        "name": "ResponseWriter",
+        "type": "heading",
+        "line": 40,
+        "exported": true,
+        "pattern": "P_HEADING_H3"
+      },
+      {
+        "name": "Functions",
+        "type": "heading",
+        "line": 44,
+        "exported": true,
+        "pattern": "P_HEADING_H2"
+      },
+      {
+        "name": "ListenAndServe",
+        "type": "heading",
+        "line": 46,
+        "parent": "Functions",
+        "exported": true,
+        "pattern": "P_HEADING_H3"
+      },
+      {
+        "name": "go",
+        "type": "code_block",
+        "line": 51,
+        "exported": true,
+        "pattern": "P_CODE_BLOCK"
+      },
+      {
+        "name": "HandleFunc",
+        "type": "heading",
+        "line": 55,
+        "exported": true,
+        "pattern": "P_HEADING_H3"
+      },
+      {
+        "name": "go",
+        "type": "code_block",
+        "line": 59,
+        "exported": true,
+        "pattern": "P_CODE_BLOCK"
+      },
+      {
+        "name": "Examples",
+        "type": "heading",
+        "line": 63,
+        "exported": true,
+        "pattern": "P_HEADING_H2"
+      },
+      {
+        "name": "go",
+        "type": "code_block",
+        "line": 67,
+        "exported": true,
+        "pattern": "P_CODE_BLOCK"
+      },
+      {
+        "name": "python",
+        "type": "code_block",
+        "line": 76,
+        "exported": true,
+        "pattern": "P_CODE_BLOCK"
+      },
+      {
+        "name": "bash",
+        "type": "code_block",
+        "line": 84,
+        "exported": true,
+        "pattern": "P_CODE_BLOCK"
+      },
+      {
+        "name": "Related Packages",
+        "type": "heading",
+        "line": 88,
+        "exported": true,
+        "pattern": "P_HEADING_H2"
+      },
+      {
+        "name": "net/url",
+        "type": "link",
+        "line": 90,
+        "value": "https://pkg.go.dev/net/url",
+        "exported": true,
+        "pattern": "P_LINK"
+      },
+      {
+        "name": "io",
+        "type": "link",
+        "line": 91,
+        "value": "https://pkg.go.dev/io",
+        "exported": true,
+        "pattern": "P_LINK"
+      },
+      {
+        "name": "context",
+        "type": "link",
+        "line": 92,
+        "value": "https://pkg.go.dev/context",
+        "exported": true,
+        "pattern": "P_LINK"
+      },
+      {
+        "name": "See Also",
+        "type": "heading",
+        "line": 94,
+        "exported": true,
+        "pattern": "P_HEADING_H2"
+      },
+      {
+        "name": "HTTP specification",
+        "type": "link",
+        "line": 96,
+        "value": "https://www.rfc-editor.org/rfc/rfc9110",
+        "exported": true,
+        "pattern": "P_LINK"
+      },
+      {
+        "name": "Go documentation",
+        "type": "link",
+        "line": 97,
+        "value": "https://pkg.go.dev/net/http",
+        "exported": true,
+        "pattern": "P_LINK"
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P_HEADING_H1",
+    "P_HEADING_H2",
+    "P_HEADING_H3",
+    "P_CODE_BLOCK",
+    "P_LINK"
+  ]
+}

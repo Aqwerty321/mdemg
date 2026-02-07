@@ -90,7 +90,7 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 
 ### Test Frameworks
 
-**UPTS (Universal Parser Test Specification)** validates 26 language parsers against JSON spec files with SHA256 fixture verification. There are two runners:
+**UPTS (Universal Parser Test Specification)** validates 27 language parsers against JSON spec files with SHA256 fixture verification. There are two runners:
 
 1. **Go-native test harness** (`cmd/ingest-codebase/languages/upts_test.go`): Loads UPTS specs, parses fixtures through the actual Go parser, and validates output against expected symbols. No external dependencies — runs via standard `go test`. This is the primary validation method.
 

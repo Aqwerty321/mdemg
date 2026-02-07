@@ -26,6 +26,8 @@ bin/
 /plugin-scaffold
 /plugin-validate
 /mcp-server
+/docs-scraper
+plugins/docs-scraper/docs-scraper
 *.exe
 *.exe~
 *.dll

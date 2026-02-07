@@ -31,6 +31,7 @@ import (
 	"mdemg/internal/ratelimit"
 	"mdemg/internal/retrieval"
 	"mdemg/internal/models"
+	"mdemg/internal/scraper"
 	"mdemg/internal/symbols"
 	"mdemg/internal/validation"
 )
@@ -77,6 +78,9 @@ type Server struct {
 	rsicCycle    *ape.CycleOrchestrator
 	rsicWatchdog *ape.Watchdog
 	stopRSIC     chan struct{}
+
+	// Phase 51: Web Scraper
+	scraperSvc *scraper.Service
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -264,6 +268,26 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		log.Printf("Memory pressure monitoring enabled (threshold: %dMB)", cfg.MemoryPressureThresholdMB)
 	}
 
+	// Phase 51: Initialize Web Scraper service
+	var scraperSvc *scraper.Service
+	if cfg.ScraperEnabled {
+		scraperCfg := scraper.Config{
+			Enabled:            cfg.ScraperEnabled,
+			DefaultSpaceID:     cfg.ScraperDefaultSpaceID,
+			MaxConcurrentJobs:  cfg.ScraperMaxConcurrentJobs,
+			DefaultDelayMs:     cfg.ScraperDefaultDelayMs,
+			DefaultTimeoutMs:   cfg.ScraperDefaultTimeoutMs,
+			CacheTTLSeconds:    cfg.ScraperCacheTTLSeconds,
+			RespectRobotsTxt:   cfg.ScraperRespectRobotsTxt,
+			MaxContentLengthKB: cfg.ScraperMaxContentLengthKB,
+		}
+		scraperSvc = scraper.NewService(scraperCfg, driver, emb, pluginMgr)
+		if convSvc != nil {
+			scraperSvc.SetConversationService(&scraperConvAdapter{svc: convSvc})
+		}
+		log.Printf("Web scraper enabled (space: %s, max_jobs: %d)", cfg.ScraperDefaultSpaceID, cfg.ScraperMaxConcurrentJobs)
+	}
+
 	// Phase 60b: Initialize RSIC components
 	var rsicCycle *ape.CycleOrchestrator
 	var rsicWatchdog *ape.Watchdog
@@ -330,6 +354,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		orgReviewService:        conversation.NewOrgReviewService(driver),
 		rsicCycle:               rsicCycle,
 		rsicWatchdog:            rsicWatchdog,
+		scraperSvc:              scraperSvc,
 	}
 }
 
@@ -853,6 +878,11 @@ func (s *Server) Routes() http.Handler {
 	// Skill Registry (Phase 48)
 	mux.HandleFunc("/v1/skills", s.handleSkills)
 	mux.HandleFunc("/v1/skills/", s.handleSkillOperation)
+
+	// Web Scraper (Phase 51)
+	mux.HandleFunc("/v1/scraper/jobs", s.handleScraperJobs)
+	mux.HandleFunc("/v1/scraper/jobs/", s.handleScraperJobByID)
+	mux.HandleFunc("/v1/scraper/spaces", s.handleListScrapeSpaces)
 
 	// Linear CRUD endpoints (Phase 4)
 	mux.HandleFunc("/v1/linear/issues", s.handleLinearIssues)

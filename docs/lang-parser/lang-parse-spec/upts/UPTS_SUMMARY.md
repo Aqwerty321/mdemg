@@ -1,8 +1,8 @@
 # UPTS Parser Summary
 
-**Generated:** 2026-02-05
-**Total Parsers:** 25 UPTS-validated
-**Pass Rate:** 100% (25/25)
+**Generated:** 2026-02-07
+**Total Parsers:** 27 UPTS-validated
+**Pass Rate:** 100% (27/27)
 
 ---
 
@@ -35,6 +35,8 @@
 | 23 | OpenAPI | Regex | `.yaml`, `.yml`, `.json` (with openapi marker) | YAML | - | 8 patterns | 30-40 | REST endpoints, HTTP methods, operationIds, schemas, security |
 | 24 | Markdown | Regex | `.md`, `.markdown` | - | - | 4 patterns | 15-25 | Headings (H1-H4), code blocks, links |
 | 25 | XML | Regex | `.xml`, `.csproj`, `.vbproj` | - | - | 4 patterns | 8-15 | .NET project files: PackageReference, Target, PropertyGroup |
+| 26 | Lua | Regex | `.lua` | - | - | 4 patterns | 15-25 | Functions, local variables, tables, metatables |
+| 27 | Scraper Markdown | Regex (delegates to Markdown) | `.scraped.md` | Markdown | - | 5 patterns | 20-28 | Web-scraped docs: headings, code blocks, links; used by scraper section chunking |
 
 ---
 
@@ -59,12 +61,13 @@
 |--------|-------|
 | C# | Brace-depth scope tracking; records, properties, attributes, namespaces |
 
-### Scripting Languages (3)
+### Scripting Languages (4)
 | Parser | Notes |
 |--------|-------|
 | Python | Protocol, dataclass, async/await, decorators |
 | TypeScript | Includes JS/JSX/TSX; decorators, NestJS patterns |
 | Shell | Functions, variables, aliases, exports |
+| Lua | Functions, local variables, module tables, metatables |
 
 ### Configuration Languages (4)
 | Parser | Notes |
@@ -94,11 +97,12 @@
 | GraphQL | Types, interfaces, inputs, unions, Query/Mutation/Subscription |
 | OpenAPI | REST endpoints, HTTP methods, operationIds, schemas, security schemes |
 
-### Documentation / Markup (2)
+### Documentation / Markup (3)
 | Parser | Notes |
 |--------|-------|
 | Markdown | Headings, code blocks, links |
 | XML | .NET project files, build targets |
+| Scraper Markdown | Delegates to Markdown parser; used by web scraper for section chunking |
 
 ---
 
@@ -113,6 +117,8 @@ Shell ─> Makefile (recipe syntax)
 YAML ─> OpenAPI (uses YAML parsing as base)
 
 TypeScript ─> JavaScript, JSX, TSX (file extension variants)
+
+Markdown ─> Scraper Markdown (delegates symbol extraction)
 ```
 
 ---
@@ -121,13 +127,13 @@ TypeScript ─> JavaScript, JSX, TSX (file extension variants)
 
 | Pattern | Code | Description | Parsers Supporting |
 |---------|------|-------------|-------------------|
-| P1 | `P1_CONSTANT` | Named constant values | All 25 |
-| P2 | `P2_FUNCTION` | Standalone functions | 22/25 (not INI, JSON, Markdown) |
-| P3 | `P3_CLASS_STRUCT` | Classes/structs/messages | 18/25 |
-| P4 | `P4_INTERFACE_TRAIT` | Interfaces/traits/protocols | 12/25 |
-| P5 | `P5_ENUM` | Enumerations | 14/25 |
-| P6 | `P6_METHOD` | Class/struct methods | 15/25 |
-| P7 | `P7_TYPE_ALIAS` | Type aliases | 8/25 |
+| P1 | `P1_CONSTANT` | Named constant values | All 27 |
+| P2 | `P2_FUNCTION` | Standalone functions | 23/27 (not INI, JSON, Markdown, Scraper Markdown) |
+| P3 | `P3_CLASS_STRUCT` | Classes/structs/messages | 18/27 |
+| P4 | `P4_INTERFACE_TRAIT` | Interfaces/traits/protocols | 12/27 |
+| P5 | `P5_ENUM` | Enumerations | 15/27 |
+| P6 | `P6_METHOD` | Class/struct methods | 15/27 |
+| P7 | `P7_TYPE_ALIAS` | Type aliases | 8/27 |
 
 ### Extended Patterns (Domain-Specific)
 
@@ -203,3 +209,4 @@ go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v -count=1
 | 1.2 | 2026-02-04 | Added C#, Kotlin, Terraform, Makefile |
 | 1.3 | 2026-02-05 | Added Protocol Buffers, GraphQL |
 | 1.4 | 2026-02-05 | Added OpenAPI, Markdown, XML; 25 parsers total |
+| 1.5 | 2026-02-07 | Added Lua, Scraper Markdown; 27 parsers total |

@@ -11,11 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Diagnostics Framework**: Structured `Diagnostic` struct with severity, code, message, parser, and context fields; `DiagnosticSummary` for aggregate reporting; `TruncateContentWithInfo()` and `NewDiagnostic()` helpers; wired into `walkCodebase` with summary logging
 - **9 New Language Parsers**: C# (.cs), Kotlin (.kt, .kts), Terraform/HCL (.tf, .tfvars), Makefile (.mk, Makefile), Protocol Buffers (.proto), GraphQL (.graphql, .gql), OpenAPI (via content detection), Markdown (.md), XML (.xml, .csproj) — all with UPTS specs, test fixtures, and diagnostics support
 - **UPTS Evidence Validation**: Structural consistency checks in the Go-native test harness — validates LineEnd consistency, CodeElement ranges, symbol containment, and LineEnd matching against specs; enabled for Go and Rust parsers
-- **25 UPTS-Validated Parsers**: All 25 language parsers pass CI validation (100% pass rate) — Go, Python, TypeScript, Rust, Java, C, C++, CUDA, SQL, Cypher, YAML, TOML, JSON, INI, Dockerfile, Shell, C#, Kotlin, Terraform, Makefile, Protocol Buffers, GraphQL, OpenAPI, Markdown, XML
+- **27 UPTS-Validated Parsers**: All 27 language parsers pass CI validation (100% pass rate) — Go, Python, TypeScript, Rust, Java, C, C++, CUDA, SQL, Cypher, YAML, TOML, JSON, INI, Dockerfile, Shell, C#, Kotlin, Terraform, Makefile, Protocol Buffers, GraphQL, OpenAPI, Markdown, XML, Lua, Scraper Markdown
 - **UPTS Summary Document**: `docs/lang-parser/lang-parse-spec/upts/UPTS_SUMMARY.md` — comprehensive parser table with parent-child relationships, pattern coverage, and validation commands
 
 ### Fixed
-- **Ingestion whitelist**: `getEnabledLanguages()` now includes all 25 registered parsers (was missing yaml, toml, ini, dockerfile, shell, cuda, cypher + new parsers)
+- **Ingestion whitelist**: `getEnabledLanguages()` now includes all 27 registered parsers (was missing yaml, toml, ini, dockerfile, shell, cuda, cypher + new parsers)
 - **OpenAPI parser routing**: YAML parser now skips files containing `openapi:` or `swagger:` markers to ensure OpenAPI parser handles them (Go map iteration order is non-deterministic)
 - **Makefile parser `:=` assignment**: Fixed disambiguation logic that incorrectly rejected `:=` variable assignments as target definitions
 

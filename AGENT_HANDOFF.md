@@ -281,6 +281,7 @@ Phases are organized into **numbered series** to group related work:
 | Phase 7 (Public Readiness) | **Phase 50** | Public Readiness & Open Source Hardening | 📋 Planned |
 | — (Web Scraper) | **Phase 51** | Web Scraper Ingestion Module | 📋 Approved |
 | — (CMS Advanced II) | **Phase 60** | CMS Advanced Functionality II | ✅ Complete |
+| — (RSIC) | **Phase 60b** | Recursive Self-Improvement Cycle | 📋 Planned |
 
 ---
 
@@ -321,6 +322,7 @@ Phases are organized into **numbered series** to group related work:
 | 50 | Public Readiness | 📋 | `docs/development/repo-to-public-roadmap.md` |
 | 51 | Web Scraper Ingestion | 📋 | `docs/specs/phase51-web-scraper-ingestion.md` |
 | 60 | CMS Advanced II | ✅ | `docs/specs/phase60-cms-advanced-ii.md` |
+| 60b | Recursive Self-Improvement Cycle (RSIC) | 📋 | `docs/specs/phase60b-rsic.md` |
 
 ---
 
@@ -647,6 +649,291 @@ score = (recency_weight × recency_score) +
 - Critical (40% budget): Corrections, errors, recent decisions
 - Important (35% budget): Task context, active learnings
 - Background (25% budget): Older observations, summarized
+
+---
+
+### Phase 60b: Recursive Self-Improvement Cycle (RSIC) 📋
+
+**Status:** Planned
+**Priority:** Critical (Highest)
+**Spec:** `docs/specs/phase60b-rsic.md`
+**Dependencies:** Phase 60 (CMS Advanced II), Phase 43A (CMS Enforcement), Phase 45.5 (APE Scheduler)
+
+**What it does:** Forces LLM coding agents to run programmatically-defined recursive self-improvement cycles. The system assesses its own knowledge quality, reflects on gaps and degradation, plans remediation, delegates execution to background agents, and validates improvement — all autonomously within defined safety bounds. A decay watchdog enforces cycle compliance: if the agent fails to complete a cycle within the configured period, escalating pressure forces execution automatically.
+
+**Design Philosophy:**
+- **Layered approach**: Enforced discipline first (mandatory cycles), architected toward autonomous cognition as trust increases
+- **MDEMG-first, portable later**: Deep integration with Neo4j/learning/hidden layer now; clean `SelfImprovementCycle` interface for future protocol abstraction
+- **Full autonomy within safety bounds**: System prunes, merges, re-weights, and restructures without human approval, bounded by per-cycle limits and protected space rules
+
+#### Core Loop: 5-Stage RSIC
+
+```
+ORCHESTRATOR (main agent)              BACKGROUND AGENTS
+─────────────────────────              ─────────────────
+  1. ASSESS   (inline)
+  2. REFLECT  (inline)
+  3. PLAN     (inline)
+         │
+         ├── dispatch ──────────→  Agent 1: prune_decayed_edges
+         ├── dispatch ──────────→  Agent 2: trigger_consolidation
+         ├── dispatch ──────────→  Agent 3: fill_knowledge_gap
+         │
+         │   ← progress report ──  Agent 1: 50% complete
+         │   (user interaction continues)
+         │   ← final report ─────  Agent 2: COMPLETE
+         │   ← final report ─────  Agent 1: COMPLETE
+         │   ← final report ─────  Agent 3: COMPLETE
+         │
+  4. VALIDATE (reviews reports + checks metrics)
+  5. RECORD   (persists cycle outcome as CMS observation)
+         │
+         └── reset watchdog decay timer
+```
+
+Stages 1-3 and 5 run **inline** on the orchestrator. Stage 4 (Execute) is **delegated** to background agents via standardized task specs. The orchestrator monitors progress via periodic summary reports while remaining available for user interaction.
+
+#### Three Cycle Tiers
+
+| Tier | Period | Trigger | Scope |
+|------|--------|---------|-------|
+| **Micro** | Per-session (start + end) | `session_start`, `session_end` | Quick health pulse: distribution stats, volatile counts, correction rate since last session |
+| **Meso** | Every N sessions or T hours (default: 6hr / 5 sessions) | APE cron + session counter | Full self-assessment: retrieval quality, knowledge gaps, edge health, calibration update |
+| **Macro** | Daily (default: `0 3 * * *`) | APE cron | Comprehensive: memory structure review, hidden layer re-consolidation, topology optimization, long-term trend analysis |
+
+#### Stage 1: ASSESS (`internal/ape/self_assess.go`)
+
+Gathers quantitative metrics from all subsystems into a `SelfAssessmentReport`:
+
+**Retrieval Quality Metrics:**
+- Relevance score distribution (P25/P50/P75/P95) from recent queries
+- Knowledge gap count and trend (from `/v1/system/capability-gaps`)
+- Cache hit ratio trend
+- Recall coverage (% of queries returning >= threshold results)
+
+**Task Performance Metrics:**
+- Correction rate: `corrections / total_observations` (rolling window)
+- Re-work rate: observations that correct previous observations
+- Decision reversal rate: decisions that contradict earlier decisions
+- User satisfaction signal: implicit from correction frequency decay
+
+**Memory Health Metrics:**
+- Learning phase and edge count (from distribution stats)
+- Orphan node ratio (unconnected / total)
+- Volatile observation backlog (pending graduation)
+- Consolidation freshness (time since last hidden layer rebuild)
+- Embedding coverage (% nodes with valid embeddings)
+- Edge weight entropy (healthy = distributed, unhealthy = clustered at extremes)
+
+**Self-Reported Confidence:**
+- Per-observation confidence scores (predicted utility)
+- Validated against: was the observation recalled? Was it corrected?
+- Calibration score: correlation between predicted and actual utility
+
+#### Stage 2: REFLECT (`internal/ape/self_reflect.go`)
+
+Analyzes the assessment report to identify actionable patterns:
+
+- **Degradation detection**: Metrics trending downward across cycles
+- **Blind spot identification**: Topics with high gap counts but low observation coverage
+- **Saturation detection**: Learning phase approaching/at saturation
+- **Stale knowledge detection**: High-confidence nodes not accessed or validated recently
+- **Structural imbalance**: Hub nodes with excessive edges, orphan clusters
+- **Calibration drift**: Self-reported confidence diverging from actual outcomes
+
+Uses the existing `/v1/memory/reflect` endpoint internally for topic-specific introspection. Produces `ReflectionInsights` — a prioritized list of findings with severity and recommended action category.
+
+#### Stage 3: PLAN (`internal/ape/improvement_plan.go`)
+
+Generates concrete `ImprovementAction` items and builds standardized `RSICTaskSpec` for each:
+
+| Action Type | Trigger Condition |
+|------------|-------------------|
+| `prune_decayed_edges` | Edge count > saturation threshold or low-weight accumulation |
+| `prune_excess_edges` | Hub nodes exceeding per-node edge cap |
+| `graduate_volatile` | Stable volatile observations past threshold |
+| `tombstone_stale` | Observations not accessed in N days with low importance |
+| `trigger_consolidation` | Orphan ratio > threshold or consolidation stale |
+| `re_weight_scoring` | Calibration drift detected |
+| `fill_knowledge_gap` | High-priority gap identified |
+| `merge_redundant_concepts` | Hidden layer concepts with high cosine similarity |
+| `refresh_stale_edges` | Stale co-activation edges need recalculation |
+| `adjust_cycle_period` | Meso/macro frequency tuning based on change velocity |
+
+**Safety Bounds (hardcoded):**
+- Max nodes pruned per cycle: 5% of total
+- Max edges pruned per cycle: 10% of total
+- Protected spaces (`mdemg-dev`) never modified destructively
+- All actions logged with before/after snapshots
+- Rollback window: last 3 cycles retained
+
+#### Standardized Task Specification (RSICTaskSpec)
+
+Every background agent receives a fully self-contained task spec:
+
+```go
+type RSICTaskSpec struct {
+    // Identity
+    TaskID             string              // "rsic-meso-20260207-prune-01"
+    CycleID            string              // parent cycle ID
+    ActionType         string              // "prune_decayed_edges"
+
+    // Purpose
+    Purpose            string              // human-readable rationale
+    TriggerInsight     string              // reflection insight that caused this
+    AssessmentContext   *AssessmentSummary  // relevant metrics snapshot
+
+    // Scope
+    TargetSpaceID      string
+    Scope              TaskScope           // nodes, edges, or graph region
+
+    // Tools (explicit allowlist)
+    AllowedEndpoints   []EndpointSpec      // method, path, purpose, allowed params
+
+    // Safety
+    SafetyBounds       SafetyBounds        // max affected, protected spaces, dry_run_first, require_snapshot
+
+    // Deliverables
+    Deliverables       []Deliverable       // name, description, format (json/markdown/metric), required
+    SuccessCriteria    []Criterion         // metric, operator, threshold
+
+    // Reporting
+    ReportingSchedule  ReportSchedule      // interval_type (time/progress/milestone), interval, milestones
+
+    // Constraints
+    Timeout            time.Duration
+    Priority           string              // "low" | "medium" | "high"
+    RollbackPlan       string              // instructions if things go wrong
+    BaselineMetrics    map[string]float64  // before-state for validation
+}
+```
+
+**Agent Progress Reports** (periodic, at intervals defined in task spec):
+
+```go
+type RSICProgressReport struct {
+    TaskID           string
+    CycleID          string
+    Timestamp        time.Time
+    Status           string              // "in_progress" | "completed" | "failed" | "blocked"
+    ProgressPct      int                 // 0-100
+    Milestone        string              // current milestone
+    ActionsCompleted int
+    ActionsRemaining int
+    Summary          string              // human-readable narrative
+    MetricsDelta     map[string]float64  // running comparison vs baseline
+    Warnings         []string
+    Errors           []string
+    Deliverables     map[string]any      // final reports only
+    RollbackNeeded   bool
+}
+```
+
+The orchestrator reads these reports while remaining available for user interaction. It can cancel, redirect, or escalate agents based on report content.
+
+#### Stage 4: VALIDATE (`internal/ape/calibration.go`)
+
+After all background agents complete, the orchestrator:
+
+- **Immediate validation**: Collects final reports, checks `SuccessCriteria` for each task
+- **Metric comparison**: Compares `BaselineMetrics` → current metrics across all actions
+- **Deferred validation**: Next cycle checks if improvements held (no regression)
+- **Calibration update**: Adjusts confidence in each action type based on historical success rate
+- **Meta-learning**: Tracks which action types consistently produce improvement — future planning prioritizes proven actions
+
+#### Decay Watchdog (`internal/ape/watchdog.go`)
+
+A background goroutine enforces cycle compliance. If the agent doesn't complete a self-improvement cycle within the configured period, escalating pressure forces execution.
+
+**Decay Function:**
+```
+decay_score = (time_since_last_cycle / cycle_period) * decay_rate
+```
+Ranges from 0.0 (just completed) to 1.0 (fully overdue). Persisted on TapRoot node (`rsic_last_cycle` property) so it survives server restarts.
+
+**Escalation Levels:**
+
+| Level | Decay Range | Behavior |
+|-------|------------|----------|
+| **0 — Nominal** | 0.0–0.3 | No action. System healthy. |
+| **1 — Nudge** | 0.3–0.6 | Injects `rsic_overdue: true` into `/v1/conversation/resume` response. Agent sees "Self-improvement cycle due" in restored context. |
+| **2 — Warn** | 0.6–0.9 | Session health score penalized. `X-MDEMG-Warning: rsic-overdue` header on all API responses. APE fires `rsic_overdue` event. |
+| **3 — Force** | ≥ 0.9 | Watchdog auto-dispatches full RSIC cycle via APE scheduler. No agent cooperation required. Forced execution logged as `error` observation. |
+
+Completing any cycle tier resets the watchdog to Level 0.
+
+#### API Endpoints (7 new)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/v1/self-improve/assess` | Trigger on-demand assessment (specify tier) |
+| `GET` | `/v1/self-improve/report` | Latest assessment report |
+| `GET` | `/v1/self-improve/report/{cycle_id}` | Specific cycle report |
+| `POST` | `/v1/self-improve/cycle` | Trigger full RSIC cycle (assess→validate) |
+| `GET` | `/v1/self-improve/history` | Cycle history with outcomes |
+| `GET` | `/v1/self-improve/calibration` | Calibration metrics and confidence scores |
+| `GET` | `/v1/self-improve/health` | Aggregate self-improvement health score + watchdog status |
+
+#### Portability Interface
+
+The cycle is defined as a clean Go interface for future protocol abstraction:
+
+```go
+type SelfImprovementCycle interface {
+    Assess(ctx context.Context, tier CycleTier) (*AssessmentReport, error)
+    Reflect(ctx context.Context, report *AssessmentReport) (*ReflectionInsights, error)
+    Plan(ctx context.Context, insights *ReflectionInsights) ([]ImprovementAction, error)
+    Dispatch(ctx context.Context, actions []ImprovementAction) ([]TaskHandle, error)
+    Monitor(ctx context.Context, handles []TaskHandle) (<-chan ProgressReport, error)
+    Validate(ctx context.Context, results []ExecutionResult) (*CycleOutcome, error)
+}
+```
+
+MDEMG implements this natively. Future portable spec (USIC — Universal Self-Improvement Cycle) would define the interface at the protocol level for adoption by any LLM coding agent.
+
+#### Key Files
+
+| File | Purpose |
+|------|---------|
+| `internal/ape/self_assess.go` | Assessment engine — gathers metrics from all subsystems |
+| `internal/ape/self_reflect.go` | Reflection engine — pattern detection, gap analysis |
+| `internal/ape/improvement_plan.go` | Planning engine — generates task specs from insights |
+| `internal/ape/task_spec.go` | RSIC Task Specification types and builder |
+| `internal/ape/task_dispatch.go` | Dispatches task specs to background agents, tracks active tasks |
+| `internal/ape/task_monitor.go` | Reads progress reports, aggregates status, alerts on failures |
+| `internal/ape/calibration.go` | Validation engine — calibration, meta-learning |
+| `internal/ape/watchdog.go` | Decay watchdog — timer, escalation, forced trigger |
+| `internal/ape/cycle.go` | Cycle orchestrator — runs inline stages, dispatches execute, monitors |
+| `internal/ape/types_rsic.go` | All RSIC types (report, insights, actions, task spec, progress) |
+| `internal/api/handlers_self_improve.go` | HTTP handlers for 7 new endpoints |
+| `docs/specs/phase60b-rsic.md` | Full specification document |
+| `docs/api/api-spec/uats/specs/self_improve_*.uats.json` | UATS specs for all endpoints |
+
+#### Configuration
+
+```bash
+# Cycle Periods
+RSIC_MICRO_ENABLED=true
+RSIC_MESO_PERIOD_HOURS=6              # or RSIC_MESO_PERIOD_SESSIONS=5
+RSIC_MACRO_CRON="0 3 * * *"           # daily at 3am
+
+# Safety Bounds
+RSIC_MAX_NODE_PRUNE_PCT=5             # max 5% nodes per cycle
+RSIC_MAX_EDGE_PRUNE_PCT=10            # max 10% edges per cycle
+RSIC_ROLLBACK_WINDOW=3                # retain last 3 cycles for rollback
+
+# Watchdog
+RSIC_WATCHDOG_ENABLED=true
+RSIC_WATCHDOG_CHECK_INTERVAL_SEC=60   # how often watchdog ticks
+RSIC_WATCHDOG_DECAY_RATE=1.0          # 1.0=linear, >1.0=aggressive, <1.0=lenient
+RSIC_WATCHDOG_NUDGE_THRESHOLD=0.3     # Level 1
+RSIC_WATCHDOG_WARN_THRESHOLD=0.6      # Level 2
+RSIC_WATCHDOG_FORCE_THRESHOLD=0.9     # Level 3
+
+# Calibration
+RSIC_CALIBRATION_WINDOW_DAYS=7        # rolling window for calibration scoring
+RSIC_MIN_CONFIDENCE_THRESHOLD=0.3     # below this, action type is deprioritized
+```
 
 ---
 
@@ -1115,6 +1402,7 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 | ~~`TestScoringGolden`~~ | ✅ Fixed | `tests/integration/scoring_golden_test.go` | Updated target similarities to be above retrieval threshold |
 | ~~UOBS Prometheus metrics~~ | ✅ Fixed | `docs/tests/uobs/specs/prometheus_metrics.uobs.json` | All 10/10 metrics now passing |
 | ~~UATS specs not all verified~~ | ✅ Fixed | `docs/api/api-spec/uats/specs/` | 66 specs, 118/118 variants passing (100%). Fixed: 4 structural, 45 stale hashes, 8 assertion mismatches, 48 variable syntax corrections. |
+| **Phase 60b RSIC not started** | **Critical** | `internal/ape/` | Recursive Self-Improvement Cycle — highest priority planned phase. Enforced self-assessment, delegated execution, decay watchdog. |
 | Obsidian module not started | Low | Phase 44/45 | Listed in roadmap but no implementation |
 | Context Cooler (APE) not started | Medium | Phase 45.5 | Volatile observation graduation to long-term memory |
 | `internal/ape/` low coverage | Medium | `docs/specs/test-coverage-baseline.md` | 0.0% coverage |
@@ -1181,4 +1469,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-07 — UATS framework 100%: 66 specs, 118/118 variants passing. Fixed structural issues, assertion mismatches, stale hashes, and variable syntax. Next priority: Phase 51 (Web Scraper).*
+*Last updated: 2026-02-07 — UATS framework 100%: 66 specs, 118/118 variants passing. Phase 60b (RSIC — Recursive Self-Improvement Cycle) planned as highest priority: enforced self-assessment cycles, delegated background execution, decay watchdog enforcement.*

@@ -310,6 +310,7 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 |--------|----------|-------------|
 | GET | `/healthz` | Liveness check |
 | GET | `/readyz` | Readiness check (includes embedding provider status) |
+| GET | `/v1/embedding/health` | Embedding provider health with active probe |
 
 ### Memory Operations
 
@@ -322,10 +323,11 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | GET | `/v1/memory/stats` | Memory graph statistics |
 | POST | `/v1/memory/consolidate` | Trigger hidden layer consolidation |
 | POST | `/v1/memory/archive/bulk` | Bulk archive nodes |
-| * | `/v1/memory/nodes/{id}` | Node CRUD operations |
+| * | `/v1/memory/nodes/{id}` | Node CRUD operations (archive, unarchive, delete) |
 | GET | `/v1/memory/symbols` | Search code symbols |
-| GET | `/v1/memory/distribution` | Score distribution stats |
+| GET | `/v1/memory/distribution` | Score distribution and learning phase stats |
 | GET | `/v1/memory/cache/stats` | Embedding/query cache stats |
+| DELETE | `/v1/memory/cache` | Clear query cache |
 | GET | `/v1/memory/query/metrics` | Query performance metrics |
 | POST | `/v1/memory/consult` | SME-style Q&A |
 | POST | `/v1/memory/suggest` | Suggest related concepts |
@@ -338,7 +340,7 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | GET | `/v1/memory/ingest/status/{id}` | Check job progress |
 | POST | `/v1/memory/ingest/cancel/{id}` | Cancel running job |
 | GET | `/v1/memory/ingest/jobs` | List all ingestion jobs |
-| POST | `/v1/memory/ingest/files` | Ingest files with background job |
+| POST | `/v1/memory/ingest/files` | Ingest specific files with background job |
 | * | `/v1/memory/ingest-codebase` | Codebase ingestion route (deprecated) |
 
 ### Freshness & Sync
@@ -346,6 +348,7 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/v1/memory/spaces/{id}/freshness` | Space freshness and staleness status |
+| GET | `/v1/memory/freshness` | Batch freshness check across spaces |
 
 ### Learning & Hebbian Edges
 
@@ -368,22 +371,53 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | POST | `/v1/conversation/consolidate` | Consolidate conversation themes |
 | GET | `/v1/conversation/volatile/stats` | Volatile memory stats |
 | POST | `/v1/conversation/graduate` | Graduate volatile to permanent |
+| GET | `/v1/conversation/session/health` | Session health score |
+
+### CMS Templates (Phase 60)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | GET/POST | `/v1/conversation/templates` | List or create observation templates |
-| * | `/v1/conversation/templates/{id}` | Template CRUD operations |
-| POST | `/v1/conversation/snapshot` | Create session snapshot |
-| * | `/v1/conversation/snapshot/{id}` | Snapshot operations (get/delete/restore) |
-| POST | `/v1/conversation/relevance` | Compute observation relevance scores |
-| POST | `/v1/conversation/truncate` | Truncate old observations |
-| GET | `/v1/conversation/org-review` | Get observations pending org review |
-| POST | `/v1/conversation/org-review/{id}/approve` | Approve for org sharing |
-| POST | `/v1/conversation/org-review/{id}/reject` | Reject from org sharing |
+| GET/PUT/DELETE | `/v1/conversation/templates/{id}` | Template CRUD operations |
+
+### CMS Snapshots (Phase 60)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/v1/conversation/snapshot` | List or create session snapshots |
+| GET | `/v1/conversation/snapshot/latest` | Get latest snapshot for session |
+| POST | `/v1/conversation/snapshot/cleanup` | Clean up old snapshots |
+| GET/DELETE | `/v1/conversation/snapshot/{id}` | Get or delete snapshot |
+
+### CMS Org Reviews (Phase 60)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/conversation/org-reviews` | List pending org reviews |
+| GET | `/v1/conversation/org-reviews/stats` | Org review statistics |
+| POST | `/v1/conversation/org-reviews/{id}/decision` | Approve or reject observation |
+| POST | `/v1/conversation/observations/{id}/flag-org` | Flag observation for org review |
+
+### Self-Improvement Cycle — RSIC (Phase 60b)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/self-improve/assess` | Trigger on-demand self-assessment |
+| GET | `/v1/self-improve/report` | Get active task report |
+| GET | `/v1/self-improve/report/{cycle_id}` | Get specific cycle report |
+| POST | `/v1/self-improve/cycle` | Trigger full RSIC cycle (assess→validate) |
+| GET | `/v1/self-improve/history` | Cycle history with outcomes |
+| GET | `/v1/self-improve/calibration` | Calibration metrics and confidence scores |
+| GET | `/v1/self-improve/health` | Watchdog status and health score |
 
 ### Cleanup & Edge Consistency
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/v1/memory/cleanup/orphans` | Detect/archive/delete orphaned nodes after re-ingestion |
+| POST | `/v1/memory/cleanup/orphans` | Detect/archive/delete orphaned nodes |
 | POST | `/v1/memory/cleanup/schedule` | Schedule automated cleanup |
+| GET | `/v1/memory/cleanup/schedules` | List cleanup schedules |
+| GET | `/v1/memory/cleanup/stats` | Cleanup statistics |
 | GET | `/v1/memory/edges/stale/stats` | Get stale edge statistics |
 | POST | `/v1/memory/edges/stale/refresh` | Trigger stale edge refresh |
 
@@ -392,23 +426,35 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/v1/webhooks/linear` | Linear webhook receiver (HMAC-SHA256 verified) |
+| POST | `/v1/webhooks/{source}` | Generic webhook receiver |
 
-### System & Plugins
+### Linear Integration (Phase 44)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/v1/linear/issues` | List or create Linear issues |
+| GET/PUT/DELETE | `/v1/linear/issues/{id}` | Read, update, or delete issue |
+| GET/POST | `/v1/linear/projects` | List or create Linear projects |
+| GET/PUT | `/v1/linear/projects/{id}` | Read or update project |
+| POST | `/v1/linear/comments` | Create comment on issue |
+
+### System, Plugins & Monitoring
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/v1/metrics` | Prometheus-style metrics |
 | GET | `/v1/prometheus` | Prometheus format metrics endpoint |
-| GET | `/v1/embedding/health` | Embedding provider health check |
 | GET | `/v1/modules` | List modules |
-| * | `/v1/modules/{id}` | Module sync |
-| * | `/v1/plugins` | Plugin operations |
+| POST | `/v1/modules/{id}` | Module sync |
+| GET/POST/PUT/DELETE | `/v1/plugins` | Plugin operations |
 | POST | `/v1/plugins/create` | Create plugin from spec |
-| GET | `/v1/ape/status` | APE (Autonomous Prompt Evolution) status |
-| POST | `/v1/ape/trigger` | Trigger APE |
+| GET | `/v1/ape/status` | APE scheduler status |
+| POST | `/v1/ape/trigger` | Trigger APE action |
 | POST | `/v1/feedback` | Submit feedback |
 | GET | `/v1/system/capability-gaps` | List capability gaps |
+| * | `/v1/system/capability-gaps/{id}` | Capability gap operations |
 | GET | `/v1/system/gap-interviews` | Gap interview sessions |
+| * | `/v1/system/gap-interviews/{id}` | Gap interview operations |
 | GET | `/v1/system/pool-metrics` | Neo4j connection pool metrics |
 | GET | `/v1/jobs/{id}/stream` | SSE streaming for job progress |
 

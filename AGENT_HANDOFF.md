@@ -281,7 +281,7 @@ Phases are organized into **numbered series** to group related work:
 | Phase 7 (Public Readiness) | **Phase 50** | Public Readiness & Open Source Hardening | 📋 Planned |
 | — (Web Scraper) | **Phase 51** | Web Scraper Ingestion Module | 📋 Approved |
 | — (CMS Advanced II) | **Phase 60** | CMS Advanced Functionality II | ✅ Complete |
-| — (RSIC) | **Phase 60b** | Recursive Self-Improvement Cycle | 📋 Planned |
+| — (RSIC) | **Phase 60b** | Recursive Self-Improvement Cycle | ✅ Complete |
 
 ---
 
@@ -322,7 +322,7 @@ Phases are organized into **numbered series** to group related work:
 | 50 | Public Readiness | 📋 | `docs/development/repo-to-public-roadmap.md` |
 | 51 | Web Scraper Ingestion | 📋 | `docs/specs/phase51-web-scraper-ingestion.md` |
 | 60 | CMS Advanced II | ✅ | `docs/specs/phase60-cms-advanced-ii.md` |
-| 60b | Recursive Self-Improvement Cycle (RSIC) | 📋 | `docs/specs/phase60b-rsic.md` |
+| 60b | Recursive Self-Improvement Cycle (RSIC) | ✅ | `docs/specs/phase60b-rsic.md` |
 
 ---
 
@@ -652,9 +652,9 @@ score = (recency_weight × recency_score) +
 
 ---
 
-### Phase 60b: Recursive Self-Improvement Cycle (RSIC) 📋
+### Phase 60b: Recursive Self-Improvement Cycle (RSIC) ✅
 
-**Status:** Planned
+**Completed:** 2026-02-07
 **Priority:** Critical (Highest)
 **Spec:** `docs/specs/phase60b-rsic.md`
 **Dependencies:** Phase 60 (CMS Advanced II), Phase 43A (CMS Enforcement), Phase 45.5 (APE Scheduler)
@@ -1273,9 +1273,9 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 
 ### UATS (Active)
 
-Located at `docs/api/api-spec/uats/specs/` — 66 specs covering all HTTP endpoints. Runner: `docs/api/api-spec/uats/runners/uats_runner.py`.
+Located at `docs/api/api-spec/uats/specs/` — 72 specs covering all HTTP endpoints. Runner: `docs/api/api-spec/uats/runners/uats_runner.py`.
 
-**Current Status:** 66 specs, 118 variants, 118 passing (100%), 0 errors.
+**Current Status:** 72 specs, 124 variants, 124 passing (100%), 0 errors.
 
 **Hash Integrity:** All specs include SHA256 hashes (`config.sha256`). The runner verifies hashes on load (use `--skip-hash` to bypass during development).
 
@@ -1402,7 +1402,7 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 | ~~`TestScoringGolden`~~ | ✅ Fixed | `tests/integration/scoring_golden_test.go` | Updated target similarities to be above retrieval threshold |
 | ~~UOBS Prometheus metrics~~ | ✅ Fixed | `docs/tests/uobs/specs/prometheus_metrics.uobs.json` | All 10/10 metrics now passing |
 | ~~UATS specs not all verified~~ | ✅ Fixed | `docs/api/api-spec/uats/specs/` | 66 specs, 118/118 variants passing (100%). Fixed: 4 structural, 45 stale hashes, 8 assertion mismatches, 48 variable syntax corrections. |
-| **Phase 60b RSIC not started** | **Critical** | `internal/ape/` | Recursive Self-Improvement Cycle — highest priority planned phase. Enforced self-assessment, delegated execution, decay watchdog. |
+| ~~Phase 60b RSIC not started~~ | ✅ Complete | `internal/ape/` | Implemented: 10 new files (types, assess, reflect, plan, spec, dispatch, monitor, calibration, watchdog, cycle), 7 API endpoints, 6 UATS specs. 124/124 variants passing. |
 | Obsidian module not started | Low | Phase 44/45 | Listed in roadmap but no implementation |
 | Context Cooler (APE) not started | Medium | Phase 45.5 | Volatile observation graduation to long-term memory |
 | `internal/ape/` low coverage | Medium | `docs/specs/test-coverage-baseline.md` | 0.0% coverage |
@@ -1437,7 +1437,7 @@ python3 docs/tests/uobs/runners/uobs_runner.py --spec "docs/tests/uobs/specs/*.u
 python3 docs/tests/uobs/runners/uobs_runner.py --spec docs/tests/uobs/specs/embedding_health.uobs.json
 
 # === UATS Tests ===
-make test-api                                         # Run all 66 UATS specs
+make test-api                                         # Run all 72 UATS specs
 python3 docs/api/api-spec/uats/runners/uats_runner.py add-hashes --spec-dir docs/api/api-spec/uats/specs/
 python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir docs/api/api-spec/uats/specs/
 
@@ -1469,4 +1469,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-07 — UATS framework 100%: 66 specs, 118/118 variants passing. Phase 60b (RSIC — Recursive Self-Improvement Cycle) planned as highest priority: enforced self-assessment cycles, delegated background execution, decay watchdog enforcement.*
+*Last updated: 2026-02-07 — UATS framework 100%: 72 specs, 124/124 variants passing. Phase 60b (RSIC — Recursive Self-Improvement Cycle) complete: 10 new files in internal/ape/, 7 API endpoints, 6 UATS specs, decay watchdog enforcement.*

@@ -115,30 +115,30 @@ func TestCalculateReinforcementsToGraduate(t *testing.T) {
 	}
 }
 
-func TestContextCoolerConstants(t *testing.T) {
-	// Verify constants are sensible
-	if ReinforcementWindowHours < 1 {
-		t.Error("ReinforcementWindowHours should be at least 1 hour")
+func TestContextCoolerDefaultConstants(t *testing.T) {
+	// Verify default constants are sensible
+	if defaultReinforcementWindowHours < 1 {
+		t.Error("defaultReinforcementWindowHours should be at least 1 hour")
 	}
 
-	if StabilityIncreasePerReinforcement <= 0 || StabilityIncreasePerReinforcement > 0.5 {
-		t.Errorf("StabilityIncreasePerReinforcement = %.2f, should be between 0 and 0.5",
-			StabilityIncreasePerReinforcement)
+	if defaultStabilityIncreasePerReinf <= 0 || defaultStabilityIncreasePerReinf > 0.5 {
+		t.Errorf("defaultStabilityIncreasePerReinf = %.2f, should be between 0 and 0.5",
+			defaultStabilityIncreasePerReinf)
 	}
 
-	if StabilityDecayRate <= 0 || StabilityDecayRate > 0.5 {
-		t.Errorf("StabilityDecayRate = %.2f, should be between 0 and 0.5",
-			StabilityDecayRate)
+	if defaultStabilityDecayRate <= 0 || defaultStabilityDecayRate > 0.5 {
+		t.Errorf("defaultStabilityDecayRate = %.2f, should be between 0 and 0.5",
+			defaultStabilityDecayRate)
 	}
 
-	if TombstoneThreshold >= DefaultStabilityScore {
-		t.Errorf("TombstoneThreshold (%.2f) should be less than DefaultStabilityScore (%.2f)",
-			TombstoneThreshold, DefaultStabilityScore)
+	if defaultTombstoneThreshold >= DefaultStabilityScore {
+		t.Errorf("defaultTombstoneThreshold (%.2f) should be less than DefaultStabilityScore (%.2f)",
+			defaultTombstoneThreshold, DefaultStabilityScore)
 	}
 
-	if GraduationStabilityThreshold <= DefaultStabilityScore {
-		t.Errorf("GraduationStabilityThreshold (%.2f) should be greater than DefaultStabilityScore (%.2f)",
-			GraduationStabilityThreshold, DefaultStabilityScore)
+	if defaultGraduationThreshold <= DefaultStabilityScore {
+		t.Errorf("defaultGraduationThreshold (%.2f) should be greater than DefaultStabilityScore (%.2f)",
+			defaultGraduationThreshold, DefaultStabilityScore)
 	}
 }
 

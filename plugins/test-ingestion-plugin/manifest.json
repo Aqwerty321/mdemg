@@ -1,0 +1,13 @@
+{
+  "id": "test-ingestion-plugin",
+  "name": "Test Ingestion Plugin",
+  "version": "1.0.0",
+  "type": "INGESTION",
+  "binary": "test-ingestion-plugin",
+  "capabilities": {
+    "ingestion_sources": ["test-ingestion-plugin://"],
+    "content_types": ["application/x-test-ingestion-plugin"]
+  },
+  "health_check_interval_ms": 5000,
+  "startup_timeout_ms": 10000
+}

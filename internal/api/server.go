@@ -169,14 +169,14 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	var convSvc *conversation.Service
 	var ctxCooler *conversation.ContextCooler
 	if emb != nil {
-		convSvc = conversation.NewServiceWithConfig(driver, emb, cfg.VectorIndexName)
-		log.Printf("Conversation service initialized (vector index: %s)", cfg.VectorIndexName)
+		convSvc = conversation.NewServiceWithConfig(driver, emb, cfg.VectorIndexName, cfg)
+		log.Printf("Conversation service initialized (vector index: %s, constraint detection: %v)", cfg.VectorIndexName, cfg.ConstraintDetectionEnabled)
 
 		// Initialize Context Cooler (Phase 3: Graduation logic for volatile observations)
-		ctxCooler = conversation.NewContextCooler(driver)
+		ctxCooler = conversation.NewContextCooler(driver, cfg)
 		lea.SetStabilityReinforcer(ctxCooler)
-		log.Printf("Context Cooler initialized (graduation threshold: %.2f, decay rate: %.2f)",
-			conversation.GraduationStabilityThreshold, conversation.StabilityDecayRate)
+		log.Printf("Context Cooler initialized (graduation: %.2f, decay: %.2f, constraint protection: %v)",
+			cfg.CoolerGraduationThreshold, cfg.CoolerStabilityDecayRate, cfg.ConstraintProtectFromDecay)
 	} else {
 		log.Printf("Conversation service disabled (requires embedder)")
 	}
@@ -287,8 +287,16 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	rsicWatchdog = ape.NewWatchdog(cfg, "mdemg-dev", nil)
 	rsicCycle = ape.NewCycleOrchestrator(cfg, rsicAssessor, rsicReflector, rsicPlanner, rsicDispatcher, rsicMonitor, rsicCalibrator, rsicWatchdog)
 	// Wire the watchdog's force-trigger to the cycle orchestrator
+	// When force-triggered, also run consolidation deterministically (Phase 45.5)
 	rsicWatchdog = ape.NewWatchdog(cfg, "mdemg-dev", func(ctx context.Context, spaceID string) {
 		_, _ = rsicCycle.RunCycle(ctx, spaceID, ape.TierMeso)
+		if cfg.ConsolidateOnWatchdogEnabled && hid != nil {
+			if _, err := hid.RunConsolidation(ctx, spaceID); err != nil {
+				log.Printf("RSIC watchdog: consolidation failed: %v", err)
+			} else {
+				log.Printf("RSIC watchdog: consolidation triggered alongside meso cycle")
+			}
+		}
 	})
 	rsicCycle = ape.NewCycleOrchestrator(cfg, rsicAssessor, rsicReflector, rsicPlanner, rsicDispatcher, rsicMonitor, rsicCalibrator, rsicWatchdog)
 	log.Printf("RSIC initialized (watchdog=%v, micro=%v)", cfg.RSICWatchdogEnabled, cfg.RSICMicroEnabled)
@@ -812,6 +820,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversation/volatile/stats", s.handleVolatileStats)
 	mux.HandleFunc("/v1/conversation/graduate", s.handleProcessGraduations)
 	mux.HandleFunc("/v1/conversation/session/health", s.handleSessionHealth)
+
+	// Constraint Module (Phase 45.5)
+	mux.HandleFunc("/v1/constraints", s.handleConstraintsList)
+	mux.HandleFunc("/v1/constraints/stats", s.handleConstraintStats)
 
 	// CMS Templates (Phase 60)
 	mux.HandleFunc("/v1/conversation/templates", s.handleTemplates)

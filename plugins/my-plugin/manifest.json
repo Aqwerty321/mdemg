@@ -1,0 +1,13 @@
+{
+  "id": "my-plugin",
+  "name": "My Plugin",
+  "version": "1.0.0",
+  "type": "INGESTION",
+  "binary": "my-plugin",
+  "capabilities": {
+    "ingestion_sources": ["my-plugin://"],
+    "content_types": ["application/x-my-plugin"]
+  },
+  "health_check_interval_ms": 5000,
+  "startup_timeout_ms": 10000
+}

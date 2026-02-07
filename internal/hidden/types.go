@@ -67,12 +67,14 @@ type BackwardPassResult struct {
 
 // ConsolidationResult holds the combined results of a full consolidation run
 type ConsolidationResult struct {
-	HiddenNodesCreated  int
-	ConceptNodesCreated map[int]int // layer -> count of concepts created
-	ConceptNodesMerged  int         // count of clusters merged into existing concepts
-	ForwardPass         *ForwardPassResult
-	BackwardPass        *BackwardPassResult
-	TotalDuration       time.Duration
+	HiddenNodesCreated    int
+	ConceptNodesCreated   map[int]int          // layer -> count of concepts created
+	ConceptNodesMerged    int                  // count of clusters merged into existing concepts
+	ConstraintNodesResult *ConstraintNodeResult `json:"constraint_nodes,omitempty"` // Phase 45.5
+	PipelineSteps         map[string]*StepResult // Phase 46: all pipeline step results
+	ForwardPass           *ForwardPassResult
+	BackwardPass          *BackwardPassResult
+	TotalDuration         time.Duration
 }
 
 // Edge represents a relationship between nodes with weight

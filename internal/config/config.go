@@ -229,6 +229,21 @@ type Config struct {
 	RSICCalibrationDays    int     // RSIC_CALIBRATION_DAYS — days of history for calibration (default: 30)
 	RSICMinConfidence      float64 // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
 
+	// Context Cooler tuning (Phase 45.5)
+	CoolerReinforcementWindowHours  int     // COOLER_REINFORCEMENT_WINDOW_HOURS — reinforcement window (default: 2)
+	CoolerStabilityIncreasePerReinf float64 // COOLER_STABILITY_INCREASE_PER_REINFORCEMENT (default: 0.15)
+	CoolerStabilityDecayRate        float64 // COOLER_STABILITY_DECAY_RATE — daily decay for unreinforced nodes (default: 0.1)
+	CoolerTombstoneThreshold        float64 // COOLER_TOMBSTONE_THRESHOLD — stability below which nodes are tombstoned (default: 0.05)
+	CoolerGraduationThreshold       float64 // COOLER_GRADUATION_THRESHOLD — stability for graduation (default: 0.8)
+
+	// Constraint Module (Phase 45.5)
+	ConstraintDetectionEnabled bool    // CONSTRAINT_DETECTION_ENABLED — enable constraint detection in observations (default: true)
+	ConstraintMinConfidence    float64 // CONSTRAINT_MIN_CONFIDENCE — minimum confidence to tag as constraint (default: 0.6)
+	ConstraintProtectFromDecay bool    // CONSTRAINT_PROTECT_FROM_DECAY — protect constraint-tagged obs from tombstoning (default: true)
+
+	// Deterministic consolidation trigger (Phase 45.5)
+	ConsolidateOnWatchdogEnabled bool // CONSOLIDATE_ON_WATCHDOG_ENABLED — trigger consolidation alongside RSIC force (default: true)
+
 	// Data transmission optimization settings (Phase 10.3)
 	CompressionEnabled  bool // Enable gzip compression for responses (default: true)
 	CompressionMinSize  int  // Minimum response size in bytes to compress (default: 1024)
@@ -1154,6 +1169,39 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// Context Cooler tuning (Phase 45.5)
+	coolerReinfWindowHours, err := atoi("COOLER_REINFORCEMENT_WINDOW_HOURS", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	coolerStabilityIncrease, err := atof("COOLER_STABILITY_INCREASE_PER_REINFORCEMENT", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	coolerDecayRate, err := atof("COOLER_STABILITY_DECAY_RATE", 0.1)
+	if err != nil {
+		return Config{}, err
+	}
+	coolerTombstoneThresh, err := atof("COOLER_TOMBSTONE_THRESHOLD", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	coolerGradThresh, err := atof("COOLER_GRADUATION_THRESHOLD", 0.8)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// Constraint Module (Phase 45.5)
+	constraintDetectionEnabled := getBool("CONSTRAINT_DETECTION_ENABLED", true)
+	constraintMinConfidence, err := atof("CONSTRAINT_MIN_CONFIDENCE", 0.6)
+	if err != nil {
+		return Config{}, err
+	}
+	constraintProtectFromDecay := getBool("CONSTRAINT_PROTECT_FROM_DECAY", true)
+
+	// Deterministic consolidation trigger
+	consolidateOnWatchdog := getBool("CONSOLIDATE_ON_WATCHDOG_ENABLED", true)
+
 	// Data transmission optimization settings
 	compressionEnabled := getBool("COMPRESSION_ENABLED", true)
 	compressionMinSize, err := atoi("COMPRESSION_MIN_SIZE", 1024)
@@ -1611,6 +1659,18 @@ func FromEnv() (Config, error) {
 		RSICForceThreshold:     rsicForceThreshold,
 		RSICCalibrationDays:    rsicCalibrationDays,
 		RSICMinConfidence:      rsicMinConfidence,
+
+		CoolerReinforcementWindowHours:  coolerReinfWindowHours,
+		CoolerStabilityIncreasePerReinf: coolerStabilityIncrease,
+		CoolerStabilityDecayRate:        coolerDecayRate,
+		CoolerTombstoneThreshold:        coolerTombstoneThresh,
+		CoolerGraduationThreshold:       coolerGradThresh,
+
+		ConstraintDetectionEnabled: constraintDetectionEnabled,
+		ConstraintMinConfidence:    constraintMinConfidence,
+		ConstraintProtectFromDecay: constraintProtectFromDecay,
+
+		ConsolidateOnWatchdogEnabled: consolidateOnWatchdog,
 	}, nil
 }
 

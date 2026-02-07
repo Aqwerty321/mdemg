@@ -8,24 +8,16 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/config"
 )
 
-// Context Cooler Configuration
+// Default cooler constants (used as fallbacks when config values are zero)
 const (
-	// ReinforcementWindowHours is how long a node stays in the reinforcement window
-	ReinforcementWindowHours = 2
-
-	// StabilityIncreasePerReinforcement is how much stability increases per co-activation
-	StabilityIncreasePerReinforcement = 0.15
-
-	// StabilityDecayRate is the daily decay rate for unreinforced nodes
-	StabilityDecayRate = 0.1
-
-	// TombstoneThreshold is the stability below which stagnant nodes are tombstoned
-	TombstoneThreshold = 0.05
-
-	// MinStabilityForGraduation is when a node graduates from volatile
-	// (using the constant from types.go: GraduationStabilityThreshold = 0.8)
+	defaultReinforcementWindowHours    = 2
+	defaultStabilityIncreasePerReinf   = 0.15
+	defaultStabilityDecayRate          = 0.1
+	defaultTombstoneThreshold          = 0.05
+	defaultGraduationThreshold         = 0.8
 )
 
 // ContextCooler manages the graduation of volatile observations to permanent memory.
@@ -33,11 +25,44 @@ const (
 // their value through reinforcement before becoming permanent (cold storage).
 type ContextCooler struct {
 	driver neo4j.DriverWithContext
+
+	// Config-driven tuning parameters
+	reinforcementWindowHours  int
+	stabilityIncreasePerReinf float64
+	stabilityDecayRate        float64
+	tombstoneThreshold        float64
+	graduationThreshold       float64
+	constraintProtectFromDecay bool
 }
 
-// NewContextCooler creates a new Context Cooler instance
-func NewContextCooler(driver neo4j.DriverWithContext) *ContextCooler {
-	return &ContextCooler{driver: driver}
+// NewContextCooler creates a new Context Cooler instance with config-driven parameters.
+func NewContextCooler(driver neo4j.DriverWithContext, cfg config.Config) *ContextCooler {
+	c := &ContextCooler{
+		driver:                     driver,
+		reinforcementWindowHours:   cfg.CoolerReinforcementWindowHours,
+		stabilityIncreasePerReinf:  cfg.CoolerStabilityIncreasePerReinf,
+		stabilityDecayRate:         cfg.CoolerStabilityDecayRate,
+		tombstoneThreshold:         cfg.CoolerTombstoneThreshold,
+		graduationThreshold:        cfg.CoolerGraduationThreshold,
+		constraintProtectFromDecay: cfg.ConstraintProtectFromDecay,
+	}
+	// Apply defaults for zero values
+	if c.reinforcementWindowHours <= 0 {
+		c.reinforcementWindowHours = defaultReinforcementWindowHours
+	}
+	if c.stabilityIncreasePerReinf <= 0 {
+		c.stabilityIncreasePerReinf = defaultStabilityIncreasePerReinf
+	}
+	if c.stabilityDecayRate <= 0 {
+		c.stabilityDecayRate = defaultStabilityDecayRate
+	}
+	if c.tombstoneThreshold <= 0 {
+		c.tombstoneThreshold = defaultTombstoneThreshold
+	}
+	if c.graduationThreshold <= 0 {
+		c.graduationThreshold = defaultGraduationThreshold
+	}
+	return c
 }
 
 // GraduationResult contains the result of a graduation check
@@ -74,7 +99,7 @@ func (c *ContextCooler) UpdateStabilityOnReinforcement(ctx context.Context, spac
 		params := map[string]any{
 			"spaceId":  spaceID,
 			"nodeId":   nodeID,
-			"increase": StabilityIncreasePerReinforcement,
+			"increase": c.stabilityIncreasePerReinf,
 		}
 
 		result, err := tx.Run(ctx, cypher, params)
@@ -116,7 +141,7 @@ func (c *ContextCooler) CheckGraduation(ctx context.Context, spaceID, nodeID str
 		params := map[string]any{
 			"spaceId":             spaceID,
 			"nodeId":              nodeID,
-			"graduationThreshold": GraduationStabilityThreshold,
+			"graduationThreshold": c.graduationThreshold,
 		}
 
 		res, err := tx.Run(ctx, cypher, params)
@@ -131,7 +156,7 @@ func (c *ContextCooler) CheckGraduation(ctx context.Context, spaceID, nodeID str
 				NodeID:         nodeID,
 				Graduated:      true,
 				StabilityScore: stability.(float64),
-				Reason:         fmt.Sprintf("stability %.2f >= %.2f threshold", stability, GraduationStabilityThreshold),
+				Reason:         fmt.Sprintf("stability %.2f >= %.2f threshold", stability, c.graduationThreshold),
 			}, nil
 		}
 
@@ -154,7 +179,7 @@ func (c *ContextCooler) CheckGraduation(ctx context.Context, spaceID, nodeID str
 				Graduated:      false,
 				StabilityScore: stability.(float64),
 				Reason: fmt.Sprintf("stability %.2f < %.2f threshold (volatile=%v)",
-					stability, GraduationStabilityThreshold, volatile),
+					stability, c.graduationThreshold, volatile),
 			}, nil
 		}
 
@@ -197,7 +222,7 @@ func (c *ContextCooler) ApplyDecay(ctx context.Context, spaceID string) (int, er
 
 		params := map[string]any{
 			"spaceId":   spaceID,
-			"decayRate": StabilityDecayRate,
+			"decayRate": c.stabilityDecayRate,
 		}
 
 		res, err := tx.Run(ctx, cypher, params)
@@ -245,7 +270,7 @@ func (c *ContextCooler) ProcessGraduations(ctx context.Context, spaceID string) 
 
 		res, err := tx.Run(ctx, graduateCypher, map[string]any{
 			"spaceId":             spaceID,
-			"graduationThreshold": GraduationStabilityThreshold,
+			"graduationThreshold": c.graduationThreshold,
 		})
 		if err != nil {
 			return nil, err
@@ -256,13 +281,20 @@ func (c *ContextCooler) ProcessGraduations(ctx context.Context, spaceID string) 
 		}
 
 		// Step 2: Tombstone stagnant nodes past the reinforcement window with low stability
-		windowCutoff := time.Now().UTC().Add(-time.Duration(ReinforcementWindowHours) * time.Hour)
+		// Constraint-tagged observations are protected from tombstoning when configured
+		windowCutoff := time.Now().UTC().Add(-time.Duration(c.reinforcementWindowHours) * time.Hour)
+
+		constraintExclusion := ""
+		if c.constraintProtectFromDecay {
+			constraintExclusion = "\n\t\t\t  AND NOT any(tag IN coalesce(n.tags, []) WHERE tag STARTS WITH 'constraint:')"
+		}
+
 		tombstoneCypher := `
 			MATCH (n:MemoryNode {space_id: $spaceId})
 			WHERE n.role_type = 'conversation_observation'
 			  AND coalesce(n.volatile, true) = true
 			  AND n.created_at < datetime($windowCutoff)
-			  AND coalesce(n.stability_score, 0.1) < $tombstoneThreshold
+			  AND coalesce(n.stability_score, 0.1) < $tombstoneThreshold` + constraintExclusion + `
 			SET n.is_archived = true,
 			    n.archived_at = datetime(),
 			    n.archive_reason = 'context_cooler_tombstone',
@@ -273,7 +305,7 @@ func (c *ContextCooler) ProcessGraduations(ctx context.Context, spaceID string) 
 		res, err = tx.Run(ctx, tombstoneCypher, map[string]any{
 			"spaceId":            spaceID,
 			"windowCutoff":       windowCutoff.Format(time.RFC3339),
-			"tombstoneThreshold": TombstoneThreshold,
+			"tombstoneThreshold": c.tombstoneThreshold,
 		})
 		if err != nil {
 			return nil, err
@@ -386,19 +418,19 @@ type VolatileStats struct {
 }
 
 // CalculateDecayedStability calculates what a stability score would be after decay.
-// This is a pure function for testing/preview purposes.
+// This is a pure function for testing/preview purposes (uses default decay rate).
 func CalculateDecayedStability(currentStability float64, daysInactive int) float64 {
 	if daysInactive <= 0 {
 		return currentStability
 	}
-	return currentStability * math.Pow(1.0-StabilityDecayRate, float64(daysInactive))
+	return currentStability * math.Pow(1.0-defaultStabilityDecayRate, float64(daysInactive))
 }
 
-// CalculateReinforcementsToGraduate calculates how many reinforcements needed to graduate.
+// CalculateReinforcementsToGraduate calculates how many reinforcements needed to graduate (uses defaults).
 func CalculateReinforcementsToGraduate(currentStability float64) int {
-	if currentStability >= GraduationStabilityThreshold {
+	if currentStability >= defaultGraduationThreshold {
 		return 0
 	}
-	needed := (GraduationStabilityThreshold - currentStability) / StabilityIncreasePerReinforcement
+	needed := (defaultGraduationThreshold - currentStability) / defaultStabilityIncreasePerReinf
 	return int(math.Ceil(needed))
 }

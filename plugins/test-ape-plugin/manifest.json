@@ -1,0 +1,12 @@
+{
+  "id": "test-ape-plugin",
+  "name": "Test APE Plugin",
+  "version": "1.0.0",
+  "type": "APE",
+  "binary": "test-ape-plugin",
+  "capabilities": {
+    "event_triggers": ["session_end", "consolidate"]
+  },
+  "health_check_interval_ms": 5000,
+  "startup_timeout_ms": 10000
+}

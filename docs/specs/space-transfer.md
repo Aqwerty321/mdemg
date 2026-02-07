@@ -2,7 +2,7 @@
 
 **Phase**: N/A (standalone tooling)
 **Status**: Complete (all planned deliverables implemented)
-**Author**: Agent (Cursor)
+**Author**: reh3376 & Claude (gMEM-dev)
 **Date**: 2026-02-06
 
 ---

@@ -1,7 +1,10 @@
 {
   "upts_version": "1.0.0",
   "language": "terraform",
-  "variants": [".tf", ".tfvars"],
+  "variants": [
+    ".tf",
+    ".tfvars"
+  ],
   "metadata": {
     "author": "auto-generated",
     "created": "2026-02-05",
@@ -22,7 +25,7 @@
   "fixture": {
     "type": "file",
     "path": "../fixtures/terraform_test_fixture.tf",
-    "sha256": ""
+    "sha256": "c133b2f901b030fa84ca591520563369055092bd7d202290ad03cd8c5845b53c"
   },
   "expected": {
     "symbol_count": {
@@ -36,7 +39,9 @@
         "line": 4,
         "exported": true,
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["terraform-block"]
+        "tags": [
+          "terraform-block"
+        ]
       },
       {
         "name": "provider.aws",
@@ -45,7 +50,9 @@
         "exported": true,
         "value": "aws",
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["provider"]
+        "tags": [
+          "provider"
+        ]
       },
       {
         "name": "environment",
@@ -55,7 +62,10 @@
         "value": "production",
         "doc_comment": "The deployment environment",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "string"]
+        "tags": [
+          "variable",
+          "string"
+        ]
       },
       {
         "name": "instance_type",
@@ -65,7 +75,10 @@
         "value": "t3.medium",
         "doc_comment": "EC2 instance type",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "string"]
+        "tags": [
+          "variable",
+          "string"
+        ]
       },
       {
         "name": "enable_monitoring",
@@ -75,7 +88,10 @@
         "value": "true",
         "doc_comment": "Enable detailed monitoring",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "bool"]
+        "tags": [
+          "variable",
+          "bool"
+        ]
       },
       {
         "name": "allowed_cidrs",
@@ -84,7 +100,10 @@
         "exported": true,
         "doc_comment": "List of allowed CIDR blocks",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "list"]
+        "tags": [
+          "variable",
+          "list"
+        ]
       },
       {
         "name": "tags",
@@ -93,7 +112,10 @@
         "exported": true,
         "doc_comment": "Additional resource tags",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "map"]
+        "tags": [
+          "variable",
+          "map"
+        ]
       },
       {
         "name": "name_prefix",
@@ -102,7 +124,10 @@
         "exported": true,
         "parent": "locals",
         "pattern": "P1_CONSTANT",
-        "tags": ["local", "interpolation"]
+        "tags": [
+          "local",
+          "interpolation"
+        ]
       },
       {
         "name": "common_tags",
@@ -111,7 +136,10 @@
         "exported": true,
         "parent": "locals",
         "pattern": "P1_CONSTANT",
-        "tags": ["local", "function-call"]
+        "tags": [
+          "local",
+          "function-call"
+        ]
       },
       {
         "name": "subnet_count",
@@ -121,7 +149,10 @@
         "value": "3",
         "parent": "locals",
         "pattern": "P1_CONSTANT",
-        "tags": ["local", "integer"]
+        "tags": [
+          "local",
+          "integer"
+        ]
       },
       {
         "name": "is_production",
@@ -130,7 +161,10 @@
         "exported": true,
         "parent": "locals",
         "pattern": "P1_CONSTANT",
-        "tags": ["local", "expression"]
+        "tags": [
+          "local",
+          "expression"
+        ]
       },
       {
         "name": "data.aws_ami.ubuntu",
@@ -139,7 +173,9 @@
         "exported": true,
         "value": "aws_ami",
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["data-source"]
+        "tags": [
+          "data-source"
+        ]
       },
       {
         "name": "aws_security_group.web",
@@ -148,7 +184,10 @@
         "exported": true,
         "value": "aws_security_group",
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["resource", "security"]
+        "tags": [
+          "resource",
+          "security"
+        ]
       },
       {
         "name": "aws_instance.web",
@@ -157,7 +196,10 @@
         "exported": true,
         "value": "aws_instance",
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["resource", "compute"]
+        "tags": [
+          "resource",
+          "compute"
+        ]
       },
       {
         "name": "module.vpc",
@@ -165,7 +207,10 @@
         "line": 134,
         "exported": true,
         "pattern": "P3_CLASS_STRUCT",
-        "tags": ["module", "networking"]
+        "tags": [
+          "module",
+          "networking"
+        ]
       },
       {
         "name": "instance_id",
@@ -175,7 +220,9 @@
         "value": "aws_instance.web.id",
         "doc_comment": "The ID of the EC2 instance",
         "pattern": "P1_CONSTANT",
-        "tags": ["output"]
+        "tags": [
+          "output"
+        ]
       },
       {
         "name": "security_group_id",
@@ -185,7 +232,9 @@
         "value": "aws_security_group.web.id",
         "doc_comment": "The ID of the security group",
         "pattern": "P1_CONSTANT",
-        "tags": ["output"]
+        "tags": [
+          "output"
+        ]
       },
       {
         "name": "public_ip",
@@ -195,7 +244,9 @@
         "value": "aws_instance.web.public_ip",
         "doc_comment": "The public IP of the instance",
         "pattern": "P1_CONSTANT",
-        "tags": ["output"]
+        "tags": [
+          "output"
+        ]
       }
     ],
     "excluded": [

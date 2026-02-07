@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -75,6 +76,10 @@ type ObserveRequest struct {
 
 	// Cross-module linking (CMS v2)
 	RefersTo []string `json:"refers_to,omitempty"` // Node/symbol IDs this observation references
+
+	// Structured Observations (Phase 60)
+	TemplateID     string         `json:"template_id,omitempty"`     // Template to use for structured observation
+	StructuredData map[string]any `json:"structured_data,omitempty"` // Template-validated data
 }
 
 // ObserveResponse is the response from capturing an observation
@@ -103,6 +108,36 @@ type CorrectRequest struct {
 
 	// Cross-module linking (CMS v2)
 	RefersTo []string `json:"refers_to,omitempty"` // Node/symbol IDs this correction references
+}
+
+// calculateInitialImportance returns an initial importance score based on observation type
+func calculateInitialImportance(obsType ObservationType) float64 {
+	switch obsType {
+	case ObsTypeCorrection:
+		return 0.9 // Corrections are high priority
+	case ObsTypeDecision:
+		return 0.8 // Decisions are important
+	case ObsTypeError:
+		return 0.75 // Errors need tracking
+	case ObsTypeBlocker:
+		return 0.8 // Blockers are critical
+	case ObsTypeContext:
+		return 0.7 // Context for continuity
+	case ObsTypeLearning:
+		return 0.6 // Learnings are moderate
+	case ObsTypeInsight:
+		return 0.65 // Insights are valuable
+	case ObsTypePreference:
+		return 0.5 // Preferences are useful
+	case ObsTypeProgress:
+		return 0.4 // Progress updates are less critical
+	case ObsTypeTechnicalNote:
+		return 0.5 // Technical notes are moderate
+	case ObsTypeTask:
+		return 0.7 // Tasks are important for continuity
+	default:
+		return 0.5 // Default moderate importance
+	}
 }
 
 // Observe captures a conversation observation
@@ -186,21 +221,28 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 
 	// Create observation object
 	// New observations start as volatile with low stability score
+	now := time.Now().UTC()
 	obs := Observation{
-		ObsID:          obsID,
-		SpaceID:        req.SpaceID,
-		SessionID:      req.SessionID,
-		ObsType:        obsType,
-		Content:        req.Content,
-		Embedding:      embedding,
-		Tags:           req.Tags,
-		Metadata:       req.Metadata,
-		CreatedAt:      time.Now().UTC(),
-		UserID:         req.UserID,
-		Visibility:     visibility,
-		Volatile:       true, // New observations are volatile until reinforced
-		StabilityScore: DefaultStabilityScore,
-		AgentID:        req.AgentID,
+		ObsID:           obsID,
+		SpaceID:         req.SpaceID,
+		SessionID:       req.SessionID,
+		ObsType:         obsType,
+		Content:         req.Content,
+		Embedding:       embedding,
+		Tags:            req.Tags,
+		Metadata:        req.Metadata,
+		CreatedAt:       now,
+		UserID:          req.UserID,
+		Visibility:      visibility,
+		Volatile:        true, // New observations are volatile until reinforced
+		StabilityScore:  DefaultStabilityScore,
+		AgentID:         req.AgentID,
+		TemplateID:      req.TemplateID,
+		StructuredData:  req.StructuredData,
+		ImportanceScore: calculateInitialImportance(obsType), // Phase 60
+		Tier:            "important",                          // Default tier
+		LastAccessedAt:  now,
+		OrgReviewStatus: "none",
 	}
 
 	// Generate summary (first 200 chars)
@@ -336,6 +378,12 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 				visibility: $visibility,
 				volatile: $volatile,
 				stability_score: $stabilityScore,
+				template_id: $templateId,
+				structured_data: $structuredData,
+				importance_score: $importanceScore,
+				tier: $tier,
+				last_accessed_at: datetime($lastAccessedAt),
+				org_review_status: $orgReviewStatus,
 				created_at: datetime($createdAt),
 				updated_at: datetime($createdAt)
 			})
@@ -354,23 +402,49 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 			stabilityScore = DefaultStabilityScore
 		}
 
+		// Serialize structured data to JSON string
+		var structuredDataStr string
+		if obs.StructuredData != nil && len(obs.StructuredData) > 0 {
+			if data, err := json.Marshal(obs.StructuredData); err == nil {
+				structuredDataStr = string(data)
+			}
+		}
+
+		// Set default tier if not specified
+		tier := obs.Tier
+		if tier == "" {
+			tier = "important"
+		}
+
+		// Set last accessed time
+		lastAccessedAt := obs.LastAccessedAt
+		if lastAccessedAt.IsZero() {
+			lastAccessedAt = obs.CreatedAt
+		}
+
 		params := map[string]any{
-			"nodeId":         nodeID,
-			"spaceId":        obs.SpaceID,
-			"obsId":          obs.ObsID,
-			"sessionId":      obs.SessionID,
-			"obsType":        string(obs.ObsType),
-			"content":        obs.Content,
-			"summary":        obs.Summary,
-			"embedding":      obs.Embedding,
-			"surpriseScore":  obs.SurpriseScore,
-			"tags":           tags,
-			"userId":         obs.UserID,
-			"agentId":        obs.AgentID,
-			"visibility":     string(visibility),
-			"volatile":       obs.Volatile,
-			"stabilityScore": stabilityScore,
-			"createdAt":      obs.CreatedAt.Format(time.RFC3339),
+			"nodeId":          nodeID,
+			"spaceId":         obs.SpaceID,
+			"obsId":           obs.ObsID,
+			"sessionId":       obs.SessionID,
+			"obsType":         string(obs.ObsType),
+			"content":         obs.Content,
+			"summary":         obs.Summary,
+			"embedding":       obs.Embedding,
+			"surpriseScore":   obs.SurpriseScore,
+			"tags":            tags,
+			"userId":          obs.UserID,
+			"agentId":         obs.AgentID,
+			"visibility":      string(visibility),
+			"volatile":        obs.Volatile,
+			"stabilityScore":  stabilityScore,
+			"templateId":      obs.TemplateID,
+			"structuredData":  structuredDataStr,
+			"importanceScore": obs.ImportanceScore,
+			"tier":            tier,
+			"lastAccessedAt":  lastAccessedAt.Format(time.RFC3339),
+			"orgReviewStatus": obs.OrgReviewStatus,
+			"createdAt":       obs.CreatedAt.Format(time.RFC3339),
 		}
 
 		// Add metadata as properties if present

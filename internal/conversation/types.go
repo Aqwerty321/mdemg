@@ -67,6 +67,20 @@ type Observation struct {
 
 	// Multi-Agent Identity (CMS v3)
 	AgentID string // Persistent agent identity (survives across sessions)
+
+	// Structured Observations (Phase 60)
+	TemplateID     string         // Template ID used for this observation
+	StructuredData map[string]any // Template-validated structured data
+
+	// Resume Optimization (Phase 60)
+	ImportanceScore float64 // 0.0-1.0, for relevance-based resume
+	Tier            string  // critical, important, background
+	LastAccessedAt  time.Time
+
+	// Org-Level Review (Phase 60)
+	OrgReviewStatus string    // none, pending, approved, rejected
+	OrgFlaggedAt    time.Time // When flagged for org review
+	OrgFlaggedBy    string    // Who flagged it
 }
 
 // SurpriseFactors breaks down the surprise score

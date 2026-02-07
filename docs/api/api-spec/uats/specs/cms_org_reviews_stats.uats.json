@@ -1,0 +1,56 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Get Org Review Stats",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "org-review",
+      "read",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates Org Review Stats endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "df5de87465b6a084fd349779dedde123268d66000804eb454f4c18b4a08ab605"
+  },
+  "variables": {
+    "test_space": "uats-orgreview-test"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/conversation/org-reviews/stats",
+    "query": {
+      "space_id": "{{test_space}}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.pending",
+        "type": "number"
+      },
+      {
+        "path": "$.approved",
+        "type": "number"
+      },
+      {
+        "path": "$.rejected",
+        "type": "number"
+      }
+    ]
+  }
+}

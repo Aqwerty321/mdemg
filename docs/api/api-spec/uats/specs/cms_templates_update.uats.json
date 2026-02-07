@@ -1,0 +1,58 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Update CMS Template",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "templates",
+      "write",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates Update Template endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "a67b5d99433a7a76ac2a3dfbd6dd375dd2ad691486ac7af3082b6b34d88ab558"
+  },
+  "variables": {
+    "test_space": "uats-templates-test",
+    "test_template_id": "uats-update-test"
+  },
+  "request": {
+    "method": "PUT",
+    "path": "/v1/conversation/templates/{{test_template_id}}",
+    "body": {
+      "space_id": "{{test_space}}",
+      "name": "Updated Template Name",
+      "description": "Updated by UATS",
+      "obs_type": "learning",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "updated_field": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": [
+      200,
+      404
+    ],
+    "body_assertions": []
+  }
+}

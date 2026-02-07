@@ -1,0 +1,82 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Create Task Snapshot",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "snapshot",
+      "write",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates Create Snapshot endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "5cc1c62a92256ddffe982c21497421f7830dd29552045e9a9d006b46af3b32dd"
+  },
+  "variables": {
+    "test_space": "uats-snapshot-test",
+    "test_session": "uats-session-001"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/snapshot",
+    "body": {
+      "space_id": "{{test_space}}",
+      "session_id": "{{test_session}}",
+      "trigger": "manual",
+      "context": {
+        "task_name": "UATS Test Task",
+        "status": "in_progress",
+        "active_files": [
+          "test.go"
+        ],
+        "current_goal": "Run UATS tests"
+      }
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 201,
+    "body_assertions": [
+      {
+        "path": "$.snapshot_id",
+        "type": "string"
+      },
+      {
+        "path": "$.space_id",
+        "operator": "equals",
+        "value": "{{test_space}}"
+      },
+      {
+        "path": "$.session_id",
+        "operator": "equals",
+        "value": "{{test_session}}"
+      },
+      {
+        "path": "$.trigger",
+        "operator": "equals",
+        "value": "manual"
+      },
+      {
+        "path": "$.context",
+        "type": "object"
+      },
+      {
+        "path": "$.created_at",
+        "type": "string"
+      }
+    ]
+  }
+}

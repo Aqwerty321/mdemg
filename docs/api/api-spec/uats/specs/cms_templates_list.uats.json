@@ -1,0 +1,52 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "List CMS Templates",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "templates",
+      "read",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates List Templates endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "57339e155389bd4396efa0d5e5f775039d6452bb042a41834533845210327e68"
+  },
+  "variables": {
+    "test_space": "uats-templates-test"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/conversation/templates",
+    "query": {
+      "space_id": "{{test_space}}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.templates",
+        "type": "array"
+      },
+      {
+        "path": "$.count",
+        "type": "number"
+      }
+    ]
+  }
+}

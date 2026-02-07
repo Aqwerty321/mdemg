@@ -1,0 +1,53 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "List Pending Org Reviews",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "org-review",
+      "read",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates List Pending Org Reviews endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "1dbf8b549427b451093b5f4efa07d2942bb164840eb44f41e8237737042f3e29"
+  },
+  "variables": {
+    "test_space": "uats-orgreview-test"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/conversation/org-reviews",
+    "query": {
+      "space_id": "{{test_space}}",
+      "status": "pending"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.reviews",
+        "type": "array"
+      },
+      {
+        "path": "$.count",
+        "type": "number"
+      }
+    ]
+  }
+}

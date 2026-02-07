@@ -711,6 +711,331 @@ Manually trigger graduation processing for the Context Cooler.
 
 ---
 
+## CMS Advanced Functionality (Phase 60)
+
+Advanced CMS features including observation templates, task snapshots, relevance scoring, smart truncation, and org-level review workflows.
+
+### Observation Templates
+
+Templates provide structured schemas for consistent observation capture with JSON Schema validation.
+
+#### GET /v1/conversation/templates
+
+List all observation templates for a space.
+
+**Query Parameters**:
+- `space_id` (required): The memory space
+
+**Response**:
+```json
+{
+  "templates": [
+    {
+      "template_id": "task_handoff",
+      "space_id": "mdemg-dev",
+      "name": "Task Handoff",
+      "description": "Capture task state for session continuity",
+      "obs_type": "context",
+      "created_at": "2026-02-07T10:00:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+#### POST /v1/conversation/templates
+
+Create a new observation template.
+
+**Request Body**:
+```json
+{
+  "space_id": "mdemg-dev",
+  "template_id": "task_handoff",
+  "name": "Task Handoff",
+  "description": "Capture task state for session continuity",
+  "obs_type": "context",
+  "schema": {
+    "type": "object",
+    "required": ["task_name", "status"],
+    "properties": {
+      "task_name": {"type": "string"},
+      "status": {"type": "string", "enum": ["in_progress", "blocked", "completed"]}
+    }
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "template_id": "task_handoff",
+  "space_id": "mdemg-dev",
+  "name": "Task Handoff",
+  "created_at": "2026-02-07T10:00:00Z"
+}
+```
+
+#### GET /v1/conversation/templates/{template_id}
+
+Get a specific template by ID.
+
+**Query Parameters**:
+- `space_id` (required): The memory space
+
+**Response**: Same as single template in list response.
+
+#### PUT /v1/conversation/templates/{template_id}
+
+Update an existing template.
+
+**Request Body**: Same as create (all fields optional except `space_id`).
+
+**Response**:
+```json
+{
+  "template_id": "task_handoff",
+  "updated": true,
+  "updated_at": "2026-02-07T11:00:00Z"
+}
+```
+
+#### DELETE /v1/conversation/templates/{template_id}
+
+Delete a template.
+
+**Query Parameters**:
+- `space_id` (required): The memory space
+
+**Response**:
+```json
+{
+  "template_id": "task_handoff",
+  "deleted": true
+}
+```
+
+### Task Context Snapshots
+
+Snapshots capture task state for session continuity, triggered manually or automatically on session end/compaction.
+
+#### GET /v1/conversation/snapshots
+
+List snapshots for a session.
+
+**Query Parameters**:
+- `space_id` (required)
+- `session_id` (optional): Filter by session
+- `limit` (optional): Max results (default: 50)
+
+**Response**:
+```json
+{
+  "snapshots": [
+    {
+      "snapshot_id": "snap-abc123",
+      "space_id": "mdemg-dev",
+      "session_id": "session-123",
+      "trigger": "manual",
+      "context": {
+        "task_name": "Phase 60 implementation",
+        "active_files": ["service.go"]
+      },
+      "created_at": "2026-02-07T10:00:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+#### POST /v1/conversation/snapshots
+
+Create a new task context snapshot.
+
+**Request Body**:
+```json
+{
+  "space_id": "mdemg-dev",
+  "session_id": "session-123",
+  "trigger": "manual",
+  "context": {
+    "task_name": "Phase 60 implementation",
+    "active_files": ["service.go", "types.go"],
+    "current_goal": "Add templates",
+    "recent_tool_calls": ["Read", "Edit", "Bash"],
+    "pending_items": ["Create tests", "Update docs"]
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "snapshot_id": "snap-abc123",
+  "space_id": "mdemg-dev",
+  "session_id": "session-123",
+  "trigger": "manual",
+  "created_at": "2026-02-07T10:00:00Z"
+}
+```
+
+#### GET /v1/conversation/snapshots/{snapshot_id}
+
+Get a specific snapshot.
+
+**Query Parameters**:
+- `space_id` (required)
+
+**Response**: Same as single snapshot in list response.
+
+#### GET /v1/conversation/snapshots/latest
+
+Get the most recent snapshot for a session.
+
+**Query Parameters**:
+- `space_id` (required)
+- `session_id` (required)
+
+**Response**: Single snapshot object.
+
+#### DELETE /v1/conversation/snapshots/{snapshot_id}
+
+Delete a snapshot.
+
+**Query Parameters**:
+- `space_id` (required)
+
+**Response**:
+```json
+{
+  "snapshot_id": "snap-abc123",
+  "deleted": true
+}
+```
+
+#### POST /v1/conversation/snapshots/cleanup
+
+Clean up old snapshots for a space.
+
+**Request Body**:
+```json
+{
+  "space_id": "mdemg-dev",
+  "keep_count": 10,
+  "older_than_days": 7
+}
+```
+
+**Response**:
+```json
+{
+  "space_id": "mdemg-dev",
+  "deleted_count": 5
+}
+```
+
+### Org-Level Review
+
+Workflow for flagging observations for org-level review before promotion to team/global visibility.
+
+#### GET /v1/conversation/org-reviews
+
+List observations pending org-level review.
+
+**Query Parameters**:
+- `space_id` (required)
+- `limit` (optional): Max results (default: 50, max: 500)
+
+**Response**:
+```json
+{
+  "reviews": [
+    {
+      "obs_id": "obs-abc123",
+      "space_id": "mdemg-dev",
+      "content": "Architectural decision about...",
+      "obs_type": "decision",
+      "flagged_at": "2026-02-07T10:00:00Z",
+      "flagged_by": "agent-claude",
+      "suggested_visibility": "team",
+      "flag_reason": "Valuable for team reference"
+    }
+  ],
+  "count": 1
+}
+```
+
+#### GET /v1/conversation/org-reviews/stats
+
+Get review statistics for a space.
+
+**Query Parameters**:
+- `space_id` (required)
+
+**Response**:
+```json
+{
+  "pending": 5,
+  "approved": 42,
+  "rejected": 3
+}
+```
+
+#### POST /v1/conversation/org-reviews/flag
+
+Flag an observation for org-level review.
+
+**Request Body**:
+```json
+{
+  "obs_id": "obs-abc123",
+  "space_id": "mdemg-dev",
+  "reason": "Valuable architectural decision for team reference",
+  "suggested_visibility": "team",
+  "flagged_by": "agent-claude"
+}
+```
+
+**Response**:
+```json
+{
+  "obs_id": "obs-abc123",
+  "flagged_for_review": true,
+  "review_status": "pending",
+  "flagged_at": "2026-02-07T10:00:00Z",
+  "flagged_by": "agent-claude"
+}
+```
+
+#### POST /v1/conversation/org-reviews/decision
+
+Process an approve/reject decision on a flagged observation.
+
+**Request Body**:
+```json
+{
+  "obs_id": "obs-abc123",
+  "space_id": "mdemg-dev",
+  "decision": "approve",
+  "visibility": "team",
+  "reviewed_by": "user@example.com",
+  "notes": "Good addition to team knowledge"
+}
+```
+
+**Response**:
+```json
+{
+  "obs_id": "obs-abc123",
+  "decision": "approve",
+  "new_visibility": "team",
+  "reviewed_at": "2026-02-07T11:00:00Z",
+  "reviewed_by": "user@example.com"
+}
+```
+
+---
+
 ## Capability Gaps
 
 Endpoints for capability gap detection and interview prompts.

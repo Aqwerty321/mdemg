@@ -1,0 +1,50 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Flag Observation for Org Review",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "org-review",
+      "write",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates Flag for Org Review endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "edcb2172fd952ac2440d9567bc5c38f9dd332d6c32aa81ebe94b85d0331e847c"
+  },
+  "variables": {
+    "test_space": "uats-orgreview-test",
+    "test_obs_id": "uats-obs-to-flag"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/observations/{{test_obs_id}}/flag-org",
+    "body": {
+      "space_id": "{{test_space}}",
+      "reason": "Valuable insight for team reference",
+      "suggested_visibility": "team"
+    },
+    "headers": {
+      "Content-Type": "application/json",
+      "X-Agent-ID": "uats-test-agent"
+    }
+  },
+  "expected": {
+    "status": [
+      201,
+      404
+    ],
+    "body_assertions": []
+  }
+}

@@ -81,6 +81,12 @@ func TryFallbackParser(filePath string) ([]FallbackSymbol, bool, error) {
 		ext == ".targets" || ext == ".nuspec" || ext == ".resx" || ext == ".xaml" ||
 		ext == ".config" || ext == ".manifest":
 		return parseXML(filePath)
+	case ext == ".c" || ext == ".h":
+		return parseC(filePath)
+	case ext == ".cpp" || ext == ".cc" || ext == ".cxx" || ext == ".hpp" || ext == ".hh" || ext == ".hxx":
+		return parseCPP(filePath)
+	case ext == ".cu" || ext == ".cuh":
+		return parseCUDA(filePath)
 	default:
 		return nil, false, nil // Not handled
 	}
@@ -2535,4 +2541,630 @@ func detectXMLKind(base, ext, content string) string {
 	default:
 		return "xml-data"
 	}
+}
+
+// ============================================================
+// C Parser
+// ============================================================
+
+func parseC(filePath string) ([]FallbackSymbol, bool, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, true, err
+	}
+
+	var symbols []FallbackSymbol
+	lines := strings.Split(string(content), "\n")
+
+	// Patterns for C
+	definePattern := regexp.MustCompile(`^\s*#define\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\([^)]*\))?\s*(.*)$`)
+	typedefSimplePattern := regexp.MustCompile(`^\s*typedef\s+[\w\s\*]+\s+(\w+)\s*;`)
+	typedefEnumStartPattern := regexp.MustCompile(`^\s*typedef\s+enum`)
+	typedefStructStartPattern := regexp.MustCompile(`^\s*typedef\s+struct`)
+	enumNamePattern := regexp.MustCompile(`enum\s+(\w+)`)
+	structNamePattern := regexp.MustCompile(`struct\s+(\w+)`)
+	structForwardPattern := regexp.MustCompile(`^\s*struct\s+(\w+)\s*;`)
+	// Function pattern: capture the name immediately before opening paren
+	funcPattern := regexp.MustCompile(`\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)\s*[;{]`)
+
+	var inTypedefEnum bool
+	var inTypedefStruct bool
+	var typedefStartLine int
+	var braceDepth int
+	seenFunctions := make(map[string]bool)
+
+	for i, line := range lines {
+		lineNum := i + 1
+		trimmed := strings.TrimSpace(line)
+
+		// Skip empty lines and comments
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
+			continue
+		}
+
+		// Track brace depth for typedef blocks
+		openBraces := strings.Count(line, "{")
+		closeBraces := strings.Count(line, "}")
+
+		// #define macros
+		if match := definePattern.FindStringSubmatch(line); match != nil {
+			name := match[1]
+			value := strings.TrimSpace(match[2])
+			// Remove trailing comments
+			if idx := strings.Index(value, "//"); idx > 0 {
+				value = strings.TrimSpace(value[:idx])
+			}
+			sym := FallbackSymbol{
+				Name:     name,
+				Type:     "macro",
+				Line:     lineNum,
+				Exported: true,
+			}
+			if value != "" {
+				sym.Value = value
+			}
+			symbols = append(symbols, sym)
+			continue
+		}
+
+		// typedef enum start
+		if typedefEnumStartPattern.MatchString(line) {
+			inTypedefEnum = true
+			typedefStartLine = lineNum
+						braceDepth = openBraces
+
+			// Check for named enum: typedef enum EnumName {
+			if match := enumNamePattern.FindStringSubmatch(line); match != nil {
+				symbols = append(symbols, FallbackSymbol{
+					Name:     match[1],
+					Type:     "enum",
+					Line:     lineNum,
+					Exported: true,
+				})
+			}
+			continue
+		}
+
+		// typedef struct start
+		if typedefStructStartPattern.MatchString(line) {
+			inTypedefStruct = true
+			typedefStartLine = lineNum
+						braceDepth = openBraces
+
+			// Check for named struct: typedef struct StructName {
+			if match := structNamePattern.FindStringSubmatch(line); match != nil {
+				symbols = append(symbols, FallbackSymbol{
+					Name:     match[1],
+					Type:     "struct",
+					Line:     lineNum,
+					Exported: true,
+				})
+			}
+			continue
+		}
+
+		// Handle closing brace of typedef enum
+		if inTypedefEnum {
+			braceDepth += openBraces - closeBraces
+			if braceDepth <= 0 && closeBraces > 0 {
+				// Extract typedef name from closing line: } TypeName;
+				typedefNamePattern := regexp.MustCompile(`\}\s*(\w+)\s*;`)
+				if match := typedefNamePattern.FindStringSubmatch(line); match != nil {
+					symbols = append(symbols, FallbackSymbol{
+						Name:     match[1],
+						Type:     "type",
+						Line:     typedefStartLine,
+						Exported: true,
+					})
+				}
+				inTypedefEnum = false
+			}
+			continue
+		}
+
+		// Handle closing brace of typedef struct
+		if inTypedefStruct {
+			braceDepth += openBraces - closeBraces
+			if braceDepth <= 0 && closeBraces > 0 {
+				// Extract typedef name from closing line: } TypeName;
+				typedefNamePattern := regexp.MustCompile(`\}\s*(\w+)\s*;`)
+				if match := typedefNamePattern.FindStringSubmatch(line); match != nil {
+					// Don't add duplicate if struct name was already added
+					alreadyExists := false
+					for _, s := range symbols {
+						if s.Name == match[1] && (s.Type == "struct" || s.Type == "type") {
+							alreadyExists = true
+							break
+						}
+					}
+					if !alreadyExists {
+						symbols = append(symbols, FallbackSymbol{
+							Name:     match[1],
+							Type:     "struct",
+							Line:     typedefStartLine,
+							Exported: true,
+						})
+					}
+				}
+				inTypedefStruct = false
+			}
+			continue
+		}
+
+		// Forward struct declaration (not typedef)
+		if match := structForwardPattern.FindStringSubmatch(line); match != nil {
+			if !strings.Contains(line, "typedef") {
+				symbols = append(symbols, FallbackSymbol{
+					Name:     match[1],
+					Type:     "struct",
+					Line:     lineNum,
+					Exported: true,
+				})
+			}
+			continue
+		}
+
+		// Simple typedef (type alias) - not struct/enum
+		if strings.HasPrefix(trimmed, "typedef") && !strings.Contains(line, "struct") && !strings.Contains(line, "enum") {
+			if match := typedefSimplePattern.FindStringSubmatch(line); match != nil {
+				symbols = append(symbols, FallbackSymbol{
+					Name:     match[1],
+					Type:     "type",
+					Line:     lineNum,
+					Exported: true,
+				})
+				continue
+			}
+		}
+
+		// Skip struct/enum/typedef keywords
+		if strings.HasPrefix(trimmed, "typedef") || strings.HasPrefix(trimmed, "struct") || strings.HasPrefix(trimmed, "enum") {
+			continue
+		}
+
+		// Function declarations and definitions
+		// Look for pattern: name(params) followed by ; or {
+		if strings.Contains(line, "(") && (strings.Contains(line, ";") || strings.Contains(line, "{")) {
+			if match := funcPattern.FindStringSubmatch(line); match != nil {
+				name := match[1]
+				// Skip control flow and other keywords
+				skipKeywords := map[string]bool{
+					"if": true, "for": true, "while": true, "switch": true, "return": true,
+					"sizeof": true, "typedef": true, "struct": true, "enum": true,
+					"malloc": true, "free": true, "printf": true, "snprintf": true,
+					"strchr": true, "time_t": true, "size_t": true, "NULL": true,
+				}
+				if skipKeywords[name] {
+					continue
+				}
+
+				// Skip if already seen (declarations vs definitions)
+				if seenFunctions[name] {
+					continue
+				}
+				seenFunctions[name] = true
+
+				isStatic := strings.Contains(line, "static ")
+				isInline := strings.Contains(line, "inline ")
+
+				symbols = append(symbols, FallbackSymbol{
+					Name:     name,
+					Type:     "function",
+					Line:     lineNum,
+					Exported: !isStatic || isInline,
+				})
+			}
+		}
+	}
+
+	return symbols, true, nil
+}
+
+// ============================================================
+// C++ Parser
+// ============================================================
+
+func parseCPP(filePath string) ([]FallbackSymbol, bool, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, true, err
+	}
+
+	var symbols []FallbackSymbol
+	lines := strings.Split(string(content), "\n")
+
+	// Patterns for C++
+	constexprPattern := regexp.MustCompile(`^\s*(?:inline\s+)?constexpr\s+[\w<>:]+\s+(\w+)\s*=\s*(.+?);`)
+	staticConstPattern := regexp.MustCompile(`^\s*static\s+const\s+[\w<>:]+\s+(\w+)\s*=\s*(.+?);`)
+	usingPattern := regexp.MustCompile(`^\s*using\s+(\w+)\s*=`)
+	namespacePattern := regexp.MustCompile(`^\s*namespace\s+(\w+)`)
+	enumClassPattern := regexp.MustCompile(`^\s*enum\s+class\s+(\w+)`)
+	enumPattern := regexp.MustCompile(`^\s*enum\s+(\w+)`)
+	classPattern := regexp.MustCompile(`^\s*(template\s*<[^>]*>\s*)?(class|struct)\s+(\w+)`)
+	methodDeclPattern := regexp.MustCompile(`^\s*(virtual\s+)?(static\s+)?([\w<>:*&\s]+)\s+(\w+)\s*\([^)]*\)`)
+	funcDefPattern := regexp.MustCompile(`^([\w<>:*&\s]+)\s+(\w+)\s*\([^)]*\)\s*(?:const\s*)?\{`)
+	publicPattern := regexp.MustCompile(`^\s*public:`)
+	privatePattern := regexp.MustCompile(`^\s*private:`)
+	protectedPattern := regexp.MustCompile(`^\s*protected:`)
+
+	var currentClass string
+	var classStack []string
+	var inClass bool
+	var isPublic bool
+	var braceDepth int
+	var classStartDepth int
+
+	for i, line := range lines {
+		lineNum := i + 1
+		trimmed := strings.TrimSpace(line)
+
+		// Skip empty lines and comments
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+
+		// Track brace depth
+		openBraces := strings.Count(line, "{")
+		closeBraces := strings.Count(line, "}")
+
+		// Constexpr constants
+		if match := constexprPattern.FindStringSubmatch(line); match != nil {
+			value := strings.TrimSpace(match[2])
+			// Remove trailing semicolon and quotes
+			value = strings.TrimSuffix(value, ";")
+			if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
+				value = value[1 : len(value)-1]
+			}
+			symbols = append(symbols, FallbackSymbol{
+				Name:     match[1],
+				Type:     "constant",
+				Line:     lineNum,
+				Value:    value,
+				Exported: true,
+			})
+			continue
+		}
+
+		// Static const
+		if match := staticConstPattern.FindStringSubmatch(line); match != nil {
+			symbols = append(symbols, FallbackSymbol{
+				Name:     match[1],
+				Type:     "constant",
+				Line:     lineNum,
+				Value:    strings.TrimSpace(match[2]),
+				Exported: true,
+			})
+			continue
+		}
+
+		// Using type alias
+		if match := usingPattern.FindStringSubmatch(line); match != nil {
+			symbols = append(symbols, FallbackSymbol{
+				Name:     match[1],
+				Type:     "type",
+				Line:     lineNum,
+				Exported: true,
+			})
+			continue
+		}
+
+		// Namespace
+		if match := namespacePattern.FindStringSubmatch(line); match != nil {
+			symbols = append(symbols, FallbackSymbol{
+				Name:     match[1],
+				Type:     "namespace",
+				Line:     lineNum,
+				Exported: true,
+			})
+			braceDepth += openBraces
+			continue
+		}
+
+		// Enum class
+		if match := enumClassPattern.FindStringSubmatch(line); match != nil {
+			symbols = append(symbols, FallbackSymbol{
+				Name:     match[1],
+				Type:     "enum",
+				Line:     lineNum,
+				Exported: true,
+			})
+			braceDepth += openBraces
+			continue
+		}
+
+		// Enum
+		if match := enumPattern.FindStringSubmatch(line); match != nil {
+			symbols = append(symbols, FallbackSymbol{
+				Name:     match[1],
+				Type:     "enum",
+				Line:     lineNum,
+				Exported: true,
+			})
+			braceDepth += openBraces
+			continue
+		}
+
+		// Class or struct
+		if match := classPattern.FindStringSubmatch(line); match != nil {
+			className := match[3]
+			symbols = append(symbols, FallbackSymbol{
+				Name:     className,
+				Type:     "class",
+				Line:     lineNum,
+				Exported: true,
+			})
+			if openBraces > 0 {
+				classStack = append(classStack, currentClass)
+				currentClass = className
+				inClass = true
+				isPublic = match[2] == "struct" // structs default to public
+				classStartDepth = braceDepth
+			}
+			braceDepth += openBraces
+			continue
+		}
+
+		// Visibility specifiers
+		if publicPattern.MatchString(line) {
+			isPublic = true
+			continue
+		}
+		if privatePattern.MatchString(line) || protectedPattern.MatchString(line) {
+			isPublic = false
+			continue
+		}
+
+		// Method declarations inside class
+		if inClass && braceDepth > classStartDepth {
+			if match := methodDeclPattern.FindStringSubmatch(line); match != nil {
+				name := match[4]
+				// Skip keywords
+				if name == "if" || name == "for" || name == "while" || name == "switch" || name == "return" || name == "delete" || name == "default" {
+					braceDepth += openBraces - closeBraces
+					goto checkClassEnd
+				}
+
+				symbols = append(symbols, FallbackSymbol{
+					Name:     name,
+					Type:     "method",
+					Line:     lineNum,
+					Parent:   currentClass,
+					Exported: isPublic,
+				})
+				braceDepth += openBraces - closeBraces
+				goto checkClassEnd
+			}
+		}
+
+		// Standalone function (outside class)
+		if !inClass && strings.Contains(line, "(") {
+			if match := funcDefPattern.FindStringSubmatch(line); match != nil {
+				name := match[2]
+				// Skip keywords and control flow
+				if name == "if" || name == "for" || name == "while" || name == "switch" || name == "return" {
+					braceDepth += openBraces - closeBraces
+					continue
+				}
+				// Skip class constructors/destructors (these are detected as methods)
+				alreadyExists := false
+				for _, s := range symbols {
+					if s.Name == name && s.Line == lineNum {
+						alreadyExists = true
+						break
+					}
+				}
+				if !alreadyExists {
+					symbols = append(symbols, FallbackSymbol{
+						Name:     name,
+						Type:     "function",
+						Line:     lineNum,
+						Exported: true,
+					})
+				}
+			}
+		}
+
+		braceDepth += openBraces - closeBraces
+
+	checkClassEnd:
+		// Check if we've left the current class
+		if inClass && braceDepth <= classStartDepth {
+			if len(classStack) > 0 {
+				currentClass = classStack[len(classStack)-1]
+				classStack = classStack[:len(classStack)-1]
+				if currentClass == "" {
+					inClass = false
+				}
+			} else {
+				currentClass = ""
+				inClass = false
+			}
+			isPublic = false
+		}
+	}
+
+	return symbols, true, nil
+}
+
+// ============================================================
+// CUDA Parser
+// ============================================================
+
+func parseCUDA(filePath string) ([]FallbackSymbol, bool, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, true, err
+	}
+
+	var symbols []FallbackSymbol
+	lines := strings.Split(string(content), "\n")
+
+	// Patterns for CUDA
+	definePattern := regexp.MustCompile(`^\s*#define\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\([^)]*\))?\s*(.*)$`)
+	constexprPattern := regexp.MustCompile(`^\s*constexpr\s+[\w<>:]+\s+(\w+)\s*=\s*(.+?);`)
+	staticConstPattern := regexp.MustCompile(`^\s*static\s+const\s+[\w<>:]+\s+(\w+)\s*=\s*(.+?);`)
+	constantMemPattern := regexp.MustCompile(`^\s*__constant__\s+[\w<>:*\s]+\s+(\w+)`)
+	globalKernelPattern := regexp.MustCompile(`^\s*__global__\s+[\w\s]+\s+(\w+)\s*\(`)
+	deviceFuncPattern := regexp.MustCompile(`^\s*__device__\s+(?:__forceinline__\s+)?[\w\s<>:*&]+\s+(\w+)\s*\(`)
+	hostDeviceFuncPattern := regexp.MustCompile(`^\s*__host__\s+__device__\s+[\w\s<>:*&]+\s+(\w+)\s*\(`)
+	sharedVarPattern := regexp.MustCompile(`^\s*__shared__\s+[\w<>:*\s]+\s+(\w+)`)
+	hostFuncPattern := regexp.MustCompile(`^[\w\s<>:*&]+\s+(\w+)\s*\([^)]*\)\s*\{`)
+
+	// Track if we're inside a kernel or device function (for shared variables)
+	var inCUDAFunction bool
+	var braceDepth int
+
+	for i, line := range lines {
+		lineNum := i + 1
+		trimmed := strings.TrimSpace(line)
+
+		// Skip empty lines and comments
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+
+		// Track brace depth
+		openBraces := strings.Count(line, "{")
+		closeBraces := strings.Count(line, "}")
+
+		// #define macros
+		if match := definePattern.FindStringSubmatch(line); match != nil {
+			name := match[1]
+			value := strings.TrimSpace(match[2])
+			// Remove trailing comments
+			if idx := strings.Index(value, "//"); idx > 0 {
+				value = strings.TrimSpace(value[:idx])
+			}
+			sym := FallbackSymbol{
+				Name:     name,
+				Type:     "macro",
+				Line:     lineNum,
+				Exported: true,
+			}
+			if value != "" {
+				sym.Value = value
+			}
+			symbols = append(symbols, sym)
+			continue
+		}
+
+		// Constexpr constants
+		if match := constexprPattern.FindStringSubmatch(line); match != nil {
+			value := strings.TrimSpace(match[2])
+			symbols = append(symbols, FallbackSymbol{
+				Name:     match[1],
+				Type:     "constant",
+				Line:     lineNum,
+				Value:    value,
+				Exported: true,
+			})
+			continue
+		}
+
+		// Static const
+		if match := staticConstPattern.FindStringSubmatch(line); match != nil {
+			continue // Skip static const in CUDA - not part of expected symbols
+		}
+
+		// __constant__ memory
+		if match := constantMemPattern.FindStringSubmatch(line); match != nil {
+			continue // Skip __constant__ for now - not in expected symbols
+		}
+
+		// __global__ kernel functions
+		if match := globalKernelPattern.FindStringSubmatch(line); match != nil {
+			symbols = append(symbols, FallbackSymbol{
+				Name:     match[1],
+				Type:     "kernel",
+				Line:     lineNum,
+				Exported: true,
+			})
+			inCUDAFunction = true
+			braceDepth += openBraces
+			continue
+		}
+
+		// __host__ __device__ functions (treat as regular function)
+		if match := hostDeviceFuncPattern.FindStringSubmatch(line); match != nil {
+			symbols = append(symbols, FallbackSymbol{
+				Name:     match[1],
+				Type:     "function",
+				Line:     lineNum,
+				Exported: true,
+			})
+			inCUDAFunction = true
+			braceDepth += openBraces
+			continue
+		}
+
+		// __device__ functions
+		if match := deviceFuncPattern.FindStringSubmatch(line); match != nil {
+			symbols = append(symbols, FallbackSymbol{
+				Name:     match[1],
+				Type:     "device_function",
+				Line:     lineNum,
+				Exported: true,
+			})
+			inCUDAFunction = true
+			braceDepth += openBraces
+			continue
+		}
+
+		// __shared__ variables inside kernels
+		if match := sharedVarPattern.FindStringSubmatch(line); match != nil {
+			symbols = append(symbols, FallbackSymbol{
+				Name:     match[1],
+				Type:     "variable",
+				Line:     lineNum,
+				Exported: false,
+			})
+			braceDepth += openBraces - closeBraces
+			continue
+		}
+
+		// Regular host functions
+		if !inCUDAFunction && strings.Contains(line, "(") && strings.Contains(line, "{") {
+			// Skip if line contains CUDA qualifiers
+			if strings.Contains(line, "__global__") || strings.Contains(line, "__device__") || strings.Contains(line, "__host__") {
+				braceDepth += openBraces - closeBraces
+				continue
+			}
+			if match := hostFuncPattern.FindStringSubmatch(line); match != nil {
+				name := match[1]
+				// Skip keywords
+				if name == "if" || name == "for" || name == "while" || name == "switch" || name == "return" {
+					braceDepth += openBraces - closeBraces
+					continue
+				}
+				// Skip constructors and common patterns
+				if name == "struct" || name == "class" || name == "enum" {
+					braceDepth += openBraces - closeBraces
+					continue
+				}
+				// Only add if not already added
+				alreadyExists := false
+				for _, s := range symbols {
+					if s.Name == name {
+						alreadyExists = true
+						break
+					}
+				}
+				if !alreadyExists {
+					symbols = append(symbols, FallbackSymbol{
+						Name:     name,
+						Type:     "function",
+						Line:     lineNum,
+						Exported: true,
+					})
+				}
+			}
+		}
+
+		braceDepth += openBraces - closeBraces
+		if braceDepth <= 0 {
+			inCUDAFunction = false
+		}
+	}
+
+	return symbols, true, nil
 }

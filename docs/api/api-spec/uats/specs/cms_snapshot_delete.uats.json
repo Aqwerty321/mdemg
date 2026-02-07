@@ -1,0 +1,43 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Delete Snapshot",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "snapshot",
+      "write",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates Delete Snapshot endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "4e60fe1cb1bdf6e9bf30c94ed75f7ac40b03061fc83689acabc7d678b7b73d1f"
+  },
+  "variables": {
+    "test_snapshot_id": "uats-snapshot-delete-id"
+  },
+  "request": {
+    "method": "DELETE",
+    "path": "/v1/conversation/snapshot/{{test_snapshot_id}}",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": [
+      204,
+      404
+    ],
+    "body_assertions": []
+  }
+}

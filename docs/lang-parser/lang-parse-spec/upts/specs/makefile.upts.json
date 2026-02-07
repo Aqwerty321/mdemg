@@ -1,7 +1,9 @@
 {
   "upts_version": "1.0.0",
   "language": "makefile",
-  "variants": [".mk"],
+  "variants": [
+    ".mk"
+  ],
   "metadata": {
     "author": "auto-generated",
     "created": "2026-02-05",
@@ -23,7 +25,7 @@
   "fixture": {
     "type": "file",
     "path": "../fixtures/makefile_test_fixture.mk",
-    "sha256": ""
+    "sha256": "89f99d50c99173a5a32c1da13e61bad1e30c50fad2ef296f969ddedf19499b86"
   },
   "expected": {
     "symbol_count": {
@@ -38,7 +40,10 @@
         "exported": false,
         "value": "gcc",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "simple-assign"]
+        "tags": [
+          "variable",
+          "simple-assign"
+        ]
       },
       {
         "name": "CFLAGS",
@@ -47,7 +52,10 @@
         "exported": false,
         "value": "-Wall -Wextra -O2",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "immediate-assign"]
+        "tags": [
+          "variable",
+          "immediate-assign"
+        ]
       },
       {
         "name": "PREFIX",
@@ -56,7 +64,10 @@
         "exported": false,
         "value": "/usr/local",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "conditional-assign"]
+        "tags": [
+          "variable",
+          "conditional-assign"
+        ]
       },
       {
         "name": "LDFLAGS",
@@ -65,7 +76,10 @@
         "exported": false,
         "value": "-lpthread",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "append-assign"]
+        "tags": [
+          "variable",
+          "append-assign"
+        ]
       },
       {
         "name": "SOURCES",
@@ -74,7 +88,10 @@
         "exported": false,
         "value": "main.c",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "multi-line"]
+        "tags": [
+          "variable",
+          "multi-line"
+        ]
       },
       {
         "name": "VERSION",
@@ -83,7 +100,10 @@
         "exported": false,
         "value": "1.2.3",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "immediate-assign"]
+        "tags": [
+          "variable",
+          "immediate-assign"
+        ]
       },
       {
         "name": "BUILD_DIR",
@@ -92,7 +112,10 @@
         "exported": false,
         "value": "build",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "immediate-assign"]
+        "tags": [
+          "variable",
+          "immediate-assign"
+        ]
       },
       {
         "name": "PATH",
@@ -101,7 +124,9 @@
         "exported": true,
         "value": "",
         "pattern": "P1_CONSTANT",
-        "tags": ["export"]
+        "tags": [
+          "export"
+        ]
       },
       {
         "name": "all",
@@ -109,7 +134,10 @@
         "line": 31,
         "exported": true,
         "pattern": "P2_FUNCTION",
-        "tags": ["target", "phony"]
+        "tags": [
+          "target",
+          "phony"
+        ]
       },
       {
         "name": "$(BUILD_DIR)/app",
@@ -117,7 +145,10 @@
         "line": 35,
         "exported": false,
         "pattern": "P2_FUNCTION",
-        "tags": ["target", "build"]
+        "tags": [
+          "target",
+          "build"
+        ]
       },
       {
         "name": "clean",
@@ -125,7 +156,10 @@
         "line": 40,
         "exported": true,
         "pattern": "P2_FUNCTION",
-        "tags": ["target", "phony"]
+        "tags": [
+          "target",
+          "phony"
+        ]
       },
       {
         "name": "install",
@@ -133,7 +167,10 @@
         "line": 45,
         "exported": true,
         "pattern": "P2_FUNCTION",
-        "tags": ["target", "phony"]
+        "tags": [
+          "target",
+          "phony"
+        ]
       },
       {
         "name": "test",
@@ -141,7 +178,10 @@
         "line": 50,
         "exported": true,
         "pattern": "P2_FUNCTION",
-        "tags": ["target", "phony"]
+        "tags": [
+          "target",
+          "phony"
+        ]
       },
       {
         "name": "lint",
@@ -149,7 +189,10 @@
         "line": 54,
         "exported": true,
         "pattern": "P2_FUNCTION",
-        "tags": ["target", "phony"]
+        "tags": [
+          "target",
+          "phony"
+        ]
       },
       {
         "name": "%.o",
@@ -157,7 +200,10 @@
         "line": 59,
         "exported": false,
         "pattern": "P2_FUNCTION",
-        "tags": ["target", "pattern-rule"]
+        "tags": [
+          "target",
+          "pattern-rule"
+        ]
       },
       {
         "name": "run_checks",
@@ -167,7 +213,10 @@
         "exported": false,
         "doc_comment": "macro",
         "pattern": "P2_FUNCTION",
-        "tags": ["macro", "define"]
+        "tags": [
+          "macro",
+          "define"
+        ]
       },
       {
         "name": "help",
@@ -175,7 +224,11 @@
         "line": 76,
         "exported": true,
         "pattern": "P2_FUNCTION",
-        "tags": ["target", "phony", "semicolon-recipe"]
+        "tags": [
+          "target",
+          "phony",
+          "semicolon-recipe"
+        ]
       },
       {
         "name": "DEBUG_FLAGS",
@@ -184,7 +237,10 @@
         "exported": false,
         "value": "-g -DDEBUG",
         "pattern": "P1_CONSTANT",
-        "tags": ["variable", "conditional-assign"]
+        "tags": [
+          "variable",
+          "conditional-assign"
+        ]
       },
       {
         "name": "GOPATH",
@@ -193,7 +249,10 @@
         "exported": true,
         "value": "$(HOME)/go",
         "pattern": "P1_CONSTANT",
-        "tags": ["export", "variable"]
+        "tags": [
+          "export",
+          "variable"
+        ]
       },
       {
         "name": "release",
@@ -201,7 +260,9 @@
         "line": 88,
         "exported": false,
         "pattern": "P2_FUNCTION",
-        "tags": ["target"]
+        "tags": [
+          "target"
+        ]
       },
       {
         "name": "docker",
@@ -209,7 +270,9 @@
         "line": 94,
         "exported": false,
         "pattern": "P2_FUNCTION",
-        "tags": ["target"]
+        "tags": [
+          "target"
+        ]
       },
       {
         "name": "deploy",
@@ -217,7 +280,9 @@
         "line": 99,
         "exported": false,
         "pattern": "P2_FUNCTION",
-        "tags": ["target"]
+        "tags": [
+          "target"
+        ]
       }
     ],
     "excluded": [

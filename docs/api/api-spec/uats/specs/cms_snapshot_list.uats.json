@@ -1,0 +1,53 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "List Task Snapshots",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "snapshot",
+      "read",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates List Snapshots endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "0a29aab17cd425d8f055b8a2ec972ffd72673035b7ad41d5196833044c7833af"
+  },
+  "variables": {
+    "test_space": "uats-snapshot-test"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/conversation/snapshot",
+    "query": {
+      "space_id": "{{test_space}}",
+      "limit": "10"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.snapshots",
+        "type": "array"
+      },
+      {
+        "path": "$.count",
+        "type": "number"
+      }
+    ]
+  }
+}

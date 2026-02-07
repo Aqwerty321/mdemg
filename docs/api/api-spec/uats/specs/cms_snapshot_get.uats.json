@@ -1,0 +1,43 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Get Snapshot by ID",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "snapshot",
+      "read",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates Get Snapshot by ID endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "13f5bbc9668bd2fe17330ab84fb9c2e934919f541e3fc40eba70159673a34710"
+  },
+  "variables": {
+    "test_snapshot_id": "uats-snapshot-test-id"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/conversation/snapshot/{{test_snapshot_id}}",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": [
+      200,
+      404
+    ],
+    "body_assertions": []
+  }
+}

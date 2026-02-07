@@ -115,19 +115,23 @@ func TestMemoryPressure_Middleware_HealthBypass(t *testing.T) {
 }
 
 func TestMemoryPressure_Middleware_Rejection(t *testing.T) {
-	// Allocate memory
-	data := make([]byte, 2*1024*1024)
-	_ = data
+	// Allocate enough memory to guarantee heap stays well above threshold
+	// even if GC runs between our measurement and the middleware check.
+	data := make([]byte, 10*1024*1024) // 10MB
 
+	// Force GC first to get a stable baseline, then read stats
+	runtime.GC()
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	heapMB := memStats.HeapAlloc / (1024 * 1024)
 
-	if heapMB == 0 {
+	if heapMB < 2 {
 		t.Skip("heap too small for rejection test")
 	}
 
-	mp := NewMemoryPressure(heapMB-1, true) // Should be under pressure
+	// Use threshold well below current heap to avoid flakiness from GC
+	threshold := heapMB / 2
+	mp := NewMemoryPressure(threshold, true) // Should be under pressure
 
 	handler := mp.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -137,9 +141,12 @@ func TestMemoryPressure_Middleware_Rejection(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
+	// Keep data alive past the middleware call to prevent GC from collecting it
+	runtime.KeepAlive(data)
+
 	if rr.Code != http.StatusServiceUnavailable {
 		t.Errorf("expected 503 under pressure, got %d (heap: %d MB, threshold: %d MB)",
-			rr.Code, heapMB, heapMB-1)
+			rr.Code, heapMB, threshold)
 	}
 
 	if rr.Header().Get("Retry-After") != "5" {

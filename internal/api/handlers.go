@@ -1234,73 +1234,58 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	// Step 1: Create hidden nodes from orphan base data (unless skipped)
+	// Step 1: Run node-creation pipeline (hidden, concern, config, comparison, temporal, ui, constraint)
 	if !req.SkipClustering {
-		created, err := s.hiddenLayer.CreateHiddenNodes(r.Context(), req.SpaceID)
+		pipelineResult, err := s.hiddenLayer.RunNodeCreationPipeline(r.Context(), req.SpaceID)
 		if err != nil {
-			writeInternalError(w, err, "hidden node creation")
+			writeInternalError(w, err, "node creation pipeline")
 			return
 		}
-		resp.HiddenNodesCreated = created
-	}
 
-	// Step 1b: Create concern nodes for cross-cutting patterns (P1 improvement)
-	if !req.SkipClustering {
-		concernResult, err := s.hiddenLayer.CreateConcernNodes(r.Context(), req.SpaceID)
-		if err != nil {
-			// Log but don't fail - concern nodes are an enhancement
-			log.Printf("warning: failed to create concern nodes: %v", err)
-		} else if concernResult != nil {
-			resp.ConcernNodesCreated = concernResult.ConcernNodesCreated
-			resp.ConcernEdgesCreated = concernResult.EdgesCreated
+		// Log non-fatal pipeline step errors
+		for _, stepErr := range pipelineResult.Errors {
+			log.Printf("warning: pipeline step %s failed: %s", stepErr.Step, stepErr.Message)
 		}
-	}
 
-	// Step 1c: Create config summary node (P2 Track 4.3)
-	if !req.SkipClustering {
-		configResult, err := s.hiddenLayer.CreateConfigNodes(r.Context(), req.SpaceID)
-		if err != nil {
-			// Log but don't fail - config nodes are an enhancement
-			log.Printf("warning: failed to create config nodes: %v", err)
-		} else if configResult != nil && configResult.ConfigNodeCreated {
-			resp.ConfigNodeCreated = true
-			resp.ConfigEdgesCreated = configResult.EdgesCreated
+		// Populate dynamic Steps map
+		resp.Steps = make(map[string]*models.StepResultAPI, len(pipelineResult.Steps))
+		for name, sr := range pipelineResult.Steps {
+			resp.Steps[name] = &models.StepResultAPI{
+				NodesCreated: sr.NodesCreated,
+				NodesUpdated: sr.NodesUpdated,
+				EdgesCreated: sr.EdgesCreated,
+				Details:      sr.Details,
+			}
 		}
-	}
 
-	// Step 1d: Create comparison nodes for similar modules (P2 Track 3)
-	if !req.SkipClustering {
-		compResult, err := s.hiddenLayer.CreateComparisonNodes(r.Context(), req.SpaceID)
-		if err != nil {
-			// Log but don't fail - comparison nodes are an enhancement
-			log.Printf("warning: failed to create comparison nodes: %v", err)
-		} else if compResult != nil && compResult.ComparisonNodesCreated > 0 {
-			resp.ComparisonNodesCreated = compResult.ComparisonNodesCreated
-			resp.ComparisonEdgesCreated = compResult.EdgesCreated
+		// Populate flat fields for backward compatibility
+		if sr, ok := pipelineResult.Steps["hidden"]; ok {
+			resp.HiddenNodesCreated = sr.NodesCreated
 		}
-	}
-
-	// Step 1e: Create temporal pattern nodes (P3 Track 5)
-	if !req.SkipClustering {
-		tempResult, err := s.hiddenLayer.CreateTemporalNodes(r.Context(), req.SpaceID)
-		if err != nil {
-			// Log but don't fail - temporal nodes are an enhancement
-			log.Printf("warning: failed to create temporal nodes: %v", err)
-		} else if tempResult != nil && tempResult.TemporalNodeCreated {
-			resp.TemporalNodeCreated = true
-			resp.TemporalEdgesCreated = tempResult.EdgesCreated
+		if sr, ok := pipelineResult.Steps["concern"]; ok {
+			resp.ConcernNodesCreated = sr.NodesCreated
+			resp.ConcernEdgesCreated = sr.EdgesCreated
 		}
-	}
-
-	// Step 1f: Create UI pattern nodes (P4 Track 6)
-	if !req.SkipClustering {
-		uiResult, err := s.hiddenLayer.CreateUINodes(r.Context(), req.SpaceID)
-		if err != nil {
-			// Log but don't fail - UI nodes are an enhancement
-			log.Printf("warning: failed to create UI nodes: %v", err)
-		} else if uiResult != nil && uiResult.UINodesCreated > 0 {
-			resp.UINodesCreated = uiResult.UINodesCreated
-			resp.UIEdgesCreated = uiResult.EdgesCreated
+		if sr, ok := pipelineResult.Steps["config"]; ok {
+			resp.ConfigNodeCreated = sr.NodesCreated > 0
+			resp.ConfigEdgesCreated = sr.EdgesCreated
+		}
+		if sr, ok := pipelineResult.Steps["comparison"]; ok {
+			resp.ComparisonNodesCreated = sr.NodesCreated
+			resp.ComparisonEdgesCreated = sr.EdgesCreated
+		}
+		if sr, ok := pipelineResult.Steps["temporal"]; ok {
+			resp.TemporalNodeCreated = sr.NodesCreated > 0
+			resp.TemporalEdgesCreated = sr.EdgesCreated
+		}
+		if sr, ok := pipelineResult.Steps["ui"]; ok {
+			resp.UINodesCreated = sr.NodesCreated
+			resp.UIEdgesCreated = sr.EdgesCreated
+		}
+		if sr, ok := pipelineResult.Steps["constraint"]; ok {
+			resp.ConstraintNodesCreated = sr.NodesCreated
+			resp.ConstraintNodesUpdated = sr.NodesUpdated
+			resp.ConstraintEdgesLinked = sr.EdgesCreated
 		}
 	}
 

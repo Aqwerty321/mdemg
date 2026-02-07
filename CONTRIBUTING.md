@@ -300,6 +300,16 @@ mdemg/
 └── plugins/              # Plugin modules
 ```
 
+## Pipeline Registry Pattern
+
+MDEMG uses a **Dynamic Pipeline Registry** for consolidation node creation. Instead of adding new node types across four files, each step is a self-contained adapter implementing the `NodeCreator` interface and registered in a single pipeline.
+
+**Why:** Before Phase 46, every new consolidation step (concern, config, comparison, temporal, UI, constraint) required parallel edits to `service.go`, `handlers.go`, `types.go`, and `models.go`. This violated Open/Closed Principle and caused duplicate logic between the handler and service. The pipeline eliminates this — adding a new node type is now a two-file operation (create the step adapter, register it in `buildPipeline()`).
+
+**How:** Each step implements `Name()`, `Phase()`, `Required()`, and `Run()`. The pipeline executes steps in phase order, aggregates results into a universal `StepResult` map, and handles required vs. optional error semantics. The API response includes both a dynamic `steps` map and backward-compatible flat fields.
+
+Full details, code examples, and the guide for adding new steps: **[docs/development/REGISTRY.md](docs/development/REGISTRY.md)**
+
 ## API Endpoints
 
 Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endpoint). Below is the complete endpoint list registered in `internal/api/server.go`:

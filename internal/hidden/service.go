@@ -12,13 +12,35 @@ import (
 
 // Service handles hidden layer operations including clustering and message passing
 type Service struct {
-	cfg    config.Config
-	driver neo4j.DriverWithContext
+	cfg      config.Config
+	driver   neo4j.DriverWithContext
+	pipeline *Pipeline
 }
 
 // NewService creates a new hidden layer service
 func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
-	return &Service{cfg: cfg, driver: driver}
+	s := &Service{cfg: cfg, driver: driver}
+	s.pipeline = s.buildPipeline()
+	return s
+}
+
+// buildPipeline registers all node-creation steps in phase order.
+func (s *Service) buildPipeline() *Pipeline {
+	p := NewPipeline()
+	p.Register(&hiddenStep{svc: s})      // phase 10 — required
+	p.Register(&concernStep{svc: s})     // phase 20
+	p.Register(&configStep{svc: s})      // phase 20
+	p.Register(&comparisonStep{svc: s})  // phase 20
+	p.Register(&temporalStep{svc: s})    // phase 20
+	p.Register(&uiStep{svc: s})          // phase 20
+	p.Register(&constraintStep{svc: s})  // phase 20
+	return p
+}
+
+// RunNodeCreationPipeline runs only the node-creation steps of consolidation.
+// This is the public entry point used by the API handler.
+func (s *Service) RunNodeCreationPipeline(ctx context.Context, spaceID string) (*PipelineResult, error) {
+	return s.pipeline.RunAll(ctx, spaceID, nil)
 }
 
 // CreateHiddenNodes performs hybrid DBSCAN clustering on orphan base nodes
@@ -1185,46 +1207,32 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 		ConceptNodesCreated: make(map[int]int),
 	}
 
-	// Step 1: Create hidden nodes from orphan base data (L0 → L1)
-	hiddenCreated, err := s.CreateHiddenNodes(ctx, spaceID)
+	// Step 1: Run all node-creation steps via pipeline (hidden, concern, config, comparison, temporal, ui, constraint)
+	pipelineResult, err := s.pipeline.RunAll(ctx, spaceID, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create hidden nodes: %w", err)
+		return nil, fmt.Errorf("node creation pipeline: %w", err)
 	}
-	result.HiddenNodesCreated = hiddenCreated
+	result.PipelineSteps = pipelineResult.Steps
 
-	// Step 1b: Create concern nodes for cross-cutting patterns (P1 improvement)
-	_, err = s.CreateConcernNodes(ctx, spaceID)
-	if err != nil {
-		// Log but don't fail - concern nodes are an enhancement
-		fmt.Printf("warning: failed to create concern nodes: %v\n", err)
+	// Map pipeline results back to ConsolidationResult for backward compatibility
+	if sr, ok := pipelineResult.Steps["hidden"]; ok {
+		result.HiddenNodesCreated = sr.NodesCreated
 	}
-
-	// Step 1c: Create config summary node (P2 Track 4.3)
-	_, err = s.CreateConfigNodes(ctx, spaceID)
-	if err != nil {
-		// Log but don't fail - config nodes are an enhancement
-		fmt.Printf("warning: failed to create config nodes: %v\n", err)
-	}
-
-	// Step 1d: Create comparison nodes for similar modules (P2 Track 3)
-	_, err = s.CreateComparisonNodes(ctx, spaceID)
-	if err != nil {
-		// Log but don't fail - comparison nodes are an enhancement
-		fmt.Printf("warning: failed to create comparison nodes: %v\n", err)
+	if sr, ok := pipelineResult.Steps["constraint"]; ok {
+		result.ConstraintNodesResult = &ConstraintNodeResult{
+			Created: sr.NodesCreated,
+			Updated: sr.NodesUpdated,
+			Linked:  sr.EdgesCreated,
+		}
+		if sr.NodesCreated > 0 || sr.NodesUpdated > 0 {
+			fmt.Printf("constraint nodes: %d created, %d updated, %d linked\n",
+				sr.NodesCreated, sr.NodesUpdated, sr.EdgesCreated)
+		}
 	}
 
-	// Step 1e: Create temporal pattern node (P3 Track 5)
-	_, err = s.CreateTemporalNodes(ctx, spaceID)
-	if err != nil {
-		// Log but don't fail - temporal nodes are an enhancement
-		fmt.Printf("warning: failed to create temporal nodes: %v\n", err)
-	}
-
-	// Step 1f: Create UI pattern nodes (P4 Track 6)
-	_, err = s.CreateUINodes(ctx, spaceID)
-	if err != nil {
-		// Log but don't fail - UI nodes are an enhancement
-		fmt.Printf("warning: failed to create UI nodes: %v\n", err)
+	// Log non-fatal pipeline step errors
+	for _, stepErr := range pipelineResult.Errors {
+		fmt.Printf("warning: failed to run %s step: %s\n", stepErr.Step, stepErr.Message)
 	}
 
 	// Step 2: Forward pass (update embeddings up the hierarchy)
@@ -1237,17 +1245,13 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	// Step 3: Multi-layer concept clustering (L1 → L2, L2 → L3, etc.)
 	// Try ALL layers - don't break early. Upper layers have looser constraints
 	// and may form clusters even if intermediate layers don't.
-	// This allows emergent concepts to form at any level of abstraction.
 	maxLayers := 5
 	for targetLayer := 2; targetLayer <= maxLayers; targetLayer++ {
 		conceptCreated, conceptMerged, err := s.CreateConceptNodes(ctx, spaceID, targetLayer)
 		if err != nil {
 			return nil, fmt.Errorf("create concept nodes layer %d: %w", targetLayer, err)
 		}
-		// Track merged concepts
 		result.ConceptNodesMerged += conceptMerged
-		// Don't break on zero - upper layers may still form clusters
-		// due to adaptive (looser) constraints
 		if conceptCreated > 0 {
 			result.ConceptNodesCreated[targetLayer] = conceptCreated
 

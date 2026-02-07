@@ -474,29 +474,46 @@ type ConsolidateRequest struct {
 	SkipBackward  bool   `json:"skip_backward,omitempty"`   // Skip backward pass
 }
 
+// StepResultAPI is the API-layer mirror of hidden.StepResult.
+// Used in ConsolidateResponse.Steps for dynamic pipeline results.
+type StepResultAPI struct {
+	NodesCreated int            `json:"nodes_created"`
+	NodesUpdated int            `json:"nodes_updated"`
+	EdgesCreated int            `json:"edges_created"`
+	Details      map[string]any `json:"details,omitempty"`
+}
+
 // ConsolidateResponse - response from consolidate endpoint
 type ConsolidateResponse struct {
-	SpaceID             string  `json:"space_id"`
+	SpaceID             string                     `json:"space_id"`
+	Enabled             bool                       `json:"enabled"` // Whether hidden layer is enabled
+	Steps               map[string]*StepResultAPI  `json:"steps,omitempty"` // Dynamic pipeline step results (Phase 46)
+
+	// Core consolidation fields (forward/backward pass, concepts)
 	HiddenNodesCreated  int     `json:"hidden_nodes_created"`
 	HiddenNodesUpdated  int     `json:"hidden_nodes_updated"`
-	ConceptNodesCreated int     `json:"concept_nodes_created"`      // Number of concept layer nodes created (L2+)
-	ConceptNodesMerged  int     `json:"concept_nodes_merged"`       // Number of clusters merged into existing concepts (V0007)
+	ConceptNodesCreated int     `json:"concept_nodes_created"`
+	ConceptNodesMerged  int     `json:"concept_nodes_merged"`
 	ConceptNodesUpdated int     `json:"concept_nodes_updated"`
-	ConcernNodesCreated int     `json:"concern_nodes_created"`      // Number of cross-cutting concern nodes created (P1)
-	ConcernEdgesCreated int     `json:"concern_edges_created"`      // Number of IMPLEMENTS_CONCERN edges created
-	ConfigNodeCreated       bool    `json:"config_node_created"`        // Whether config summary node was created (P2)
-	ConfigEdgesCreated      int     `json:"config_edges_created"`       // Number of IMPLEMENTS_CONFIG edges created
-	ComparisonNodesCreated  int     `json:"comparison_nodes_created"`   // Number of comparison nodes created (P2 Track 3)
-	ComparisonEdgesCreated  int     `json:"comparison_edges_created"`   // Number of COMPARED_IN edges created
-	TemporalNodeCreated     bool    `json:"temporal_node_created"`      // Whether temporal pattern node was created (P3 Track 5)
-	TemporalEdgesCreated    int     `json:"temporal_edges_created"`     // Number of SHARES_TEMPORAL_PATTERN edges created
-	UINodesCreated          int     `json:"ui_nodes_created"`           // Number of UI pattern nodes created (P4 Track 6)
-	UIEdgesCreated          int     `json:"ui_edges_created"`           // Number of SHARES_UI_PATTERN edges created
-	SummariesGenerated      int     `json:"summaries_generated"`        // Number of summaries generated
-	EdgesRefreshed          int     `json:"edges_refreshed"`            // Number of stale edges refreshed (Phase 9.5.3)
 	EdgesStrengthened   int     `json:"edges_strengthened"`
+	SummariesGenerated  int     `json:"summaries_generated"`
+	EdgesRefreshed      int     `json:"edges_refreshed"`
 	DurationMs          float64 `json:"duration_ms"`
-	Enabled             bool    `json:"enabled"` // Whether hidden layer is enabled
+
+	// Flat fields preserved for backward compatibility (populated from Steps map)
+	ConcernNodesCreated    int  `json:"concern_nodes_created"`
+	ConcernEdgesCreated    int  `json:"concern_edges_created"`
+	ConfigNodeCreated      bool `json:"config_node_created"`
+	ConfigEdgesCreated     int  `json:"config_edges_created"`
+	ComparisonNodesCreated int  `json:"comparison_nodes_created"`
+	ComparisonEdgesCreated int  `json:"comparison_edges_created"`
+	TemporalNodeCreated    bool `json:"temporal_node_created"`
+	TemporalEdgesCreated   int  `json:"temporal_edges_created"`
+	UINodesCreated         int  `json:"ui_nodes_created"`
+	UIEdgesCreated         int  `json:"ui_edges_created"`
+	ConstraintNodesCreated int  `json:"constraint_nodes_created"`
+	ConstraintNodesUpdated int  `json:"constraint_nodes_updated"`
+	ConstraintEdgesLinked  int  `json:"constraint_edges_linked"`
 }
 
 // ObserveRequest - request for POST /v1/conversation/observe
@@ -521,12 +538,20 @@ type ObserveRequest struct {
 }
 
 // ObserveResponse - response from POST /v1/conversation/observe
+// DetectedConstraintInfo represents a constraint found during observation (Phase 45.5)
+type DetectedConstraintInfo struct {
+	ConstraintType string  `json:"constraint_type"`
+	Name           string  `json:"name"`
+	Confidence     float64 `json:"confidence"`
+}
+
 type ObserveResponse struct {
-	ObsID           string             `json:"obs_id"`
-	NodeID          string             `json:"node_id"`
-	SurpriseScore   float64            `json:"surprise_score"`
-	SurpriseFactors map[string]float64 `json:"surprise_factors"`
-	Summary         string             `json:"summary,omitempty"`
+	ObsID               string                   `json:"obs_id"`
+	NodeID              string                   `json:"node_id"`
+	SurpriseScore       float64                  `json:"surprise_score"`
+	SurpriseFactors     map[string]float64       `json:"surprise_factors"`
+	Summary             string                   `json:"summary,omitempty"`
+	DetectedConstraints []DetectedConstraintInfo  `json:"detected_constraints,omitempty"`
 }
 
 // CorrectRequest - request for POST /v1/conversation/correct

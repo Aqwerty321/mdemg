@@ -1,7 +1,9 @@
 {
   "upts_version": "1.0.0",
   "language": "lua",
-  "variants": [".lua"],
+  "variants": [
+    ".lua"
+  ],
   "metadata": {
     "author": "mdemg-team",
     "created": "2026-02-06",
@@ -16,7 +18,7 @@
   "fixture": {
     "type": "file",
     "path": "../fixtures/lua_test_fixture.lua",
-    "sha256": ""
+    "sha256": "7c0baa873526db81d72b16d0f7ac5812c52e2744993ab30b206a6af2c9bec659"
   },
   "expected": {
     "symbol_count": {
@@ -24,31 +26,166 @@
       "max": 40
     },
     "symbols": [
-      {"name": "MAX_BUFFER_SIZE", "type": "constant", "line": 8, "exported": false},
-      {"name": "VERSION", "type": "constant", "line": 9, "exported": false},
-      {"name": "DEBUG_MODE", "type": "constant", "line": 10, "exported": false},
-      {"name": "PI", "type": "constant", "line": 15, "exported": true},
-      {"name": "DEFAULT_TIMEOUT", "type": "constant", "line": 16, "exported": true},
-      {"name": "APP_NAME", "type": "constant", "line": 17, "exported": true},
-      {"name": "calculateSum", "type": "function", "line": 22, "exported": true},
-      {"name": "multiply", "type": "function", "line": 26, "exported": true},
-      {"name": "processData", "type": "function", "line": 30, "exported": true},
-      {"name": "privateHelper", "type": "function", "line": 38, "exported": false},
-      {"name": "validateInput", "type": "function", "line": 42, "exported": false},
-      {"name": "User", "type": "class", "line": 49, "exported": true},
-      {"name": "new", "type": "method", "line": 52, "exported": true, "parent": "User"},
-      {"name": "getName", "type": "method", "line": 60, "exported": true, "parent": "User"},
-      {"name": "setName", "type": "method", "line": 64, "exported": true, "parent": "User"},
-      {"name": "deactivate", "type": "method", "line": 68, "exported": true, "parent": "User"},
-      {"name": "isActive", "type": "method", "line": 72, "exported": true, "parent": "User"},
-      {"name": "Repository", "type": "class", "line": 77, "exported": true},
-      {"name": "new", "type": "method", "line": 80, "exported": true, "parent": "Repository"},
-      {"name": "add", "type": "method", "line": 86, "exported": true, "parent": "Repository"},
-      {"name": "find", "type": "method", "line": 90, "exported": true, "parent": "Repository"},
-      {"name": "count", "type": "method", "line": 99, "exported": true, "parent": "Repository"},
-      {"name": "clear", "type": "method", "line": 103, "exported": true, "parent": "Repository"},
-      {"name": "Status", "type": "enum", "line": 110, "exported": true},
-      {"name": "Priority", "type": "enum", "line": 117, "exported": true}
+      {
+        "name": "MAX_BUFFER_SIZE",
+        "type": "constant",
+        "line": 8,
+        "exported": false
+      },
+      {
+        "name": "VERSION",
+        "type": "constant",
+        "line": 9,
+        "exported": false
+      },
+      {
+        "name": "DEBUG_MODE",
+        "type": "constant",
+        "line": 10,
+        "exported": false
+      },
+      {
+        "name": "PI",
+        "type": "constant",
+        "line": 15,
+        "exported": true
+      },
+      {
+        "name": "DEFAULT_TIMEOUT",
+        "type": "constant",
+        "line": 16,
+        "exported": true
+      },
+      {
+        "name": "APP_NAME",
+        "type": "constant",
+        "line": 17,
+        "exported": true
+      },
+      {
+        "name": "calculateSum",
+        "type": "function",
+        "line": 22,
+        "exported": true
+      },
+      {
+        "name": "multiply",
+        "type": "function",
+        "line": 26,
+        "exported": true
+      },
+      {
+        "name": "processData",
+        "type": "function",
+        "line": 30,
+        "exported": true
+      },
+      {
+        "name": "privateHelper",
+        "type": "function",
+        "line": 38,
+        "exported": false
+      },
+      {
+        "name": "validateInput",
+        "type": "function",
+        "line": 42,
+        "exported": false
+      },
+      {
+        "name": "User",
+        "type": "class",
+        "line": 49,
+        "exported": true
+      },
+      {
+        "name": "new",
+        "type": "method",
+        "line": 52,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "getName",
+        "type": "method",
+        "line": 60,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "setName",
+        "type": "method",
+        "line": 64,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "deactivate",
+        "type": "method",
+        "line": 68,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "isActive",
+        "type": "method",
+        "line": 72,
+        "exported": true,
+        "parent": "User"
+      },
+      {
+        "name": "Repository",
+        "type": "class",
+        "line": 77,
+        "exported": true
+      },
+      {
+        "name": "new",
+        "type": "method",
+        "line": 80,
+        "exported": true,
+        "parent": "Repository"
+      },
+      {
+        "name": "add",
+        "type": "method",
+        "line": 86,
+        "exported": true,
+        "parent": "Repository"
+      },
+      {
+        "name": "find",
+        "type": "method",
+        "line": 90,
+        "exported": true,
+        "parent": "Repository"
+      },
+      {
+        "name": "count",
+        "type": "method",
+        "line": 99,
+        "exported": true,
+        "parent": "Repository"
+      },
+      {
+        "name": "clear",
+        "type": "method",
+        "line": 103,
+        "exported": true,
+        "parent": "Repository"
+      },
+      {
+        "name": "Status",
+        "type": "enum",
+        "line": 110,
+        "exported": true
+      },
+      {
+        "name": "Priority",
+        "type": "enum",
+        "line": 117,
+        "exported": true
+      }
     ]
   }
 }

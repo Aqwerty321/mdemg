@@ -1,7 +1,10 @@
 {
   "upts_version": "1.0.0",
   "language": "kotlin",
-  "variants": [".kt", ".kts"],
+  "variants": [
+    ".kt",
+    ".kts"
+  ],
   "metadata": {
     "author": "auto-generated",
     "created": "2026-02-05",
@@ -16,7 +19,7 @@
   "fixture": {
     "type": "file",
     "path": "../fixtures/kotlin_test_fixture.kt",
-    "sha256": ""
+    "sha256": "9d3add484a11345b0334485cf108a31299cd90dcd05cce3721f36ca8853e6b10"
   },
   "expected": {
     "symbol_count": {

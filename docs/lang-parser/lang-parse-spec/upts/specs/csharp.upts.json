@@ -1,7 +1,9 @@
 {
   "upts_version": "1.0.0",
   "language": "csharp",
-  "variants": [".cs"],
+  "variants": [
+    ".cs"
+  ],
   "metadata": {
     "author": "auto-generated",
     "created": "2026-02-05",
@@ -16,10 +18,13 @@
   "fixture": {
     "type": "file",
     "path": "../fixtures/csharp_test_fixture.cs",
-    "sha256": ""
+    "sha256": "04c84581d53ea327ce10cda1cde3f32092a8b25bdfd6f9b3f272ed6d9b6ae7f3"
   },
   "expected": {
-    "symbol_count": {"min": 55, "max": 65},
+    "symbol_count": {
+      "min": 55,
+      "max": 65
+    },
     "symbols": [
       {
         "name": "TestNamespace.Models",

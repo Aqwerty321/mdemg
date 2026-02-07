@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "2de292e22de521127fc70f6fd3d8684d5077c17c40127b56894e7295f5483291"
+    "sha256": "3a3e250cd88a1e0307ac9b196ab9276217a6086d10edd8a62a072f3b7be3775b"
   },
   "variables": {
     "test_space": "demo"
@@ -70,7 +70,7 @@
       "description": "Clear cache entries for a specific space",
       "request": {
         "method": "DELETE",
-        "path": "/v1/memory/cache?confirm=true&space_id=${test_space}"
+        "path": "/v1/memory/cache?confirm=true&space_id={{test_space}}"
       },
       "expected": {
         "status": 200,
@@ -81,7 +81,7 @@
           },
           {
             "path": "$.space_id",
-            "equals": "${test_space}"
+            "equals": "{{test_space}}"
           },
           {
             "path": "$.entries_cleared",

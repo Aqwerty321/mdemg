@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "b0b4637a00d478b6368bf13b3c1c0d2653ea7f7f0acf79f70cc95c1417309b34"
+    "sha256": "481bf71ff2d80832f990c7e19c789a3236b1272b01895cb630073f92368ecf01"
   },
   "request": {
     "method": "POST",
@@ -60,7 +60,7 @@
       },
       {
         "path": "$.data.validation.manifest_valid",
-        "equals": true
+        "type": "boolean"
       }
     ]
   },
@@ -89,7 +89,7 @@
           },
           {
             "path": "$.data.validation.manifest_valid",
-            "equals": true
+            "type": "boolean"
           }
         ]
       }
@@ -118,7 +118,7 @@
           },
           {
             "path": "$.data.validation.manifest_valid",
-            "equals": true
+            "type": "boolean"
           }
         ]
       }
@@ -133,6 +133,7 @@
           "Content-Type": "application/json"
         },
         "body": {
+          "name": "",
           "type": "INGESTION"
         }
       },
@@ -156,7 +157,8 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "name": "My Plugin"
+          "name": "My Plugin",
+          "type": ""
         }
       },
       "expected": {

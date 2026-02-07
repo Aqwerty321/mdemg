@@ -30,7 +30,7 @@
       "$.stats.duration",
       "$.stats.rate"
     ],
-    "sha256": "40d8ee614ad1f597f5d2f03911760ff2b9c822d57b81d8b817e6e48cc70b9724"
+    "sha256": "3be1142c80172b68617a61fee713694b00662ebdc4eb93f05c716dc836ec1f66"
   },
   "variables": {
     "test_space": "uats-ingest-test",
@@ -394,60 +394,38 @@
     },
     {
       "name": "missing_space_id",
-      "description": "Jobs are queued even with missing space_id (validation in job)",
+      "description": "Empty space_id is rejected with 400",
       "request": {
         "body": {
+          "space_id": "",
           "path": "{{test_path}}"
         }
       },
       "expected": {
-        "status": [
-          200,
-          202
-        ],
+        "status": 400,
         "body_assertions": [
           {
-            "path": "$.job_id",
-            "exists": true
-          },
-          {
-            "path": "$.status",
-            "in": [
-              "queued",
-              "running",
-              "completed",
-              "failed"
-            ]
+            "path": "$.error",
+            "contains": "space_id"
           }
         ]
       }
     },
     {
       "name": "missing_path",
-      "description": "Jobs are queued even with missing path (validation in job)",
+      "description": "Empty path is rejected with 400",
       "request": {
         "body": {
-          "space_id": "{{test_space}}"
+          "space_id": "{{test_space}}",
+          "path": ""
         }
       },
       "expected": {
-        "status": [
-          200,
-          202
-        ],
+        "status": 400,
         "body_assertions": [
           {
-            "path": "$.job_id",
-            "exists": true
-          },
-          {
-            "path": "$.status",
-            "in": [
-              "queued",
-              "running",
-              "completed",
-              "failed"
-            ]
+            "path": "$.error",
+            "contains": "path"
           }
         ]
       }

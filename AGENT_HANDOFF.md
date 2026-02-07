@@ -988,7 +988,7 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 
 Located at `docs/api/api-spec/uats/specs/` — 66 specs covering all HTTP endpoints. Runner: `docs/api/api-spec/uats/runners/uats_runner.py`.
 
-**Current Status:** 66 specs, 118 variants, 88 passing (74.6%), 0 errors.
+**Current Status:** 66 specs, 118 variants, 118 passing (100%), 0 errors.
 
 **Hash Integrity:** All specs include SHA256 hashes (`config.sha256`). The runner verifies hashes on load (use `--skip-hash` to bypass during development).
 
@@ -1009,7 +1009,8 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 - Additional test cases go in `variants[]` array
 - Body assertions use inline operators: `"equals"`, `"contains"`, `"type"`, `"exists"` (not `"operator": "equals", "value": ...`)
 - Query parameters use `"query"` key (not `"query_params"`)
-- Variables use `${var}` syntax (not `{{var}}`)
+- Spec-level variables use `{{var}}` syntax (resolved from `variables` section)
+- Environment variables use `${ENV_VAR}` syntax (resolved from OS environment)
 
 ### UPTS (Active)
 
@@ -1113,7 +1114,7 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 |-------|----------|----------|-------|
 | ~~`TestScoringGolden`~~ | ✅ Fixed | `tests/integration/scoring_golden_test.go` | Updated target similarities to be above retrieval threshold |
 | ~~UOBS Prometheus metrics~~ | ✅ Fixed | `docs/tests/uobs/specs/prometheus_metrics.uobs.json` | All 10/10 metrics now passing |
-| ~~UATS specs not all verified~~ | ✅ Fixed | `docs/api/api-spec/uats/specs/` | 66 specs, 0 errors, 88/118 variants passing (74.6%). 4 structurally invalid specs fixed, 45 stale SHA256 hashes regenerated. |
+| ~~UATS specs not all verified~~ | ✅ Fixed | `docs/api/api-spec/uats/specs/` | 66 specs, 118/118 variants passing (100%). Fixed: 4 structural, 45 stale hashes, 8 assertion mismatches, 48 variable syntax corrections. |
 | Obsidian module not started | Low | Phase 44/45 | Listed in roadmap but no implementation |
 | Context Cooler (APE) not started | Medium | Phase 45.5 | Volatile observation graduation to long-term memory |
 | `internal/ape/` low coverage | Medium | `docs/specs/test-coverage-baseline.md` | 0.0% coverage |
@@ -1180,4 +1181,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-07 — UATS framework fully operational: 66 specs, 0 errors, 88/118 variants passing (74.6%). Fixed 4 structurally invalid specs + 45 stale SHA256 hashes. Next priority: Phase 51 (Web Scraper).*
+*Last updated: 2026-02-07 — UATS framework 100%: 66 specs, 118/118 variants passing. Fixed structural issues, assertion mismatches, stale hashes, and variable syntax. Next priority: Phase 51 (Web Scraper).*

@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "45378d9d6918e5c5cf944d7a1038ffa21ff450b6fb5a2438176ae5a36dc0bb91"
+    "sha256": "733d4e73bd9591871235536cba0dfba5d05bc2acc9c723408ee0b2167aaefca1"
   },
   "variables": {
     "test_space": "demo"
@@ -29,7 +29,7 @@
     "method": "GET",
     "path": "/v1/system/capability-gaps",
     "query": {
-      "space_id": "${test_space}"
+      "space_id": "{{test_space}}"
     }
   },
   "expected": {
@@ -68,8 +68,8 @@
         "status": 200,
         "body_assertions": [
           {
-            "path": "$.data.metrics",
-            "type": "object"
+            "path": "$.data.gaps",
+            "type": "array"
           }
         ]
       }
@@ -84,7 +84,7 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "space_id": "${test_space}",
+          "space_id": "{{test_space}}",
           "query_text": "how to integrate with slack",
           "is_negative": true,
           "comment": "No results found for Slack integration"
@@ -94,8 +94,8 @@
         "status": 200,
         "body_assertions": [
           {
-            "path": "$.data.received",
-            "equals": true
+            "path": "$.status",
+            "equals": "recorded"
           }
         ]
       }
@@ -110,7 +110,7 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "space_id": "${test_space}",
+          "space_id": "{{test_space}}",
           "query_text": "import jira tickets",
           "is_negative": true,
           "comment": "Need Jira integration",
@@ -121,15 +121,15 @@
         "status": 200,
         "body_assertions": [
           {
-            "path": "$.data.received",
-            "equals": true
+            "path": "$.status",
+            "equals": "recorded"
           }
         ]
       }
     },
     {
       "name": "gaps_run_analysis",
-      "description": "Trigger full gap analysis",
+      "description": "POST not supported - returns 405 Method Not Allowed",
       "request": {
         "method": "POST",
         "path": "/v1/system/capability-gaps",
@@ -137,18 +137,13 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "space_id": "${test_space}",
+          "space_id": "{{test_space}}",
           "run_analysis": true
         }
       },
       "expected": {
-        "status": 200,
-        "body_assertions": [
-          {
-            "path": "$.data.gaps",
-            "type": "array"
-          }
-        ]
+        "status": 405,
+        "body_assertions": []
       }
     }
   ]

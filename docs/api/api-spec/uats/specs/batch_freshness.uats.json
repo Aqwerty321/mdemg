@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "d0956bdfe38ca26498cc1396834f322b601e4f7c04f528702125e51e4173b9ae"
+    "sha256": "f228ec902513c6c7904a87235d69960e0c10cdc4fe31b65f177d4e51087971f7"
   },
   "variables": {
     "test_space_1": "demo",
@@ -31,7 +31,7 @@
     "method": "GET",
     "path": "/v1/memory/freshness",
     "query": {
-      "space_ids": "${test_space_1},${test_space_2}"
+      "space_ids": "{{test_space_1}},{{test_space_2}}"
     }
   },
   "expected": {

@@ -21,14 +21,14 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "0c5ebad491a5c0e23085f2e6aaa8457083d87d623da1045b95361ee221555159"
+    "sha256": "cf10ba82875f7d2bd4e9103b4b051204a644526343102a2b36dec70faa07e833"
   },
   "variables": {
     "webhook_source": "github"
   },
   "request": {
     "method": "POST",
-    "path": "/v1/webhooks/${webhook_source}",
+    "path": "/v1/webhooks/{{webhook_source}}",
     "headers": {
       "Content-Type": "application/json",
       "X-GitHub-Event": "push",

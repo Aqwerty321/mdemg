@@ -10,6 +10,9 @@ The Conversation Memory System (CMS) provides **persistent memory for LLM coding
 - Signal vs. noise (not all observations are equally valuable)
 - Multi-agent isolation (private vs. shared knowledge)
 - Cross-session continuity (work spans days/weeks, not just one session)
+- Memory degradation over time (edge decay, stale knowledge, orphan accumulation)
+
+CMS is not just passive storage — it actively maintains its own health. The **Recursive Self-Improvement Cycle (RSIC)** continuously monitors memory quality across retrieval, learning, conversation, and graph subsystems, then autonomously remediates detected issues (pruning decayed edges, triggering consolidation, graduating volatile observations, refreshing stale connections). A decay watchdog enforces cycle compliance: if self-improvement doesn't run within the configured period, escalating pressure culminates in automatic forced execution.
 
 ## How It Works
 
@@ -20,17 +23,24 @@ Session 1: resume → observe → observe → observe → [compaction]
                                                         ↓
                                                   (auto-snapshot)
                                                         ↓
+            [RSIC micro cycle: quick health pulse]
+                                                        ↓
 Session 2: resume → [context restored] → observe → ... → [compaction]
                                                               ↓
                                                         (auto-snapshot)
                                                               ↓
+            [RSIC meso cycle: full assessment + remediation]
+                                                              ↓
 Session N: resume → [context restored] → continue work indefinitely
+                                                              ↓
+            [RSIC macro cycle: daily topology optimization + consolidation]
 ```
 
 1. **Observe** — During a session, significant events are captured: decisions, corrections, learnings, errors, preferences, progress updates
 2. **Store** — Each observation gets a semantic embedding, surprise score, and quality assessment, then persists in Neo4j
 3. **Resume** — On session start, the system retrieves the most relevant observations (ranked by recency, importance, and task relevance), related themes, and emergent concepts
 4. **Reinforce** — Observations accessed together strengthen co-activation edges (Hebbian learning), increasing their future retrieval priority
+5. **Self-Improve** — Between sessions, RSIC assesses memory health, reflects on degradation patterns, plans remediation, executes repairs (edge pruning, consolidation, graduation), and validates that improvements hold
 
 ### Observation Types
 

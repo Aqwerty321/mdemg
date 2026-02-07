@@ -32,6 +32,21 @@ const (
 	defaultMinInterval    = 300            // 5 minutes
 )
 
+// Config holds configuration for the context-cooler module.
+type Config struct {
+	SocketPath    string
+	MDEMGEndpoint string
+	HTTPTimeout   time.Duration
+}
+
+// DefaultConfig returns the default configuration.
+func DefaultConfig() Config {
+	return Config{
+		MDEMGEndpoint: defaultMDEMGEndpoint,
+		HTTPTimeout:   30 * time.Second,
+	}
+}
+
 type server struct {
 	pb.UnimplementedModuleLifecycleServer
 	pb.UnimplementedAPEModuleServer
@@ -44,6 +59,26 @@ type server struct {
 	lastTombstoned  int64
 	httpClient      *http.Client
 	mdemgEndpoint   string
+}
+
+// newServer creates a new server with the given configuration.
+func newServer(cfg Config) *server {
+	endpoint := cfg.MDEMGEndpoint
+	if endpoint == "" {
+		endpoint = defaultMDEMGEndpoint
+	}
+	timeout := cfg.HTTPTimeout
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+
+	return &server{
+		startTime:     time.Now(),
+		mdemgEndpoint: endpoint,
+		httpClient: &http.Client{
+			Timeout: timeout,
+		},
+	}
 }
 
 // GraduateRequest is the request body for /v1/conversation/graduate
@@ -61,6 +96,52 @@ type GraduateSummary struct {
 	DecayApplied      int       `json:"decay_applied"`
 }
 
+// run executes the main server logic. This is separated from main() for testability.
+func run(cfg Config, stopCh <-chan struct{}) error {
+	if cfg.SocketPath == "" {
+		return fmt.Errorf("socket path is required")
+	}
+
+	// Remove stale socket
+	os.Remove(cfg.SocketPath)
+
+	// Create Unix socket listener
+	listener, err := net.Listen("unix", cfg.SocketPath)
+	if err != nil {
+		return fmt.Errorf("failed to listen on socket: %w", err)
+	}
+	defer listener.Close()
+	defer os.Remove(cfg.SocketPath)
+
+	log.Printf("%s: listening on %s", moduleID, cfg.SocketPath)
+
+	// Create gRPC server
+	grpcServer := grpc.NewServer()
+	s := newServer(cfg)
+
+	pb.RegisterModuleLifecycleServer(grpcServer, s)
+	pb.RegisterAPEModuleServer(grpcServer, s)
+
+	// Handle shutdown signals or stop channel
+	done := make(chan error, 1)
+	go func() {
+		done <- grpcServer.Serve(listener)
+	}()
+
+	// Wait for stop signal or server error
+	select {
+	case <-stopCh:
+		log.Printf("%s: received shutdown signal", moduleID)
+		grpcServer.GracefulStop()
+		return nil
+	case err := <-done:
+		if err != nil {
+			return fmt.Errorf("failed to serve: %w", err)
+		}
+		return nil
+	}
+}
+
 func main() {
 	socketPath := flag.String("socket", "", "Unix socket path")
 	flag.Parse()
@@ -69,51 +150,30 @@ func main() {
 		log.Fatal("--socket flag is required")
 	}
 
-	// Remove stale socket
-	os.Remove(*socketPath)
-
-	// Create Unix socket listener
-	listener, err := net.Listen("unix", *socketPath)
-	if err != nil {
-		log.Fatalf("Failed to listen on socket: %v", err)
-	}
-	defer listener.Close()
-	defer os.Remove(*socketPath)
-
-	log.Printf("%s: listening on %s", moduleID, *socketPath)
-
 	// Get MDEMG endpoint from environment or use default
 	mdemgEndpoint := os.Getenv("MDEMG_ENDPOINT")
 	if mdemgEndpoint == "" {
 		mdemgEndpoint = defaultMDEMGEndpoint
 	}
 
-	// Create gRPC server
-	grpcServer := grpc.NewServer()
-	s := &server{
-		startTime:     time.Now(),
-		mdemgEndpoint: mdemgEndpoint,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+	cfg := Config{
+		SocketPath:    *socketPath,
+		MDEMGEndpoint: mdemgEndpoint,
+		HTTPTimeout:   30 * time.Second,
 	}
-
-	pb.RegisterModuleLifecycleServer(grpcServer, s)
-	pb.RegisterAPEModuleServer(grpcServer, s)
 
 	// Handle shutdown signals
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 
+	stopCh := make(chan struct{})
 	go func() {
 		<-sigChan
-		log.Printf("%s: received shutdown signal", moduleID)
-		grpcServer.GracefulStop()
+		close(stopCh)
 	}()
 
-	// Start serving
-	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+	if err := run(cfg, stopCh); err != nil {
+		log.Fatalf("Error: %v", err)
 	}
 }
 

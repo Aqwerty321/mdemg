@@ -12,6 +12,9 @@ import (
 	"mdemg/internal/plugins"
 )
 
+// DefaultCheckInterval is the default interval between scheduled task checks.
+const DefaultCheckInterval = 30 * time.Second
+
 // Scheduler manages execution of APE (Active Participant Engine) modules.
 // It handles scheduled tasks and event-triggered executions.
 type Scheduler struct {
@@ -25,6 +28,10 @@ type Scheduler struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+
+	// checkInterval is the interval between scheduled task checks.
+	// Defaults to DefaultCheckInterval (30 seconds).
+	checkInterval time.Duration
 }
 
 type moduleSchedule struct {
@@ -39,13 +46,20 @@ type moduleSchedule struct {
 func NewScheduler(pluginMgr *plugins.Manager) *Scheduler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Scheduler{
-		pluginMgr:   pluginMgr,
-		schedules:   make(map[string]*moduleSchedule),
-		lastRun:     make(map[string]time.Time),
-		runningTask: make(map[string]bool),
-		ctx:         ctx,
-		cancel:      cancel,
+		pluginMgr:     pluginMgr,
+		schedules:     make(map[string]*moduleSchedule),
+		lastRun:       make(map[string]time.Time),
+		runningTask:   make(map[string]bool),
+		ctx:           ctx,
+		cancel:        cancel,
+		checkInterval: DefaultCheckInterval,
 	}
+}
+
+// SetCheckInterval sets the interval between scheduled task checks.
+// This is primarily useful for testing. Must be called before Start().
+func (s *Scheduler) SetCheckInterval(d time.Duration) {
+	s.checkInterval = d
 }
 
 // Start initializes schedules from APE modules and starts the scheduler loop
@@ -144,7 +158,7 @@ func (s *Scheduler) refreshSchedules() error {
 func (s *Scheduler) schedulerLoop() {
 	defer s.wg.Done()
 
-	ticker := time.NewTicker(30 * time.Second) // Check every 30 seconds
+	ticker := time.NewTicker(s.checkInterval)
 	defer ticker.Stop()
 
 	for {

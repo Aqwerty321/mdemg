@@ -2,11 +2,67 @@ package ape
 
 import (
 	"context"
+	"errors"
+	"sync"
 	"testing"
 	"time"
 
+	pb "mdemg/api/modulepb"
 	"mdemg/internal/plugins"
+
+	"google.golang.org/grpc"
 )
+
+// =============================================================================
+// Mock APE Module Client for testing
+// =============================================================================
+
+// mockAPEModuleClient implements pb.APEModuleClient for testing
+type mockAPEModuleClient struct {
+	getScheduleResp  *pb.GetScheduleResponse
+	getScheduleErr   error
+	executeResp      *pb.ExecuteResponse
+	executeErr       error
+	executeCalled    bool
+	executeReq       *pb.ExecuteRequest
+	mu               sync.Mutex
+}
+
+func (m *mockAPEModuleClient) Execute(ctx context.Context, in *pb.ExecuteRequest, opts ...grpc.CallOption) (*pb.ExecuteResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.executeCalled = true
+	m.executeReq = in
+	return m.executeResp, m.executeErr
+}
+
+func (m *mockAPEModuleClient) GetSchedule(ctx context.Context, in *pb.GetScheduleRequest, opts ...grpc.CallOption) (*pb.GetScheduleResponse, error) {
+	return m.getScheduleResp, m.getScheduleErr
+}
+
+func (m *mockAPEModuleClient) wasExecuteCalled() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.executeCalled
+}
+
+func (m *mockAPEModuleClient) getExecuteRequest() *pb.ExecuteRequest {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.executeReq
+}
+
+// createMockAPEModule creates a mock APE module with the given client
+func createMockAPEModule(id string, client pb.APEModuleClient) *plugins.ModuleInfo {
+	return &plugins.ModuleInfo{
+		Manifest: plugins.Manifest{
+			ID:   id,
+			Type: "APE",
+		},
+		State:     plugins.StateReady,
+		APEClient: client,
+	}
+}
 
 // =============================================================================
 // parseNextCronRun tests - covers all 9 cron patterns
@@ -579,5 +635,843 @@ func TestRefreshSchedules_NoModules(t *testing.T) {
 
 	if len(s.schedules) != 0 {
 		t.Errorf("schedules should be empty, got %d", len(s.schedules))
+	}
+}
+
+func TestRefreshSchedules_WithMockAPEModules(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	// Create mock APE client that returns a schedule
+	mockClient := &mockAPEModuleClient{
+		getScheduleResp: &pb.GetScheduleResponse{
+			CronExpression:     "*/15 * * * *",
+			EventTriggers:      []string{"ingest", "session_end"},
+			MinIntervalSeconds: 300,
+		},
+	}
+
+	// Inject mock module into manager
+	mockModule := createMockAPEModule("test-ape-module", mockClient)
+	mgr.InjectModuleForTest(mockModule)
+
+	s := NewScheduler(mgr)
+
+	err := s.refreshSchedules()
+	if err != nil {
+		t.Errorf("refreshSchedules should not error: %v", err)
+	}
+
+	if len(s.schedules) != 1 {
+		t.Fatalf("expected 1 schedule, got %d", len(s.schedules))
+	}
+
+	sched := s.schedules["test-ape-module"]
+	if sched == nil {
+		t.Fatal("schedule for test-ape-module not found")
+	}
+
+	if sched.CronExpression != "*/15 * * * *" {
+		t.Errorf("CronExpression = %q, want */15 * * * *", sched.CronExpression)
+	}
+
+	if len(sched.EventTriggers) != 2 {
+		t.Errorf("EventTriggers len = %d, want 2", len(sched.EventTriggers))
+	}
+
+	if sched.MinInterval != 300*time.Second {
+		t.Errorf("MinInterval = %v, want 5m0s", sched.MinInterval)
+	}
+
+	// nextRun should be set since we have a cron expression
+	if sched.nextRun.IsZero() {
+		t.Error("nextRun should be set")
+	}
+}
+
+func TestRefreshSchedules_NilAPEClient(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	// Create module with nil APEClient
+	mockModule := &plugins.ModuleInfo{
+		Manifest: plugins.Manifest{
+			ID:   "nil-client-module",
+			Type: "APE",
+		},
+		State:     plugins.StateReady,
+		APEClient: nil, // nil client
+	}
+	mgr.InjectModuleForTest(mockModule)
+
+	s := NewScheduler(mgr)
+
+	err := s.refreshSchedules()
+	if err != nil {
+		t.Errorf("refreshSchedules should not error with nil client: %v", err)
+	}
+
+	// Should skip the module with nil client
+	if len(s.schedules) != 0 {
+		t.Errorf("expected 0 schedules (nil client skipped), got %d", len(s.schedules))
+	}
+}
+
+func TestRefreshSchedules_GetScheduleError(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	// Create mock APE client that returns an error
+	mockClient := &mockAPEModuleClient{
+		getScheduleErr: errors.New("connection refused"),
+	}
+
+	mockModule := createMockAPEModule("error-module", mockClient)
+	mgr.InjectModuleForTest(mockModule)
+
+	s := NewScheduler(mgr)
+
+	// Should not return error, just log and continue
+	err := s.refreshSchedules()
+	if err != nil {
+		t.Errorf("refreshSchedules should not propagate GetSchedule error: %v", err)
+	}
+
+	// Module should not be added to schedules
+	if len(s.schedules) != 0 {
+		t.Errorf("expected 0 schedules (error module skipped), got %d", len(s.schedules))
+	}
+}
+
+func TestRefreshSchedules_MultipleModules(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	// Create multiple mock APE modules
+	mockClient1 := &mockAPEModuleClient{
+		getScheduleResp: &pb.GetScheduleResponse{
+			CronExpression: "0 * * * *",
+			EventTriggers:  []string{"ingest"},
+		},
+	}
+	mockClient2 := &mockAPEModuleClient{
+		getScheduleResp: &pb.GetScheduleResponse{
+			CronExpression: "0 0 * * *",
+			EventTriggers:  []string{"daily"},
+		},
+	}
+
+	mgr.InjectModuleForTest(createMockAPEModule("module-1", mockClient1))
+	mgr.InjectModuleForTest(createMockAPEModule("module-2", mockClient2))
+
+	s := NewScheduler(mgr)
+
+	err := s.refreshSchedules()
+	if err != nil {
+		t.Errorf("refreshSchedules should not error: %v", err)
+	}
+
+	if len(s.schedules) != 2 {
+		t.Errorf("expected 2 schedules, got %d", len(s.schedules))
+	}
+}
+
+func TestRefreshSchedules_EventOnlyModule(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	// Create module with no cron expression (event-only)
+	mockClient := &mockAPEModuleClient{
+		getScheduleResp: &pb.GetScheduleResponse{
+			CronExpression: "", // No cron
+			EventTriggers:  []string{"ingest"},
+		},
+	}
+
+	mgr.InjectModuleForTest(createMockAPEModule("event-only-module", mockClient))
+
+	s := NewScheduler(mgr)
+
+	err := s.refreshSchedules()
+	if err != nil {
+		t.Errorf("refreshSchedules should not error: %v", err)
+	}
+
+	sched := s.schedules["event-only-module"]
+	if sched == nil {
+		t.Fatal("schedule should exist")
+	}
+
+	// nextRun should be zero since no cron expression
+	if !sched.nextRun.IsZero() {
+		t.Error("nextRun should be zero for event-only module")
+	}
+}
+
+// =============================================================================
+// executeModuleWithContext tests with mock modules
+// =============================================================================
+
+func TestExecuteModuleWithContext_SuccessWithStats(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	mockClient := &mockAPEModuleClient{
+		executeResp: &pb.ExecuteResponse{
+			Success: true,
+			Message: "completed successfully",
+			Stats: &pb.ExecuteStats{
+				NodesCreated: 10,
+				NodesUpdated: 5,
+				EdgesCreated: 8,
+				EdgesUpdated: 3,
+				DurationMs:   150,
+			},
+		},
+	}
+
+	mockModule := createMockAPEModule("success-module", mockClient)
+	mgr.InjectModuleForTest(mockModule)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Scheduler{
+		pluginMgr:   mgr,
+		schedules:   make(map[string]*moduleSchedule),
+		lastRun:     make(map[string]time.Time),
+		runningTask: make(map[string]bool),
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+
+	s.executeModuleWithContext("success-module", "test-trigger", map[string]string{
+		"space_id": "test-space",
+	})
+
+	// Verify execute was called
+	if !mockClient.wasExecuteCalled() {
+		t.Error("Execute should have been called")
+	}
+
+	// Verify request parameters
+	req := mockClient.getExecuteRequest()
+	if req == nil {
+		t.Fatal("Execute request should not be nil")
+	}
+
+	if req.Trigger != "test-trigger" {
+		t.Errorf("Trigger = %q, want test-trigger", req.Trigger)
+	}
+
+	if req.Context["space_id"] != "test-space" {
+		t.Errorf("Context[space_id] = %q, want test-space", req.Context["space_id"])
+	}
+
+	// Verify lastRun was set
+	if _, ok := s.lastRun["success-module"]; !ok {
+		t.Error("lastRun should be set after execution")
+	}
+
+	// Verify runningTask was cleared
+	if s.runningTask["success-module"] {
+		t.Error("runningTask should be false after execution")
+	}
+}
+
+func TestExecuteModuleWithContext_SuccessWithMessage(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	mockClient := &mockAPEModuleClient{
+		executeResp: &pb.ExecuteResponse{
+			Success: true,
+			Message: "processed 100 items",
+			Stats:   nil, // No stats, just message
+		},
+	}
+
+	mockModule := createMockAPEModule("message-module", mockClient)
+	mgr.InjectModuleForTest(mockModule)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Scheduler{
+		pluginMgr:   mgr,
+		schedules:   make(map[string]*moduleSchedule),
+		lastRun:     make(map[string]time.Time),
+		runningTask: make(map[string]bool),
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+
+	s.executeModuleWithContext("message-module", "schedule", nil)
+
+	if !mockClient.wasExecuteCalled() {
+		t.Error("Execute should have been called")
+	}
+}
+
+func TestExecuteModuleWithContext_ExecuteError(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	mockClient := &mockAPEModuleClient{
+		executeErr: errors.New("execution failed"),
+	}
+
+	mockModule := createMockAPEModule("error-module", mockClient)
+	mgr.InjectModuleForTest(mockModule)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Scheduler{
+		pluginMgr:   mgr,
+		schedules:   make(map[string]*moduleSchedule),
+		lastRun:     make(map[string]time.Time),
+		runningTask: make(map[string]bool),
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+
+	// Should not panic
+	s.executeModuleWithContext("error-module", "test", nil)
+
+	// lastRun should still be set (defer runs)
+	if _, ok := s.lastRun["error-module"]; !ok {
+		t.Error("lastRun should be set even after error")
+	}
+
+	// runningTask should be cleared
+	if s.runningTask["error-module"] {
+		t.Error("runningTask should be false after error")
+	}
+}
+
+func TestExecuteModuleWithContext_ResponseError(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	mockClient := &mockAPEModuleClient{
+		executeResp: &pb.ExecuteResponse{
+			Success: false,
+			Error:   "database connection failed",
+		},
+	}
+
+	mockModule := createMockAPEModule("resp-error-module", mockClient)
+	mgr.InjectModuleForTest(mockModule)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Scheduler{
+		pluginMgr:   mgr,
+		schedules:   make(map[string]*moduleSchedule),
+		lastRun:     make(map[string]time.Time),
+		runningTask: make(map[string]bool),
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+
+	// Should handle response error gracefully
+	s.executeModuleWithContext("resp-error-module", "test", nil)
+
+	if !mockClient.wasExecuteCalled() {
+		t.Error("Execute should have been called")
+	}
+}
+
+func TestExecuteModuleWithContext_NilAPEClient(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	// Module with nil APEClient
+	mockModule := &plugins.ModuleInfo{
+		Manifest: plugins.Manifest{
+			ID:   "nil-client",
+			Type: "APE",
+		},
+		State:     plugins.StateReady,
+		APEClient: nil,
+	}
+	mgr.InjectModuleForTest(mockModule)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Scheduler{
+		pluginMgr:   mgr,
+		schedules:   make(map[string]*moduleSchedule),
+		lastRun:     make(map[string]time.Time),
+		runningTask: make(map[string]bool),
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+
+	// Should return early without panic
+	s.executeModuleWithContext("nil-client", "test", nil)
+
+	// lastRun should still be set from defer
+	if _, ok := s.lastRun["nil-client"]; !ok {
+		t.Error("lastRun should be set")
+	}
+}
+
+// =============================================================================
+// schedulerLoop tests
+// =============================================================================
+
+func TestSchedulerLoop_ContextCancellation(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+	s := NewScheduler(mgr)
+
+	// Start the scheduler
+	if err := s.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	// Give the loop time to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Cancel context via Stop
+	done := make(chan struct{})
+	go func() {
+		s.Stop()
+		close(done)
+	}()
+
+	// Should exit promptly
+	select {
+	case <-done:
+		// Success - loop exited on context cancellation
+	case <-time.After(2 * time.Second):
+		t.Error("schedulerLoop did not exit on context cancellation")
+	}
+}
+
+// =============================================================================
+// checkScheduledTasks tests - execution trigger path
+// =============================================================================
+
+func TestCheckScheduledTasks_TriggersExecution(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	mockClient := &mockAPEModuleClient{
+		executeResp: &pb.ExecuteResponse{
+			Success: true,
+			Message: "executed",
+		},
+	}
+
+	mockModule := createMockAPEModule("due-module", mockClient)
+	mgr.InjectModuleForTest(mockModule)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Scheduler{
+		pluginMgr:   mgr,
+		schedules:   make(map[string]*moduleSchedule),
+		lastRun:     make(map[string]time.Time),
+		runningTask: make(map[string]bool),
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+
+	// Set up a task that is due (nextRun in the past)
+	s.schedules["due-module"] = &moduleSchedule{
+		ModuleID:       "due-module",
+		CronExpression: "* * * * *",
+		nextRun:        time.Now().Add(-1 * time.Minute), // Past due
+		MinInterval:    0,
+	}
+
+	// Check scheduled tasks - should trigger execution
+	s.checkScheduledTasks()
+
+	// Give goroutine time to execute
+	time.Sleep(100 * time.Millisecond)
+
+	if !mockClient.wasExecuteCalled() {
+		t.Error("Execute should have been called for due task")
+	}
+
+	// nextRun should be updated to a future time
+	sched := s.schedules["due-module"]
+	if sched.nextRun.Before(time.Now()) {
+		t.Error("nextRun should be updated to future time after execution")
+	}
+}
+
+func TestCheckScheduledTasks_MinIntervalMet(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	mockClient := &mockAPEModuleClient{
+		executeResp: &pb.ExecuteResponse{
+			Success: true,
+			Message: "executed",
+		},
+	}
+
+	mockModule := createMockAPEModule("interval-module", mockClient)
+	mgr.InjectModuleForTest(mockModule)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	now := time.Now()
+
+	s := &Scheduler{
+		pluginMgr:   mgr,
+		schedules:   make(map[string]*moduleSchedule),
+		lastRun:     make(map[string]time.Time),
+		runningTask: make(map[string]bool),
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+
+	// Set up task with min interval that IS met
+	s.schedules["interval-module"] = &moduleSchedule{
+		ModuleID:       "interval-module",
+		CronExpression: "* * * * *",
+		nextRun:        now.Add(-1 * time.Minute),
+		MinInterval:    5 * time.Minute,
+	}
+	// Last run was 10 minutes ago, min interval is 5 minutes - should run
+	s.lastRun["interval-module"] = now.Add(-10 * time.Minute)
+
+	s.checkScheduledTasks()
+	time.Sleep(100 * time.Millisecond)
+
+	if !mockClient.wasExecuteCalled() {
+		t.Error("Execute should have been called when min interval is met")
+	}
+}
+
+// =============================================================================
+// Start error path tests
+// =============================================================================
+
+func TestStart_RefreshSchedulesError(t *testing.T) {
+	// This test verifies that Start handles errors from refreshSchedules gracefully.
+	// Since refreshSchedules doesn't return errors to Start (it logs them),
+	// we test that Start completes successfully even when modules have issues.
+
+	mgr := plugins.NewManager("", "", "")
+
+	// Create module that will error on GetSchedule
+	mockClient := &mockAPEModuleClient{
+		getScheduleErr: errors.New("schedule fetch failed"),
+	}
+	mgr.InjectModuleForTest(createMockAPEModule("failing-module", mockClient))
+
+	s := NewScheduler(mgr)
+
+	// Start should not fail even with refresh errors
+	err := s.Start()
+	if err != nil {
+		t.Errorf("Start should not fail due to refresh errors: %v", err)
+	}
+
+	// Clean up
+	s.Stop()
+}
+
+func TestStart_WithWorkingModules(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	mockClient := &mockAPEModuleClient{
+		getScheduleResp: &pb.GetScheduleResponse{
+			CronExpression: "*/5 * * * *",
+			EventTriggers:  []string{"ingest"},
+		},
+	}
+	mgr.InjectModuleForTest(createMockAPEModule("working-module", mockClient))
+
+	s := NewScheduler(mgr)
+
+	err := s.Start()
+	if err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	// Verify schedules were loaded
+	s.mu.RLock()
+	schedLen := len(s.schedules)
+	s.mu.RUnlock()
+
+	if schedLen != 1 {
+		t.Errorf("expected 1 schedule, got %d", schedLen)
+	}
+
+	s.Stop()
+}
+
+// =============================================================================
+// TriggerEventWithContext with mock module execution
+// =============================================================================
+
+func TestTriggerEventWithContext_ExecutesMatchingModule(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	mockClient := &mockAPEModuleClient{
+		executeResp: &pb.ExecuteResponse{
+			Success: true,
+			Message: "event handled",
+		},
+	}
+
+	mockModule := createMockAPEModule("event-handler", mockClient)
+	mgr.InjectModuleForTest(mockModule)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Scheduler{
+		pluginMgr:   mgr,
+		schedules:   make(map[string]*moduleSchedule),
+		lastRun:     make(map[string]time.Time),
+		runningTask: make(map[string]bool),
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+
+	// Register schedule with event trigger
+	s.schedules["event-handler"] = &moduleSchedule{
+		ModuleID:      "event-handler",
+		EventTriggers: []string{"ingest_complete"},
+	}
+
+	// Trigger the event
+	s.TriggerEventWithContext("ingest_complete", map[string]string{
+		"space_id": "my-space",
+	})
+
+	// Wait for async execution
+	time.Sleep(150 * time.Millisecond)
+
+	if !mockClient.wasExecuteCalled() {
+		t.Error("Execute should have been called for matching event")
+	}
+
+	req := mockClient.getExecuteRequest()
+	if req == nil {
+		t.Fatal("Execute request should not be nil")
+	}
+
+	if req.Trigger != "event:ingest_complete" {
+		t.Errorf("Trigger = %q, want event:ingest_complete", req.Trigger)
+	}
+
+	if req.Context["space_id"] != "my-space" {
+		t.Errorf("Context should contain space_id")
+	}
+}
+
+// =============================================================================
+// Edge case tests
+// =============================================================================
+
+func TestScheduler_ConcurrentExecution(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	// Create a slow mock client
+	mockClient := &mockAPEModuleClient{
+		executeResp: &pb.ExecuteResponse{
+			Success: true,
+		},
+	}
+
+	mgr.InjectModuleForTest(createMockAPEModule("slow-module", mockClient))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Scheduler{
+		pluginMgr:   mgr,
+		schedules:   make(map[string]*moduleSchedule),
+		lastRun:     make(map[string]time.Time),
+		runningTask: make(map[string]bool),
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+
+	// Start first execution
+	go s.executeModuleWithContext("slow-module", "first", nil)
+
+	// Give it time to start and set runningTask
+	time.Sleep(10 * time.Millisecond)
+
+	// Mark as running to simulate concurrent call
+	s.mu.Lock()
+	s.runningTask["slow-module"] = true
+	s.mu.Unlock()
+
+	// Second call should be skipped
+	s.executeModuleWithContext("slow-module", "second", nil)
+
+	// The module should still be marked as running
+	s.mu.RLock()
+	running := s.runningTask["slow-module"]
+	s.mu.RUnlock()
+
+	if !running {
+		t.Error("runningTask should still be true while first execution runs")
+	}
+}
+
+func TestGetStatus_NoLastRun(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+	s := NewScheduler(mgr)
+
+	// Add schedule without lastRun
+	s.schedules["new-module"] = &moduleSchedule{
+		ModuleID:       "new-module",
+		CronExpression: "0 * * * *",
+		nextRun:        time.Now().Add(1 * time.Hour),
+	}
+	s.runningTask["new-module"] = false
+	// Note: No s.lastRun["new-module"] set
+
+	status := s.GetStatus()
+	modules := status["modules"].([]map[string]any)
+
+	if len(modules) != 1 {
+		t.Fatalf("expected 1 module, got %d", len(modules))
+	}
+
+	// last_run should not be present
+	if _, ok := modules[0]["last_run"]; ok {
+		t.Error("last_run should not be present for module that never ran")
+	}
+}
+
+func TestExecuteModuleWithContext_ContextMerge(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	mockClient := &mockAPEModuleClient{
+		executeResp: &pb.ExecuteResponse{
+			Success: true,
+		},
+	}
+
+	mgr.InjectModuleForTest(createMockAPEModule("ctx-module", mockClient))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Scheduler{
+		pluginMgr:   mgr,
+		schedules:   make(map[string]*moduleSchedule),
+		lastRun:     make(map[string]time.Time),
+		runningTask: make(map[string]bool),
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+
+	// Execute with multiple context values
+	s.executeModuleWithContext("ctx-module", "event:test", map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+	})
+
+	time.Sleep(50 * time.Millisecond)
+
+	req := mockClient.getExecuteRequest()
+	if req == nil {
+		t.Fatal("request should not be nil")
+	}
+
+	if len(req.Context) != 3 {
+		t.Errorf("Context should have 3 entries, got %d", len(req.Context))
+	}
+
+	if req.Context["key1"] != "value1" {
+		t.Errorf("Context[key1] = %q, want value1", req.Context["key1"])
+	}
+}
+
+// =============================================================================
+// Direct schedulerLoop ticker path test
+// =============================================================================
+
+// TestSchedulerLoop_TickerPath tests the ticker-triggered path in schedulerLoop.
+// This test directly invokes the scheduler's internal loop behavior.
+func TestSchedulerLoop_TickerPath(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	mockClient := &mockAPEModuleClient{
+		executeResp: &pb.ExecuteResponse{
+			Success: true,
+			Message: "ticker executed",
+		},
+	}
+
+	mockModule := createMockAPEModule("ticker-module", mockClient)
+	mgr.InjectModuleForTest(mockModule)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Scheduler{
+		pluginMgr:   mgr,
+		schedules:   make(map[string]*moduleSchedule),
+		lastRun:     make(map[string]time.Time),
+		runningTask: make(map[string]bool),
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+
+	// Add a due task
+	s.schedules["ticker-module"] = &moduleSchedule{
+		ModuleID:       "ticker-module",
+		CronExpression: "* * * * *",
+		nextRun:        time.Now().Add(-1 * time.Minute),
+	}
+
+	// Directly call checkScheduledTasks to simulate what the ticker would do
+	// This covers the same code path as the ticker case in schedulerLoop
+	s.checkScheduledTasks()
+
+	time.Sleep(100 * time.Millisecond)
+
+	if !mockClient.wasExecuteCalled() {
+		t.Error("Execute should have been called via checkScheduledTasks")
+	}
+}
+
+// TestSchedulerLoopInternal_TickerFires tests the ticker path in schedulerLoop
+// by using a very short check interval.
+func TestSchedulerLoopInternal_TickerFires(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+
+	// Create mock with both GetSchedule and Execute responses
+	mockClient := &mockAPEModuleClient{
+		getScheduleResp: &pb.GetScheduleResponse{
+			CronExpression:     "* * * * *",
+			EventTriggers:      []string{},
+			MinIntervalSeconds: 0,
+		},
+		executeResp: &pb.ExecuteResponse{
+			Success: true,
+		},
+	}
+	mockModule := createMockAPEModule("loop-test-module", mockClient)
+	mgr.InjectModuleForTest(mockModule)
+
+	s := NewScheduler(mgr)
+	// Set a very fast check interval for testing
+	s.SetCheckInterval(10 * time.Millisecond)
+
+	// Start the scheduler - this will call refreshSchedules
+	if err := s.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	// After refreshSchedules, manually set nextRun to be in the past so the task is due
+	s.mu.Lock()
+	if sched, ok := s.schedules["loop-test-module"]; ok {
+		sched.nextRun = time.Now().Add(-1 * time.Minute)
+	}
+	s.mu.Unlock()
+
+	// Wait for ticker to fire (should happen within 20ms given 10ms interval)
+	time.Sleep(50 * time.Millisecond)
+
+	// Stop scheduler
+	s.Stop()
+
+	// Verify execute was called via the ticker path
+	if !mockClient.wasExecuteCalled() {
+		t.Error("Execute should have been called when ticker fires with due task")
+	}
+}
+
+// TestSetCheckInterval verifies the SetCheckInterval function
+func TestSetCheckInterval(t *testing.T) {
+	mgr := plugins.NewManager("", "", "")
+	s := NewScheduler(mgr)
+
+	// Default should be 30 seconds
+	if s.checkInterval != DefaultCheckInterval {
+		t.Errorf("Default checkInterval = %v, want %v", s.checkInterval, DefaultCheckInterval)
+	}
+
+	// Set custom interval
+	s.SetCheckInterval(5 * time.Second)
+	if s.checkInterval != 5*time.Second {
+		t.Errorf("checkInterval after set = %v, want 5s", s.checkInterval)
 	}
 }

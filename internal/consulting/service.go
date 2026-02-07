@@ -22,23 +22,72 @@ import (
 // no room for belief updating with new evidence.
 const MaxConfidence = 0.95
 
+// Retriever defines the interface for retrieving memory nodes.
+// This interface allows for mocking in tests.
+type Retriever interface {
+	Retrieve(ctx context.Context, req models.RetrieveRequest) (models.RetrieveResponse, error)
+}
+
+// SymbolLookup defines the interface for looking up symbols.
+// This interface allows for mocking in tests.
+type SymbolLookup interface {
+	GetSymbolsForMemoryNode(ctx context.Context, spaceID, nodeID string) ([]symbols.SymbolRecord, error)
+}
+
+// ConceptFetcher defines the interface for fetching related concepts.
+// This interface allows for mocking in tests.
+type ConceptFetcher interface {
+	FetchRelatedConcepts(ctx context.Context, spaceID string, results []models.RetrieveResult) ([]models.RelatedConcept, error)
+}
+
 // Service provides the Agent Consulting API.
 type Service struct {
-	cfg         config.Config
-	driver      neo4j.DriverWithContext
-	retriever   *retrieval.Service
-	embedder    embeddings.Embedder
-	symbolStore *symbols.Store
+	cfg            config.Config
+	driver         neo4j.DriverWithContext
+	retriever      Retriever
+	embedder       embeddings.Embedder
+	symbolStore    SymbolLookup
+	conceptFetcher ConceptFetcher // Optional: if nil, uses internal fetchRelatedConcepts
 }
 
 // NewService creates a new consulting service.
 func NewService(cfg config.Config, driver neo4j.DriverWithContext, retriever *retrieval.Service, embedder embeddings.Embedder, symbolStore *symbols.Store) *Service {
+	var r Retriever
+	if retriever != nil {
+		r = retriever
+	}
+	var ss SymbolLookup
+	if symbolStore != nil {
+		ss = symbolStore
+	}
+	return &Service{
+		cfg:         cfg,
+		driver:      driver,
+		retriever:   r,
+		embedder:    embedder,
+		symbolStore: ss,
+	}
+}
+
+// NewServiceWithMocks creates a consulting service with mock dependencies for testing.
+func NewServiceWithMocks(cfg config.Config, driver neo4j.DriverWithContext, retriever Retriever, embedder embeddings.Embedder, symbolStore SymbolLookup) *Service {
 	return &Service{
 		cfg:         cfg,
 		driver:      driver,
 		retriever:   retriever,
 		embedder:    embedder,
 		symbolStore: symbolStore,
+	}
+}
+
+// NewServiceWithAllMocks creates a consulting service with all mock dependencies including concept fetcher.
+func NewServiceWithAllMocks(cfg config.Config, retriever Retriever, embedder embeddings.Embedder, symbolStore SymbolLookup, conceptFetcher ConceptFetcher) *Service {
+	return &Service{
+		cfg:            cfg,
+		retriever:      retriever,
+		embedder:       embedder,
+		symbolStore:    symbolStore,
+		conceptFetcher: conceptFetcher,
 	}
 }
 
@@ -84,7 +133,12 @@ func (s *Service) Consult(ctx context.Context, req models.ConsultRequest) (model
 	resp.Debug["retrieved_count"] = len(retrieveResp.Results)
 
 	// Step 2: Fetch concept nodes (higher layers) for related concepts
-	concepts, err := s.fetchRelatedConcepts(ctx, req.SpaceID, retrieveResp.Results)
+	var concepts []models.RelatedConcept
+	if s.conceptFetcher != nil {
+		concepts, err = s.conceptFetcher.FetchRelatedConcepts(ctx, req.SpaceID, retrieveResp.Results)
+	} else {
+		concepts, err = s.fetchRelatedConcepts(ctx, req.SpaceID, retrieveResp.Results)
+	}
 	if err != nil {
 		// Log but don't fail - concepts are optional enrichment
 		resp.Debug["concept_error"] = err.Error()
@@ -141,6 +195,10 @@ func (s *Service) Consult(ctx context.Context, req models.ConsultRequest) (model
 func (s *Service) fetchRelatedConcepts(ctx context.Context, spaceID string, results []models.RetrieveResult) ([]models.RelatedConcept, error) {
 	if len(results) == 0 {
 		return nil, nil
+	}
+
+	if s.driver == nil {
+		return nil, fmt.Errorf("no database driver configured")
 	}
 
 	// Collect node IDs from results
@@ -467,7 +525,12 @@ func (s *Service) Suggest(ctx context.Context, req models.SuggestRequest) (model
 	}
 
 	// Step 8: Fetch related concepts
-	concepts, err := s.fetchRelatedConcepts(ctx, req.SpaceID, filteredResults)
+	var concepts []models.RelatedConcept
+	if s.conceptFetcher != nil {
+		concepts, err = s.conceptFetcher.FetchRelatedConcepts(ctx, req.SpaceID, filteredResults)
+	} else {
+		concepts, err = s.fetchRelatedConcepts(ctx, req.SpaceID, filteredResults)
+	}
 	if err != nil {
 		resp.Debug["concept_error"] = err.Error()
 	} else {

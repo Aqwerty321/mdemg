@@ -209,6 +209,19 @@ python docs/tests/uvts/runners/uvts_runner.py \
 
 Thresholds: `mean_score`, `strong_evidence_pct`, `high_score_rate_pct`, `min_category_score`. Profiles: `quick` (16q), `standard` (40q), `full` (120q).
 
+**UNTS (Universal Hash Test Specification)** maintains a current and historical record of SHA-256 hash verification for all framework-protected files across UPTS, UATS, UBTS, USTS, UOBS, UAMS, and UDTS. Registry lives in `docs/specs/unts-registry.json`. Implementation is in `internal/unts/` with gRPC service defined in `api/proto/unts.proto`.
+
+```bash
+# Run UNTS Go unit tests
+go test ./internal/unts/... -v
+
+# UDTS contract tests for UNTS gRPC service
+export UDTS_TARGET=localhost:50051
+go test ./tests/udts/... -run TestUNTS -v
+```
+
+Core capabilities: `ListVerifiedFiles`, `GetFileStatus`, `GetHashHistory`, `VerifyNow`, `RevertToPreviousHash`, `UpdateHash`, `RegisterTrackedFile`. Each tracked file retains up to 3 historical hash values for revert. See `docs/specs/unts-hash-verification.md` for the full specification and `docs/specs/FRAMEWORK_GOVERNANCE.md` for governance context.
+
 ### Universal Test Specification Summary
 
 | Framework | Purpose | Location |
@@ -221,6 +234,7 @@ Thresholds: `mean_score`, `strong_evidence_pct`, `high_score_rate_pct`, `min_cat
 | UAMS | Auth method contracts | `docs/tests/uams/` |
 | UDTS | gRPC contract tests | `docs/api/api-spec/udts/`, `tests/udts/` |
 | UVTS | Semantic accuracy | `docs/tests/uvts/` |
+| UNTS | Hash verification | `internal/unts/`, `docs/specs/` |
 
 ### Dynamic Port Allocation
 

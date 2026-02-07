@@ -109,6 +109,57 @@ Tracks whether agents call `/resume` on session start and how actively they obse
 - Multi-factor quality scoring (specificity + actionability + context-richness)
 - Relevance-weighted resume ranking
 
+### Recursive Self-Improvement Cycle — RSIC (Phase 60b)
+
+CMS memory degrades over time: edges decay, observations go stale, knowledge gaps widen, and consolidation falls behind. RSIC is an autonomous 5-stage cycle that continuously monitors and repairs memory health without human intervention.
+
+**The 5-Stage Cycle:**
+
+```
+1. ASSESS   → Gather metrics from all subsystems (retrieval, learning, conversation, graph)
+2. REFLECT  → Detect patterns: saturation, orphans, stale consolidation, weak edges, volatile backlog
+3. PLAN     → Generate concrete remediation actions with safety bounds
+4. EXECUTE  → Dispatch actions as background goroutines (prune, consolidate, graduate, refresh)
+5. VALIDATE → Check success criteria, update calibration confidence per action type
+```
+
+**Three Cycle Tiers:**
+
+| Tier | Period | Scope |
+|------|--------|-------|
+| **Micro** | Per-session | Quick health pulse: distribution stats, volatile counts, correction rate |
+| **Meso** | Every 6 hours or 5 sessions | Full assessment: retrieval quality, edge health, knowledge gaps, calibration |
+| **Macro** | Daily (cron) | Comprehensive: topology optimization, hidden layer re-consolidation, trend analysis |
+
+**Automated Remediation Actions:**
+- `prune_decayed_edges` — Remove low-weight learning edges approaching saturation
+- `prune_excess_edges` — Trim hub nodes exceeding per-node edge cap
+- `trigger_consolidation` — Run hidden layer consolidation when orphan ratio is high or consolidation is stale
+- `graduate_volatile` — Promote stable volatile observations to permanent
+- `tombstone_stale` — Remove observations not accessed in N days with low importance
+- `refresh_stale_edges` — Recalculate stale co-activation edges
+
+**Decay Watchdog:**
+
+A background goroutine enforces cycle compliance. If the agent fails to run a self-improvement cycle within the configured period, escalating pressure forces execution:
+
+| Level | Decay Range | Behavior |
+|-------|------------|----------|
+| 0 — Nominal | 0.0–0.3 | No action |
+| 1 — Nudge | 0.3–0.6 | `rsic_overdue: true` injected into `/v1/conversation/resume` response |
+| 2 — Warn | 0.6–0.9 | `X-MDEMG-Warning: rsic-overdue` header on all API responses |
+| 3 — Force | >= 0.9 | Watchdog auto-dispatches a full meso cycle — no agent cooperation required |
+
+**Calibration & Meta-Learning:**
+
+RSIC tracks the historical success rate of each action type. Actions that consistently improve metrics gain higher confidence and are prioritized in future planning. Actions that fail are deprioritized below the minimum confidence threshold (default 0.3).
+
+**Safety Bounds:**
+- Max 5% of nodes pruned per cycle
+- Max 10% of edges pruned per cycle
+- Protected spaces (`mdemg-dev`) never modified destructively
+- All actions bounded by configurable timeout per tier
+
 ## API Endpoints
 
 ### Core Operations
@@ -145,6 +196,17 @@ Tracks whether agents call `/resume` on session start and how actively they obse
 | POST | `/v1/conversation/org-reviews/{id}/decision` | Approve or reject |
 | POST | `/v1/conversation/observations/{id}/flag-org` | Flag for review |
 
+### Self-Improvement Cycle (RSIC)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/v1/self-improve/assess` | Trigger on-demand self-assessment |
+| GET | `/v1/self-improve/report` | Get active task report |
+| GET | `/v1/self-improve/report/{cycle_id}` | Get specific cycle report |
+| POST | `/v1/self-improve/cycle` | Trigger full RSIC cycle (assess→validate) |
+| GET | `/v1/self-improve/history` | Cycle history with outcomes |
+| GET | `/v1/self-improve/calibration` | Calibration metrics and confidence scores |
+| GET | `/v1/self-improve/health` | Watchdog status and health score |
+
 ## Architecture
 
 ### Storage (Neo4j)
@@ -171,6 +233,18 @@ Observations are stored as `MemoryNode` nodes in Neo4j with:
 | `internal/conversation/org_review.go` | Org-level review workflow |
 | `internal/conversation/session_tracker.go` | Session health monitoring |
 | `internal/conversation/types.go` | Shared types (Observation, AgentID, etc.) |
+| `internal/ape/types_rsic.go` | RSIC types (reports, insights, actions, task specs) |
+| `internal/ape/self_assess.go` | Assessment — gathers metrics from all subsystems |
+| `internal/ape/self_reflect.go` | Reflection — pattern detection (8 insight types) |
+| `internal/ape/improvement_plan.go` | Planning — maps insights to remediation actions |
+| `internal/ape/task_spec.go` | Task specification builder with safety bounds |
+| `internal/ape/task_dispatch.go` | Goroutine-based action executor |
+| `internal/ape/task_monitor.go` | Task status tracking and cycle wait |
+| `internal/ape/calibration.go` | Validation and per-action confidence tracking |
+| `internal/ape/watchdog.go` | Decay watchdog with 4-level escalation |
+| `internal/ape/cycle.go` | CycleOrchestrator — ties all 5 stages together |
+| `internal/api/handlers_self_improve.go` | HTTP handlers for 7 RSIC endpoints |
+| `internal/api/rsic_adapters.go` | Adapters bridging RSIC interfaces to concrete services |
 
 ### Protected Space
 
@@ -184,6 +258,7 @@ The `mdemg-dev` space contains Claude's conversation memory and is **protected f
 | 43B | CMS Quality | Quality scoring, dedup, relevance-weighted resume |
 | 43C | Multi-Agent CMS | Agent identity, visibility levels, cross-session resume |
 | 60 | CMS Advanced II | Templates, snapshots, smart truncation, org reviews |
+| 60b | RSIC | Autonomous self-improvement cycles, decay watchdog, calibration meta-learning |
 
 ## Configuration
 
@@ -211,4 +286,27 @@ REINFORCEMENT_WINDOW_HOURS=2
 
 # Governance
 CMS_ORG_REVIEW_REQUIRED=true
+
+# RSIC — Cycle Periods
+RSIC_MICRO_ENABLED=true
+RSIC_MESO_PERIOD_HOURS=6
+RSIC_MESO_PERIOD_SESSIONS=5
+RSIC_MACRO_CRON="0 3 * * *"
+
+# RSIC — Safety Bounds
+RSIC_MAX_NODE_PRUNE_PCT=5
+RSIC_MAX_EDGE_PRUNE_PCT=10
+RSIC_ROLLBACK_WINDOW=3
+
+# RSIC — Watchdog
+RSIC_WATCHDOG_ENABLED=true
+RSIC_WATCHDOG_CHECK_INTERVAL_SEC=60
+RSIC_WATCHDOG_DECAY_RATE=1.0
+RSIC_WATCHDOG_NUDGE_THRESHOLD=0.3
+RSIC_WATCHDOG_WARN_THRESHOLD=0.6
+RSIC_WATCHDOG_FORCE_THRESHOLD=0.9
+
+# RSIC — Calibration
+RSIC_CALIBRATION_WINDOW_DAYS=7
+RSIC_MIN_CONFIDENCE_THRESHOLD=0.3
 ```

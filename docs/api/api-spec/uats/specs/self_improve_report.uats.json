@@ -1,0 +1,38 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Self-Improve Report",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "self-improve",
+      "report"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates RSIC active task report endpoint",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "5d6fd31f525b80c446501d1ac2b947a10b29aef9e878a0571406fdf14e126321"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/self-improve/report"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.active_tasks",
+        "type": "object"
+      }
+    ]
+  }
+}

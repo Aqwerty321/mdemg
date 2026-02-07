@@ -1,0 +1,68 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Self-Improve Cycle",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "self-improve",
+      "cycle"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates RSIC full cycle endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 30000,
+    "sha256": "893e1d037b698ca5db7cfba27235326fa5310881ab241641f5bd66a830fd60ed"
+  },
+  "variables": {
+    "test_space": "uats-rsic-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/self-improve/cycle",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{test_space}}",
+      "tier": "micro"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.cycle_id",
+        "type": "string"
+      },
+      {
+        "path": "$.tier",
+        "type": "string"
+      },
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.actions_executed",
+        "type": "integer"
+      },
+      {
+        "path": "$.success_count",
+        "type": "integer"
+      },
+      {
+        "path": "$.failed_count",
+        "type": "integer"
+      }
+    ]
+  }
+}

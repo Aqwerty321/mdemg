@@ -263,22 +263,24 @@ Phases are organized into **numbered series** to group related work:
 | Phase 2 (DevSpace Hub) | **Phase 32** | DevSpace Hub + Out-of-Band Distribution | ✅ Complete |
 | Phase 3 (Inter-Agent Comms) | **Phase 33** | Inter-Agent Communications | ✅ Complete |
 | Phase 4 (Incremental Sync) | **Phase 34** | Incremental Sync (Delta Export) | ✅ Complete |
-| Phase 5 (CRDT + Lineage) | **Phase 35** | CRDT for Learned Edges + Space Lineage | 📋 Planned |
+| Phase 5 (CRDT + Lineage) | **Phase 35** | CRDT for Learned Edges + Space Lineage | ✅ Complete |
 | Phase 7 (Observation Forwarding) | **Phase 36** | Selective Observation Forwarding (CMS) | 📋 Planned |
-| Phase 8 (Agent Health) | **Phase 37** | Agent Health / Heartbeat / Presence | 📋 Planned |
-| — (UNTS) | **Phase 38** | Hash Verification (UNTS / Nash Verification) | 📋 Spec Complete |
+| Phase 8 (Agent Health) | **Phase 37** | Agent Health / Heartbeat / Presence | ✅ Complete |
+| — (UNTS) | **Phase 38** | Hash Verification (UNTS / Nash Verification) | ✅ Complete |
 | Phase 1 (Cleanup) | **Phase 41** | Space Cleanup | ✅ Complete |
 | Phase 2 (Self-Ingest) | **Phase 42** | Self-Ingest MDEMG Codebase | ✅ Complete |
 | Phase 3A (CMS Enforcement) | **Phase 43A** | CMS Agent Enforcement | ✅ Complete |
 | Phase 3B (CMS Quality) | **Phase 43B** | CMS Quality & Retrieval Improvements | ✅ Complete |
 | Phase 3C (Multi-Agent CMS) | **Phase 43C** | Multi-Agent CMS Support | ✅ Complete |
-| Phase 4 (Linear CRUD) | **Phase 44** | Linear Integration — Full CRUD + Workflows | 📋 Approved (not started) |
+| Phase 4 (Linear CRUD) | **Phase 44** | Linear Integration — Full CRUD + Workflows | ✅ Complete |
 | Phase 6 (Modular Intelligence) | **Phase 45** | Modular Intelligence & Active Participation | 🔄 Partial |
 | Phase 8 (Symbols) | **Phase 46** | Symbol-Level Indexing | ✅ Complete (8.5-8.6 archived) |
 | Phase 9 (Incremental Updates) | **Phase 47** | Incremental Update & Re-Ingestion | 🔄 Partial |
 | Phase 10 (Query Optimization) | **Phase 48** | Query Optimization & Caching | ✅ Complete (10.1-10.2) |
 | Phase 11 (LLM SDK) | **Phase 49** | LLM Plugin SDK & Self-Improvement | 🔄 Partial |
 | Phase 7 (Public Readiness) | **Phase 50** | Public Readiness & Open Source Hardening | 📋 Planned |
+| — (Web Scraper) | **Phase 51** | Web Scraper Ingestion Module | 📋 Approved |
+| — (CMS Advanced II) | **Phase 60** | CMS Advanced Functionality II | ✅ Complete |
 
 ---
 
@@ -301,22 +303,24 @@ Phases are organized into **numbered series** to group related work:
 | 32 | DevSpace Hub | ✅ | `docs/specs/phase-devspace-hub.md` |
 | 33 | Inter-Agent Comms | ✅ | `docs/specs/phase3-inter-agent-comms.md` |
 | 34 | Incremental Sync | ✅ | `docs/specs/phase4-incremental-sync.md` |
-| 35 | CRDT + Lineage | 📋 | `docs/specs/development-space-collaboration.md` §Phase 5 |
+| 35 | CRDT + Lineage | ✅ | `docs/specs/development-space-collaboration.md` §Phase 5 |
 | 36 | Observation Forwarding | 📋 | `docs/specs/development-space-collaboration.md` §Phase 7 |
-| 37 | Agent Health / Presence | 📋 | `docs/specs/development-space-collaboration.md` §Phase 8 |
-| 38 | UNTS Hash Verification | 📋 | `docs/specs/unts-hash-verification.md` |
+| 37 | Agent Health / Presence | ✅ | `docs/specs/development-space-collaboration.md` §Phase 8 |
+| 38 | UNTS Hash Verification | ✅ | `docs/specs/unts-hash-verification.md` |
 | 41 | Space Cleanup | ✅ | `docs/specs/phase1-space-cleanup.md` |
 | 42 | Self-Ingest | ✅ | `docs/specs/phase2-self-ingest.md` |
 | 43A | CMS Enforcement | ✅ | `docs/specs/phase3a-cms-enforcement.md` |
 | 43B | CMS Quality | ✅ | `docs/specs/phase3b-cms-quality.md` |
 | 43C | Multi-Agent CMS | ✅ | `docs/specs/phase3c-multi-agent.md` |
-| 44 | Linear CRUD | 📋 | `docs/specs/phase4-linear-crud.md` |
+| 44 | Linear CRUD | ✅ | `docs/specs/phase4-linear-crud.md` |
 | 45 | Modular Intelligence | 🔄 | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 6 |
 | 46 | Symbol Indexing | ✅ | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 8 |
 | 47 | Incremental Updates | 🔄 | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 9 |
 | 48 | Query Optimization | ✅ | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 10 |
 | 49 | LLM Plugin SDK | 🔄 | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 11 |
 | 50 | Public Readiness | 📋 | `docs/development/repo-to-public-roadmap.md` |
+| 51 | Web Scraper Ingestion | 📋 | `docs/specs/phase51-web-scraper-ingestion.md` |
+| 60 | CMS Advanced II | ✅ | `docs/specs/phase60-cms-advanced-ii.md` |
 
 ---
 
@@ -483,22 +487,30 @@ Returns embedding provider health status with active probe validation.
 
 ---
 
-## 8. Planned Phases (35-40)
+## 8. Recently Completed DevSpace Phases (35-38)
 
-### Phase 35: CRDT for Learned Edges + Space Lineage 📋
+### Phase 35: CRDT for Learned Edges + Space Lineage ✅
 
+**Completed:** 2026-02-06
 **Master Plan:** `docs/specs/development-space-collaboration.md` §Phase 5
 
-**Goal:** CO_ACTIVATED_WITH edges merge with CRDT semantics (e.g. max weight, sum evidence_count) so concurrent updates from multiple agents don't lose data. Space lineage tracks origin, merges, and who shared what.
+**What it does:** CO_ACTIVATED_WITH edges merge with CRDT semantics (max weight, sum evidence_count) so concurrent updates from multiple agents don't lose data. Space lineage tracks origin, merges, and who shared what.
 
-**Deliverables:**
-- Define merge rules for CO_ACTIVATED_WITH (max weight, sum evidence_count)
-- Implement in importer when conflict mode is "merge" or new "crdt" mode
-- Proto fields for lineage (e.g. `SpaceMetadata.lineage`)
-- Exporter records origin; importer appends to lineage on merge
-- Tests for CRDT merge behavior and lineage round-trip
+**Key Files:**
 
-**Dependencies:** Phase 31 (Space Transfer). Phase 34 helpful for delta + CRDT together.
+| Component | Location | Description |
+|-----------|----------|-------------|
+| CRDT conflict mode | `api/proto/space-transfer.proto` | `CONFLICT_CRDT = 3` enum value |
+| Lineage messages | `api/proto/space-transfer.proto` | `Lineage`, `LineageEvent` messages |
+| CRDT importer | `internal/transfer/importer.go` | Merge logic for edges |
+| Exporter lineage | `internal/transfer/exporter.go` | Records origin in exports |
+| Tests | `internal/transfer/crdt_test.go` | 7 test functions |
+| UDTS spec | `docs/api/api-spec/udts/specs/space_transfer_crdt.udts.json` | Contract tests |
+
+**CRDT Merge Semantics:**
+- `evidence_count`: Sum (additive)
+- `weight`: Max (last-writer-wins for dimension weights)
+- `dim_temporal`, `dim_semantic`, `dim_causal`: Preserved in EdgeData
 
 ---
 
@@ -517,41 +529,151 @@ Returns embedding provider health status with active probe validation.
 
 ---
 
-### Phase 37: Agent Health / Heartbeat / Presence 📋
+### Phase 37: Agent Health / Heartbeat / Presence ✅
 
+**Completed:** 2026-02-06
 **Master Plan:** `docs/specs/development-space-collaboration.md` §Phase 8
 
-**Goal:** Agents in a DevSpace have online/away status via heartbeat. Optional offline queue for disconnected agents.
+**What it does:** Agents in a DevSpace have online/away/offline status via heartbeat. Bounded offline queue for disconnected agents.
 
-**Deliverables:**
-- Proto: `Heartbeat`, `GetPresence` (or `ListAgents` with status), optional `SetQueueSize`
-- Hub stores `last_heartbeat` per agent; presence endpoint
-- Optional bounded queue per agent
-- UDTS specs and tests
+**Key Files:**
 
-**Dependencies:** Phase 32 (registration).
+| Component | Location | Description |
+|-----------|----------|-------------|
+| Proto definitions | `api/proto/devspace.proto` | `Heartbeat`, `GetPresence`, `SetQueueConfig`, `QueueMessage`, `DrainQueue` RPCs |
+| Catalog storage | `internal/devspace/catalog.go` | `last_heartbeat` per agent |
+| Server handlers | `internal/devspace/server.go` | Presence endpoint, queue management |
+| Tests | `internal/devspace/presence_test.go` | 39 test functions (100% coverage) |
+| UDTS spec | `docs/api/api-spec/udts/specs/devspace_presence.udts.json` | Contract tests |
+
+**Presence Thresholds:**
+- Online: < 30 seconds since heartbeat
+- Away: 30 seconds - 5 minutes
+- Offline: > 5 minutes
+
+**Offline Queue:** Configurable max size (disabled, limited, unlimited)
 
 ---
 
-### Phase 38: UNTS Hash Verification (Nash Verification Module) 📋
+### Phase 38: UNTS Hash Verification (Nash Verification) ✅
 
+**Completed:** 2026-02-06
 **Spec:** `docs/specs/unts-hash-verification.md`
-**Governance:** `docs/specs/FRAMEWORK_GOVERNANCE.md`
 
-**Goal:** Central registry + API for hash verification of all framework-protected files (manifest, UDTS proto_sha256, future UATS/UBTS/USTS/UOTS/UAMS/UPTS hashes). Current + historical (last 3) hashes per file. Revert capability. gRPC/REST for monitoring and manipulation.
+**What it does:** Central registry + API for hash verification of all framework-protected files. Current + historical (last 3) hashes per file. Revert capability.
+
+**Key Files:**
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| Proto definitions | `api/proto/unts.proto` | 7 RPCs for hash verification |
+| Generated code | `api/untspb/` | Generated Go code |
+| Registry | `docs/specs/unts-registry.json` | JSON registry format |
+| Scanners | `internal/unts/scanner.go` | Ingest from manifest.sha256 and UDTS specs |
+| Core logic | `internal/unts/registry.go` | VerifyNow, UpdateHash, RevertToPreviousHash |
+| gRPC server | `internal/unts/server.go` | Service implementation |
+| Tests | `internal/unts/registry_test.go` | 10 test functions |
+| UDTS spec | `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json` | Contract tests |
+
+**gRPC RPCs:**
+- `ListVerifiedFiles` — List all tracked files
+- `GetFileStatus` — Get current hash and status
+- `GetHashHistory` — Get last 3 hashes
+- `RevertToPreviousHash` — Roll back to previous hash
+- `UpdateHash` — Update current hash
+- `VerifyNow` — Trigger verification
+- `RegisterTrackedFile` — Add new file to tracking
+
+---
+
+### Phase 60: CMS Advanced Functionality II ✅
+
+**Completed:** 2026-02-07
+**Spec:** `docs/specs/phase60-cms-advanced-ii.md`
+
+**What it does:** Enhanced CMS with structured observations, intelligent resume, and context window optimization for LLM coding agents.
+
+**Key Files:**
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| Templates Service | `internal/conversation/templates.go` | Template CRUD with JSON Schema validation |
+| Snapshot Service | `internal/conversation/snapshot.go` | Task context snapshot capture |
+| Relevance Scoring | `internal/conversation/relevance.go` | Recency, importance, task-relevance scoring |
+| Smart Truncation | `internal/conversation/truncation.go` | Tiered resume with token budget |
+| Org Review Service | `internal/conversation/org_review.go` | Flag/approve/reject workflow |
+| API Handlers | `internal/api/server.go` | Route registration for all Phase 60 endpoints |
+| UATS Specs | `docs/api/api-spec/uats/specs/cms_*.uats.json` | 15 API contract tests |
+
+**Features Implemented (All P0):**
+
+| Feature | Description |
+|---------|-------------|
+| **Observation Templates** | Predefined schemas stored in Neo4j sub-space with JSON Schema validation |
+| **Task Context Snapshots** | Auto-capture task state before compaction/session end with manual trigger |
+| **Resume Relevance Scoring** | Score by recency (0.3), importance (0.4), task-relevance (0.3) with configurable weights |
+| **Smart Truncation** | Tiered resume (critical/important/background), token budget enforcement |
+| **Org-Level Flagging** | Alert user for review before org-level ingestion with approve/reject workflow |
+
+**API Endpoints (15 total):**
+
+Templates:
+- `GET/POST /v1/conversation/templates` — List/Create templates
+- `GET/PUT/DELETE /v1/conversation/templates/{id}` — Get/Update/Delete template
+
+Snapshots:
+- `GET/POST /v1/conversation/snapshots` — List/Create snapshots
+- `GET /v1/conversation/snapshots/{id}` — Get snapshot
+- `GET /v1/conversation/snapshots/latest` — Get latest for session
+- `DELETE /v1/conversation/snapshots/{id}` — Delete snapshot
+- `POST /v1/conversation/snapshots/cleanup` — Clean up old snapshots
+
+Org Reviews:
+- `GET /v1/conversation/org-reviews` — List pending reviews
+- `GET /v1/conversation/org-reviews/stats` — Review statistics
+- `POST /v1/conversation/org-reviews/flag` — Flag for review
+- `POST /v1/conversation/org-reviews/decision` — Approve/reject decision
+
+**UATS Test Coverage:** 15/15 specs passing (100% conformance)
+
+**Relevance Scoring Formula:**
+```
+score = (recency_weight × recency_score) +
+        (importance_weight × importance_score) +
+        (task_relevance_weight × task_relevance_score)
+```
+
+**Truncation Tiers:**
+- Critical (40% budget): Corrections, errors, recent decisions
+- Important (35% budget): Task context, active learnings
+- Background (25% budget): Older observations, summarized
+
+---
+
+### Phase 51: Web Scraper Ingestion Module 📋
+
+**Status:** Approved
+**Priority:** Medium
+**Spec:** `docs/specs/phase51-web-scraper-ingestion.md`
+
+**What it does:** Asynchronous web scraping module for discovering and ingesting web content. Supports topic-based discovery or user-provided URLs, with authenticated scraping for internal documentation.
+
+**Key Features:**
+- Topic-based URL discovery or direct URL scraping
+- Asynchronous job execution with status polling
+- Authenticated scraping (cookies, headers, basic auth)
+- Content extraction profiles (documentation, forum, blog, news)
+- Quality scoring and deduplication
+- User review workflow before ingestion
+- Configurable target space_id (defaults to `web-scraper`)
 
 **Deliverables:**
-- Registry: `docs/specs/unts-registry.json` (or DB)
-- Scanners: Ingest from `manifest.sha256` and UDTS spec `proto_sha256` fields
-- Core logic: VerifyNow, UpdateHash, RevertToPreviousHash
-- gRPC service: `mdemg.unts.v1.HashVerification` (or `NashVerification`)
-  - RPCs: ListVerifiedFiles, GetFileStatus, GetHashHistory, RevertToPreviousHash, UpdateHash, VerifyNow, RegisterTrackedFile
-- UDTS specs for UNTS RPCs
-- Implementation: `internal/unts/` (or `internal/hashverify/`), `api/proto/unts.proto`
+- `internal/scraper/` — Core scraping service
+- `internal/api/handlers_scraper.go` — REST handlers
+- Job tracking via existing `internal/jobs/`
+- UATS specs for scraper endpoints
 
-**Data model:** See spec for `VerifiedFileRecord` (path, framework, current_hash, status, updated_at, history[3]).
-
-**Dependencies:** None. Governance-level capability.
+---
 
 ---
 
@@ -622,23 +744,43 @@ relevanceScore = 0.40 * recencyScore + 0.25 * surpriseScore + 0.20 * typePriorit
 
 ---
 
-### Phase 44: Linear Integration — Full CRUD + Workflows 📋
+### Phase 44: Linear Integration — Full CRUD + Workflows ✅
 
+**Completed:** 2026-02-04
 **Spec:** `docs/specs/phase4-linear-crud.md`
 
 **What it does:** Full CRUD operations for Linear (create/read/update/delete issues, projects, comments). Config-driven workflow engine. Generic CRUDModule protobuf service.
 
-**Status:** Approved, not started. The existing Linear ingestion plugin works; this phase adds write operations.
+**Key Files:**
 
-**Deliverables:**
-- CRUDModule proto service (generic entity_type dispatch)
-- Linear plugin implements CRUD for issues/projects/comments
-- REST endpoints: `/v1/linear/issues`, `/v1/linear/projects`, `/v1/linear/comments`
-- MCP tools for create, read, update, list, comment, search
-- YAML workflow engine (triggers, conditions, actions)
-- Plugin manager `additional_services` support
+| Component | Location | Description |
+|-----------|----------|-------------|
+| CRUDModule proto | `api/proto/mdemg-module.proto` | Generic CRUD service (lines 246-329) |
+| CRUD implementation | `plugins/linear-module/main.go` | Create, Read, Update, Delete, List methods |
+| Mutation builders | `plugins/linear-module/mutations.go` | GraphQL mutation query builders |
+| Workflow engine | `plugins/linear-module/workflow.go` | Config-driven trigger/action engine |
+| Default workflows | `plugins/linear-module/workflows.yaml` | Sample workflow configuration |
+| REST handlers | `internal/api/handlers_linear.go` | HTTP handlers for `/v1/linear/*` |
+| Webhook handler | `internal/api/handle_webhooks.go` | Linear webhook receiver with debounce |
+| MCP tools | `cmd/mcp-server/main.go` | 6 Linear tools (create, list, read, update, comment, search) |
 
-**Dependencies:** Existing Linear ingestion module, Phase 43 CMS.
+**REST Endpoints:**
+- `POST/GET /v1/linear/issues` — Create/List issues
+- `GET/PUT/DELETE /v1/linear/issues/{id}` — Read/Update/Delete issue
+- `POST/GET /v1/linear/projects` — Create/List projects
+- `GET/PUT /v1/linear/projects/{id}` — Read/Update project
+- `POST /v1/linear/comments` — Create comment
+- `POST /v1/webhooks/linear` — Linear webhook receiver
+
+**MCP Tools:**
+- `linear_create_issue` — Create new Linear issue
+- `linear_list_issues` — List issues with filters
+- `linear_read_issue` — Read single issue by ID
+- `linear_update_issue` — Update issue fields
+- `linear_add_comment` — Add comment to issue
+- `linear_search` — Search issues
+
+**Test Coverage:** 36 tests (20 plugin + 16 API handlers)
 
 ---
 
@@ -653,7 +795,7 @@ relevanceScore = 0.40 * recencyScore + 0.25 * surpriseScore + 0.20 * typePriorit
 | 45.1 Jiminy (Explainable Retrieval) | ✅ | `internal/retrieval/service.go` |
 | 45.2 Binary Sidecar Host (Plugin Manager) | ✅ | `internal/plugins/manager.go`, `docs/development/SDK_PLUGIN_GUIDE.md` |
 | 45.3 Code Parser Module Migration | 📋 | Extract parsers to RPC module |
-| 45.4 Non-Code Integrations (Linear, Obsidian) | 🔄 | Linear ingestion done; CRUD = Phase 44; Obsidian pending |
+| 45.4 Non-Code Integrations (Linear, Obsidian) | 🔄 | Linear complete (ingestion + CRUD); Obsidian pending |
 | 45.5 APE (Active Participant Engine) | 🔄 | `internal/ape/scheduler.go`, `plugins/reflection-module/` — Context Cooler and Constraint Module pending |
 
 ---
@@ -953,7 +1095,7 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 | Context Cooler (APE) not started | Medium | Phase 45.5 | Volatile observation graduation to long-term memory |
 | `internal/ape/` low coverage | Medium | `docs/specs/test-coverage-baseline.md` | 0.0% coverage |
 | `internal/consulting/` low coverage | Low | Same | 0.0% coverage |
-| CRDT merge semantics undefined | Medium | Phase 35 | Need to finalize max-weight vs sum-evidence approach |
+| ~~CRDT merge semantics~~ | ✅ Fixed | Phase 35 | Implemented: max for weights, sum for evidence_count |
 
 ---
 
@@ -1010,4 +1152,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-06 — Phase 48.3-48.4 (Data Transmission & Connection Pooling) completed.*
+*Last updated: 2026-02-07 — Phase 60 (CMS Advanced II) complete with 15 UATS specs (100% pass rate). Next priority: Phase 51 (Web Scraper).*

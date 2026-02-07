@@ -1,0 +1,47 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Get CMS Template by ID",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "templates",
+      "read",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates Get Template by ID endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "3fbe9d7ef17139b9b879a977454eb0156519d1dea414f39577a8c47e553ecabe"
+  },
+  "variables": {
+    "test_space": "uats-templates-test",
+    "test_template_id": "task_handoff"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/conversation/templates/{{test_template_id}}",
+    "query": {
+      "space_id": "{{test_space}}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": [
+      200,
+      404
+    ],
+    "body_assertions": []
+  }
+}

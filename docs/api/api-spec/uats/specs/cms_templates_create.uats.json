@@ -1,0 +1,83 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Create CMS Template",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "templates",
+      "write",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates Create Template endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "f387baf7e782ca97c3ca786d3418ab8e8c8ee652cf4249d5699c0299ad8ea3ec"
+  },
+  "variables": {
+    "test_space": "uats-templates-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/templates",
+    "body": {
+      "space_id": "{{test_space}}",
+      "name": "UATS Test Template",
+      "description": "Template created by UATS",
+      "obs_type": "learning",
+      "schema": {
+        "type": "object",
+        "required": [
+          "topic"
+        ],
+        "properties": {
+          "topic": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 201,
+    "body_assertions": [
+      {
+        "path": "$.template_id",
+        "type": "string"
+      },
+      {
+        "path": "$.space_id",
+        "operator": "equals",
+        "value": "{{test_space}}"
+      },
+      {
+        "path": "$.name",
+        "operator": "equals",
+        "value": "UATS Test Template"
+      },
+      {
+        "path": "$.schema",
+        "type": "object"
+      },
+      {
+        "path": "$.created_at",
+        "type": "string"
+      }
+    ]
+  }
+}

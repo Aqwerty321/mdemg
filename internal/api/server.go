@@ -67,6 +67,11 @@ type Server struct {
 
 	// Phase 48.4: Connection pooling components
 	memoryPressure *backpressure.MemoryPressure
+
+	// Phase 60: CMS Advanced II
+	templateService  *conversation.TemplateService
+	snapshotService  *conversation.SnapshotService
+	orgReviewService *conversation.OrgReviewService
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -278,6 +283,9 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		cbRegistry:              cbRegistry,
 		metricsRegistry:         metricsRegistry,
 		memoryPressure:          memPressure,
+		templateService:         conversation.NewTemplateService(driver),
+		snapshotService:         conversation.NewSnapshotService(driver),
+		orgReviewService:        conversation.NewOrgReviewService(driver),
 	}
 }
 
@@ -753,6 +761,22 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversation/volatile/stats", s.handleVolatileStats)
 	mux.HandleFunc("/v1/conversation/graduate", s.handleProcessGraduations)
 	mux.HandleFunc("/v1/conversation/session/health", s.handleSessionHealth)
+
+	// CMS Templates (Phase 60)
+	mux.HandleFunc("/v1/conversation/templates", s.handleTemplates)
+	mux.HandleFunc("/v1/conversation/templates/", s.handleTemplateByID)
+
+	// CMS Snapshots (Phase 60)
+	mux.HandleFunc("/v1/conversation/snapshot", s.handleSnapshots)
+	mux.HandleFunc("/v1/conversation/snapshot/latest", s.handleLatestSnapshot)
+	mux.HandleFunc("/v1/conversation/snapshot/cleanup", s.handleCleanupSnapshots)
+	mux.HandleFunc("/v1/conversation/snapshot/", s.handleSnapshotByID)
+
+	// CMS Org Reviews (Phase 60)
+	mux.HandleFunc("/v1/conversation/org-reviews", s.handleListOrgReviews)
+	mux.HandleFunc("/v1/conversation/org-reviews/stats", s.handleOrgReviewStats)
+	mux.HandleFunc("/v1/conversation/org-reviews/", s.handleOrgReviewDecision)
+	mux.HandleFunc("/v1/conversation/observations/", s.handleFlagForOrgReview)
 
 	// Linear CRUD endpoints (Phase 4)
 	mux.HandleFunc("/v1/linear/issues", s.handleLinearIssues)

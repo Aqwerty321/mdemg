@@ -256,6 +256,48 @@ func normalizeType(t string) string {
 
 // runJSONMode parses a single file and outputs UPTS-compatible JSON to stdout
 func runJSONMode(filePath string) {
+	// For C/C++/CUDA files, prefer the ingest-codebase parser over tree-sitter
+	// because the ingest-codebase parser has better accuracy for these languages
+	ext := strings.ToLower(filepath.Ext(filePath))
+	preferIngestParser := ext == ".c" || ext == ".h" || ext == ".cpp" || ext == ".cc" ||
+		ext == ".cxx" || ext == ".hpp" || ext == ".hh" || ext == ".hxx" ||
+		ext == ".cu" || ext == ".cuh"
+
+	// Try ingest-codebase parser first for C/C++/CUDA
+	if preferIngestParser {
+		if parser, found := languages.GetParserForFile(filePath); found {
+			absPath, _ := filepath.Abs(filePath)
+			dir := filepath.Dir(absPath)
+			elements, parseErr := parser.ParseFile(dir, absPath, true)
+			if parseErr == nil && len(elements) > 0 {
+				var allSymbols []UPTSSymbol
+				for _, elem := range elements {
+					for _, sym := range elem.Symbols {
+						uptsSymbol := UPTSSymbol{
+							Name:       sym.Name,
+							Type:       normalizeType(sym.Type),
+							Line:       sym.Line,
+							LineEnd:    sym.LineEnd,
+							Exported:   sym.Exported,
+							Parent:     sym.Parent,
+							Signature:  sym.Signature,
+							Value:      sym.Value,
+							DocComment: sym.DocComment,
+						}
+						allSymbols = append(allSymbols, uptsSymbol)
+					}
+				}
+				output := UPTSOutput{Symbols: allSymbols}
+				jsonBytes, jsonErr := json.MarshalIndent(output, "", "  ")
+				if jsonErr != nil {
+					log.Fatalf("Failed to marshal JSON: %v", jsonErr)
+				}
+				fmt.Println(string(jsonBytes))
+				return
+			}
+		}
+	}
+
 	cfg := symbols.ParserConfig{
 		IncludeDocComments: true,
 		EvaluateConstants:  true,

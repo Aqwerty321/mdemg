@@ -1,0 +1,47 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Delete CMS Template",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "templates",
+      "write",
+      "phase60"
+    ]
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-07",
+    "description": "Validates Delete Template endpoint for CMS Phase 60",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "sha256": "19ec5975e2325d0c23750dc6a7cb17705f160157b0a7549e68658d05bd3b2e80"
+  },
+  "variables": {
+    "test_space": "uats-templates-test",
+    "test_template_id": "uats-delete-test"
+  },
+  "request": {
+    "method": "DELETE",
+    "path": "/v1/conversation/templates/{{test_template_id}}",
+    "query": {
+      "space_id": "{{test_space}}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": [
+      204,
+      404
+    ],
+    "body_assertions": []
+  }
+}

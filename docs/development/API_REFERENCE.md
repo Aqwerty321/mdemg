@@ -12,6 +12,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Consolidation](#consolidation)
 - [Learning System](#learning-system)
 - [Conversation Memory](#conversation-memory)
+- [Skill Registry](#skill-registry-phase-48)
 - [Capability Gaps](#capability-gaps)
 - [Linear Integration](#linear-integration)
 - [Webhooks](#webhooks)
@@ -731,6 +732,95 @@ Manually trigger graduation processing for the Context Cooler.
   "tombstoned": 1,
   "remaining_volatile": 11,
   "decay_applied": 5
+}
+```
+
+---
+
+## Skill Registry (Phase 48)
+
+Skills are CMS pinned observations with `skill:<name>` tags. The Skill Registry API provides convenience endpoints for listing, recalling, and registering skills.
+
+### GET /v1/skills?space_id={space_id}
+
+List all registered skills discovered from pinned observations with `skill:*` tags.
+
+**Response:**
+```json
+{
+  "space_id": "mdemg-dev",
+  "skills": [
+    {
+      "name": "mdemg-api",
+      "description": "# CMS Endpoints (Conversation Memory System)...",
+      "sections": ["cms", "memory", "learning", "retrieval", "workflows", "system"],
+      "observation_count": 6
+    }
+  ],
+  "count": 1
+}
+```
+
+### POST /v1/skills/{name}/recall
+
+Recall skill content by tag. Uses direct Cypher query (not vector search) for reliable tag-based retrieval.
+
+**Request:**
+```json
+{
+  "space_id": "mdemg-dev",
+  "section": "cms",
+  "top_k": 10
+}
+```
+
+**Response:**
+```json
+{
+  "space_id": "mdemg-dev",
+  "skill": "mdemg-api",
+  "section": "cms",
+  "query": "skill mdemg-api instructions",
+  "results": [
+    {
+      "type": "conversation_observation",
+      "node_id": "abc-123",
+      "content": "# CMS Endpoints...",
+      "score": 1.0,
+      "layer": 0
+    }
+  ],
+  "debug": {"tag_filter": "skill:mdemg-api:cms", "observation_count": 1}
+}
+```
+
+### POST /v1/skills/{name}/register
+
+Register skill sections as pinned observations. Each section becomes a permanent, non-decaying observation with `skill:<name>` and `skill:<name>:<section>` tags.
+
+**Request:**
+```json
+{
+  "space_id": "mdemg-dev",
+  "session_id": "skill-registry",
+  "description": "MDEMG API reference",
+  "sections": [
+    {
+      "name": "cms",
+      "content": "# CMS Endpoints...",
+      "tags": ["api-reference"]
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "skill": "mdemg-api",
+  "space_id": "mdemg-dev",
+  "sections_created": 1,
+  "observation_ids": ["abc-123"]
 }
 ```
 

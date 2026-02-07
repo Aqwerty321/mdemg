@@ -1,0 +1,71 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Register Skill Sections",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "skills",
+      "register",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates that POST /v1/skills/{name}/register creates pinned observations for each section",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "109dbf98ec11124b94afb28073a9c2954487752b623a99488761d9f39d8beb5a"
+  },
+  "variables": {
+    "test_space": "uats-skills-register-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/skills/uats-reg-skill/register",
+    "body": {
+      "space_id": "{{test_space}}",
+      "session_id": "uats-session",
+      "description": "Test skill for UATS",
+      "sections": [
+        {
+          "name": "core",
+          "content": "This is the core section of the UATS test skill with instructions for testing."
+        },
+        {
+          "name": "reference",
+          "content": "This is the reference section of the UATS test skill with additional details."
+        }
+      ]
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.skill",
+        "type": "string"
+      },
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.sections_created",
+        "type": "number"
+      },
+      {
+        "path": "$.observation_ids",
+        "type": "array"
+      }
+    ]
+  }
+}

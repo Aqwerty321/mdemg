@@ -420,6 +420,14 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | GET | `/v1/self-improve/calibration` | Calibration metrics and confidence scores |
 | GET | `/v1/self-improve/health` | Watchdog status and health score |
 
+### Skill Registry (Phase 48)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/skills?space_id=X` | List registered skills (discovered from pinned observations) |
+| POST | `/v1/skills/{name}/recall` | Recall skill content by tag |
+| POST | `/v1/skills/{name}/register` | Register skill sections as pinned observations |
+
 ### Cleanup & Edge Consistency
 
 | Method | Endpoint | Description |

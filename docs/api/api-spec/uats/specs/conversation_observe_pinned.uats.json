@@ -1,0 +1,72 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Record Pinned Observation",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "observe",
+      "pinned",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates that pinned observations are created as permanent and non-decaying",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "3554a6512a2d64f0ce00e6eecbcea98710de84da5643b5712a358cbca50d5619"
+  },
+  "variables": {
+    "test_space": "uats-observe-pinned-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/observe",
+    "body": {
+      "space_id": "{{test_space}}",
+      "session_id": "uats-session-pinned",
+      "content": "Pinned observation from UATS - this should be permanent",
+      "obs_type": "decision",
+      "tags": [
+        "skill:uats-test",
+        "skill:uats-test:pinned"
+      ],
+      "pinned": true
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.obs_id",
+        "type": "string"
+      },
+      {
+        "path": "$.node_id",
+        "type": "string"
+      },
+      {
+        "path": "$.surprise_score",
+        "type": "number"
+      },
+      {
+        "path": "$.surprise_factors",
+        "type": "object"
+      },
+      {
+        "path": "$.summary",
+        "type": "string"
+      }
+    ]
+  }
+}

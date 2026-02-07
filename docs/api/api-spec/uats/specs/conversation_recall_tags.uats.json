@@ -1,0 +1,61 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Recall Memories with Tag Filter",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "recall",
+      "filter_tags",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates that recall endpoint supports filter_tags for tag-based filtering",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "5b2f62df87d2f69e57f72d174d4d30158fbb8105c3b0c9537a532d237af7db27"
+  },
+  "variables": {
+    "test_space": "uats-recall-tags-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/recall",
+    "body": {
+      "space_id": "{{test_space}}",
+      "query": "pinned skill instructions",
+      "top_k": 5,
+      "filter_tags": [
+        "skill:uats-test"
+      ]
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.query",
+        "type": "string"
+      },
+      {
+        "path": "$.results",
+        "type": "array"
+      }
+    ]
+  }
+}

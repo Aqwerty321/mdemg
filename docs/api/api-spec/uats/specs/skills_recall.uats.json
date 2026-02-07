@@ -1,0 +1,60 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Recall Skill Content",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "skills",
+      "recall",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates that POST /v1/skills/{name}/recall returns skill content via tag-filtered recall",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "6f367c28022cf2dc9bc900e20fc159efb1dee4e619de7080099b9908950a33a9"
+  },
+  "variables": {
+    "test_space": "uats-skills-recall-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/skills/uats-test-skill/recall",
+    "body": {
+      "space_id": "{{test_space}}",
+      "top_k": 5
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.skill",
+        "type": "string"
+      },
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.query",
+        "type": "string"
+      },
+      {
+        "path": "$.results",
+        "type": "array"
+      }
+    ]
+  }
+}

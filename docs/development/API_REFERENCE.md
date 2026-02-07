@@ -454,17 +454,42 @@ Trigger hidden layer creation (concept abstraction).
   "data": {
     "space_id": "my-project",
     "enabled": true,
+    "steps": {
+      "hidden":     { "nodes_created": 45, "nodes_updated": 0, "edges_created": 0 },
+      "concern":    { "nodes_created": 3,  "nodes_updated": 0, "edges_created": 8, "details": {"concerns": ["auth", "logging"]} },
+      "config":     { "nodes_created": 1,  "nodes_updated": 0, "edges_created": 5 },
+      "comparison": { "nodes_created": 8,  "nodes_updated": 0, "edges_created": 12, "details": {"modules_compared": 4} },
+      "temporal":   { "nodes_created": 1,  "nodes_updated": 0, "edges_created": 3, "details": {"patterns_detected": ["validFrom/validTo"]} },
+      "ui":         { "nodes_created": 2,  "nodes_updated": 0, "edges_created": 6, "details": {"patterns_detected": ["store", "component"]} },
+      "constraint": { "nodes_created": 1,  "nodes_updated": 0, "edges_created": 1 }
+    },
     "hidden_nodes_created": 45,
-    "concept_nodes_created": 12,
-    "concern_nodes_created": 3,
-    "comparison_nodes_created": 8,
     "hidden_nodes_updated": 150,
+    "concept_nodes_created": 12,
+    "concept_nodes_merged": 0,
+    "concept_nodes_updated": 25,
     "edges_strengthened": 230,
     "summaries_generated": 57,
-    "duration_ms": 12500
+    "edges_refreshed": 0,
+    "duration_ms": 12500,
+    "concern_nodes_created": 3,
+    "concern_edges_created": 8,
+    "config_node_created": true,
+    "config_edges_created": 5,
+    "comparison_nodes_created": 8,
+    "comparison_edges_created": 12,
+    "temporal_node_created": true,
+    "temporal_edges_created": 3,
+    "ui_nodes_created": 2,
+    "ui_edges_created": 6,
+    "constraint_nodes_created": 1,
+    "constraint_nodes_updated": 0,
+    "constraint_edges_linked": 1
   }
 }
 ```
+
+> **Phase 46 (Dynamic Pipeline Registry):** The `steps` map is populated dynamically by the pipeline registry. Each registered `NodeCreator` step produces a `StepResult` entry keyed by step name. The flat fields (e.g., `concern_nodes_created`) are preserved for backward compatibility and populated from the same pipeline results. New steps added to the pipeline automatically appear in the `steps` map without API changes. See [REGISTRY.md](REGISTRY.md) for details.
 
 ---
 

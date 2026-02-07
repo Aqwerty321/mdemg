@@ -212,6 +212,23 @@ type Config struct {
 	GapAnalysisWindowHours int     // Time window for pattern analysis in hours (default: 24)
 	GapMetricsWindowSize   int     // Number of queries to keep in history (default: 1000)
 
+	// RSIC (Recursive Self-Improvement Cycle) settings (Phase 60b)
+	RSICMicroEnabled       bool    // RSIC_MICRO_ENABLED — enable per-request micro cycles (default: false)
+	RSICMesoPeriodHours    int     // RSIC_MESO_PERIOD_HOURS — hours between meso cycles (default: 6)
+	RSICMesoPeriodSessions int     // RSIC_MESO_PERIOD_SESSIONS — sessions between meso cycles (default: 10)
+	RSICMacroCron          string  // RSIC_MACRO_CRON — cron expression for macro cycles (default: "0 3 * * 0")
+	RSICMaxNodePrunePct    float64 // RSIC_MAX_NODE_PRUNE_PCT — max % of nodes a single action can prune (default: 0.05)
+	RSICMaxEdgePrunePct    float64 // RSIC_MAX_EDGE_PRUNE_PCT — max % of edges a single action can prune (default: 0.10)
+	RSICRollbackWindow     int     // RSIC_ROLLBACK_WINDOW — seconds to keep rollback snapshots (default: 3600)
+	RSICWatchdogEnabled    bool    // RSIC_WATCHDOG_ENABLED — enable decay watchdog (default: true)
+	RSICWatchdogCheckSec   int     // RSIC_WATCHDOG_CHECK_SEC — seconds between watchdog checks (default: 300)
+	RSICWatchdogDecayRate  float64 // RSIC_WATCHDOG_DECAY_RATE — decay score increase per hour without cycle (default: 0.1)
+	RSICNudgeThreshold     float64 // RSIC_NUDGE_THRESHOLD — decay score for nudge-level escalation (default: 0.3)
+	RSICWarnThreshold      float64 // RSIC_WARN_THRESHOLD — decay score for warn-level escalation (default: 0.6)
+	RSICForceThreshold     float64 // RSIC_FORCE_THRESHOLD — decay score for force-trigger escalation (default: 0.9)
+	RSICCalibrationDays    int     // RSIC_CALIBRATION_DAYS — days of history for calibration (default: 30)
+	RSICMinConfidence      float64 // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
+
 	// Data transmission optimization settings (Phase 10.3)
 	CompressionEnabled  bool // Enable gzip compression for responses (default: true)
 	CompressionMinSize  int  // Minimum response size in bytes to compress (default: 1024)
@@ -1084,6 +1101,59 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("GAP_METRICS_WINDOW_SIZE must be >= 100")
 	}
 
+	// RSIC settings (Phase 60b)
+	rsicMicroEnabled := getBool("RSIC_MICRO_ENABLED", false)
+	rsicMesoPeriodHours, err := atoi("RSIC_MESO_PERIOD_HOURS", 6)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicMesoPeriodSessions, err := atoi("RSIC_MESO_PERIOD_SESSIONS", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicMacroCron := get("RSIC_MACRO_CRON", "0 3 * * 0")
+	rsicMaxNodePrunePct, err := atof("RSIC_MAX_NODE_PRUNE_PCT", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicMaxEdgePrunePct, err := atof("RSIC_MAX_EDGE_PRUNE_PCT", 0.10)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicRollbackWindow, err := atoi("RSIC_ROLLBACK_WINDOW", 3600)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicWatchdogEnabled := getBool("RSIC_WATCHDOG_ENABLED", true)
+	rsicWatchdogCheckSec, err := atoi("RSIC_WATCHDOG_CHECK_SEC", 300)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicWatchdogDecayRate, err := atof("RSIC_WATCHDOG_DECAY_RATE", 0.1)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicNudgeThreshold, err := atof("RSIC_NUDGE_THRESHOLD", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicWarnThreshold, err := atof("RSIC_WARN_THRESHOLD", 0.6)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicForceThreshold, err := atof("RSIC_FORCE_THRESHOLD", 0.9)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicCalibrationDays, err := atoi("RSIC_CALIBRATION_DAYS", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicMinConfidence, err := atof("RSIC_MIN_CONFIDENCE", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// Data transmission optimization settings
 	compressionEnabled := getBool("COMPRESSION_ENABLED", true)
 	compressionMinSize, err := atoi("COMPRESSION_MIN_SIZE", 1024)
@@ -1524,6 +1594,23 @@ func FromEnv() (Config, error) {
 		EmbeddingOllamaBurst:      embeddingOllamaBurst,
 		MemoryPressureEnabled:     memoryPressureEnabled,
 		MemoryPressureThresholdMB: memoryPressureThresholdMB,
+
+		// Phase 60b: RSIC
+		RSICMicroEnabled:       rsicMicroEnabled,
+		RSICMesoPeriodHours:    rsicMesoPeriodHours,
+		RSICMesoPeriodSessions: rsicMesoPeriodSessions,
+		RSICMacroCron:          rsicMacroCron,
+		RSICMaxNodePrunePct:    rsicMaxNodePrunePct,
+		RSICMaxEdgePrunePct:    rsicMaxEdgePrunePct,
+		RSICRollbackWindow:     rsicRollbackWindow,
+		RSICWatchdogEnabled:    rsicWatchdogEnabled,
+		RSICWatchdogCheckSec:   rsicWatchdogCheckSec,
+		RSICWatchdogDecayRate:  rsicWatchdogDecayRate,
+		RSICNudgeThreshold:     rsicNudgeThreshold,
+		RSICWarnThreshold:      rsicWarnThreshold,
+		RSICForceThreshold:     rsicForceThreshold,
+		RSICCalibrationDays:    rsicCalibrationDays,
+		RSICMinConfidence:      rsicMinConfidence,
 	}, nil
 }
 

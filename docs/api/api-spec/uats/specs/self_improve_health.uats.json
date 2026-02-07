@@ -1,0 +1,43 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Self-Improve Health",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "self-improve",
+      "health"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates RSIC health/watchdog status endpoint",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "911eaef3b7c2cd5b768a5c58fcc4c38ee35966268ed460bdf201923999aeb1eb"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/self-improve/health"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.status",
+        "type": "string",
+        "value": "ok"
+      },
+      {
+        "path": "$.active_tasks",
+        "type": "integer"
+      }
+    ]
+  }
+}

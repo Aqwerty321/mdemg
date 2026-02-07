@@ -72,6 +72,11 @@ type Server struct {
 	templateService  *conversation.TemplateService
 	snapshotService  *conversation.SnapshotService
 	orgReviewService *conversation.OrgReviewService
+
+	// Phase 60b: RSIC (Recursive Self-Improvement Cycle)
+	rsicCycle    *ape.CycleOrchestrator
+	rsicWatchdog *ape.Watchdog
+	stopRSIC     chan struct{}
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -259,6 +264,35 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		log.Printf("Memory pressure monitoring enabled (threshold: %dMB)", cfg.MemoryPressureThresholdMB)
 	}
 
+	// Phase 60b: Initialize RSIC components
+	var rsicCycle *ape.CycleOrchestrator
+	var rsicWatchdog *ape.Watchdog
+
+	// Create adapters for RSIC interfaces
+	learnerAdapter := &rsicLearningAdapter{svc: lea}
+	var convAdapter *rsicConvAdapter
+	if ctxCooler != nil {
+		convAdapter = &rsicConvAdapter{cooler: ctxCooler}
+	}
+	hiddenAdapter := &rsicHiddenAdapter{svc: hid}
+
+	rsicAssessor := ape.NewAssessor(cfg, driver, learnerAdapter, convAdapter)
+	rsicReflector := ape.NewReflector(cfg, driver)
+	rsicPlanner := ape.NewPlanner(cfg)
+	rsicDispatcher := ape.NewDispatcher(driver, learnerAdapter, convAdapter, hiddenAdapter)
+	rsicMonitor := ape.NewMonitor(rsicDispatcher)
+	rsicCalibrator := ape.NewCalibrator(convAdapter)
+
+	// Watchdog and cycle orchestrator (watchdog trigger wired after cycle creation)
+	rsicWatchdog = ape.NewWatchdog(cfg, "mdemg-dev", nil)
+	rsicCycle = ape.NewCycleOrchestrator(cfg, rsicAssessor, rsicReflector, rsicPlanner, rsicDispatcher, rsicMonitor, rsicCalibrator, rsicWatchdog)
+	// Wire the watchdog's force-trigger to the cycle orchestrator
+	rsicWatchdog = ape.NewWatchdog(cfg, "mdemg-dev", func(ctx context.Context, spaceID string) {
+		_, _ = rsicCycle.RunCycle(ctx, spaceID, ape.TierMeso)
+	})
+	rsicCycle = ape.NewCycleOrchestrator(cfg, rsicAssessor, rsicReflector, rsicPlanner, rsicDispatcher, rsicMonitor, rsicCalibrator, rsicWatchdog)
+	log.Printf("RSIC initialized (watchdog=%v, micro=%v)", cfg.RSICWatchdogEnabled, cfg.RSICMicroEnabled)
+
 	return &Server{
 		cfg:             cfg,
 		driver:          driver,
@@ -286,6 +320,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		templateService:         conversation.NewTemplateService(driver),
 		snapshotService:         conversation.NewSnapshotService(driver),
 		orgReviewService:        conversation.NewOrgReviewService(driver),
+		rsicCycle:               rsicCycle,
+		rsicWatchdog:            rsicWatchdog,
 	}
 }
 
@@ -304,6 +340,7 @@ func (s *Server) Shutdown() {
 	s.StopContextCoolerProcessing()
 	s.StopWeeklyGapInterviews()
 	s.StopScheduledSync()
+	s.StopRSICWatchdog()
 }
 
 // StartFileWatchers starts file watchers based on configuration.
@@ -603,6 +640,20 @@ func (s *Server) StopScheduledSync() {
 	}
 }
 
+// StartRSICWatchdog starts the RSIC decay watchdog.
+func (s *Server) StartRSICWatchdog() {
+	if s.rsicWatchdog != nil {
+		s.rsicWatchdog.Start()
+	}
+}
+
+// StopRSICWatchdog stops the RSIC decay watchdog.
+func (s *Server) StopRSICWatchdog() {
+	if s.rsicWatchdog != nil {
+		s.rsicWatchdog.Stop()
+	}
+}
+
 // runScheduledSyncCheck queries all TapRoot nodes for staleness and triggers
 // incremental re-ingestion for stale spaces with configured repo paths.
 func (s *Server) runScheduledSyncCheck() {
@@ -777,6 +828,15 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversation/org-reviews/stats", s.handleOrgReviewStats)
 	mux.HandleFunc("/v1/conversation/org-reviews/", s.handleOrgReviewDecision)
 	mux.HandleFunc("/v1/conversation/observations/", s.handleFlagForOrgReview)
+
+	// RSIC (Recursive Self-Improvement Cycle) endpoints (Phase 60b)
+	mux.HandleFunc("/v1/self-improve/assess", s.handleSelfImproveAssess)
+	mux.HandleFunc("/v1/self-improve/report", s.handleSelfImproveReport)
+	mux.HandleFunc("/v1/self-improve/report/", s.handleSelfImproveReportByID)
+	mux.HandleFunc("/v1/self-improve/cycle", s.handleSelfImproveCycle)
+	mux.HandleFunc("/v1/self-improve/history", s.handleSelfImproveHistory)
+	mux.HandleFunc("/v1/self-improve/calibration", s.handleSelfImproveCalibration)
+	mux.HandleFunc("/v1/self-improve/health", s.handleSelfImproveHealth)
 
 	// Linear CRUD endpoints (Phase 4)
 	mux.HandleFunc("/v1/linear/issues", s.handleLinearIssues)

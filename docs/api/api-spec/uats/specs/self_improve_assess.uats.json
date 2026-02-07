@@ -1,0 +1,72 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Self-Improve Assess",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "self-improve",
+      "assess"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates RSIC self-assessment endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "f907be4597349fb0cf0d50cc5f640f91ecf7c1104ec881e1c8ed643e85524f77"
+  },
+  "variables": {
+    "test_space": "uats-rsic-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/self-improve/assess",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{test_space}}",
+      "tier": "meso"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.tier",
+        "type": "string"
+      },
+      {
+        "path": "$.overall_health",
+        "type": "number"
+      },
+      {
+        "path": "$.confidence",
+        "type": "number"
+      },
+      {
+        "path": "$.retrieval_quality",
+        "type": "number"
+      },
+      {
+        "path": "$.memory_health",
+        "type": "number"
+      },
+      {
+        "path": "$.edge_health",
+        "type": "number"
+      }
+    ]
+  }
+}

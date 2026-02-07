@@ -63,6 +63,9 @@ func main() {
 		srv.StartScheduledSync(time.Duration(cfg.SyncIntervalMinutes) * time.Minute)
 	}
 
+	// Start RSIC decay watchdog (Phase 60b)
+	srv.StartRSICWatchdog()
+
 	h := &http.Server{
 		Handler:           srv.Routes(),
 		ReadHeaderTimeout: 5 * time.Second,

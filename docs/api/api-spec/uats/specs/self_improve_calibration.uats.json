@@ -1,0 +1,38 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Self-Improve Calibration",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "self-improve",
+      "calibration"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates RSIC calibration data endpoint",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "6b016a479995e0651688392029bef37f7efff24bbf7b85b32a0b0a8ab427822e"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/self-improve/calibration"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.calibration",
+        "type": "object"
+      }
+    ]
+  }
+}

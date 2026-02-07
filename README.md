@@ -134,7 +134,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Multi-layer graph architecture**: Base observations (L0) → Hidden concepts (L1) → Abstract concepts (L2+)
 - **Hybrid search**: Combines vector similarity with graph traversal
 - **Conversation Memory System (CMS)**: Persistent memory across agent sessions with surprise-weighted learning
-- **Symbol extraction (UPTS)**: Unified Parser Test Schema supporting 30+ languages with file:line evidence
+- **Symbol extraction (UPTS)**: Unified Parser Test Schema supporting 26 languages with file:line evidence and SHA256 fixture verification
 - **Plugin system**: Extensible via ingestion, reasoning, and APE (Autonomous Pattern Extraction) modules
 - **Evidence-based retrieval**: Returns symbol-level citations (file:line references) with results
 - **Capability gap detection**: Identifies missing knowledge areas for targeted improvement
@@ -263,6 +263,16 @@ Install the post-commit hook to automatically ingest changes on every commit:
 | `/v1/conversation/correct` | POST | Record user corrections for learning |
 | `/v1/conversation/recall` | POST | Query conversation history |
 | `/v1/conversation/consolidate` | POST | Create themes from observations |
+| `/v1/conversation/templates` | GET/POST | List or create observation templates |
+| `/v1/conversation/templates/{id}` | GET/PUT/DELETE | CRUD for specific template |
+| `/v1/conversation/snapshot` | POST | Create session snapshot |
+| `/v1/conversation/snapshot/{id}` | GET/DELETE | Retrieve or delete snapshot |
+| `/v1/conversation/snapshot/{id}/restore` | POST | Restore session from snapshot |
+| `/v1/conversation/relevance` | POST | Compute observation relevance scores |
+| `/v1/conversation/truncate` | POST | Truncate old observations |
+| `/v1/conversation/org-review` | GET | Get observations pending org review |
+| `/v1/conversation/org-review/{id}/approve` | POST | Approve observation for org sharing |
+| `/v1/conversation/org-review/{id}/reject` | POST | Reject observation from org sharing |
 
 ### Learning Control
 
@@ -277,11 +287,11 @@ Install the post-commit hook to automatically ingest changes on every commit:
 
 MDEMG extracts code symbols during ingestion using the Unified Parser Test Schema (UPTS):
 
-**Supported Languages (25 UPTS-validated):**
+**Supported Languages (26 UPTS-validated, 100% pass rate):**
 - **Systems**: Go, Rust, C, C++, CUDA
 - **JVM**: Java, Kotlin
 - **.NET**: C#
-- **Scripting**: Python, TypeScript/JavaScript, Shell
+- **Scripting**: Python, TypeScript/JavaScript, Lua, Shell
 - **API Schemas**: Protocol Buffers, GraphQL, OpenAPI
 - **Configuration**: YAML, TOML, JSON, INI
 - **Infrastructure**: Terraform/HCL, Dockerfile, Makefile
@@ -405,30 +415,32 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 48.5 | Observability Stack (Prometheus/Grafana) | ✅ Complete |
+| 60 | CMS Advanced Functionality II (Templates, Snapshots, Relevance, Truncation, Org-Review) | ✅ Complete |
+| 49 | LLM Plugin SDK (Scaffolding, Validation, Gap Detection) | ✅ Complete |
+| 48.3-48.4 | Data Transmission & Connection Pooling | ✅ Complete |
+| 47 | Optimistic Lock Retry + Edge Consistency | ✅ Complete |
+| 37 | Agent Health / Heartbeat / Presence | ✅ Complete |
+| 38 | UNTS Hash Verification (Nash Verification) | ✅ Complete |
+| 35 | CRDT for Learned Edges + Space Lineage | ✅ Complete |
 | 34 | Incremental Sync (Delta Export) | ✅ Complete |
 | 46 | Symbol Indexing | ✅ Complete |
+| 48.5 | Observability Stack (Prometheus/Grafana) | ✅ Complete |
 
 ### In Progress / Next Up
 
 | Priority | Phase | Task | Description |
 |----------|-------|------|-------------|
-| 1 | 47 | Optimistic lock retry | Retry with backoff on concurrent updates |
-| 2 | 47 | Edge consistency | Re-run Hebbian learning on source changes |
-| 3 | 48.3 | Data transmission | gzip compression, cursor-based pagination |
-| 4 | 48.4 | Connection pooling | Neo4j pool tuning, pool metrics |
-| 5 | 49.4 | Plugin scaffolding | `mdemg plugin new <name> --type=<TYPE>` |
-| 6 | 35 | CRDT merge | Merge semantics for learned edges |
+| 1 | 45.5 | APE Context Cooler | Volatile → long-term memory graduation |
+| 2 | 45.5 | APE Constraint Module | Priority/deadline enforcement |
+| 3 | 51 | Web Scraper Ingestion | Browser automation for web content |
+| 4 | 50 | Public Readiness | Open source hardening |
 
 ### Planned
 
 | Phase | Name | Description |
 |-------|------|-------------|
-| 37 | Agent Health | Heartbeat, presence, agent status |
-| 38 | UNTS Hash Verification | Protected file integrity |
-| 44 | Linear Full CRUD | Issues, projects, comments + workflows |
-| 45.5 | APE Context Cooler | Volatile → long-term memory graduation |
-| 50 | Public Readiness | Open source hardening |
+| 36 | Observation Forwarding | Team-visible observations via DevSpace |
+| 50 | Public Readiness | Governance, security, CI/CD, onboarding |
 
 See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for detailed phase specifications.
 

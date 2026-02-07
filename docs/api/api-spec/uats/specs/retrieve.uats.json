@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "e50ed96454d6f45011e6190809c512740e6c92d7db893020e6c04195a05db26a"
+    "sha256": "a149e0a9e0f5a7e14edb8f5ce3b4d83637e85ce956aa89ce647e1079b8f979eb"
   },
   "variables": {
     "test_space": "demo"
@@ -49,12 +49,8 @@
         "type": "array"
       },
       {
-        "path": "$.evidence_metrics",
-        "type": "object"
-      },
-      {
-        "path": "$.debug",
-        "type": "object"
+        "path": "$.has_more",
+        "type": "boolean"
       }
     ]
   },

@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "24084d89aeec20938dd00d646f9e0d30788070e236ba6020b29cf203e3c017b9"
+    "sha256": "3778d61efc9b70f04cbe28519edcd8bc5fdd77bd9b3948f9af231faa09327237"
   },
   "variables": {
     "job_id": "nonexistent-job-id"

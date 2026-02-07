@@ -1,0 +1,17 @@
+{
+  "id": "context-cooler",
+  "name": "Context Cooler APE Module",
+  "version": "1.0.0",
+  "type": "APE",
+  "binary": "context-cooler",
+  "capabilities": {
+    "event_triggers": ["session_end", "consolidate"]
+  },
+  "health_check_interval_ms": 5000,
+  "startup_timeout_ms": 10000,
+  "config": {
+    "cron_expression": "*/30 * * * *",
+    "mdemg_endpoint": "http://localhost:9999",
+    "min_interval_seconds": "300"
+  }
+}

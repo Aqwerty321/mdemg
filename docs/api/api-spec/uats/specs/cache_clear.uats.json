@@ -21,35 +21,29 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": ""
+    "sha256": "3a3e250cd88a1e0307ac9b196ab9276217a6086d10edd8a62a072f3b7be3775b"
   },
   "variables": {
     "test_space": "demo"
   },
-  "tests": [
-    {
-      "name": "cache_clear_requires_confirmation",
-      "description": "Cache clear requires confirm=true parameter",
-      "request": {
-        "method": "DELETE",
-        "path": "/v1/memory/cache"
+  "request": {
+    "method": "DELETE",
+    "path": "/v1/memory/cache"
+  },
+  "expected": {
+    "status": 400,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "equals": "confirmation required"
       },
-      "expected": {
-        "status": 400,
-        "body_assertions": [
-          {
-            "path": "$.error",
-            "operator": "equals",
-            "value": "confirmation required"
-          },
-          {
-            "path": "$.message",
-            "operator": "contains",
-            "value": "confirm=true"
-          }
-        ]
+      {
+        "path": "$.message",
+        "contains": "confirm=true"
       }
-    },
+    ]
+  },
+  "variants": [
     {
       "name": "cache_clear_all",
       "description": "Clear all cache entries with confirmation",
@@ -62,12 +56,11 @@
         "body_assertions": [
           {
             "path": "$.message",
-            "operator": "equals",
-            "value": "All cache entries cleared"
+            "equals": "All cache entries cleared"
           },
           {
             "path": "$.entries_cleared",
-            "operator": "exists"
+            "exists": true
           }
         ]
       }
@@ -77,24 +70,22 @@
       "description": "Clear cache entries for a specific space",
       "request": {
         "method": "DELETE",
-        "path": "/v1/memory/cache?confirm=true&space_id=${test_space}"
+        "path": "/v1/memory/cache?confirm=true&space_id={{test_space}}"
       },
       "expected": {
         "status": 200,
         "body_assertions": [
           {
             "path": "$.message",
-            "operator": "equals",
-            "value": "Cache cleared for space"
+            "equals": "Cache cleared for space"
           },
           {
             "path": "$.space_id",
-            "operator": "equals",
-            "value": "${test_space}"
+            "equals": "{{test_space}}"
           },
           {
             "path": "$.entries_cleared",
-            "operator": "exists"
+            "exists": true
           }
         ]
       }

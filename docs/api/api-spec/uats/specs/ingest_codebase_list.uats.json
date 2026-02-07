@@ -24,7 +24,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "47be90bae80ae42fadc8afc17149526d144e120cc2067ed009d7d54487d5e6e4"
+    "sha256": "3d551032d54ff130f1fd857f97ddf077b7b4774bae718f814dc8b0d5a5f692ef"
   },
   "request": {
     "method": "GET",

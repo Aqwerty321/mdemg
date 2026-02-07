@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "7b76792975f83f5425da02efeec5f561a26eabd358b76fc8f82ddbfe824640b0"
+    "sha256": "2354a854b2dc1ac2055f165fd0ce75ba439dec45f8a28d32aa7162acb359400b"
   },
   "variables": {
     "test_space": "uats-freeze-test"

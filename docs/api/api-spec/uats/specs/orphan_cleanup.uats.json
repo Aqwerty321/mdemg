@@ -20,57 +20,56 @@
     "priority": "medium"
   },
   "config": {
-    "timeout_ms": 60000
+    "timeout_ms": 60000,
+    "sha256": "befbe438efa0c965047380cc4d1142c2547351e6d04d0606120866ba95fafbad"
   },
   "variables": {
     "test_space": "demo"
   },
-  "endpoints": [
-    {
-      "name": "list_orphans",
-      "request": {
-        "method": "POST",
-        "path": "/v1/memory/cleanup/orphans",
-        "headers": {
-          "Content-Type": "application/json"
-        },
-        "body": {
-          "space_id": "${test_space}",
-          "action": "list",
-          "limit": 10
-        }
-      },
-      "expected": {
-        "status": 200,
-        "body_assertions": [
-          {
-            "path": "$.space_id",
-            "type": "string",
-            "equals": "${test_space}"
-          },
-          {
-            "path": "$.orphans_found",
-            "type": "number"
-          },
-          {
-            "path": "$.orphans_acted",
-            "type": "number",
-            "equals": 0
-          },
-          {
-            "path": "$.action",
-            "type": "string",
-            "equals": "list"
-          },
-          {
-            "path": "$.orphans",
-            "type": "array"
-          }
-        ]
-      }
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/cleanup/orphans",
+    "headers": {
+      "Content-Type": "application/json"
     },
+    "body": {
+      "space_id": "{{test_space}}",
+      "action": "list",
+      "limit": 10
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string",
+        "equals": "{{test_space}}"
+      },
+      {
+        "path": "$.orphans_found",
+        "type": "number"
+      },
+      {
+        "path": "$.orphans_acted",
+        "type": "number",
+        "equals": 0
+      },
+      {
+        "path": "$.action",
+        "type": "string",
+        "equals": "list"
+      },
+      {
+        "path": "$.orphans",
+        "type": "array"
+      }
+    ]
+  },
+  "variants": [
     {
       "name": "count_orphans",
+      "description": "Count orphan nodes",
       "request": {
         "method": "POST",
         "path": "/v1/memory/cleanup/orphans",
@@ -78,7 +77,7 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "space_id": "${test_space}",
+          "space_id": "{{test_space}}",
           "action": "count"
         }
       },
@@ -99,6 +98,7 @@
     },
     {
       "name": "list_orphans_with_filters",
+      "description": "List orphans with age and path filters",
       "request": {
         "method": "POST",
         "path": "/v1/memory/cleanup/orphans",
@@ -106,7 +106,7 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "space_id": "${test_space}",
+          "space_id": "{{test_space}}",
           "action": "list",
           "limit": 10,
           "older_than_days": 7,
@@ -129,6 +129,7 @@
     },
     {
       "name": "dry_run_archive",
+      "description": "Dry run archive operation",
       "request": {
         "method": "POST",
         "path": "/v1/memory/cleanup/orphans",
@@ -136,7 +137,7 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "space_id": "${test_space}",
+          "space_id": "{{test_space}}",
           "action": "archive",
           "limit": 5,
           "dry_run": true
@@ -160,6 +161,7 @@
     },
     {
       "name": "schedule_cleanup",
+      "description": "Schedule periodic cleanup",
       "request": {
         "method": "POST",
         "path": "/v1/memory/cleanup/schedule",
@@ -167,7 +169,7 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "space_id": "${test_space}",
+          "space_id": "{{test_space}}",
           "interval_hours": 24,
           "action": "archive",
           "limit": 100
@@ -203,11 +205,12 @@
     },
     {
       "name": "cleanup_stats",
+      "description": "Get cleanup statistics",
       "request": {
         "method": "GET",
         "path": "/v1/memory/cleanup/stats",
-        "query_params": {
-          "space_id": "${test_space}"
+        "query": {
+          "space_id": "{{test_space}}"
         }
       },
       "expected": {
@@ -227,11 +230,10 @@
           }
         ]
       }
-    }
-  ],
-  "error_cases": [
+    },
     {
       "name": "missing_space_id",
+      "description": "Empty space_id returns 400 validation error",
       "request": {
         "method": "POST",
         "path": "/v1/memory/cleanup/orphans",
@@ -239,15 +241,23 @@
           "Content-Type": "application/json"
         },
         "body": {
+          "space_id": "",
           "action": "list"
         }
       },
       "expected": {
-        "status": 400
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "equals": "validation_failed"
+          }
+        ]
       }
     },
     {
       "name": "invalid_action",
+      "description": "Invalid action returns 400 validation error",
       "request": {
         "method": "POST",
         "path": "/v1/memory/cleanup/orphans",
@@ -255,16 +265,23 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "space_id": "${test_space}",
+          "space_id": "{{test_space}}",
           "action": "invalid"
         }
       },
       "expected": {
-        "status": 400
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "equals": "validation_failed"
+          }
+        ]
       }
     },
     {
       "name": "protected_space_delete",
+      "description": "Delete on protected space returns 403",
       "request": {
         "method": "POST",
         "path": "/v1/memory/cleanup/orphans",

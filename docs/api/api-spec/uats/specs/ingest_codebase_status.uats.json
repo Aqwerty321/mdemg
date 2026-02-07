@@ -28,7 +28,7 @@
       "$.stats.duration",
       "$.stats.rate"
     ],
-    "sha256": "fbc156eaac0a8de9179e29f7d946e72882146304517cff115d40d6c183e22e1a"
+    "sha256": "15815bff2dd7f296802fd2892f9e328733ddcf3ca2be623108eb8773ea058c43"
   },
   "variables": {
     "job_id": "nonexistent-job-id"

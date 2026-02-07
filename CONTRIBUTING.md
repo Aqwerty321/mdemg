@@ -124,6 +124,118 @@ When adding a new language parser or modifying an existing one:
 2. Run `make test-api-<endpoint>` to validate
 3. Install UATS dependencies: `make uats-setup`
 
+**UBTS (Universal Benchmark Test Specification)** defines performance benchmarks with latency thresholds and throughput requirements. Specs live in `docs/tests/ubts/specs/`. Profiles (smoke, load, stress) control test intensity.
+
+```bash
+# Run a smoke benchmark
+python docs/tests/ubts/runners/ubts_runner.py \
+  --spec docs/tests/ubts/specs/retrieve_latency.ubts.json \
+  --profile docs/tests/ubts/profiles/smoke.profile.json \
+  --base-url http://localhost:9999
+
+# Run all benchmarks with load profile
+python docs/tests/ubts/runners/ubts_runner.py \
+  --spec "docs/tests/ubts/specs/*.ubts.json" \
+  --profile docs/tests/ubts/profiles/load.profile.json
+```
+
+Key threshold metrics: `p50_ms`, `p95_ms`, `p99_ms`, `max_ms`, `error_rate_pct`, `throughput_rps`.
+
+**USTS (Universal Security Test Specification)** defines security tests mapped to OWASP Top 10 categories. Specs live in `docs/tests/usts/specs/`. Tests verify authentication, authorization, injection prevention, rate limiting, and data exposure.
+
+```bash
+# Run authentication tests
+python docs/tests/usts/runners/usts_runner.py \
+  --spec docs/tests/usts/specs/auth_required.usts.json \
+  --base-url http://localhost:9999
+
+# Run all security tests with API key
+python docs/tests/usts/runners/usts_runner.py \
+  --spec "docs/tests/usts/specs/*.usts.json" \
+  --api-key "$MDEMG_API_KEY"
+```
+
+Severity levels: `critical`/`high` (exit 2), `medium`/`low` (exit 1). Custom injection payloads in `docs/tests/usts/payloads/`.
+
+**UOBS (Universal Observability Specification)** validates metrics, health endpoints, tracing, and alerting. Specs live in `docs/tests/uobs/specs/`. Includes Prometheus alert rules and Grafana dashboard templates.
+
+```bash
+# Run metrics validation
+python docs/tests/uobs/runners/uobs_runner.py \
+  --spec docs/tests/uobs/specs/prometheus_metrics.uobs.json \
+  --base-url http://localhost:9999
+
+# Run all observability tests
+python docs/tests/uobs/runners/uobs_runner.py \
+  --spec "docs/tests/uobs/specs/*.uobs.json"
+```
+
+Required Prometheus metrics: `mdemg_http_requests_total`, `mdemg_http_request_duration_seconds`, `mdemg_retrieval_latency_seconds`, `mdemg_rate_limit_rejected_total`, `mdemg_circuit_breaker_state`, `mdemg_cache_hit_ratio`.
+
+**UAMS (Universal Auth Method Specification)** defines authentication method contracts that authenticators implement. Specs live in `docs/tests/uams/specs/`. Current methods: `none`, `apikey`, `jwt`, `saml`.
+
+```bash
+# Validate UAMS specs against schema
+npx ajv validate -s docs/tests/uams/schema/uams.schema.json \
+  -d "docs/tests/uams/specs/*.uams.json"
+
+# Run conformance tests
+go test ./internal/auth/... -run TestUAMS -v
+```
+
+Specs define credential extraction sources, validation algorithms (timing-safe), principal construction, and error response contracts.
+
+**UDTS (Universal DevSpace Test Specification)** validates gRPC services (Space Transfer, DevSpace Hub) against contract specs. Specs live in `docs/api/api-spec/udts/specs/`. Tests live in `tests/udts/`.
+
+```bash
+# Start the gRPC server
+go run ./cmd/space-transfer/ serve -port 50051
+
+# Run UDTS contract tests
+export UDTS_TARGET=localhost:50051
+go test ./tests/udts/... -v -count=1
+```
+
+Supports optional `proto_sha256` for contract stability verification.
+
+**UVTS (Universal Validation Test Specification)** defines semantic accuracy validation benchmarks for MDEMG retrieval quality. Specs live in `docs/tests/uvts/specs/`. Tests measure mean score, evidence quality, and category-specific performance.
+
+```bash
+# Run validation benchmark
+python docs/tests/uvts/runners/uvts_runner.py \
+  --spec docs/tests/uvts/specs/lnl_demo_validation.uvts.json \
+  --base-url http://localhost:9999
+```
+
+Thresholds: `mean_score`, `strong_evidence_pct`, `high_score_rate_pct`, `min_category_score`. Profiles: `quick` (16q), `standard` (40q), `full` (120q).
+
+**UNTS (Universal Hash Test Specification)** maintains a current and historical record of SHA-256 hash verification for all framework-protected files across UPTS, UATS, UBTS, USTS, UOBS, UAMS, and UDTS. Registry lives in `docs/specs/unts-registry.json`. Implementation is in `internal/unts/` with gRPC service defined in `api/proto/unts.proto`.
+
+```bash
+# Run UNTS Go unit tests
+go test ./internal/unts/... -v
+
+# UDTS contract tests for UNTS gRPC service
+export UDTS_TARGET=localhost:50051
+go test ./tests/udts/... -run TestUNTS -v
+```
+
+Core capabilities: `ListVerifiedFiles`, `GetFileStatus`, `GetHashHistory`, `VerifyNow`, `RevertToPreviousHash`, `UpdateHash`, `RegisterTrackedFile`. Each tracked file retains up to 3 historical hash values for revert. See `docs/specs/unts-hash-verification.md` for the full specification and `docs/specs/FRAMEWORK_GOVERNANCE.md` for governance context.
+
+### Universal Test Specification Summary
+
+| Framework | Purpose | Location |
+|-----------|---------|----------|
+| UPTS | Parser validation | `docs/lang-parser/lang-parse-spec/upts/` |
+| UATS | HTTP API contracts | `docs/api/api-spec/uats/` |
+| UBTS | Performance benchmarks | `docs/tests/ubts/` |
+| USTS | Security tests (OWASP) | `docs/tests/usts/` |
+| UOBS | Observability validation | `docs/tests/uobs/` |
+| UAMS | Auth method contracts | `docs/tests/uams/` |
+| UDTS | gRPC contract tests | `docs/api/api-spec/udts/`, `tests/udts/` |
+| UVTS | Semantic accuracy | `docs/tests/uvts/` |
+| UNTS | Hash verification | `internal/unts/`, `docs/specs/` |
+
 ### Dynamic Port Allocation
 
 The MDEMG server uses dynamic port allocation. When started, it writes the actual bound port to `.mdemg.port`. All test commands (`make test-api`, `make test-smoke`) read this file automatically. If the file doesn't exist, port `9999` is used as the fallback default.

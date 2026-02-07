@@ -19,7 +19,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "e1c2414f90816c5cfb4643e8d6413912f0dcb5e19f330bfcc9fabc0f6525a092"
+    "sha256": "60438bec4f8ba8f71432371d0784fe107a65d4035132b004dd7e0d4182b3c842"
   },
   "variables": {
     "test_space": "demo"
@@ -36,12 +36,12 @@
         "equals": "ready"
       },
       {
-        "path": "$.embedding_provider",
-        "type": "string"
+        "path": "$.checks",
+        "type": "object"
       },
       {
-        "path": "$.embedding_dimensions",
-        "type": "integer"
+        "path": "$.version",
+        "type": "string"
       }
     ]
   }

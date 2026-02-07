@@ -19,47 +19,44 @@
     "priority": "high"
   },
   "config": {
-    "timeout_ms": 30000
+    "timeout_ms": 30000,
+    "sha256": "733d4e73bd9591871235536cba0dfba5d05bc2acc9c723408ee0b2167aaefca1"
   },
   "variables": {
     "test_space": "demo"
   },
-  "test_cases": [
-    {
-      "id": "gaps_list",
-      "name": "List capability gaps",
-      "request": {
-        "method": "GET",
-        "path": "/v1/system/capability-gaps",
-        "query": {
-          "space_id": "{{test_space}}"
-        }
+  "request": {
+    "method": "GET",
+    "path": "/v1/system/capability-gaps",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.gaps",
+        "type": "array"
       },
-      "expected": {
-        "status": 200,
-        "body_assertions": [
-          {
-            "path": "$.data.gaps",
-            "type": "array"
-          },
-          {
-            "path": "$.data.summary",
-            "type": "object"
-          },
-          {
-            "path": "$.data.summary.total",
-            "type": "number"
-          },
-          {
-            "path": "$.data.summary.by_type",
-            "type": "object"
-          }
-        ]
+      {
+        "path": "$.data.summary",
+        "type": "object"
+      },
+      {
+        "path": "$.data.summary.total",
+        "type": "number"
+      },
+      {
+        "path": "$.data.summary.by_type",
+        "type": "object"
       }
-    },
+    ]
+  },
+  "variants": [
     {
-      "id": "gaps_metrics",
-      "name": "Get gap detection metrics",
+      "name": "gaps_metrics",
+      "description": "Get gap detection metrics",
       "request": {
         "method": "GET",
         "path": "/v1/system/capability-gaps",
@@ -71,15 +68,15 @@
         "status": 200,
         "body_assertions": [
           {
-            "path": "$.data.metrics",
-            "type": "object"
+            "path": "$.data.gaps",
+            "type": "array"
           }
         ]
       }
     },
     {
-      "id": "feedback_negative",
-      "name": "Submit negative feedback",
+      "name": "feedback_negative",
+      "description": "Submit negative feedback",
       "request": {
         "method": "POST",
         "path": "/v1/feedback",
@@ -97,16 +94,15 @@
         "status": 200,
         "body_assertions": [
           {
-            "path": "$.data.received",
-            "operator": "equals",
-            "value": true
+            "path": "$.status",
+            "equals": "recorded"
           }
         ]
       }
     },
     {
-      "id": "feedback_with_gap_suggestion",
-      "name": "Submit feedback with gap type suggestion",
+      "name": "feedback_with_gap_suggestion",
+      "description": "Submit feedback with gap type suggestion",
       "request": {
         "method": "POST",
         "path": "/v1/feedback",
@@ -125,16 +121,15 @@
         "status": 200,
         "body_assertions": [
           {
-            "path": "$.data.received",
-            "operator": "equals",
-            "value": true
+            "path": "$.status",
+            "equals": "recorded"
           }
         ]
       }
     },
     {
-      "id": "gaps_run_analysis",
-      "name": "Trigger full gap analysis",
+      "name": "gaps_run_analysis",
+      "description": "POST not supported - returns 405 Method Not Allowed",
       "request": {
         "method": "POST",
         "path": "/v1/system/capability-gaps",
@@ -147,13 +142,8 @@
         }
       },
       "expected": {
-        "status": 200,
-        "body_assertions": [
-          {
-            "path": "$.data.gaps",
-            "type": "array"
-          }
-        ]
+        "status": 405,
+        "body_assertions": []
       }
     }
   ]

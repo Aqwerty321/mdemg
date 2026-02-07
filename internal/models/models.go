@@ -535,6 +535,9 @@ type ObserveRequest struct {
 
 	// Cross-module linking (CMS v2)
 	RefersTo []string `json:"refers_to,omitempty"` // Node/symbol IDs this observation references
+
+	// Pinned Observations (Phase 47)
+	Pinned bool `json:"pinned,omitempty"` // When true, observation is permanent and non-decaying
 }
 
 // ObserveResponse - response from POST /v1/conversation/observe
@@ -754,6 +757,9 @@ type RecallRequest struct {
 	// Temporal filtering (Phase 1: Time-Aware Retrieval)
 	TemporalAfter  string `json:"temporal_after,omitempty"`  // ISO8601: filter results after this time
 	TemporalBefore string `json:"temporal_before,omitempty"` // ISO8601: filter results before this time
+
+	// Tag filtering (Phase 47: Pinned Observations)
+	FilterTags []string `json:"filter_tags,omitempty"` // Return only observations with ALL these tags
 }
 
 // RecallResponse - response from POST /v1/conversation/recall

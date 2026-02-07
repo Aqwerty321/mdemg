@@ -107,6 +107,34 @@ curl -s -X POST http://localhost:9999/v1/learning/unfreeze -H "Content-Type: app
 
 ---
 
+## Skill Registry (CMS-Backed)
+
+Skills are stored as pinned CMS observations. Thin skill files in `.claude/skills/` are pointers.
+
+### Using Skills
+When a skill triggers, recall its content from CMS:
+```bash
+curl -s -X POST http://localhost:9999/v1/skills/<name>/recall \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"mdemg-dev"}'
+```
+
+### Discovering Skills
+```bash
+curl -s "http://localhost:9999/v1/skills?space_id=mdemg-dev"
+```
+
+### Creating New Skills
+1. Register sections: POST /v1/skills/<name>/register with sections array
+2. Create thin skill file in .claude/skills/<name>.md (trigger conditions + recall command)
+3. Verify: GET /v1/skills?space_id=mdemg-dev
+
+### Without CMS, Skills Are Unavailable
+Skill files do NOT contain instructions — they contain recall commands.
+If CMS is unavailable, skills cannot function. This is by design.
+
+---
+
 ## Git Workflow
 
 ### Development Branch: `mdemg-dev01`

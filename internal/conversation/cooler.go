@@ -209,6 +209,7 @@ func (c *ContextCooler) ApplyDecay(ctx context.Context, spaceID string) (int, er
 			MATCH (n:MemoryNode {space_id: $spaceId})
 			WHERE n.role_type = 'conversation_observation'
 			  AND coalesce(n.volatile, false) = true
+			  AND NOT coalesce(n.pinned, false)
 			  AND n.updated_at < datetime() - duration({hours: 24})
 			WITH n,
 			     duration.between(n.updated_at, datetime()).days as daysInactive,
@@ -261,6 +262,7 @@ func (c *ContextCooler) ProcessGraduations(ctx context.Context, spaceID string) 
 			MATCH (n:MemoryNode {space_id: $spaceId})
 			WHERE n.role_type = 'conversation_observation'
 			  AND coalesce(n.volatile, true) = true
+			  AND NOT coalesce(n.pinned, false)
 			  AND coalesce(n.stability_score, 0.1) >= $graduationThreshold
 			SET n.volatile = false,
 			    n.graduated_at = datetime(),
@@ -293,6 +295,7 @@ func (c *ContextCooler) ProcessGraduations(ctx context.Context, spaceID string) 
 			MATCH (n:MemoryNode {space_id: $spaceId})
 			WHERE n.role_type = 'conversation_observation'
 			  AND coalesce(n.volatile, true) = true
+			  AND NOT coalesce(n.pinned, false)
 			  AND n.created_at < datetime($windowCutoff)
 			  AND coalesce(n.stability_score, 0.1) < $tombstoneThreshold` + constraintExclusion + `
 			SET n.is_archived = true,

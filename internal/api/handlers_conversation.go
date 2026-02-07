@@ -49,6 +49,7 @@ func (s *Server) handleObserve(w http.ResponseWriter, r *http.Request) {
 		Visibility: req.Visibility,
 		AgentID:    req.AgentID,
 		RefersTo:   req.RefersTo,
+		Pinned:     req.Pinned,
 	}
 
 	resp, err := s.conversationSvc.Observe(r.Context(), internalReq)
@@ -246,6 +247,7 @@ func (s *Server) handleRecall(w http.ResponseWriter, r *http.Request) {
 		AgentID:          req.AgentID,
 		TemporalAfter:    req.TemporalAfter,
 		TemporalBefore:   req.TemporalBefore,
+		FilterTags:       req.FilterTags,
 	}
 
 	resp, err := s.conversationSvc.Recall(r.Context(), internalReq)

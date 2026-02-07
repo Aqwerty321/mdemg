@@ -284,6 +284,7 @@ Phases are organized into **numbered series** to group related work:
 | — (RSIC) | **Phase 60b** | Recursive Self-Improvement Cycle | ✅ Complete |
 | — (Constraint Nodes) | **Phase 45.5** | Constraint Detection & Consolidation | ✅ Complete |
 | — (Pipeline Registry) | **Phase 46-PR** | Dynamic Pipeline Registry | ✅ Complete |
+| — (Skill Registry) | **Phase 48-SR** | CMS Skill Registry API | ✅ Complete |
 
 ---
 
@@ -985,6 +986,35 @@ RSIC_MIN_CONFIDENCE_THRESHOLD=0.3     # below this, action type is deprioritized
 
 ---
 
+### Phase 48-SR: CMS Skill Registry API ✅
+
+**Status:** Complete
+**Priority:** High (structural dependency for all CMS-backed skills)
+
+**What it does:** Standardizes skill creation/recall as a first-class API surface. Skills are CMS pinned observations with `skill:<name>` tags. Thin skill files in `.claude/skills/` are pointers that recall from CMS. Without CMS, skills cannot function.
+
+**Key Files:**
+| File | Description |
+|------|-------------|
+| `internal/api/handlers_skills.go` | List, recall, and register handlers |
+
+**Endpoints:**
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/skills?space_id=X` | List registered skills (from pinned observations) |
+| `POST` | `/v1/skills/{name}/recall` | Recall skill content by tag (direct Cypher) |
+| `POST` | `/v1/skills/{name}/register` | Register skill sections as pinned observations |
+
+**Design decisions:**
+- Recall uses direct Cypher query (not vector search) for reliable tag-based retrieval
+- Register auto-sets `Pinned: true` on all skill observations (permanent, non-decaying)
+- Neo4j label is `MemoryNode` with `role_type='conversation_observation'`, NOT `ConversationObservation`
+- Migrated mdemg-api.md (519→23 lines) and create-plugin.md (931→23 lines) to CMS
+
+**UATS:** 133 variants, 132 passing (99.2%). 3 new specs: skills_list, skills_recall, skills_register.
+
+---
+
 ### Phase 51: Web Scraper Ingestion Module 📋
 
 **Status:** Approved
@@ -1453,6 +1483,7 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 | ~~Phase 60b RSIC not started~~ | ✅ Complete | `internal/ape/` | Implemented: 10 new files (types, assess, reflect, plan, spec, dispatch, monitor, calibration, watchdog, cycle), 7 API endpoints, 6 UATS specs. |
 | ~~Phase 45.5 Constraint Nodes~~ | ✅ Complete | `internal/hidden/constraint_nodes.go` | Constraint detection + promotion during consolidation. 2 new UATS specs. |
 | ~~Phase 46-PR Pipeline Registry~~ | ✅ Complete | `internal/hidden/pipeline.go` | Dynamic pipeline replaces 4-file shotgun surgery. 8 unit tests. See `docs/development/REGISTRY.md`. |
+| ~~Phase 48-SR Skill Registry~~ | ✅ Complete | `internal/api/handlers_skills.go` | 3 endpoints (list/recall/register), 3 UATS specs. Migrated 2 skill files (1,450→46 lines). |
 | Distribution Stats UATS failure | Low | `docs/api/api-spec/uats/specs/` | Nested response path `$.stats.*` not matching — pre-existing, not related to recent phases |
 | Obsidian module not started | Low | Phase 44/45 | Listed in roadmap but no implementation |
 | Context Cooler (APE) not started | Medium | Phase 45.5 | Volatile observation graduation to long-term memory |
@@ -1520,4 +1551,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-07 — 74 UATS specs, 128 variants, 127/128 passing (99.2%). Phase 45.5 (Constraint Nodes) and Phase 46-PR (Dynamic Pipeline Registry) complete. Pipeline registry eliminates 4-file shotgun surgery — new node types are a 2-file operation. See docs/development/REGISTRY.md.*
+*Last updated: 2026-02-07 — 79 UATS specs, 133 variants, 132/133 passing (99.2%). Phase 48-SR (Skill Registry API) complete: 3 endpoints, 3 UATS specs, 2 skill files migrated (1,450→46 lines). Skills are CMS pinned observations recalled by tag.*

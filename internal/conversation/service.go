@@ -91,6 +91,9 @@ type ObserveRequest struct {
 	// Structured Observations (Phase 60)
 	TemplateID     string         `json:"template_id,omitempty"`     // Template to use for structured observation
 	StructuredData map[string]any `json:"structured_data,omitempty"` // Template-validated data
+
+	// Pinned Observations (Phase 47)
+	Pinned bool `json:"pinned,omitempty"` // Create as permanent, non-decaying
 }
 
 // ObserveResponse is the response from capturing an observation
@@ -246,8 +249,9 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 		CreatedAt:       now,
 		UserID:          req.UserID,
 		Visibility:      visibility,
-		Volatile:        true, // New observations are volatile until reinforced
-		StabilityScore:  DefaultStabilityScore,
+		Volatile:        !req.Pinned, // Pinned observations are immediately permanent
+		StabilityScore:  pinnedStabilityScore(req.Pinned),
+		Pinned:          req.Pinned,
 		AgentID:         req.AgentID,
 		TemplateID:      req.TemplateID,
 		StructuredData:  req.StructuredData,
@@ -435,6 +439,7 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 				visibility: $visibility,
 				volatile: $volatile,
 				stability_score: $stabilityScore,
+				pinned: $pinned,
 				template_id: $templateId,
 				structured_data: $structuredData,
 				importance_score: $importanceScore,
@@ -495,6 +500,7 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 			"visibility":      string(visibility),
 			"volatile":        obs.Volatile,
 			"stabilityScore":  stabilityScore,
+			"pinned":          obs.Pinned,
 			"templateId":      obs.TemplateID,
 			"structuredData":  structuredDataStr,
 			"importanceScore": obs.ImportanceScore,
@@ -724,6 +730,14 @@ func (s *Service) updateSurpriseScore(ctx context.Context, nodeID string, score 
 }
 
 // generateSummary creates a brief summary from content (max 200 chars)
+// pinnedStabilityScore returns max stability for pinned observations, default otherwise.
+func pinnedStabilityScore(pinned bool) float64 {
+	if pinned {
+		return 1.0
+	}
+	return DefaultStabilityScore
+}
+
 func generateSummary(content string) string {
 	const maxLen = 200
 
@@ -855,6 +869,9 @@ type RecallRequest struct {
 	// Temporal filtering (Phase 1: Time-Aware Retrieval)
 	TemporalAfter  string `json:"temporal_after,omitempty"`  // ISO8601: filter results after this time
 	TemporalBefore string `json:"temporal_before,omitempty"` // ISO8601: filter results before this time
+
+	// Tag filtering (Phase 47: Pinned Observations)
+	FilterTags []string `json:"filter_tags,omitempty"`
 }
 
 // RecallResponse is the response from conversation recall
@@ -974,7 +991,7 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 	}
 
 	// Step 1: Find similar conversation observations (with visibility, agent, and temporal filtering)
-	obsResults, err := s.findSimilarObservations(ctx, req.SpaceID, req.RequestingUserID, req.AgentID, embedding, topK, temporalFilter, temporalParams)
+	obsResults, err := s.findSimilarObservations(ctx, req.SpaceID, req.RequestingUserID, req.AgentID, embedding, topK, temporalFilter, temporalParams, req.FilterTags)
 	if err != nil {
 		return nil, fmt.Errorf("find similar observations: %w", err)
 	}
@@ -1295,7 +1312,7 @@ LIMIT 10`
 }
 
 // findSimilarObservations finds observations similar to the query embedding
-func (s *Service) findSimilarObservations(ctx context.Context, spaceID, requestingUserID, agentID string, embedding []float32, topK int, temporalFilter string, temporalParams map[string]any) ([]RecallResult, error) {
+func (s *Service) findSimilarObservations(ctx context.Context, spaceID, requestingUserID, agentID string, embedding []float32, topK int, temporalFilter string, temporalParams map[string]any, filterTags []string) ([]RecallResult, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
@@ -1314,6 +1331,12 @@ func (s *Service) findSimilarObservations(ctx context.Context, spaceID, requesti
 		agentFilter = " AND node.agent_id = $agentId"
 	}
 
+	// Build tag filter (Phase 47: Pinned Observations)
+	tagFilter := ""
+	if len(filterTags) > 0 {
+		tagFilter = "\n  AND ALL(tag IN $filterTags WHERE tag IN coalesce(node.tags, []))"
+	}
+
 	// Use vector similarity search on conversation_observation nodes
 	cypher := fmt.Sprintf(`
 CALL db.index.vector.queryNodes('%s', $topK * 2, $embedding)
@@ -1321,12 +1344,12 @@ YIELD node, score
 WHERE node.space_id = $spaceId
   AND node.role_type = 'conversation_observation'
   AND node.layer = 0
-  AND NOT coalesce(node.is_archived, false)%s%s%s
+  AND NOT coalesce(node.is_archived, false)%s%s%s%s
 RETURN node.node_id AS nodeId, node.content AS content, node.summary AS summary,
        node.obs_type AS obsType, node.surprise_score AS surpriseScore,
        node.session_id AS sessionId, score
 ORDER BY score DESC
-LIMIT $topK`, s.vectorIndexName, visibilityFilter, agentFilter, temporalFilter)
+LIMIT $topK`, s.vectorIndexName, visibilityFilter, agentFilter, temporalFilter, tagFilter)
 
 	params := map[string]any{
 		"spaceId":          spaceID,
@@ -1337,6 +1360,9 @@ LIMIT $topK`, s.vectorIndexName, visibilityFilter, agentFilter, temporalFilter)
 	}
 	for k, v := range temporalParams {
 		params[k] = v
+	}
+	if len(filterTags) > 0 {
+		params["filterTags"] = filterTags
 	}
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {

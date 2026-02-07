@@ -850,6 +850,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/self-improve/calibration", s.handleSelfImproveCalibration)
 	mux.HandleFunc("/v1/self-improve/health", s.handleSelfImproveHealth)
 
+	// Skill Registry (Phase 48)
+	mux.HandleFunc("/v1/skills", s.handleSkills)
+	mux.HandleFunc("/v1/skills/", s.handleSkillOperation)
+
 	// Linear CRUD endpoints (Phase 4)
 	mux.HandleFunc("/v1/linear/issues", s.handleLinearIssues)
 	mux.HandleFunc("/v1/linear/issues/", s.handleLinearIssues)

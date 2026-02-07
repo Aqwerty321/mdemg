@@ -311,6 +311,22 @@ RSIC tracks the historical success rate of each action type. Actions that consis
 | GET | `/v1/self-improve/calibration` | Calibration metrics and confidence scores |
 | GET | `/v1/self-improve/health` | Watchdog status and health score |
 
+### Skill Registry (Phase 48)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/v1/skills?space_id=X` | List registered skills (discovered from pinned observations) |
+| POST | `/v1/skills/{name}/recall` | Recall skill content by tag (direct Cypher, not vector search) |
+| POST | `/v1/skills/{name}/register` | Register skill sections as pinned observations |
+
+Skills are CMS pinned observations with `skill:<name>` tags. Thin skill files in `.claude/skills/` are pointers that recall from CMS. Without CMS, skills cannot function.
+
+### Pinned Observations (Phase 47)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/v1/conversation/observe` | With `pinned: true` — permanent, non-decaying observation |
+
+Pinned observations bypass volatile graduation: they start permanent with stability 1.0. Used by the Skill Registry to store skill instructions.
+
 ## Architecture
 
 ### Storage (Neo4j)

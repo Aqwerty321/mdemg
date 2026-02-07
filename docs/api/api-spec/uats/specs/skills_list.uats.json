@@ -1,0 +1,52 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "List Registered Skills",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "skills",
+      "list",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates that GET /v1/skills returns registered skills from pinned observations",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "055697ce61098f706904748b602e550aa74ea3a885b98459fe0df236a19a1929"
+  },
+  "variables": {
+    "test_space": "uats-skills-test"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/skills?space_id={{test_space}}",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.skills",
+        "type": "array"
+      },
+      {
+        "path": "$.count",
+        "type": "number"
+      }
+    ]
+  }
+}

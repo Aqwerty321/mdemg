@@ -90,7 +90,7 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 
 ### Test Frameworks
 
-**UPTS (Universal Parser Test Specification)** validates 25 language parsers against JSON spec files. There are two runners:
+**UPTS (Universal Parser Test Specification)** validates 26 language parsers against JSON spec files with SHA256 fixture verification. There are two runners:
 
 1. **Go-native test harness** (`cmd/ingest-codebase/languages/upts_test.go`): Loads UPTS specs, parses fixtures through the actual Go parser, and validates output against expected symbols. No external dependencies — runs via standard `go test`. This is the primary validation method.
 
@@ -176,9 +176,11 @@ mdemg/
 │   ├── hidden/           # Hidden layer and concept abstraction
 │   ├── learning/         # Hebbian learning edges
 │   ├── embeddings/       # Embedding providers (OpenAI, Ollama)
-│   ├── conversation/     # Conversation Memory System (CMS)
+│   ├── conversation/     # Conversation Memory System (CMS) - templates, snapshots, relevance
 │   ├── symbols/          # Code symbol extraction
-│   └── plugins/          # Plugin system
+│   ├── optimistic/       # Optimistic locking with retry
+│   ├── backpressure/     # Memory pressure monitoring
+│   └── plugins/          # Plugin system (scaffold, validate)
 ├── migrations/           # Neo4j schema migrations (Cypher)
 ├── tests/                # Integration tests
 ├── scripts/              # Utility scripts
@@ -254,12 +256,24 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | POST | `/v1/conversation/consolidate` | Consolidate conversation themes |
 | GET | `/v1/conversation/volatile/stats` | Volatile memory stats |
 | POST | `/v1/conversation/graduate` | Graduate volatile to permanent |
+| GET/POST | `/v1/conversation/templates` | List or create observation templates |
+| * | `/v1/conversation/templates/{id}` | Template CRUD operations |
+| POST | `/v1/conversation/snapshot` | Create session snapshot |
+| * | `/v1/conversation/snapshot/{id}` | Snapshot operations (get/delete/restore) |
+| POST | `/v1/conversation/relevance` | Compute observation relevance scores |
+| POST | `/v1/conversation/truncate` | Truncate old observations |
+| GET | `/v1/conversation/org-review` | Get observations pending org review |
+| POST | `/v1/conversation/org-review/{id}/approve` | Approve for org sharing |
+| POST | `/v1/conversation/org-review/{id}/reject` | Reject from org sharing |
 
-### Cleanup
+### Cleanup & Edge Consistency
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/v1/memory/cleanup/orphans` | Detect/archive/delete orphaned nodes after re-ingestion |
+| POST | `/v1/memory/cleanup/schedule` | Schedule automated cleanup |
+| GET | `/v1/memory/edges/stale/stats` | Get stale edge statistics |
+| POST | `/v1/memory/edges/stale/refresh` | Trigger stale edge refresh |
 
 ### Webhooks
 
@@ -272,15 +286,19 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/v1/metrics` | Prometheus-style metrics |
+| GET | `/v1/prometheus` | Prometheus format metrics endpoint |
+| GET | `/v1/embedding/health` | Embedding provider health check |
 | GET | `/v1/modules` | List modules |
 | * | `/v1/modules/{id}` | Module sync |
 | * | `/v1/plugins` | Plugin operations |
+| POST | `/v1/plugins/create` | Create plugin from spec |
 | GET | `/v1/ape/status` | APE (Autonomous Prompt Evolution) status |
 | POST | `/v1/ape/trigger` | Trigger APE |
 | POST | `/v1/feedback` | Submit feedback |
 | GET | `/v1/system/capability-gaps` | List capability gaps |
 | GET | `/v1/system/gap-interviews` | Gap interview sessions |
 | GET | `/v1/system/pool-metrics` | Neo4j connection pool metrics |
+| GET | `/v1/jobs/{id}/stream` | SSE streaming for job progress |
 
 ## Reporting Issues
 

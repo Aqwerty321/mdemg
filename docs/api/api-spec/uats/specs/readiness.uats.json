@@ -19,7 +19,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "e1c2414f90816c5cfb4643e8d6413912f0dcb5e19f330bfcc9fabc0f6525a092"
+    "sha256": "9f5b27e3299321fc6e06987e50254fa7b469da95f48b4220fa35d059bb350c9b"
   },
   "variables": {
     "test_space": "demo"

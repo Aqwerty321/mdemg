@@ -20,7 +20,8 @@
     "priority": "medium"
   },
   "config": {
-    "timeout_ms": 30000
+    "timeout_ms": 30000,
+    "sha256": "0c5ebad491a5c0e23085f2e6aaa8457083d87d623da1045b95361ee221555159"
   },
   "variables": {
     "webhook_source": "github"
@@ -46,12 +47,18 @@
     }
   },
   "expected": {
-    "status": [200, 404],
+    "status": [
+      200,
+      404
+    ],
     "body_assertions": [
       {
         "path": "$.status",
         "type": "string",
-        "in": ["accepted", "ignored"],
+        "in": [
+          "accepted",
+          "ignored"
+        ],
         "optional": true
       }
     ],
@@ -104,7 +111,10 @@
         }
       },
       "expected": {
-        "status": [401, 404],
+        "status": [
+          401,
+          404
+        ],
         "notes": "Returns 401 if signature required but missing, 404 if source not configured"
       }
     }

@@ -19,47 +19,44 @@
     "priority": "high"
   },
   "config": {
-    "timeout_ms": 30000
+    "timeout_ms": 30000,
+    "sha256": "45378d9d6918e5c5cf944d7a1038ffa21ff450b6fb5a2438176ae5a36dc0bb91"
   },
   "variables": {
     "test_space": "demo"
   },
-  "test_cases": [
-    {
-      "id": "gaps_list",
-      "name": "List capability gaps",
-      "request": {
-        "method": "GET",
-        "path": "/v1/system/capability-gaps",
-        "query": {
-          "space_id": "{{test_space}}"
-        }
+  "request": {
+    "method": "GET",
+    "path": "/v1/system/capability-gaps",
+    "query": {
+      "space_id": "${test_space}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.gaps",
+        "type": "array"
       },
-      "expected": {
-        "status": 200,
-        "body_assertions": [
-          {
-            "path": "$.data.gaps",
-            "type": "array"
-          },
-          {
-            "path": "$.data.summary",
-            "type": "object"
-          },
-          {
-            "path": "$.data.summary.total",
-            "type": "number"
-          },
-          {
-            "path": "$.data.summary.by_type",
-            "type": "object"
-          }
-        ]
+      {
+        "path": "$.data.summary",
+        "type": "object"
+      },
+      {
+        "path": "$.data.summary.total",
+        "type": "number"
+      },
+      {
+        "path": "$.data.summary.by_type",
+        "type": "object"
       }
-    },
+    ]
+  },
+  "variants": [
     {
-      "id": "gaps_metrics",
-      "name": "Get gap detection metrics",
+      "name": "gaps_metrics",
+      "description": "Get gap detection metrics",
       "request": {
         "method": "GET",
         "path": "/v1/system/capability-gaps",
@@ -78,8 +75,8 @@
       }
     },
     {
-      "id": "feedback_negative",
-      "name": "Submit negative feedback",
+      "name": "feedback_negative",
+      "description": "Submit negative feedback",
       "request": {
         "method": "POST",
         "path": "/v1/feedback",
@@ -87,7 +84,7 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "space_id": "{{test_space}}",
+          "space_id": "${test_space}",
           "query_text": "how to integrate with slack",
           "is_negative": true,
           "comment": "No results found for Slack integration"
@@ -98,15 +95,14 @@
         "body_assertions": [
           {
             "path": "$.data.received",
-            "operator": "equals",
-            "value": true
+            "equals": true
           }
         ]
       }
     },
     {
-      "id": "feedback_with_gap_suggestion",
-      "name": "Submit feedback with gap type suggestion",
+      "name": "feedback_with_gap_suggestion",
+      "description": "Submit feedback with gap type suggestion",
       "request": {
         "method": "POST",
         "path": "/v1/feedback",
@@ -114,7 +110,7 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "space_id": "{{test_space}}",
+          "space_id": "${test_space}",
           "query_text": "import jira tickets",
           "is_negative": true,
           "comment": "Need Jira integration",
@@ -126,15 +122,14 @@
         "body_assertions": [
           {
             "path": "$.data.received",
-            "operator": "equals",
-            "value": true
+            "equals": true
           }
         ]
       }
     },
     {
-      "id": "gaps_run_analysis",
-      "name": "Trigger full gap analysis",
+      "name": "gaps_run_analysis",
+      "description": "Trigger full gap analysis",
       "request": {
         "method": "POST",
         "path": "/v1/system/capability-gaps",
@@ -142,7 +137,7 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "space_id": "{{test_space}}",
+          "space_id": "${test_space}",
           "run_analysis": true
         }
       },

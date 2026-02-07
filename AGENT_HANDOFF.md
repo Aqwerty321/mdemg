@@ -986,7 +986,30 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 
 ### UATS (Active)
 
-Located at `docs/api/api-spec/uats/specs/` — 40+ specs covering all HTTP endpoints. Runner: `docs/api/api-spec/uats/runners/uats_runner.py`.
+Located at `docs/api/api-spec/uats/specs/` — 66 specs covering all HTTP endpoints. Runner: `docs/api/api-spec/uats/runners/uats_runner.py`.
+
+**Current Status:** 66 specs, 118 variants, 88 passing (74.6%), 0 errors.
+
+**Hash Integrity:** All specs include SHA256 hashes (`config.sha256`). The runner verifies hashes on load (use `--skip-hash` to bypass during development).
+
+**Key Commands:**
+```bash
+# Run all UATS tests
+make test-api
+
+# Add/regenerate hashes after editing specs
+python3 docs/api/api-spec/uats/runners/uats_runner.py add-hashes --spec-dir docs/api/api-spec/uats/specs/
+
+# Verify hashes without running tests
+python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir docs/api/api-spec/uats/specs/
+```
+
+**Spec Format Requirements:**
+- Must have top-level `request` and `expected` fields (not `tests[]`, `test_cases[]`, or `endpoints[]`)
+- Additional test cases go in `variants[]` array
+- Body assertions use inline operators: `"equals"`, `"contains"`, `"type"`, `"exists"` (not `"operator": "equals", "value": ...`)
+- Query parameters use `"query"` key (not `"query_params"`)
+- Variables use `${var}` syntax (not `{{var}}`)
 
 ### UPTS (Active)
 
@@ -1090,7 +1113,7 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 |-------|----------|----------|-------|
 | ~~`TestScoringGolden`~~ | ✅ Fixed | `tests/integration/scoring_golden_test.go` | Updated target similarities to be above retrieval threshold |
 | ~~UOBS Prometheus metrics~~ | ✅ Fixed | `docs/tests/uobs/specs/prometheus_metrics.uobs.json` | All 10/10 metrics now passing |
-| UATS specs not all verified | Low | `docs/api/api-spec/uats/specs/` | 40+ specs exist but runner needs server |
+| ~~UATS specs not all verified~~ | ✅ Fixed | `docs/api/api-spec/uats/specs/` | 66 specs, 0 errors, 88/118 variants passing (74.6%). 4 structurally invalid specs fixed, 45 stale SHA256 hashes regenerated. |
 | Obsidian module not started | Low | Phase 44/45 | Listed in roadmap but no implementation |
 | Context Cooler (APE) not started | Medium | Phase 45.5 | Volatile observation graduation to long-term memory |
 | `internal/ape/` low coverage | Medium | `docs/specs/test-coverage-baseline.md` | 0.0% coverage |
@@ -1124,6 +1147,11 @@ UDTS_TARGET=localhost:50052 go test ./tests/udts/... -v
 python3 docs/tests/uobs/runners/uobs_runner.py --spec "docs/tests/uobs/specs/*.uobs.json"
 python3 docs/tests/uobs/runners/uobs_runner.py --spec docs/tests/uobs/specs/embedding_health.uobs.json
 
+# === UATS Tests ===
+make test-api                                         # Run all 66 UATS specs
+python3 docs/api/api-spec/uats/runners/uats_runner.py add-hashes --spec-dir docs/api/api-spec/uats/specs/
+python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir docs/api/api-spec/uats/specs/
+
 # === Health Endpoints ===
 curl http://localhost:9999/healthz                    # Liveness probe
 curl http://localhost:9999/readyz                     # Readiness probe
@@ -1152,4 +1180,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-07 — Phase 60 (CMS Advanced II) complete with 15 UATS specs (100% pass rate). Next priority: Phase 51 (Web Scraper).*
+*Last updated: 2026-02-07 — UATS framework fully operational: 66 specs, 0 errors, 88/118 variants passing (74.6%). Fixed 4 structurally invalid specs + 45 stale SHA256 hashes. Next priority: Phase 51 (Web Scraper).*

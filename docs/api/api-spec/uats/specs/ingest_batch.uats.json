@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "5eb7634345020c070e91d604e0692455287dfb09f722e9b934fbc7b8b3d5cb91"
+    "sha256": "2369dd9e5386d15811d1e2c6ecaf586b52b84ba2e291fe4e38047de63230b0ae"
   },
   "variables": {
     "test_space": "uats-batch-{{$timestamp}}"

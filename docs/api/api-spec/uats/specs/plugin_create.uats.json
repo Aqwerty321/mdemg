@@ -19,60 +19,55 @@
     "priority": "high"
   },
   "config": {
-    "timeout_ms": 30000
+    "timeout_ms": 30000,
+    "sha256": "b0b4637a00d478b6368bf13b3c1c0d2653ea7f7f0acf79f70cc95c1417309b34"
   },
-  "test_cases": [
-    {
-      "id": "plugin_create_ingestion",
-      "name": "Create INGESTION plugin scaffold",
-      "request": {
-        "method": "POST",
-        "path": "/v1/plugins/create",
-        "headers": {
-          "Content-Type": "application/json"
-        },
-        "body": {
-          "name": "Test Ingestion Plugin",
-          "type": "INGESTION",
-          "version": "1.0.0",
-          "description": "E2E test plugin"
-        }
-      },
-      "expected": {
-        "status": 201,
-        "body_assertions": [
-          {
-            "path": "$.data.plugin_id",
-            "operator": "equals",
-            "value": "test-ingestion-plugin"
-          },
-          {
-            "path": "$.data.files_created",
-            "type": "array"
-          },
-          {
-            "path": "$.data.files_created[?(@=='manifest.json')]",
-            "operator": "exists"
-          },
-          {
-            "path": "$.data.files_created[?(@=='main.go')]",
-            "operator": "exists"
-          },
-          {
-            "path": "$.data.files_created[?(@=='handler.go')]",
-            "operator": "exists"
-          },
-          {
-            "path": "$.data.validation.manifest_valid",
-            "operator": "equals",
-            "value": true
-          }
-        ]
-      }
+  "request": {
+    "method": "POST",
+    "path": "/v1/plugins/create",
+    "headers": {
+      "Content-Type": "application/json"
     },
+    "body": {
+      "name": "Test Ingestion Plugin",
+      "type": "INGESTION",
+      "version": "1.0.0",
+      "description": "E2E test plugin"
+    }
+  },
+  "expected": {
+    "status": 201,
+    "body_assertions": [
+      {
+        "path": "$.data.plugin_id",
+        "equals": "test-ingestion-plugin"
+      },
+      {
+        "path": "$.data.files_created",
+        "type": "array"
+      },
+      {
+        "path": "$.data.files_created[?(@=='manifest.json')]",
+        "exists": true
+      },
+      {
+        "path": "$.data.files_created[?(@=='main.go')]",
+        "exists": true
+      },
+      {
+        "path": "$.data.files_created[?(@=='handler.go')]",
+        "exists": true
+      },
+      {
+        "path": "$.data.validation.manifest_valid",
+        "equals": true
+      }
+    ]
+  },
+  "variants": [
     {
-      "id": "plugin_create_reasoning",
-      "name": "Create REASONING plugin scaffold",
+      "name": "plugin_create_reasoning",
+      "description": "Create REASONING plugin scaffold",
       "request": {
         "method": "POST",
         "path": "/v1/plugins/create",
@@ -90,20 +85,18 @@
         "body_assertions": [
           {
             "path": "$.data.plugin_id",
-            "operator": "equals",
-            "value": "test-reasoning-plugin"
+            "equals": "test-reasoning-plugin"
           },
           {
             "path": "$.data.validation.manifest_valid",
-            "operator": "equals",
-            "value": true
+            "equals": true
           }
         ]
       }
     },
     {
-      "id": "plugin_create_ape",
-      "name": "Create APE plugin scaffold",
+      "name": "plugin_create_ape",
+      "description": "Create APE plugin scaffold",
       "request": {
         "method": "POST",
         "path": "/v1/plugins/create",
@@ -121,20 +114,18 @@
         "body_assertions": [
           {
             "path": "$.data.plugin_id",
-            "operator": "equals",
-            "value": "test-ape-plugin"
+            "equals": "test-ape-plugin"
           },
           {
             "path": "$.data.validation.manifest_valid",
-            "operator": "equals",
-            "value": true
+            "equals": true
           }
         ]
       }
     },
     {
-      "id": "plugin_create_missing_name",
-      "name": "Reject plugin creation without name",
+      "name": "plugin_create_missing_name",
+      "description": "Reject plugin creation without name",
       "request": {
         "method": "POST",
         "path": "/v1/plugins/create",
@@ -150,15 +141,14 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "operator": "contains",
-            "value": "name"
+            "contains": "name"
           }
         ]
       }
     },
     {
-      "id": "plugin_create_missing_type",
-      "name": "Reject plugin creation without type",
+      "name": "plugin_create_missing_type",
+      "description": "Reject plugin creation without type",
       "request": {
         "method": "POST",
         "path": "/v1/plugins/create",
@@ -174,15 +164,14 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "operator": "contains",
-            "value": "type"
+            "contains": "type"
           }
         ]
       }
     },
     {
-      "id": "plugin_create_invalid_type",
-      "name": "Reject plugin creation with invalid type",
+      "name": "plugin_create_invalid_type",
+      "description": "Reject plugin creation with invalid type",
       "request": {
         "method": "POST",
         "path": "/v1/plugins/create",
@@ -199,8 +188,7 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "operator": "contains",
-            "value": "type"
+            "contains": "type"
           }
         ]
       }

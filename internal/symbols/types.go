@@ -105,12 +105,37 @@ type FileSymbols struct {
 	// Symbols is the list of extracted symbols.
 	Symbols []Symbol `json:"symbols"`
 
+	// Relationships is the list of extracted relationships (imports, calls, inheritance).
+	// Added in Phase 75A - tree-sitter query-based relationship extraction.
+	Relationships []Relationship `json:"relationships,omitempty"`
+
 	// ParseErrors contains any non-fatal parsing errors encountered.
 	ParseErrors []string `json:"parse_errors,omitempty"`
 
 	// ParsedAt is when the file was parsed.
 	ParsedAt time.Time `json:"parsed_at"`
 }
+
+// Relationship represents a code relationship extracted from AST queries.
+// Examples: imports, function calls, inheritance (extends/implements).
+type Relationship struct {
+	Source     string  `json:"source"`
+	Relation   string  `json:"relation"`
+	Target     string  `json:"target"`
+	SourceFile string  `json:"source_file"`
+	TargetFile string  `json:"target_file,omitempty"`
+	Line       int     `json:"line,omitempty"`
+	Confidence float64 `json:"confidence,omitempty"`
+	Tier       int     `json:"tier"`
+}
+
+// Relationship type constants
+const (
+	RelImports    = "IMPORTS"
+	RelExtends    = "EXTENDS"
+	RelImplements = "IMPLEMENTS"
+	RelCalls      = "CALLS"
+)
 
 // ParserConfig holds configuration for symbol extraction.
 type ParserConfig struct {

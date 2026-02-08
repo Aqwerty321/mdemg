@@ -87,6 +87,10 @@ type Server struct {
 	// Phase 70: Neo4j Backup & Restore
 	backupSvc       *backup.Service
 	backupScheduler *backup.Scheduler
+
+	// Phase 75: Relationship extraction
+	symbolParser   *symbols.Parser
+	symbolResolver *symbols.Resolver
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -147,7 +151,12 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 	// Initialize symbol store
 	symStore := symbols.NewStore(driver)
-	log.Printf("Symbol store initialized")
+	symParser, symParserErr := symbols.NewParser(symbols.ParserConfig{})
+	if symParserErr != nil {
+		log.Printf("WARNING: symbol parser init failed (relationship extraction disabled): %v", symParserErr)
+	}
+	symResolver := symbols.NewResolver(driver)
+	log.Printf("Symbol store initialized (parser + resolver for relationship extraction)")
 
 	// Initialize consulting service (Agent Consulting API)
 	cons := consulting.NewService(cfg, driver, ret, emb, symStore)
@@ -368,6 +377,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		pluginMgr:       pluginMgr,
 		apeScheduler:    apeSched,
 		symbolStore:     symStore,
+		symbolParser:    symParser,
+		symbolResolver:  symResolver,
 		consultant:      cons,
 		gapDetector:     gapDet,
 		gapInterviewer:  gapInt,
@@ -928,6 +939,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/backup/restore", s.handleBackupRestore)
 	mux.HandleFunc("/v1/backup/restore/status/", s.handleRestoreStatus)
 	mux.HandleFunc("/v1/backup/", s.handleBackupByID)
+
+	// Phase 75: Symbol Relationships
+	mux.HandleFunc("/v1/symbols/relationships", s.handleRelationshipStats)
+	mux.HandleFunc("/v1/symbols/", s.handleSymbolRelationships)
 
 	// Linear CRUD endpoints (Phase 4)
 	mux.HandleFunc("/v1/linear/issues", s.handleLinearIssues)

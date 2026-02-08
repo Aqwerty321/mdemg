@@ -421,7 +421,7 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		cypher := `
-			CREATE (n:MemoryNode {
+			CREATE (n:MemoryNode:ConversationObs {
 				node_id: $nodeId,
 				space_id: $spaceId,
 				role_type: 'conversation_observation',
@@ -1220,10 +1220,10 @@ func (s *Service) fetchRelatedThemes(ctx context.Context, spaceID, sessionID str
 		sessionFilter = " AND o.session_id = $sessionId"
 	}
 
-	// Find themes that have GENERALIZES edges from recent observations
+	// Find themes that have THEME_OF edges from recent observations
 	cypher := fmt.Sprintf(`
 MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})
-      -[:GENERALIZES]->(t:MemoryNode {space_id: $spaceId, role_type: 'conversation_theme'})
+      -[:THEME_OF]->(t:MemoryNode {space_id: $spaceId, role_type: 'conversation_theme'})
 WHERE o.layer = 0%s
 WITH t, count(o) AS memberCount
 RETURN DISTINCT t.node_id AS nodeId, t.name AS name, t.summary AS summary,

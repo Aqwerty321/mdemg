@@ -34,6 +34,7 @@ func (s *Service) buildPipeline() *Pipeline {
 	p.Register(&temporalStep{svc: s})    // phase 20
 	p.Register(&uiStep{svc: s})          // phase 20
 	p.Register(&constraintStep{svc: s})  // phase 20
+	p.Register(&emergentL5Step{svc: s})  // phase 30 — post-processing
 	return p
 }
 
@@ -316,7 +317,7 @@ func (s *Service) createHiddenNodeWithEdges(ctx context.Context, spaceID, name s
 	}
 
 	cypher := `
-CREATE (h:MemoryNode {
+CREATE (h:MemoryNode:HiddenPattern {
   space_id: $spaceId,
   node_id: randomUUID(),
   name: $name,
@@ -855,7 +856,7 @@ func (s *Service) createConceptNodeWithEdges(ctx context.Context, spaceID, name 
 	}
 
 	cypher := `
-CREATE (c:MemoryNode {
+CREATE (c:MemoryNode:Concept {
   space_id: $spaceId,
   node_id: randomUUID(),
   name: $name,
@@ -1270,6 +1271,28 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	}
 	result.BackwardPass = bwdResult
 
+	// Step 5: Dynamic edge creation for upper-layer concepts
+	if s.cfg.DynamicEdgesEnabled {
+		dynamicCreated, err := s.CreateDynamicEdges(ctx, spaceID)
+		if err != nil {
+			fmt.Printf("warning: dynamic edge creation failed: %v\n", err)
+		} else if dynamicCreated > 0 {
+			fmt.Printf("created %d dynamic edges for space %s\n", dynamicCreated, spaceID)
+		}
+		result.DynamicEdgesCreated = dynamicCreated
+	}
+
+	// Step 6: L5 Emergent layer
+	if s.cfg.L5EmergentEnabled {
+		l5Created, err := s.CreateL5EmergentNodes(ctx, spaceID)
+		if err != nil {
+			fmt.Printf("warning: L5 emergent layer failed: %v\n", err)
+		} else if l5Created > 0 {
+			fmt.Printf("created %d L5 emergent nodes for space %s\n", l5Created, spaceID)
+		}
+		result.L5NodesCreated = l5Created
+	}
+
 	result.TotalDuration = time.Since(start)
 	return result, nil
 }
@@ -1402,7 +1425,7 @@ WITH members, embeddings,
          reduce(sum = 0.0, emb IN embeddings | sum + emb[i]) / size(embeddings)
        ]
      ELSE null END AS centroid
-CREATE (c:MemoryNode {
+CREATE (c:MemoryNode:Concern {
   space_id: $spaceId,
   node_id: randomUUID(),
   name: $concernName,
@@ -1543,7 +1566,7 @@ WITH members, embeddings, categories,
          reduce(sum = 0.0, emb IN embeddings | sum + emb[i]) / size(embeddings)
        ]
      ELSE null END AS centroid
-CREATE (c:MemoryNode {
+CREATE (c:MemoryNode:ConfigPattern {
   space_id: $spaceId,
   node_id: randomUUID(),
   name: 'configuration',
@@ -1935,7 +1958,7 @@ func (s *Service) createComparisonNodeWithEdges(ctx context.Context, spaceID str
 
 	// Create comparison node and COMPARED_IN edges
 	createCypher := `
-CREATE (c:MemoryNode {
+CREATE (c:MemoryNode:Comparison {
   space_id: $spaceId,
   node_id: randomUUID(),
   name: $compName,
@@ -2579,8 +2602,9 @@ func (s *Service) CreateDynamicEdges(ctx context.Context, spaceID string) (int, 
 MATCH (a:MemoryNode {space_id: $spaceId}), (b:MemoryNode {space_id: $spaceId})
 WHERE a.layer >= 4 AND b.layer >= 4
   AND a.node_id < b.node_id
-  AND NOT (a)-[:DYNAMIC_EDGE]-(b)
+  AND NOT (a)-[:ANALOGOUS_TO|CONTRASTS_WITH|COMPOSES_WITH|INFLUENCES|SPECIALIZES|GENERALIZES_TO|BRIDGES]-(b)
   AND a.embedding IS NOT NULL AND b.embedding IS NOT NULL
+  AND size((a)--()) < $degreeCap AND size((b)--()) < $degreeCap
 WITH a, b,
      gds.similarity.cosine(a.embedding, b.embedding) AS sim
 WHERE sim > 0.3
@@ -2592,7 +2616,10 @@ ORDER BY sim DESC
 LIMIT 50`
 
 	pairs, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, findPairsCypher, map[string]any{"spaceId": spaceID})
+		res, err := tx.Run(ctx, findPairsCypher, map[string]any{
+			"spaceId":   spaceID,
+			"degreeCap": s.cfg.DynamicEdgeDegreeCap,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -2643,39 +2670,234 @@ LIMIT 50`
 	})
 
 	created := 0
+	// Group inferences by type for batched edge creation
+	grouped := make(map[string][]map[string]any)
 	for _, pair := range pairList {
 		inference := s.InferEdgeType(pair.Source, pair.Target, pair.Sim)
 
+		// Skip low-confidence inferences
+		if inference.Confidence < s.cfg.DynamicEdgeMinConfidence {
+			continue
+		}
+
+		edgeType := string(inference.InferredType)
+		grouped[edgeType] = append(grouped[edgeType], map[string]any{
+			"sourceId":   inference.SourceID,
+			"targetId":   inference.TargetID,
+			"confidence": inference.Confidence,
+			"evidence":   inference.Evidence,
+			"spaceId":    spaceID,
+		})
+	}
+
+	// Create edges per type using proper Neo4j relationship types (no APOC)
+	for edgeType, records := range grouped {
+		cypher := fmt.Sprintf(`
+UNWIND $rels AS rel
+MATCH (a:MemoryNode {space_id: rel.spaceId, node_id: rel.sourceId})
+MATCH (b:MemoryNode {space_id: rel.spaceId, node_id: rel.targetId})
+MERGE (a)-[r:%s {space_id: rel.spaceId}]->(b)
+ON CREATE SET
+    r.edge_id = randomUUID(),
+    r.weight = rel.confidence,
+    r.confidence = rel.confidence,
+    r.evidence = rel.evidence,
+    r.created_at = datetime(),
+    r.updated_at = datetime(),
+    r.inferred_at = datetime(),
+    r.evidence_count = 1,
+    r.version = 1,
+    r.status = 'active'
+ON MATCH SET
+    r.updated_at = datetime(),
+    r.evidence_count = r.evidence_count + 1,
+    r.confidence = CASE WHEN rel.confidence > r.confidence THEN rel.confidence ELSE r.confidence END
+`, edgeType)
+
+		_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			res, err := tx.Run(ctx, cypher, map[string]any{"rels": records})
+			if err != nil {
+				return nil, err
+			}
+			summary, _ := res.Consume(ctx)
+			if summary != nil {
+				created += summary.Counters().RelationshipsCreated()
+			}
+			return nil, nil
+		})
+		if err != nil {
+			fmt.Printf("warning: failed to create %s edges: %v\n", edgeType, err)
+		}
+	}
+
+	return created, nil
+}
+
+// CreateL5EmergentNodes creates L5 emergent concepts from L4 nodes
+// connected by high-evidence ANALOGOUS_TO or BRIDGES edges.
+// L5 represents meta-patterns spanning multiple L4 domains.
+func (s *Service) CreateL5EmergentNodes(ctx context.Context, spaceID string) (int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	minEvidence := s.cfg.L5BridgeEvidenceMin
+	if minEvidence < 1 {
+		minEvidence = 3
+	}
+
+	// Find clusters of L4 nodes connected by high-evidence ANALOGOUS_TO or BRIDGES
+	clusterCypher := `
+MATCH (a:MemoryNode {space_id: $spaceId, layer: 4})-[r:ANALOGOUS_TO|BRIDGES]->(b:MemoryNode {space_id: $spaceId, layer: 4})
+WHERE r.evidence_count >= $minEvidence
+  AND NOT EXISTS {
+    MATCH (a)-[:ABSTRACTS_TO]->(l5:MemoryNode {space_id: $spaceId, layer: 5})
+    WHERE (b)-[:ABSTRACTS_TO]->(l5)
+  }
+RETURN a.node_id AS sourceId, b.node_id AS targetId,
+       a.name AS sourceName, b.name AS targetName,
+       a.embedding AS sourceEmb, b.embedding AS targetEmb,
+       r.evidence_count AS evidence, type(r) AS relType
+ORDER BY evidence DESC
+LIMIT 20`
+
+	type l5Pair struct {
+		SourceID, TargetID     string
+		SourceName, TargetName string
+		SourceEmb, TargetEmb   []float64
+		Evidence               int
+		RelType                string
+	}
+
+	pairs, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, clusterCypher, map[string]any{
+			"spaceId":     spaceID,
+			"minEvidence": minEvidence,
+		})
+		if err != nil {
+			return nil, err
+		}
+		var pairs []l5Pair
+		for res.Next(ctx) {
+			rec := res.Record()
+			p := l5Pair{
+				SourceID:   asString(rec.Values[0]),
+				TargetID:   asString(rec.Values[1]),
+				SourceName: asString(rec.Values[2]),
+				TargetName: asString(rec.Values[3]),
+				Evidence:   asInt(rec.Values[6]),
+				RelType:    asString(rec.Values[7]),
+			}
+			if emb := rec.Values[4]; emb != nil {
+				p.SourceEmb = asFloat64Slice(emb)
+			}
+			if emb := rec.Values[5]; emb != nil {
+				p.TargetEmb = asFloat64Slice(emb)
+			}
+			pairs = append(pairs, p)
+		}
+		return pairs, res.Err()
+	})
+	if err != nil {
+		return 0, fmt.Errorf("L5 cluster query: %w", err)
+	}
+
+	pairList := pairs.([]l5Pair)
+	if len(pairList) == 0 {
+		return 0, nil
+	}
+
+	// Group connected components (simple union-find)
+	parent := make(map[string]string)
+	var find func(string) string
+	find = func(x string) string {
+		if parent[x] == "" || parent[x] == x {
+			parent[x] = x
+			return x
+		}
+		parent[x] = find(parent[x])
+		return parent[x]
+	}
+	union := func(a, b string) {
+		fa, fb := find(a), find(b)
+		if fa != fb {
+			parent[fa] = fb
+		}
+	}
+
+	nameMap := make(map[string]string)
+	for _, p := range pairList {
+		union(p.SourceID, p.TargetID)
+		nameMap[p.SourceID] = p.SourceName
+		nameMap[p.TargetID] = p.TargetName
+	}
+
+	// Build clusters
+	clusters := make(map[string][]string)
+	for id := range nameMap {
+		root := find(id)
+		clusters[root] = append(clusters[root], id)
+	}
+
+	created := 0
+	for _, members := range clusters {
+		if len(members) < 2 {
+			continue
+		}
+
+		// Build L5 node name from member names
+		names := make([]string, 0, len(members))
+		for _, m := range members {
+			if n, ok := nameMap[m]; ok && n != "" {
+				names = append(names, n)
+			}
+		}
+		l5Name := "Emergent: " + strings.Join(names, " ∩ ")
+		if len(l5Name) > 200 {
+			l5Name = l5Name[:200]
+		}
+
+		// Create L5 node + ABSTRACTS_TO edges from members
 		createCypher := `
-MATCH (a:MemoryNode {space_id: $spaceId, node_id: $sourceId})
-MATCH (b:MemoryNode {space_id: $spaceId, node_id: $targetId})
-CREATE (a)-[r:DYNAMIC_EDGE {
-  space_id: $spaceId,
-  edge_id: randomUUID(),
-  edge_type: $edgeType,
-  weight: $confidence,
-  confidence: $confidence,
-  evidence: $evidence,
-  created_at: datetime(),
-  inferred_at: datetime()
-}]->(b)
-RETURN r.edge_id`
+WITH $members AS memberIds, $name AS l5Name, $spaceId AS sid
+CREATE (l5:MemoryNode:EmergentConcept {
+    node_id: randomUUID(),
+    space_id: sid,
+    name: l5Name,
+    layer: 5,
+    role_type: 'emergent_concept',
+    created_at: datetime(),
+    updated_at: datetime(),
+    version: 1,
+    status: 'active'
+})
+WITH l5, memberIds
+UNWIND memberIds AS mid
+MATCH (m:MemoryNode {space_id: l5.space_id, node_id: mid})
+CREATE (m)-[:ABSTRACTS_TO {
+    space_id: l5.space_id,
+    edge_id: randomUUID(),
+    created_at: datetime(),
+    updated_at: datetime(),
+    weight: 1.0,
+    evidence_count: 1,
+    version: 1,
+    status: 'active'
+}]->(l5)
+RETURN l5.node_id AS l5Id`
 
 		_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 			_, err := tx.Run(ctx, createCypher, map[string]any{
-				"spaceId":    spaceID,
-				"sourceId":   inference.SourceID,
-				"targetId":   inference.TargetID,
-				"edgeType":   string(inference.InferredType),
-				"confidence": inference.Confidence,
-				"evidence":   inference.Evidence,
+				"members": members,
+				"name":    l5Name,
+				"spaceId": spaceID,
 			})
 			return nil, err
 		})
-
-		if err == nil {
-			created++
+		if err != nil {
+			fmt.Printf("warning: failed to create L5 node: %v\n", err)
+			continue
 		}
+		created++
 	}
 
 	return created, nil
@@ -2827,7 +3049,7 @@ WITH members, embeddings, categories,
          reduce(sum = 0.0, emb IN embeddings | sum + emb[i]) / size(embeddings)
        ]
      ELSE null END AS centroid
-CREATE (t:MemoryNode {
+CREATE (t:MemoryNode:TemporalPattern {
   space_id: $spaceId,
   node_id: randomUUID(),
   name: 'temporal-patterns',
@@ -3052,7 +3274,7 @@ WITH members, embeddings,
          reduce(sum = 0.0, emb IN embeddings | sum + emb[i]) / size(embeddings)
        ]
      ELSE null END AS centroid
-CREATE (u:MemoryNode {
+CREATE (u:MemoryNode:UIPattern {
   space_id: $spaceId,
   node_id: randomUUID(),
   name: $patternName,
@@ -3290,12 +3512,12 @@ func (s *Service) fetchOrphanConversationObservations(ctx context.Context, space
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
-	// Query for conversation_observation nodes that don't have a GENERALIZES edge to a theme
+	// Query for conversation_observation nodes that don't have a THEME_OF edge to a theme
 	var cypher string
 	if s.cfg.HiddenLayerBatchSize > 0 {
 		cypher = fmt.Sprintf(`
 MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation', layer: 0})
-WHERE NOT (o)-[:GENERALIZES]->(:MemoryNode {role_type: 'conversation_theme'})
+WHERE NOT (o)-[:THEME_OF]->(:MemoryNode {role_type: 'conversation_theme'})
   AND o.embedding IS NOT NULL
 RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
        o.summary AS summary, o.embedding AS embedding, o.surprise_score AS surpriseScore,
@@ -3304,7 +3526,7 @@ LIMIT %d`, s.cfg.HiddenLayerBatchSize)
 	} else {
 		cypher = `
 MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation', layer: 0})
-WHERE NOT (o)-[:GENERALIZES]->(:MemoryNode {role_type: 'conversation_theme'})
+WHERE NOT (o)-[:THEME_OF]->(:MemoryNode {role_type: 'conversation_theme'})
   AND o.embedding IS NOT NULL
 RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
        o.summary AS summary, o.embedding AS embedding, o.surprise_score AS surpriseScore,
@@ -3389,7 +3611,7 @@ func (s *Service) createConversationThemeWithEdges(ctx context.Context, spaceID,
 	}
 
 	cypher := `
-CREATE (t:MemoryNode {
+CREATE (t:MemoryNode:ConversationTheme {
   space_id: $spaceId,
   node_id: randomUUID(),
   name: $name,
@@ -4410,7 +4632,7 @@ func (s *Service) createEmergentConceptWithEdges(ctx context.Context, spaceID, n
 	}
 
 	cypher := `
-CREATE (c:MemoryNode {
+CREATE (c:MemoryNode:EmergentConcept {
   space_id: $spaceId,
   node_id: randomUUID(),
   name: $name,

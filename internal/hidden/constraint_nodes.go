@@ -154,7 +154,7 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 					now := time.Now().UTC().Format(time.RFC3339)
 
 					createCypher := `
-						CREATE (c:MemoryNode {
+						CREATE (c:MemoryNode:Constraint {
 							space_id: $spaceId,
 							node_id: $nodeId,
 							role_type: 'constraint',
@@ -190,7 +190,7 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 
 					if len(embParam) > 0 {
 						createCypher = `
-							CREATE (c:MemoryNode {
+							CREATE (c:MemoryNode:Constraint {
 								space_id: $spaceId,
 								node_id: $nodeId,
 								role_type: 'constraint',

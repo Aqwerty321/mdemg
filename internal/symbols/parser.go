@@ -22,9 +22,10 @@ import (
 
 // Parser extracts symbols from source code files using tree-sitter.
 type Parser struct {
-	config    ParserConfig
-	tsParser  *sitter.Parser
-	languages map[Language]*sitter.Language
+	config      ParserConfig
+	tsParser    *sitter.Parser
+	languages   map[Language]*sitter.Language
+	queryEngine *QueryEngine
 }
 
 // NewParser creates a new symbol parser with the given configuration.
@@ -45,6 +46,13 @@ func NewParser(config ParserConfig) (*Parser, error) {
 	p.languages[LangCPP] = cpp.GetLanguage()
 	p.languages[LangCUDA] = cpp.GetLanguage() // CUDA uses C++ grammar
 	p.languages[LangJava] = java.GetLanguage()
+
+	// Initialize query engine for relationship extraction (Phase 75A)
+	qe, err := NewQueryEngine(p.languages)
+	if err != nil {
+		log.Printf("WARN: query engine init failed: %v (relationship extraction disabled)", err)
+	}
+	p.queryEngine = qe
 
 	return p, nil
 }
@@ -148,6 +156,11 @@ func (p *Parser) ParseContent(ctx context.Context, filePath string, lang Languag
 				fmt.Sprintf("truncated at %d symbols (max limit)", p.config.MaxSymbolsPerFile))
 			break
 		}
+	}
+
+	// Extract relationships using tree-sitter queries (Phase 75A)
+	if p.queryEngine != nil {
+		result.Relationships = p.queryEngine.ExtractRelationships(lang, tree.RootNode(), content, filePath)
 	}
 
 	return result, nil

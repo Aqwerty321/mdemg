@@ -502,6 +502,13 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | POST | `/v1/backup/restore` | Trigger restore from full backup |
 | GET | `/v1/backup/restore/status/{id}` | Restore job status |
 
+### Symbol Relationships (Phase 75)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/symbols/relationships?space_id=X` | Relationship edge counts by type |
+| GET | `/v1/symbols/{id}/relationships?space_id=X` | Incoming/outgoing edges for a symbol |
+
 ### System, Plugins & Monitoring
 
 | Method | Endpoint | Description |

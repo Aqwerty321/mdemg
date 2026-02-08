@@ -105,3 +105,42 @@ func (p *Pipeline) RunAll(ctx context.Context, spaceID string, skip map[string]b
 	result.DurationMs = float64(time.Since(start).Milliseconds())
 	return result, nil
 }
+
+// RunPhaseRange executes only steps whose Phase() is in [minPhase, maxPhase].
+// Steps outside the range are silently skipped. Skip map is also honoured.
+func (p *Pipeline) RunPhaseRange(ctx context.Context, spaceID string, skip map[string]bool, minPhase, maxPhase int) (*PipelineResult, error) {
+	start := time.Now()
+	result := &PipelineResult{
+		Steps: make(map[string]*StepResult, len(p.steps)),
+	}
+
+	for _, step := range p.steps {
+		if step.Phase() < minPhase || step.Phase() > maxPhase {
+			continue
+		}
+		if skip[step.Name()] {
+			continue
+		}
+
+		sr, err := step.Run(ctx, spaceID)
+		if err != nil {
+			if step.Required() {
+				return nil, fmt.Errorf("pipeline step %q: %w", step.Name(), err)
+			}
+			result.Errors = append(result.Errors, StepError{
+				Step:    step.Name(),
+				Message: err.Error(),
+			})
+			continue
+		}
+
+		if sr != nil {
+			result.Steps[step.Name()] = sr
+			result.TotalNodes += sr.NodesCreated + sr.NodesUpdated
+			result.TotalEdges += sr.EdgesCreated
+		}
+	}
+
+	result.DurationMs = float64(time.Since(start).Milliseconds())
+	return result, nil
+}

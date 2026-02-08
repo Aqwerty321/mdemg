@@ -514,6 +514,8 @@ type ConsolidateResponse struct {
 	ConstraintNodesCreated int  `json:"constraint_nodes_created"`
 	ConstraintNodesUpdated int  `json:"constraint_nodes_updated"`
 	ConstraintEdgesLinked  int  `json:"constraint_edges_linked"`
+	DynamicEdgesCreated    int  `json:"dynamic_edges_created"`
+	L5NodesCreated         int  `json:"l5_nodes_created"`
 }
 
 // ObserveRequest - request for POST /v1/conversation/observe

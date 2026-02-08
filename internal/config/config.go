@@ -279,7 +279,8 @@ type Config struct {
 	DynamicEdgeDegreeCap     int     // DYNAMIC_EDGE_DEGREE_CAP — max dynamic edges per node (default: 10)
 	DynamicEdgeMinConfidence float64 // DYNAMIC_EDGE_MIN_CONFIDENCE — minimum confidence for dynamic edges (default: 0.5)
 	L5EmergentEnabled        bool    // L5_EMERGENT_ENABLED — enable Layer 5 emergent concept nodes (default: true)
-	L5BridgeEvidenceMin      int     // L5_BRIDGE_EVIDENCE_MIN — minimum bridge evidence for L5 promotion (default: 3)
+	L5BridgeEvidenceMin      int     // L5_BRIDGE_EVIDENCE_MIN — minimum bridge evidence for L5 promotion (default: 1)
+	L5SourceMinLayer         int     // L5_SOURCE_MIN_LAYER — minimum layer for L5/dynamic edge source nodes (default: 3)
 	SymbolActivationEnabled  bool    // SYMBOL_ACTIVATION_ENABLED — enable symbol-aware activation boost (default: true)
 	SecondaryLabelsEnabled   bool    // SECONDARY_LABELS_ENABLED — enable secondary node labels (default: true)
 	ThemeOfEdgeEnabled       bool    // THEME_OF_EDGE_ENABLED — enable THEME_OF edge creation (default: true)
@@ -1347,7 +1348,11 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("DYNAMIC_EDGE_MIN_CONFIDENCE must be float: %w", err)
 	}
 	l5EmergentEnabled := getBool("L5_EMERGENT_ENABLED", true)
-	l5BridgeEvidenceMin, err := atoi("L5_BRIDGE_EVIDENCE_MIN", 3)
+	l5BridgeEvidenceMin, err := atoi("L5_BRIDGE_EVIDENCE_MIN", 1)
+	if err != nil {
+		return Config{}, err
+	}
+	l5SourceMinLayer, err := atoi("L5_SOURCE_MIN_LAYER", 3)
 	if err != nil {
 		return Config{}, err
 	}
@@ -1865,6 +1870,7 @@ func FromEnv() (Config, error) {
 		DynamicEdgeMinConfidence: dynamicEdgeMinConfidence,
 		L5EmergentEnabled:        l5EmergentEnabled,
 		L5BridgeEvidenceMin:      l5BridgeEvidenceMin,
+		L5SourceMinLayer:         l5SourceMinLayer,
 		SymbolActivationEnabled:  symbolActivationEnabled,
 		SecondaryLabelsEnabled:   secondaryLabelsEnabled,
 		ThemeOfEdgeEnabled:       themeOfEdgeEnabled,

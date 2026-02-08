@@ -1385,7 +1385,37 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 		resp.EdgesStrengthened = bwdResult.EdgesStrengthened
 	}
 
-	// Step 5: Generate summaries for hidden and concept nodes
+	// Step 5: Post-clustering pipeline (dynamic edges + L5 emergent nodes)
+	postResult, err := s.hiddenLayer.RunPostClusteringPipeline(r.Context(), req.SpaceID)
+	if err != nil {
+		log.Printf("warning: post-clustering pipeline failed: %v", err)
+	} else {
+		// Merge post-clustering steps into the Steps map
+		if resp.Steps == nil {
+			resp.Steps = make(map[string]*models.StepResultAPI)
+		}
+		for name, sr := range postResult.Steps {
+			resp.Steps[name] = &models.StepResultAPI{
+				NodesCreated: sr.NodesCreated,
+				NodesUpdated: sr.NodesUpdated,
+				EdgesCreated: sr.EdgesCreated,
+				Details:      sr.Details,
+			}
+		}
+		// Log non-fatal step errors
+		for _, stepErr := range postResult.Errors {
+			log.Printf("warning: post-clustering step %s failed: %s", stepErr.Step, stepErr.Message)
+		}
+		// Populate flat backward-compat fields
+		if sr, ok := postResult.Steps["dynamic_edges"]; ok {
+			resp.DynamicEdgesCreated = sr.EdgesCreated
+		}
+		if sr, ok := postResult.Steps["emergent_l5"]; ok {
+			resp.L5NodesCreated = sr.NodesCreated
+		}
+	}
+
+	// Step 6: Generate summaries for hidden and concept nodes
 	summariesUpdated, err := s.hiddenLayer.GenerateSummaries(r.Context(), req.SpaceID)
 	if err != nil {
 		// Log but don't fail - summaries are nice-to-have

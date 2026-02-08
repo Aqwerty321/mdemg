@@ -86,10 +86,11 @@ DYNAMIC_EDGES_ENABLED=true         # Create typed dynamic edges during consolida
 DYNAMIC_EDGE_DEGREE_CAP=10         # Max dynamic edges per node (default: 10)
 DYNAMIC_EDGE_MIN_CONFIDENCE=0.5    # Minimum confidence for dynamic edge creation (default: 0.5)
 L5_EMERGENT_ENABLED=true           # Enable L5 emergent concept layer (default: true)
-L5_BRIDGE_EVIDENCE_MIN=3           # Minimum bridge evidence to trigger L5 (default: 3)
+L5_BRIDGE_EVIDENCE_MIN=1           # Minimum bridge evidence to trigger L5 (default: 1)
 SYMBOL_ACTIVATION_ENABLED=true     # Enable SymbolNode co-activation learning (default: true)
 SECONDARY_LABELS_ENABLED=true      # Apply secondary labels to MemoryNodes (default: true)
 THEME_OF_EDGE_ENABLED=true         # Use THEME_OF for conversation edges (default: true)
+L5_SOURCE_MIN_LAYER=3              # Minimum layer for L5/dynamic edge source nodes (default: 3)
 ```
 
 ---
@@ -180,6 +181,7 @@ During consolidation, `CreateDynamicEdges()` finds pairs of L4+ nodes that shoul
 | High similarity + same layer | ANALOGOUS_TO |
 | Low similarity + high co-activation | CONTRASTS_WITH |
 | High co-activation + moderate similarity | COMPOSES_WITH |
+| Cross-layer + moderate similarity | BRIDGES |
 | Layer difference + similarity | SPECIALIZES or GENERALIZES_TO |
 | Default | INFLUENCES |
 
@@ -187,12 +189,14 @@ Edges are created as proper Neo4j relationship types (not generic `DYNAMIC_EDGE`
 
 ### L5 Emergent Layer
 
-L5 nodes represent meta-patterns that span multiple L4 concepts:
+L5 nodes represent meta-patterns that span multiple L3+ concepts:
 
-1. Query L4 nodes connected by high-evidence ANALOGOUS_TO or BRIDGES edges
+1. Query L3+ nodes (configurable via `L5_SOURCE_MIN_LAYER`, default: 3) connected by high-evidence ANALOGOUS_TO, BRIDGES, or COMPOSES_WITH edges
 2. Group into clusters using union-find
 3. Create L5 `:MemoryNode:EmergentConcept` nodes with ABSTRACTS_TO edges from members
-4. Requires minimum `L5_BRIDGE_EVIDENCE_MIN` evidence count (default: 3)
+4. Requires minimum `L5_BRIDGE_EVIDENCE_MIN` evidence count (default: 1)
+
+> **Phase 75C:** The L5 step runs as a post-clustering pipeline step (phase 30) via `RunPhaseRange(25, 30)`. Dynamic edges (phase 25) are created first, ensuring qualifying edges exist before L5 clustering runs.
 
 ### SymbolNode Co-Activation
 
@@ -277,7 +281,8 @@ MATCH ()-[r:THEME_OF]->() RETURN count(r);
 | `internal/symbols/go_types.go` | Tier 5 stub (deferred) |
 | `internal/models/edge_properties.go` | BaseEdgeProperties() standardized edge metadata |
 | `internal/api/handlers_relationships.go` | 2 HTTP handlers for relationship endpoints |
-| `internal/hidden/step_emergent_l5.go` | L5 emergent pipeline step |
+| `internal/hidden/step_dynamic_edges.go` | Dynamic edge pipeline step (phase 25) |
+| `internal/hidden/step_emergent_l5.go` | L5 emergent pipeline step (phase 30) |
 | `internal/hidden/service.go` | CreateDynamicEdges (fixed), CreateL5EmergentNodes, THEME_OF + secondary labels |
 | `internal/learning/service.go` | ApplySymbolCoactivation |
 | `internal/config/config.go` | 16 new configuration fields |

@@ -26,7 +26,7 @@ A pipeline registry pattern where consolidation steps are self-registering units
 
 type NodeCreator interface {
     Name() string                                              // Step identifier
-    Phase() int                                                // Execution order (10=core, 20=enrichment)
+    Phase() int                                                // Execution order (10=core, 20=enrichment, 25=dynamic edges, 30=post-processing)
     Required() bool                                            // If true, errors abort the pipeline
     Run(ctx context.Context, spaceID string) (*StepResult, error)
 }
@@ -39,7 +39,7 @@ type StepResult struct {
 }
 ```
 
-Every consolidation step implements `NodeCreator`. The `Pipeline` struct holds registered steps sorted by `Phase()` and executes them in order via `RunAll()`.
+Every consolidation step implements `NodeCreator`. The `Pipeline` struct holds registered steps sorted by `Phase()` and executes them via `RunAll()` or selectively via `RunPhaseRange(min, max)` for split execution.
 
 ### Step Adapters
 
@@ -54,11 +54,13 @@ Each existing `Create*Nodes()` method has a thin adapter in its own file:
 | `step_temporal.go` | `temporal` | 20 | no | `CreateTemporalNodes` |
 | `step_ui.go` | `ui` | 20 | no | `CreateUINodes` |
 | `step_constraint.go` | `constraint` | 20 | no | `CreateConstraintNodes` |
+| `step_dynamic_edges.go` | `dynamic_edges` | 25 | no | `CreateDynamicEdges` |
+| `step_emergent_l5.go` | `emergent_l5` | 30 | no | `CreateL5EmergentNodes` |
 
 ### Error Handling
 
 - **Required steps** (phase 10, `hidden`): failure aborts the pipeline and returns an error.
-- **Optional steps** (phase 20, all enrichment steps): failure is logged in `PipelineResult.Errors` and execution continues. This matches the pre-pipeline behavior where enrichment steps logged warnings without failing consolidation.
+- **Optional steps** (phase 20/25/30, enrichment and post-processing): failure is logged in `PipelineResult.Errors` and execution continues. This matches the pre-pipeline behavior where enrichment steps logged warnings without failing consolidation.
 
 ### Registration
 
@@ -74,6 +76,8 @@ func (s *Service) buildPipeline() *Pipeline {
     p.Register(&temporalStep{svc: s})
     p.Register(&uiStep{svc: s})
     p.Register(&constraintStep{svc: s})
+    p.Register(&dynamicEdgesStep{svc: s})  // phase 25 — dynamic edges (after clustering)
+    p.Register(&emergentL5Step{svc: s})    // phase 30 — post-processing
     return p
 }
 ```
@@ -154,6 +158,8 @@ That's it. The handler, response model, and UATS automatically pick up the new s
 | `internal/hidden/step_temporal.go` | Adapter for `CreateTemporalNodes` |
 | `internal/hidden/step_ui.go` | Adapter for `CreateUINodes` |
 | `internal/hidden/step_constraint.go` | Adapter for `CreateConstraintNodes` |
+| `internal/hidden/step_dynamic_edges.go` | Adapter for `CreateDynamicEdges` (Phase 75C) |
+| `internal/hidden/step_emergent_l5.go` | Adapter for `CreateL5EmergentNodes` (Phase 75C) |
 
 ### Modified files
 
@@ -166,7 +172,14 @@ That's it. The handler, response model, and UATS automatically pick up the new s
 
 ## Scope and Boundaries
 
-The pipeline covers **node-creation steps only** (Steps 1-1g of consolidation). The following operations remain explicit in the handler and `RunConsolidation()` because they depend on pipeline output or operate differently:
+The pipeline covers **node-creation and post-processing steps** across two execution phases:
+
+- **Pre-clustering** (phases 10-20): Core node creation (`hidden`) and enrichment steps (`concern`, `config`, `comparison`, `temporal`, `ui`, `constraint`). Executed via `RunPhaseRange(10, 20)`.
+- **Post-clustering** (phases 25-30): `dynamic_edges` (phase 25) and `emergent_l5` (phase 30). Executed via `RunPhaseRange(25, 30)` after multi-layer clustering completes.
+
+This split execution (introduced in Phase 75C) ensures dynamic edges and L5 emergent nodes have access to fully clustered graph state.
+
+The following operations remain explicit in the handler and `RunConsolidation()` because they depend on pipeline output or operate differently:
 
 - Forward pass (updates embeddings after node creation)
 - Multi-layer concept clustering (iterative L2-L5 with interleaved forward passes)

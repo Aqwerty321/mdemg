@@ -1191,6 +1191,40 @@ flowchart TD
 - [x] **75.18** — 31 unit tests (symbols), 14 (hidden), all passing; 94 UATS specs, 151/151 passing (100%)
 - [x] **75.19** — Documentation: `docs/development/RELATIONSHIP_EXTRACTION.md`, CONTRIBUTING.md, AGENT_HANDOFF.md
 
+### Phase 75C: L5 Emergent Layer — Unblock Emergence ✅
+
+**Completed:** 2026-02-08
+**Dependencies:** Phase 75B (L5 infrastructure), Phase 46 (Pipeline Registry)
+
+**What it does:** Fixed 6 bottlenecks preventing L5 emergent node creation:
+
+| # | Fix | Impact |
+|---|-----|--------|
+| 75C.1 | Added BRIDGES to InferEdgeType | L5 query can now find qualifying edges |
+| 75C.2 | L5BridgeEvidenceMin default 3→1 | L5 triggers on first consolidation |
+| 75C.3 | Expanded L5 edges: +COMPOSES_WITH | 3 edge types qualify (was 2) |
+| 75C.4 | Source layer L4→L3+ (L5SourceMinLayer) | L3 concepts feed L5 clusters |
+| 75C.5 | Fixed co-activation param (0.0) | Edge inference uses honest inputs |
+| 75C.6 | Dynamic edges via pipeline post-clustering | Edges exist before L5 step runs |
+
+**Architecture:**
+- Pipeline split execution: `RunPhaseRange(10,20)` pre-clustering, `RunPhaseRange(25,30)` post-clustering
+- New step: `step_dynamic_edges.go` (phase 25) between enrichment and L5
+- New pipeline method: `RunPhaseRange()` for selective phase execution
+
+**Results:** 50 dynamic edges + 4 L5 nodes on mdemg-dev consolidation. UATS: 150/151 (99.3%).
+
+**Key Files:**
+
+| File | Change |
+|------|--------|
+| `internal/hidden/step_dynamic_edges.go` | NEW — Pipeline step for dynamic edge creation |
+| `internal/hidden/pipeline.go` | Added `RunPhaseRange()` method |
+| `internal/hidden/service.go` | BRIDGES in InferEdgeType, L3+ layer filter, split pipeline, co-activation fix |
+| `internal/config/config.go` | `L5SourceMinLayer` field, evidence default 3→1 |
+| `internal/models/models.go` | `DynamicEdgesCreated`, `L5NodesCreated` flat fields |
+| `internal/api/handlers.go` | Post-clustering pipeline call + flat field population |
+
 **Planned Key Files:**
 
 | File | Purpose |
@@ -1760,4 +1794,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-07 — 92 UATS specs, 147 variants, 146 passing (99.3%). Phase 70 (Neo4j Backup & Restore) complete: 6 backup files, 1 handler file, 7 UATS specs, migration V0013. Backup disabled by default (BACKUP_ENABLED=false). Phase 51 (Web Scraper) also complete.*
+*Last updated: 2026-02-08 — 94 UATS specs, 151 variants, 150 passing (99.3%). Phase 75C (L5 Emergent Layer — Unblock Emergence) complete: 6 bottleneck fixes, 50 dynamic edges + 4 L5 nodes, pipeline split execution (RunPhaseRange), 2 new pipeline steps (dynamic_edges phase 25, emergent_l5 phase 30). Phase 75, 70, 51 also complete.*

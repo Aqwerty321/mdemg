@@ -33,15 +33,22 @@ func (s *Service) buildPipeline() *Pipeline {
 	p.Register(&comparisonStep{svc: s})  // phase 20
 	p.Register(&temporalStep{svc: s})    // phase 20
 	p.Register(&uiStep{svc: s})          // phase 20
-	p.Register(&constraintStep{svc: s})  // phase 20
-	p.Register(&emergentL5Step{svc: s})  // phase 30 — post-processing
+	p.Register(&constraintStep{svc: s})    // phase 20
+	p.Register(&dynamicEdgesStep{svc: s})  // phase 25 — dynamic edges (after clustering)
+	p.Register(&emergentL5Step{svc: s})    // phase 30 — post-processing
 	return p
 }
 
-// RunNodeCreationPipeline runs only the node-creation steps of consolidation.
-// This is the public entry point used by the API handler.
+// RunNodeCreationPipeline runs only the node-creation steps of consolidation (phase 10-20).
+// This is the public entry point used by the API handler for the first pipeline pass.
 func (s *Service) RunNodeCreationPipeline(ctx context.Context, spaceID string) (*PipelineResult, error) {
-	return s.pipeline.RunAll(ctx, spaceID, nil)
+	return s.pipeline.RunPhaseRange(ctx, spaceID, nil, 10, 20)
+}
+
+// RunPostClusteringPipeline runs the post-clustering steps (phase 25-30: dynamic edges, L5).
+// Call this AFTER forward/backward pass and concept clustering have completed.
+func (s *Service) RunPostClusteringPipeline(ctx context.Context, spaceID string) (*PipelineResult, error) {
+	return s.pipeline.RunPhaseRange(ctx, spaceID, nil, 25, 30)
 }
 
 // CreateHiddenNodes performs hybrid DBSCAN clustering on orphan base nodes
@@ -914,7 +921,7 @@ func (s *Service) findSimilarConcept(ctx context.Context, spaceID string, layer 
 	cypher := `
 	MATCH (c:MemoryNode {space_id: $spaceId, layer: $layer, role_type: 'concept'})
 	WHERE c.embedding IS NOT NULL
-	WITH c, gds.similarity.cosine(c.embedding, $centroid) AS similarity
+	WITH c, vector.similarity.cosine(c.embedding, $centroid) AS similarity
 	WHERE similarity > $threshold
 	RETURN c.node_id AS nodeId, similarity
 	ORDER BY similarity DESC
@@ -1208,8 +1215,8 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 		ConceptNodesCreated: make(map[int]int),
 	}
 
-	// Step 1: Run all node-creation steps via pipeline (hidden, concern, config, comparison, temporal, ui, constraint)
-	pipelineResult, err := s.pipeline.RunAll(ctx, spaceID, nil)
+	// Step 1: Run node-creation steps via pipeline (phase 10-20: hidden, concern, config, comparison, temporal, ui, constraint)
+	pipelineResult, err := s.pipeline.RunPhaseRange(ctx, spaceID, nil, 10, 20)
 	if err != nil {
 		return nil, fmt.Errorf("node creation pipeline: %w", err)
 	}
@@ -1271,26 +1278,24 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	}
 	result.BackwardPass = bwdResult
 
-	// Step 5: Dynamic edge creation for upper-layer concepts
-	if s.cfg.DynamicEdgesEnabled {
-		dynamicCreated, err := s.CreateDynamicEdges(ctx, spaceID)
-		if err != nil {
-			fmt.Printf("warning: dynamic edge creation failed: %v\n", err)
-		} else if dynamicCreated > 0 {
-			fmt.Printf("created %d dynamic edges for space %s\n", dynamicCreated, spaceID)
+	// Step 5: Post-clustering pipeline (phase 25-30: dynamic edges + L5 emergent nodes)
+	postResult, err := s.pipeline.RunPhaseRange(ctx, spaceID, nil, 25, 30)
+	if err != nil {
+		fmt.Printf("warning: post-clustering pipeline failed: %v\n", err)
+	} else {
+		// Merge post-clustering steps into pipeline results
+		for name, sr := range postResult.Steps {
+			result.PipelineSteps[name] = sr
 		}
-		result.DynamicEdgesCreated = dynamicCreated
-	}
-
-	// Step 6: L5 Emergent layer
-	if s.cfg.L5EmergentEnabled {
-		l5Created, err := s.CreateL5EmergentNodes(ctx, spaceID)
-		if err != nil {
-			fmt.Printf("warning: L5 emergent layer failed: %v\n", err)
-		} else if l5Created > 0 {
-			fmt.Printf("created %d L5 emergent nodes for space %s\n", l5Created, spaceID)
+		for _, stepErr := range postResult.Errors {
+			fmt.Printf("warning: post-clustering step %s failed: %s\n", stepErr.Step, stepErr.Message)
 		}
-		result.L5NodesCreated = l5Created
+		if sr, ok := postResult.Steps["dynamic_edges"]; ok {
+			result.DynamicEdgesCreated = sr.EdgesCreated
+		}
+		if sr, ok := postResult.Steps["emergent_l5"]; ok {
+			result.L5NodesCreated = sr.NodesCreated
+		}
 	}
 
 	result.TotalDuration = time.Since(start)
@@ -2349,8 +2354,17 @@ func (s *Service) InferEdgeType(source, target UpperLayerNode, coActivation floa
 		confidence = metrics.CoActivation
 		evidence = fmt.Sprintf("High co-activation (%.2f) with moderate similarity suggests composition", metrics.CoActivation)
 
-	// Layer difference with similarity = SPECIALIZES or GENERALIZES_TO
-	case metrics.LayerDistance > 0 && metrics.CosineSimilarity >= 0.5:
+	// Cross-layer with moderate similarity = BRIDGES
+	case metrics.LayerDistance > 0 && metrics.CosineSimilarity >= 0.4 && metrics.CosineSimilarity < thresholds.AnalogousMinSim:
+		inferredType = EdgeBridges
+		confidence = metrics.CosineSimilarity * (1.0 + 0.1*float64(metrics.LayerDistance))
+		if confidence > 1.0 {
+			confidence = 1.0
+		}
+		evidence = fmt.Sprintf("Cross-layer bridge (layer distance %d, sim %.2f) connects disparate domains", metrics.LayerDistance, metrics.CosineSimilarity)
+
+	// Layer difference with high similarity = SPECIALIZES or GENERALIZES_TO
+	case metrics.LayerDistance > 0 && metrics.CosineSimilarity >= 0.7:
 		if source.Layer > target.Layer {
 			inferredType = EdgeGeneralizes
 			evidence = fmt.Sprintf("Higher layer node generalizes lower layer concept (layer %d → %d)", source.Layer, target.Layer)
@@ -2597,20 +2611,25 @@ func (s *Service) CreateDynamicEdges(ctx context.Context, spaceID string) (int, 
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	// Find pairs of L4+ nodes that should be connected but aren't
+	// Find pairs of L3+ nodes that should be connected but aren't
+	minLayer := s.cfg.L5SourceMinLayer
+	if minLayer < 1 {
+		minLayer = 3
+	}
 	findPairsCypher := `
 MATCH (a:MemoryNode {space_id: $spaceId}), (b:MemoryNode {space_id: $spaceId})
-WHERE a.layer >= 4 AND b.layer >= 4
+WHERE a.layer >= $minLayer AND b.layer >= $minLayer
   AND a.node_id < b.node_id
   AND NOT (a)-[:ANALOGOUS_TO|CONTRASTS_WITH|COMPOSES_WITH|INFLUENCES|SPECIALIZES|GENERALIZES_TO|BRIDGES]-(b)
   AND a.embedding IS NOT NULL AND b.embedding IS NOT NULL
-  AND size((a)--()) < $degreeCap AND size((b)--()) < $degreeCap
+  AND COUNT { (a)--() } < $degreeCap AND COUNT { (b)--() } < $degreeCap
 WITH a, b,
-     gds.similarity.cosine(a.embedding, b.embedding) AS sim
+     vector.similarity.cosine(a.embedding, b.embedding) AS sim
 WHERE sim > 0.3
 RETURN a.node_id AS sourceId, b.node_id AS targetId,
        a.embedding AS sourceEmb, b.embedding AS targetEmb,
        a.layer AS sourceLayer, b.layer AS targetLayer,
+       a.name AS sourceName, b.name AS targetName,
        sim
 ORDER BY sim DESC
 LIMIT 50`
@@ -2619,6 +2638,7 @@ LIMIT 50`
 		res, err := tx.Run(ctx, findPairsCypher, map[string]any{
 			"spaceId":   spaceID,
 			"degreeCap": s.cfg.DynamicEdgeDegreeCap,
+			"minLayer":  minLayer,
 		})
 		if err != nil {
 			return nil, err
@@ -2636,6 +2656,8 @@ LIMIT 50`
 			targetEmb, _ := rec.Get("targetEmb")
 			sourceLayer, _ := rec.Get("sourceLayer")
 			targetLayer, _ := rec.Get("targetLayer")
+			sourceName, _ := rec.Get("sourceName")
+			targetName, _ := rec.Get("targetName")
 			sim, _ := rec.Get("sim")
 
 			pairs = append(pairs, struct {
@@ -2646,11 +2668,13 @@ LIMIT 50`
 				Source: UpperLayerNode{
 					NodeID:    asString(sourceId),
 					Layer:     asInt(sourceLayer),
+					Name:      asString(sourceName),
 					Embedding: asFloat64Slice(sourceEmb),
 				},
 				Target: UpperLayerNode{
 					NodeID:    asString(targetId),
 					Layer:     asInt(targetLayer),
+					Name:      asString(targetName),
 					Embedding: asFloat64Slice(targetEmb),
 				},
 				Sim: asFloat64(sim),
@@ -2673,7 +2697,7 @@ LIMIT 50`
 	// Group inferences by type for batched edge creation
 	grouped := make(map[string][]map[string]any)
 	for _, pair := range pairList {
-		inference := s.InferEdgeType(pair.Source, pair.Target, pair.Sim)
+		inference := s.InferEdgeType(pair.Source, pair.Target, 0.0) // Pass 0 — no real Hebbian co-activation data available
 
 		// Skip low-confidence inferences
 		if inference.Confidence < s.cfg.DynamicEdgeMinConfidence {
@@ -2742,13 +2766,18 @@ func (s *Service) CreateL5EmergentNodes(ctx context.Context, spaceID string) (in
 
 	minEvidence := s.cfg.L5BridgeEvidenceMin
 	if minEvidence < 1 {
-		minEvidence = 3
+		minEvidence = 1
+	}
+	minSourceLayer := s.cfg.L5SourceMinLayer
+	if minSourceLayer < 1 {
+		minSourceLayer = 3
 	}
 
-	// Find clusters of L4 nodes connected by high-evidence ANALOGOUS_TO or BRIDGES
+	// Find clusters of L3+ nodes connected by high-evidence qualifying edges
 	clusterCypher := `
-MATCH (a:MemoryNode {space_id: $spaceId, layer: 4})-[r:ANALOGOUS_TO|BRIDGES]->(b:MemoryNode {space_id: $spaceId, layer: 4})
-WHERE r.evidence_count >= $minEvidence
+MATCH (a:MemoryNode {space_id: $spaceId})-[r:ANALOGOUS_TO|BRIDGES|COMPOSES_WITH]->(b:MemoryNode {space_id: $spaceId})
+WHERE a.layer >= $minSourceLayer AND b.layer >= $minSourceLayer
+  AND r.evidence_count >= $minEvidence
   AND NOT EXISTS {
     MATCH (a)-[:ABSTRACTS_TO]->(l5:MemoryNode {space_id: $spaceId, layer: 5})
     WHERE (b)-[:ABSTRACTS_TO]->(l5)
@@ -2770,8 +2799,9 @@ LIMIT 20`
 
 	pairs, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, clusterCypher, map[string]any{
-			"spaceId":     spaceID,
-			"minEvidence": minEvidence,
+			"spaceId":        spaceID,
+			"minEvidence":    minEvidence,
+			"minSourceLayer": minSourceLayer,
 		})
 		if err != nil {
 			return nil, err

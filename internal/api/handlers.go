@@ -357,6 +357,7 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 
 	// Learning deltas: bounded writeback
 	_ = s.learner.ApplyCoactivation(r.Context(), req.SpaceID, resp)
+	_ = s.learner.ApplySymbolCoactivation(r.Context(), req.SpaceID, resp)
 
 	// Record query result for capability gap detection
 	if s.gapDetector != nil && req.QueryText != "" {
@@ -545,6 +546,50 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 				// Non-fatal - continue with response
 			} else {
 				log.Printf("Stored %d symbols for space %s", len(allSymbols), req.SpaceID)
+			}
+		}
+
+		// Phase 75: Extract and save relationships from file content
+		if s.symbolParser != nil && s.symbolResolver != nil && s.cfg.RelExtractImports {
+			var allRels []symbols.Relationship
+			for _, obs := range req.Observations {
+				if obs.Path == "" {
+					continue
+				}
+				contentStr := ""
+				switch v := obs.Content.(type) {
+				case string:
+					contentStr = v
+				case map[string]any:
+					if text, ok := v["text"].(string); ok {
+						contentStr = text
+					}
+				}
+				if contentStr == "" || len(contentStr) < 10 {
+					continue
+				}
+				ext := filepath.Ext(obs.Path)
+				lang := symbols.LanguageFromExtension(ext)
+				if lang == "" {
+					continue
+				}
+				result, parseErr := s.symbolParser.ParseContent(r.Context(), obs.Path, lang, []byte(contentStr))
+				if parseErr != nil || result == nil {
+					continue
+				}
+				if len(result.Relationships) > 0 {
+					allRels = append(allRels, result.Relationships...)
+				}
+			}
+			if len(allRels) > 0 {
+				resolved, err := s.symbolResolver.Resolve(r.Context(), req.SpaceID, allRels)
+				if err != nil {
+					log.Printf("WARNING: relationship resolution failed: %v", err)
+				} else if len(resolved) > 0 {
+					if err := s.symbolStore.SaveRelationships(r.Context(), req.SpaceID, resolved); err != nil {
+						log.Printf("WARNING: failed to save relationships: %v", err)
+					}
+				}
 			}
 		}
 	}

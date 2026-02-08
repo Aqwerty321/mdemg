@@ -1,0 +1,77 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Symbol Relationships",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "symbols",
+      "relationships",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-08",
+    "description": "Validates Symbol Relationships query endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "9b4b78cd4fdc20fc0c6cb38996fad83ac315407c281cf456d5c2f95154a38f67"
+  },
+  "variables": {
+    "test_space": "demo",
+    "test_symbol_id": "test-symbol-id"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/symbols/{{test_symbol_id}}/relationships",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.symbol_id",
+        "type": "string"
+      },
+      {
+        "path": "$.relationships",
+        "type": "array"
+      },
+      {
+        "path": "$.count",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Test validation error when space_id is missing",
+      "request": {
+        "query": {
+          "space_id": null
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

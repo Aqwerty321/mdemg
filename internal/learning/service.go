@@ -379,6 +379,63 @@ RETURN count(*) AS updated;`
 	return nil
 }
 
+// ApplySymbolCoactivation creates CO_ACTIVATED_WITH edges between
+// SymbolNodes that are co-retrieved (connected via DEFINES_SYMBOL to
+// co-activated MemoryNodes). Guards behind SymbolActivationEnabled config.
+func (s *Service) ApplySymbolCoactivation(ctx context.Context, spaceID string, resp models.RetrieveResponse) error {
+	if !s.cfg.SymbolActivationEnabled || spaceID == "" || len(resp.Results) < 2 {
+		return nil
+	}
+
+	if s.IsFrozen(spaceID) {
+		return nil
+	}
+
+	// Collect node IDs from retrieval results
+	nodeIDs := make([]string, 0, len(resp.Results))
+	for _, r := range resp.Results {
+		if r.NodeID != "" {
+			nodeIDs = append(nodeIDs, r.NodeID)
+		}
+	}
+	if len(nodeIDs) < 2 {
+		return nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Find SymbolNodes connected to co-retrieved MemoryNodes, then MERGE CO_ACTIVATED_WITH
+	cypher := `
+UNWIND $nodeIds AS nid
+MATCH (m:MemoryNode {node_id: nid, space_id: $spaceId})-[:DEFINES_SYMBOL]->(sym:SymbolNode {space_id: $spaceId})
+WITH collect(DISTINCT sym) AS symbols
+WHERE size(symbols) >= 2
+UNWIND range(0, size(symbols)-2) AS i
+UNWIND range(i+1, size(symbols)-1) AS j
+WITH symbols[i] AS s1, symbols[j] AS s2
+MERGE (s1)-[r:CO_ACTIVATED_WITH {space_id: s1.space_id}]->(s2)
+ON CREATE SET
+    r.weight = 0.1,
+    r.created_at = datetime(),
+    r.updated_at = datetime(),
+    r.evidence_count = 1
+ON MATCH SET
+    r.weight = CASE WHEN r.weight < 1.0 THEN r.weight + 0.05 ELSE r.weight END,
+    r.updated_at = datetime(),
+    r.evidence_count = r.evidence_count + 1`
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		_, err := tx.Run(ctx, cypher, map[string]any{
+			"nodeIds": nodeIDs,
+			"spaceId": spaceID,
+		})
+		return nil, err
+	})
+
+	return err
+}
+
 // reinforceConversationObservations calls the stability reinforcer for any conversation observations
 // in the co-activated nodes. This supports the Context Cooler graduation system.
 func (s *Service) reinforceConversationObservations(ctx context.Context, spaceID string, nodes []models.RetrieveResult) {

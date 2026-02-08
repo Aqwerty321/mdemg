@@ -133,11 +133,22 @@ func effectiveWeight(e Edge) float64 {
 
 // EdgeAttentionWeights holds per-edge-type attention weights for activation spreading
 type EdgeAttentionWeights struct {
-	CoActivated  float64 // Weight for CO_ACTIVATED_WITH edges
-	Associated   float64 // Weight for ASSOCIATED_WITH edges
-	Generalizes  float64 // Weight for GENERALIZES edges
-	AbstractsTo  float64 // Weight for ABSTRACTS_TO edges
-	Temporal     float64 // Weight for TEMPORALLY_ADJACENT edges
+	CoActivated   float64 // Weight for CO_ACTIVATED_WITH edges
+	Associated    float64 // Weight for ASSOCIATED_WITH edges
+	Generalizes   float64 // Weight for GENERALIZES edges
+	AbstractsTo   float64 // Weight for ABSTRACTS_TO edges
+	Temporal      float64 // Weight for TEMPORALLY_ADJACENT edges
+	AnalogousTo   float64 // Weight for ANALOGOUS_TO edges
+	Bridges       float64 // Weight for BRIDGES edges
+	ComposesWith  float64 // Weight for COMPOSES_WITH edges
+	ContrastsWith float64 // Weight for CONTRASTS_WITH edges
+	Influences    float64 // Weight for INFLUENCES edges
+	DefinesSymbol float64 // Weight for DEFINES_SYMBOL edges
+	ThemeOf       float64 // Weight for THEME_OF edges
+	Imports       float64 // Weight for IMPORTS edges
+	Calls         float64 // Weight for CALLS edges
+	Extends       float64 // Weight for EXTENDS edges
+	Implements    float64 // Weight for IMPLEMENTS edges
 }
 
 // QueryContext provides context for attention modulation
@@ -173,12 +184,38 @@ func ComputeEdgeAttention(ctx QueryContext, cfg config.Config) EdgeAttentionWeig
 		weights.CoActivated *= 0.8
 	}
 
+	// Set weights for dynamic edge types (Phase 75)
+	weights.AnalogousTo = 0.55
+	weights.Bridges = 0.60
+	weights.ComposesWith = 0.50
+	weights.ContrastsWith = 0.40
+	weights.Influences = 0.45
+	weights.DefinesSymbol = 0.70
+	weights.ThemeOf = 0.65
+
+	// Set weights for parser-derived edge types (Phase 75A)
+	weights.Imports = 0.50
+	weights.Calls = 0.55
+	weights.Extends = 0.70
+	weights.Implements = 0.70
+
 	// Clamp all weights to [0, 1]
 	weights.CoActivated = clampWeight(weights.CoActivated)
 	weights.Associated = clampWeight(weights.Associated)
 	weights.Generalizes = clampWeight(weights.Generalizes)
 	weights.AbstractsTo = clampWeight(weights.AbstractsTo)
 	weights.Temporal = clampWeight(weights.Temporal)
+	weights.AnalogousTo = clampWeight(weights.AnalogousTo)
+	weights.Bridges = clampWeight(weights.Bridges)
+	weights.ComposesWith = clampWeight(weights.ComposesWith)
+	weights.ContrastsWith = clampWeight(weights.ContrastsWith)
+	weights.Influences = clampWeight(weights.Influences)
+	weights.DefinesSymbol = clampWeight(weights.DefinesSymbol)
+	weights.ThemeOf = clampWeight(weights.ThemeOf)
+	weights.Imports = clampWeight(weights.Imports)
+	weights.Calls = clampWeight(weights.Calls)
+	weights.Extends = clampWeight(weights.Extends)
+	weights.Implements = clampWeight(weights.Implements)
 
 	return weights
 }
@@ -207,6 +244,28 @@ func (w EdgeAttentionWeights) GetEdgeAttention(relType string) float64 {
 		return w.AbstractsTo
 	case "TEMPORALLY_ADJACENT":
 		return w.Temporal
+	case "ANALOGOUS_TO":
+		return w.AnalogousTo
+	case "BRIDGES":
+		return w.Bridges
+	case "COMPOSES_WITH":
+		return w.ComposesWith
+	case "CONTRASTS_WITH":
+		return w.ContrastsWith
+	case "INFLUENCES":
+		return w.Influences
+	case "DEFINES_SYMBOL":
+		return w.DefinesSymbol
+	case "THEME_OF":
+		return w.ThemeOf
+	case "IMPORTS":
+		return w.Imports
+	case "CALLS":
+		return w.Calls
+	case "EXTENDS":
+		return w.Extends
+	case "IMPLEMENTS":
+		return w.Implements
 	default:
 		return 0.5 // Unknown edge types get neutral weight
 	}
@@ -216,11 +275,22 @@ func (w EdgeAttentionWeights) GetEdgeAttention(relType string) float64 {
 // (only CO_ACTIVATED_WITH edges contribute)
 func DefaultEdgeAttention() EdgeAttentionWeights {
 	return EdgeAttentionWeights{
-		CoActivated: 1.0,
-		Associated:  0.0,
-		Generalizes: 0.0,
-		AbstractsTo: 0.0,
-		Temporal:    0.0,
+		CoActivated:   1.0,
+		Associated:    0.0,
+		Generalizes:   0.0,
+		AbstractsTo:   0.0,
+		Temporal:      0.0,
+		AnalogousTo:   0.0,
+		Bridges:       0.0,
+		ComposesWith:  0.0,
+		ContrastsWith: 0.0,
+		Influences:    0.0,
+		DefinesSymbol: 0.0,
+		ThemeOf:       0.0,
+		Imports:       0.0,
+		Calls:         0.0,
+		Extends:       0.0,
+		Implements:    0.0,
 	}
 }
 

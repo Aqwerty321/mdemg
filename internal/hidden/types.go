@@ -74,6 +74,8 @@ type ConsolidationResult struct {
 	PipelineSteps         map[string]*StepResult // Phase 46: all pipeline step results
 	ForwardPass           *ForwardPassResult
 	BackwardPass          *BackwardPassResult
+	DynamicEdgesCreated   int                  // Phase 75: dynamic edges created
+	L5NodesCreated        int                  // Phase 75: L5 emergent nodes created
 	TotalDuration         time.Duration
 }
 

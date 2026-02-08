@@ -221,9 +221,9 @@ OPTIONAL MATCH (m1:MemoryNode {space_id: sym.space_id, node_id: sym.parent_node_
 WHERE sym.parent_node_id IS NOT NULL AND sym.parent_node_id <> ''
 OPTIONAL MATCH (m2:MemoryNode {space_id: sym.space_id, path: sym.file_path})
 WHERE sym.parent_node_id IS NULL OR sym.parent_node_id = ''
-WITH s, coalesce(m1, m2) AS m
+WITH s, sym, coalesce(m1, m2) AS m
 WHERE m IS NOT NULL
-MERGE (m)-[:DEFINES_SYMBOL]->(s)
+MERGE (m)-[:DEFINES_SYMBOL {space_id: sym.space_id}]->(s)
 RETURN count(s) AS created
 		`, params)
 		return nil, err

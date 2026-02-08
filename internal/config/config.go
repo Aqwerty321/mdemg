@@ -264,6 +264,26 @@ type Config struct {
 	BackupRetentionMaxStorageGB int   // BACKUP_RETENTION_MAX_STORAGE_GB — storage quota in GB (default: 50)
 	BackupRetentionRunAfter    bool   // BACKUP_RETENTION_RUN_AFTER_BACKUP — run retention after each backup (default: true)
 
+	// Phase 75: Relationship Extraction
+	RelExtractImports     bool    // REL_EXTRACT_IMPORTS — extract import relationships (default: true)
+	RelExtractInheritance bool    // REL_EXTRACT_INHERITANCE — extract inheritance relationships (default: true)
+	RelExtractCalls       bool    // REL_EXTRACT_CALLS — extract function call relationships (default: true)
+	RelCrossFileResolve   bool    // REL_CROSS_FILE_RESOLVE — enable cross-file symbol resolution (default: true)
+	GoTypesEnabled        bool    // GO_TYPES_ANALYSIS_ENABLED — use go/types for accurate analysis (default: false)
+	RelMaxCallsPerFunc    int     // REL_MAX_CALLS_PER_FUNCTION — max calls extracted per function (default: 50)
+	RelBatchSize          int     // REL_BATCH_SIZE — batch size for relationship insertion (default: 500)
+	RelResolutionTimeout  int     // REL_RESOLUTION_TIMEOUT_SEC — timeout for symbol resolution in seconds (default: 60)
+
+	// Phase 75B: Topology Hardening
+	DynamicEdgesEnabled      bool    // DYNAMIC_EDGES_ENABLED — enable dynamic edge creation during retrieval (default: true)
+	DynamicEdgeDegreeCap     int     // DYNAMIC_EDGE_DEGREE_CAP — max dynamic edges per node (default: 10)
+	DynamicEdgeMinConfidence float64 // DYNAMIC_EDGE_MIN_CONFIDENCE — minimum confidence for dynamic edges (default: 0.5)
+	L5EmergentEnabled        bool    // L5_EMERGENT_ENABLED — enable Layer 5 emergent concept nodes (default: true)
+	L5BridgeEvidenceMin      int     // L5_BRIDGE_EVIDENCE_MIN — minimum bridge evidence for L5 promotion (default: 3)
+	SymbolActivationEnabled  bool    // SYMBOL_ACTIVATION_ENABLED — enable symbol-aware activation boost (default: true)
+	SecondaryLabelsEnabled   bool    // SECONDARY_LABELS_ENABLED — enable secondary node labels (default: true)
+	ThemeOfEdgeEnabled       bool    // THEME_OF_EDGE_ENABLED — enable THEME_OF edge creation (default: true)
+
 	// Deterministic consolidation trigger (Phase 45.5)
 	ConsolidateOnWatchdogEnabled bool // CONSOLIDATE_ON_WATCHDOG_ENABLED — trigger consolidation alongside RSIC force (default: true)
 
@@ -488,7 +508,7 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("LEARNING_MAX_EDGES_PER_NODE must be int: %w", err)
 	}
 
-	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES,GENERALIZES")
+	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES,GENERALIZES,IMPORTS,CALLS,EXTENDS,IMPLEMENTS,ANALOGOUS_TO,BRIDGES,COMPOSES_WITH,INFLUENCES,CONTRASTS_WITH,SPECIALIZES,GENERALIZES_TO,THEME_OF,DEFINES_SYMBOL")
 	parts := strings.Split(allowed, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
@@ -913,7 +933,7 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("EDGE_TYPE_STRATEGY must be one of: all, structural_first, learned_only, hybrid")
 	}
 
-	structuralEdgeTypesStr := get("STRUCTURAL_EDGE_TYPES", "ASSOCIATED_WITH,GENERALIZES,ABSTRACTS_TO")
+	structuralEdgeTypesStr := get("STRUCTURAL_EDGE_TYPES", "ASSOCIATED_WITH,GENERALIZES,ABSTRACTS_TO,IMPORTS,CALLS,EXTENDS,IMPLEMENTS,ANALOGOUS_TO,BRIDGES,COMPOSES_WITH,INFLUENCES")
 	structuralEdgeTypes := make([]string, 0)
 	for _, p := range strings.Split(structuralEdgeTypesStr, ",") {
 		p = strings.TrimSpace(p)
@@ -1295,6 +1315,45 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	backupRetentionRunAfter := getBool("BACKUP_RETENTION_RUN_AFTER_BACKUP", true)
+
+	// Phase 75: Relationship Extraction
+	relExtractImports := getBool("REL_EXTRACT_IMPORTS", true)
+	relExtractInheritance := getBool("REL_EXTRACT_INHERITANCE", true)
+	relExtractCalls := getBool("REL_EXTRACT_CALLS", true)
+	relCrossFileResolve := getBool("REL_CROSS_FILE_RESOLVE", true)
+	goTypesEnabled := getBool("GO_TYPES_ANALYSIS_ENABLED", false)
+	relMaxCallsPerFunc, err := atoi("REL_MAX_CALLS_PER_FUNCTION", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	relBatchSize, err := atoi("REL_BATCH_SIZE", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	relResolutionTimeout, err := atoi("REL_RESOLUTION_TIMEOUT_SEC", 60)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// Phase 75B: Topology Hardening
+	dynamicEdgesEnabled := getBool("DYNAMIC_EDGES_ENABLED", true)
+	dynamicEdgeDegreeCap, err := atoi("DYNAMIC_EDGE_DEGREE_CAP", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	dynamicEdgeMinConfidenceStr := get("DYNAMIC_EDGE_MIN_CONFIDENCE", "0.5")
+	dynamicEdgeMinConfidence, err := strconv.ParseFloat(dynamicEdgeMinConfidenceStr, 64)
+	if err != nil {
+		return Config{}, fmt.Errorf("DYNAMIC_EDGE_MIN_CONFIDENCE must be float: %w", err)
+	}
+	l5EmergentEnabled := getBool("L5_EMERGENT_ENABLED", true)
+	l5BridgeEvidenceMin, err := atoi("L5_BRIDGE_EVIDENCE_MIN", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	symbolActivationEnabled := getBool("SYMBOL_ACTIVATION_ENABLED", true)
+	secondaryLabelsEnabled := getBool("SECONDARY_LABELS_ENABLED", true)
+	themeOfEdgeEnabled := getBool("THEME_OF_EDGE_ENABLED", true)
 
 	// Deterministic consolidation trigger
 	consolidateOnWatchdog := getBool("CONSOLIDATE_ON_WATCHDOG_ENABLED", true)
@@ -1791,6 +1850,24 @@ func FromEnv() (Config, error) {
 		BackupRetentionMaxAgeDays:  backupRetentionMaxAgeDays,
 		BackupRetentionMaxStorageGB: backupRetentionMaxStorageGB,
 		BackupRetentionRunAfter:    backupRetentionRunAfter,
+
+		// Phase 75: Relationship Extraction & Topology Hardening
+		RelExtractImports:        relExtractImports,
+		RelExtractInheritance:    relExtractInheritance,
+		RelExtractCalls:          relExtractCalls,
+		RelCrossFileResolve:      relCrossFileResolve,
+		GoTypesEnabled:           goTypesEnabled,
+		RelMaxCallsPerFunc:       relMaxCallsPerFunc,
+		RelBatchSize:             relBatchSize,
+		RelResolutionTimeout:     relResolutionTimeout,
+		DynamicEdgesEnabled:      dynamicEdgesEnabled,
+		DynamicEdgeDegreeCap:     dynamicEdgeDegreeCap,
+		DynamicEdgeMinConfidence: dynamicEdgeMinConfidence,
+		L5EmergentEnabled:        l5EmergentEnabled,
+		L5BridgeEvidenceMin:      l5BridgeEvidenceMin,
+		SymbolActivationEnabled:  symbolActivationEnabled,
+		SecondaryLabelsEnabled:   secondaryLabelsEnabled,
+		ThemeOfEdgeEnabled:       themeOfEdgeEnabled,
 	}, nil
 }
 

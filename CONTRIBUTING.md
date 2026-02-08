@@ -336,11 +336,13 @@ mdemg/
 
 ## Pipeline Registry Pattern
 
-MDEMG uses a **Dynamic Pipeline Registry** for consolidation node creation. Instead of adding new node types across four files, each step is a self-contained adapter implementing the `NodeCreator` interface and registered in a single pipeline.
+MDEMG uses a **Dynamic Pipeline Registry** for consolidation node creation. Instead of adding new node types across four files, each step is a self-contained adapter implementing the `NodeCreator` interface and registered in a single pipeline. There are currently **9 registered steps** across 4 phase levels.
 
 **Why:** Before Phase 46, every new consolidation step (concern, config, comparison, temporal, UI, constraint) required parallel edits to `service.go`, `handlers.go`, `types.go`, and `models.go`. This violated Open/Closed Principle and caused duplicate logic between the handler and service. The pipeline eliminates this — adding a new node type is now a two-file operation (create the step adapter, register it in `buildPipeline()`).
 
 **How:** Each step implements `Name()`, `Phase()`, `Required()`, and `Run()`. The pipeline executes steps in phase order, aggregates results into a universal `StepResult` map, and handles required vs. optional error semantics. The API response includes both a dynamic `steps` map and backward-compatible flat fields.
+
+**Split Execution (Phase 75C):** The pipeline supports `RunPhaseRange()` for selective phase execution. Pre-clustering steps (phases 10-20) run before multi-layer clustering. Post-clustering steps (phases 25-30: `dynamic_edges`, `emergent_l5`) run after clustering completes, ensuring they have access to fully clustered graph state.
 
 Full details, code examples, and the guide for adding new steps: **[docs/development/REGISTRY.md](docs/development/REGISTRY.md)**
 

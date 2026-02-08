@@ -463,7 +463,9 @@ Trigger hidden layer creation (concept abstraction).
       "comparison": { "nodes_created": 8,  "nodes_updated": 0, "edges_created": 12, "details": {"modules_compared": 4} },
       "temporal":   { "nodes_created": 1,  "nodes_updated": 0, "edges_created": 3, "details": {"patterns_detected": ["validFrom/validTo"]} },
       "ui":         { "nodes_created": 2,  "nodes_updated": 0, "edges_created": 6, "details": {"patterns_detected": ["store", "component"]} },
-      "constraint": { "nodes_created": 1,  "nodes_updated": 0, "edges_created": 1 }
+      "constraint":    { "nodes_created": 1,  "nodes_updated": 0, "edges_created": 1 },
+      "dynamic_edges": { "nodes_created": 0,  "nodes_updated": 0, "edges_created": 50 },
+      "emergent_l5":   { "nodes_created": 4,  "nodes_updated": 0, "edges_created": 4 }
     },
     "hidden_nodes_created": 45,
     "hidden_nodes_updated": 150,
@@ -486,12 +488,16 @@ Trigger hidden layer creation (concept abstraction).
     "ui_edges_created": 6,
     "constraint_nodes_created": 1,
     "constraint_nodes_updated": 0,
-    "constraint_edges_linked": 1
+    "constraint_edges_linked": 1,
+    "dynamic_edges_created": 50,
+    "l5_nodes_created": 4
   }
 }
 ```
 
 > **Phase 46 (Dynamic Pipeline Registry):** The `steps` map is populated dynamically by the pipeline registry. Each registered `NodeCreator` step produces a `StepResult` entry keyed by step name. The flat fields (e.g., `concern_nodes_created`) are preserved for backward compatibility and populated from the same pipeline results. New steps added to the pipeline automatically appear in the `steps` map without API changes. See [REGISTRY.md](REGISTRY.md) for details.
+>
+> **Phase 75C (Split Execution):** The pipeline now supports `RunPhaseRange()` for selective phase execution. Pre-clustering steps (phases 10-20) run before multi-layer clustering, while post-clustering steps (phases 25-30: `dynamic_edges`, `emergent_l5`) run after clustering completes. This ensures dynamic edges and L5 nodes are created with full clustering context.
 
 ---
 

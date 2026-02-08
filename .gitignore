@@ -92,6 +92,9 @@ temp/
 *.log
 logs/
 
+# Backup artifacts (Phase 70)
+backups/
+
 # Dynamic port file
 .mdemg.port
 .mdemg.port.tmp

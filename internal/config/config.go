@@ -251,6 +251,19 @@ type Config struct {
 	ScraperRespectRobotsTxt   bool   // SCRAPER_RESPECT_ROBOTS_TXT — respect robots.txt (default: true)
 	ScraperMaxContentLengthKB int    // SCRAPER_MAX_CONTENT_LENGTH_KB — max content length in KB (default: 500)
 
+	// Neo4j Backup & Restore (Phase 70)
+	BackupEnabled              bool   // BACKUP_ENABLED — enable backup module (default: false)
+	BackupStorageDir           string // BACKUP_STORAGE_DIR — directory for backup artifacts (default: "./backups")
+	BackupFullCmd              string // BACKUP_FULL_CMD — command for full backups (default: "docker")
+	BackupNeo4jContainer       string // BACKUP_NEO4J_CONTAINER — Docker container name (default: "mdemg-neo4j")
+	BackupFullIntervalHours    int    // BACKUP_FULL_INTERVAL_HOURS — hours between full backups (default: 168)
+	BackupPartialIntervalHours int    // BACKUP_PARTIAL_INTERVAL_HOURS — hours between partial backups (default: 24)
+	BackupRetentionFullCount   int    // BACKUP_RETENTION_FULL_COUNT — keep last N full backups (default: 4)
+	BackupRetentionPartialCount int   // BACKUP_RETENTION_PARTIAL_COUNT — keep last N partial backups (default: 14)
+	BackupRetentionMaxAgeDays  int    // BACKUP_RETENTION_MAX_AGE_DAYS — delete backups older than N days (default: 90)
+	BackupRetentionMaxStorageGB int   // BACKUP_RETENTION_MAX_STORAGE_GB — storage quota in GB (default: 50)
+	BackupRetentionRunAfter    bool   // BACKUP_RETENTION_RUN_AFTER_BACKUP — run retention after each backup (default: true)
+
 	// Deterministic consolidation trigger (Phase 45.5)
 	ConsolidateOnWatchdogEnabled bool // CONSOLIDATE_ON_WATCHDOG_ENABLED — trigger consolidation alongside RSIC force (default: true)
 
@@ -1246,6 +1259,43 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("SCRAPER_MAX_CONTENT_LENGTH_KB must be >= 10")
 	}
 
+	// Neo4j Backup & Restore (Phase 70)
+	backupEnabled := getBool("BACKUP_ENABLED", false)
+	backupStorageDir := get("BACKUP_STORAGE_DIR", "./backups")
+	backupFullCmd := get("BACKUP_FULL_CMD", "docker")
+	backupNeo4jContainer := get("BACKUP_NEO4J_CONTAINER", "mdemg-neo4j")
+	backupFullIntervalHours, err := atoi("BACKUP_FULL_INTERVAL_HOURS", 168)
+	if err != nil {
+		return Config{}, err
+	}
+	if backupFullIntervalHours < 1 {
+		return Config{}, errors.New("BACKUP_FULL_INTERVAL_HOURS must be >= 1")
+	}
+	backupPartialIntervalHours, err := atoi("BACKUP_PARTIAL_INTERVAL_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+	if backupPartialIntervalHours < 1 {
+		return Config{}, errors.New("BACKUP_PARTIAL_INTERVAL_HOURS must be >= 1")
+	}
+	backupRetentionFullCount, err := atoi("BACKUP_RETENTION_FULL_COUNT", 4)
+	if err != nil {
+		return Config{}, err
+	}
+	backupRetentionPartialCount, err := atoi("BACKUP_RETENTION_PARTIAL_COUNT", 14)
+	if err != nil {
+		return Config{}, err
+	}
+	backupRetentionMaxAgeDays, err := atoi("BACKUP_RETENTION_MAX_AGE_DAYS", 90)
+	if err != nil {
+		return Config{}, err
+	}
+	backupRetentionMaxStorageGB, err := atoi("BACKUP_RETENTION_MAX_STORAGE_GB", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	backupRetentionRunAfter := getBool("BACKUP_RETENTION_RUN_AFTER_BACKUP", true)
+
 	// Deterministic consolidation trigger
 	consolidateOnWatchdog := getBool("CONSOLIDATE_ON_WATCHDOG_ENABLED", true)
 
@@ -1728,6 +1778,19 @@ func FromEnv() (Config, error) {
 		ScraperCacheTTLSeconds:    scraperCacheTTL,
 		ScraperRespectRobotsTxt:   scraperRespectRobots,
 		ScraperMaxContentLengthKB: scraperMaxContentKB,
+
+		// Phase 70: Neo4j Backup & Restore
+		BackupEnabled:              backupEnabled,
+		BackupStorageDir:           backupStorageDir,
+		BackupFullCmd:              backupFullCmd,
+		BackupNeo4jContainer:       backupNeo4jContainer,
+		BackupFullIntervalHours:    backupFullIntervalHours,
+		BackupPartialIntervalHours: backupPartialIntervalHours,
+		BackupRetentionFullCount:   backupRetentionFullCount,
+		BackupRetentionPartialCount: backupRetentionPartialCount,
+		BackupRetentionMaxAgeDays:  backupRetentionMaxAgeDays,
+		BackupRetentionMaxStorageGB: backupRetentionMaxStorageGB,
+		BackupRetentionRunAfter:    backupRetentionRunAfter,
 	}, nil
 }
 

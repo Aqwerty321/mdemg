@@ -324,6 +324,7 @@ mdemg/
 │   ├── conversation/     # Conversation Memory System (CMS) - templates, snapshots, relevance
 │   ├── symbols/          # Code symbol extraction
 │   ├── optimistic/       # Optimistic locking with retry
+│   ├── backup/           # Backup & restore (full, partial, scheduler, retention)
 │   ├── backpressure/     # Memory pressure monitoring
 │   └── plugins/          # Plugin system (scaffold, validate)
 ├── migrations/           # Neo4j schema migrations (Cypher)
@@ -488,6 +489,18 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | GET/POST | `/v1/linear/projects` | List or create Linear projects |
 | GET/PUT | `/v1/linear/projects/{id}` | Read or update project |
 | POST | `/v1/linear/comments` | Create comment on issue |
+
+### Backup & Restore (Phase 70)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/backup/trigger` | Trigger backup (full or partial_space) |
+| GET | `/v1/backup/status/{id}` | Backup job status and progress |
+| GET | `/v1/backup/list` | List all backups (optional `?type=` filter) |
+| GET | `/v1/backup/manifest/{id}` | Get full backup manifest |
+| DELETE | `/v1/backup/{id}` | Delete a backup artifact |
+| POST | `/v1/backup/restore` | Trigger restore from full backup |
+| GET | `/v1/backup/restore/status/{id}` | Restore job status |
 
 ### System, Plugins & Monitoring
 

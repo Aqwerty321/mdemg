@@ -146,6 +146,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **File watcher**: Standalone `mdemg-watch` binary for automatic re-ingestion on file changes
 - **Orphan detection**: Timestamp-based detection of nodes missing from re-ingestion with archive/delete/list actions
 - **Edge consistency**: Automatic staleness tracking and edge weight refresh during consolidation
+- **Backup & restore**: Automated full database dumps and partial space exports with retention policies and scheduler
 - **Space Transfer & DevSpace**: Export/import space graphs as `.mdemg` files or via gRPC; optional DevSpace hub for agent registration, publish/pull exports, and inter-agent messaging (see `cmd/space-transfer/README.md` and `docs/specs/development-space-collaboration.md`)
 
 ## Architecture
@@ -265,6 +266,18 @@ Install the post-commit hook to automatically ingest changes on every commit:
 | `/v1/scraper/jobs/{id}/review` | POST | Approve/reject/edit scraped content |
 | `/v1/scraper/spaces` | GET | List available target spaces |
 
+### Backup & Restore (Phase 70)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/backup/trigger` | POST | Trigger backup (full database dump or partial space export) |
+| `/v1/backup/status/{id}` | GET | Backup job status and progress |
+| `/v1/backup/list` | GET | List all backups (optional `?type=` filter) |
+| `/v1/backup/manifest/{id}` | GET | Get full backup manifest (checksum, sizes, spaces) |
+| `/v1/backup/{id}` | DELETE | Delete a backup artifact |
+| `/v1/backup/restore` | POST | Trigger restore from full backup |
+| `/v1/backup/restore/status/{id}` | GET | Restore job status |
+
 ### Conversation Memory System (CMS)
 
 | Endpoint | Method | Description |
@@ -370,6 +383,7 @@ mdemg/
 │   ├── hidden/           # Concept abstraction
 │   ├── learning/         # Hebbian edges
 │   ├── conversation/     # Conversation Memory System (CMS)
+│   ├── backup/           # Backup & restore (full, partial, scheduler, retention)
 │   ├── symbols/          # Code symbol extraction
 │   └── plugins/          # Plugin system
 ├── docs/                 # Documentation
@@ -426,6 +440,7 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Phase | Name | Status |
 |-------|------|--------|
+| 70 | Neo4j Backup & Restore (Full & Partial) with Scheduler | ✅ Complete |
 | 60 | CMS Advanced Functionality II (Templates, Snapshots, Relevance, Truncation, Org-Review) | ✅ Complete |
 | 49 | LLM Plugin SDK (Scaffolding, Validation, Gap Detection) | ✅ Complete |
 | 48.3-48.4 | Data Transmission & Connection Pooling | ✅ Complete |
@@ -465,6 +480,7 @@ See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for detailed phase specifications.
 - [Benchmarking Guide](docs/benchmarks/BENCHMARK_V4_README.md) - Running and validating benchmarks
 - [CI/CD Integration](docs/development/CI_CD_INTEGRATION.md) - Git hooks, GitHub Actions, and scheduled sync
 - [API Reference](docs/development/API_REFERENCE.md) - Full API endpoint documentation
+- [Backup & Restore Guide](docs/development/NEO4J_BACKUP.md) - Backup configuration, manual triggers, retention policies
 - [Agent Handoff](AGENT_HANDOFF.md) - Complete development context and phase registry
 
 ## Contributing

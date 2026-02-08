@@ -1,0 +1,42 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Get Backup Manifest",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "backup",
+      "manifest",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates GET /v1/backup/manifest/{id} returns 503 when backup not enabled",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "88441b33e6e879d6c24e6e023dea2fc3a306bfd65465dee574c0244450187aa8"
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/backup/manifest/nonexistent-backup-id",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 503,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  }
+}

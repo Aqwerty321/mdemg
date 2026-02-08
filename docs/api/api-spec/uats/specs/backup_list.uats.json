@@ -1,0 +1,42 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "List Backups",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "backup",
+      "list",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates GET /v1/backup/list returns 503 when backup not enabled",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "4a66809ac088a81de98fad9271406f3d1568715be2fa9a47f991726d608090f6"
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/backup/list",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 503,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  }
+}

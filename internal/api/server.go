@@ -15,6 +15,7 @@ import (
 	"mdemg/internal/anomaly"
 	"mdemg/internal/ape"
 	"mdemg/internal/auth"
+	"mdemg/internal/backup"
 	"mdemg/internal/backpressure"
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
@@ -33,6 +34,7 @@ import (
 	"mdemg/internal/models"
 	"mdemg/internal/scraper"
 	"mdemg/internal/symbols"
+	"mdemg/internal/transfer"
 	"mdemg/internal/validation"
 )
 
@@ -81,6 +83,10 @@ type Server struct {
 
 	// Phase 51: Web Scraper
 	scraperSvc *scraper.Service
+
+	// Phase 70: Neo4j Backup & Restore
+	backupSvc       *backup.Service
+	backupScheduler *backup.Scheduler
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -288,6 +294,31 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		log.Printf("Web scraper enabled (space: %s, max_jobs: %d)", cfg.ScraperDefaultSpaceID, cfg.ScraperMaxConcurrentJobs)
 	}
 
+	// Phase 70: Initialize Backup service
+	var backupSvc *backup.Service
+	var backupSched *backup.Scheduler
+	if cfg.BackupEnabled {
+		backupCfg := backup.Config{
+			Enabled:              cfg.BackupEnabled,
+			StorageDir:           cfg.BackupStorageDir,
+			FullCmd:              cfg.BackupFullCmd,
+			Neo4jContainer:       cfg.BackupNeo4jContainer,
+			FullIntervalHours:    cfg.BackupFullIntervalHours,
+			PartialIntervalHours: cfg.BackupPartialIntervalHours,
+			RetentionFullCount:   cfg.BackupRetentionFullCount,
+			RetentionPartialCount: cfg.BackupRetentionPartialCount,
+			RetentionMaxAgeDays:  cfg.BackupRetentionMaxAgeDays,
+			RetentionMaxStorageGB: cfg.BackupRetentionMaxStorageGB,
+			RetentionRunAfter:    cfg.BackupRetentionRunAfter,
+		}
+		exp := transfer.NewExporter(driver)
+		backupSvc = backup.NewService(backupCfg, driver, exp)
+		backupSched = backup.NewScheduler(backupSvc)
+		backupSched.Start()
+		log.Printf("Backup enabled (storage: %s, full every %dh, partial every %dh)",
+			backupCfg.StorageDir, backupCfg.FullIntervalHours, backupCfg.PartialIntervalHours)
+	}
+
 	// Phase 60b: Initialize RSIC components
 	var rsicCycle *ape.CycleOrchestrator
 	var rsicWatchdog *ape.Watchdog
@@ -355,6 +386,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		rsicCycle:               rsicCycle,
 		rsicWatchdog:            rsicWatchdog,
 		scraperSvc:              scraperSvc,
+		backupSvc:               backupSvc,
+		backupScheduler:         backupSched,
 	}
 }
 
@@ -374,6 +407,9 @@ func (s *Server) Shutdown() {
 	s.StopWeeklyGapInterviews()
 	s.StopScheduledSync()
 	s.StopRSICWatchdog()
+	if s.backupScheduler != nil {
+		s.backupScheduler.Stop()
+	}
 }
 
 // StartFileWatchers starts file watchers based on configuration.
@@ -883,6 +919,15 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/scraper/jobs", s.handleScraperJobs)
 	mux.HandleFunc("/v1/scraper/jobs/", s.handleScraperJobByID)
 	mux.HandleFunc("/v1/scraper/spaces", s.handleListScrapeSpaces)
+
+	// Neo4j Backup & Restore (Phase 70)
+	mux.HandleFunc("/v1/backup/trigger", s.handleBackupTrigger)
+	mux.HandleFunc("/v1/backup/status/", s.handleBackupStatus)
+	mux.HandleFunc("/v1/backup/list", s.handleBackupList)
+	mux.HandleFunc("/v1/backup/manifest/", s.handleBackupManifest)
+	mux.HandleFunc("/v1/backup/restore", s.handleBackupRestore)
+	mux.HandleFunc("/v1/backup/restore/status/", s.handleRestoreStatus)
+	mux.HandleFunc("/v1/backup/", s.handleBackupByID)
 
 	// Linear CRUD endpoints (Phase 4)
 	mux.HandleFunc("/v1/linear/issues", s.handleLinearIssues)

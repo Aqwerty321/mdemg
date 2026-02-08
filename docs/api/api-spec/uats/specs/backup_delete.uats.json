@@ -1,0 +1,42 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Delete Backup",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "backup",
+      "delete",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates DELETE /v1/backup/{id} returns 503 when backup not enabled",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "519873b924acaafdefad0103455020328d6310cb2f0d4f756e25c3360ec35a7a"
+  },
+  "variables": {},
+  "request": {
+    "method": "DELETE",
+    "path": "/v1/backup/nonexistent-backup-id",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 503,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  }
+}

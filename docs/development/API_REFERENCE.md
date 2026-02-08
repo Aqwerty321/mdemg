@@ -18,6 +18,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Webhooks](#webhooks)
 - [Plugins & Modules](#plugins--modules)
 - [System & Monitoring](#system--monitoring)
+- [Backup & Restore](#backup--restore-phase-70)
 
 ---
 
@@ -1717,6 +1718,147 @@ Returns freshness and staleness information for a space's TapRoot node.
 - `is_stale` - Whether the space is considered stale based on `SYNC_STALE_THRESHOLD_HOURS`
 - `stale_hours` - Hours since last ingest
 - `threshold_hours` - Configured staleness threshold in hours
+
+---
+
+## Backup & Restore (Phase 70)
+
+Backup and restore endpoints for disaster recovery. All endpoints return `503 Service Unavailable` when `BACKUP_ENABLED=false`.
+
+See [`docs/development/NEO4J_BACKUP.md`](NEO4J_BACKUP.md) for the full operations guide.
+
+### POST /v1/backup/trigger
+
+Trigger an on-demand backup (full database dump or partial space export).
+
+**Request Body**:
+```json
+{
+  "type": "partial_space",
+  "space_ids": ["mdemg-dev"],
+  "keep_forever": false,
+  "label": "manual-backup"
+}
+```
+
+- `type` — `"full"` (neo4j-admin dump) or `"partial_space"` (space export via `.mdemg`)
+- `space_ids` — Spaces to include in partial backup (empty = all spaces). `mdemg-dev` is always included.
+- `keep_forever` — Exempt from retention cleanup
+- `label` — Optional label for identification
+
+**Response** (`202 Accepted`):
+```json
+{
+  "backup_id": "bk-20260208-022802-partial_space",
+  "status": "pending",
+  "message": "backup triggered"
+}
+```
+
+### GET /v1/backup/status/{id}
+
+Check backup job progress.
+
+**Response** (`200 OK`):
+```json
+{
+  "backup_id": "bk-20260208-022802-partial_space",
+  "status": "completed",
+  "progress": {
+    "total": 1,
+    "current": 1,
+    "percentage": 100,
+    "phase": "computing checksum"
+  },
+  "result": {
+    "backup_id": "bk-20260208-022802-partial_space",
+    "checksum": "sha256:c00da0f7...",
+    "path": "backups/bk-20260208-022802-partial_space.mdemg",
+    "size": 105898054
+  }
+}
+```
+
+### GET /v1/backup/list
+
+List available backups. Optional `?type=full` or `?type=partial_space` filter.
+
+**Response** (`200 OK`):
+```json
+{
+  "backups": [
+    {
+      "backup_id": "bk-20260208-022802-partial_space",
+      "type": "partial_space",
+      "format_version": "1.0",
+      "created_at": "2026-02-08T02:28:02Z",
+      "checksum": "sha256:c00da0f7...",
+      "size_bytes": 105898054,
+      "spaces": ["mdemg-dev"],
+      "node_count": 21033,
+      "edge_count": 232434,
+      "keep_forever": false,
+      "label": "manual-backup"
+    }
+  ],
+  "count": 1
+}
+```
+
+### GET /v1/backup/manifest/{id}
+
+Get full manifest details for a specific backup.
+
+**Response** (`200 OK`): Returns the `BackupManifest` JSON (same fields as list entries).
+
+### DELETE /v1/backup/{id}
+
+Delete a backup (removes data file + manifest from disk).
+
+**Response** (`200 OK`):
+```json
+{
+  "status": "deleted",
+  "backup_id": "bk-20260208-022802-partial_space"
+}
+```
+
+### POST /v1/backup/restore
+
+Trigger a restore from a full database dump. Full dump only for P0.
+
+**Request Body**:
+```json
+{
+  "backup_id": "bk-20260208-030000-full",
+  "snapshot_before": true
+}
+```
+
+**Response** (`202 Accepted`):
+```json
+{
+  "restore_id": "restore-abc123",
+  "status": "pending",
+  "message": "restore triggered"
+}
+```
+
+### GET /v1/backup/restore/status/{id}
+
+Check restore job progress.
+
+**Response** (`200 OK`):
+```json
+{
+  "restore_id": "restore-abc123",
+  "status": "completed",
+  "progress": {
+    "percentage": 100,
+    "phase": "complete"
+  }
+}
+```
 
 ---
 

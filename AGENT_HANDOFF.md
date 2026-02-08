@@ -93,6 +93,7 @@ internal/
   api/                      # HTTP handlers + middleware
   anomaly/                  # Anomaly detection on ingest
   ape/                      # Active Participant Engine scheduler
+  backup/                   # Neo4j backup & restore (full dump, partial space, scheduler, retention)
   config/                   # Environment-based configuration
   consulting/               # Agent consulting service
   conversation/             # CMS (observe, recall, resume, correct)
@@ -108,6 +109,7 @@ internal/
   observations/             # Observation service
   plugins/                  # Plugin manager + scaffold
   retrieval/                # Core retrieval pipeline (vector + activation + scoring + cache)
+  scraper/                  # Web scraper ingestion (types, service, store, parser, dedup)
   summarize/                # LLM summary service
   symbols/                  # Symbol extraction (tree-sitter)
   transfer/                 # Space Transfer (exporter, importer, format, validate, grpc_server)
@@ -116,7 +118,7 @@ plugins/
   linear-module/            # Linear integration plugin
   reflection-module/        # APE reflection plugin
   keyword-booster/          # Sample reasoning plugin
-migrations/                 # Neo4j Cypher migrations (V0001-V0011)
+migrations/                 # Neo4j Cypher migrations (V0001-V0013)
 tests/
   integration/              # Integration tests (Neo4j required)
   udts/                     # UDTS contract tests (gRPC)
@@ -286,8 +288,8 @@ Phases are organized into **numbered series** to group related work:
 | — (Constraint Nodes) | **Phase 45.5** | Constraint Detection & Consolidation | ✅ Complete |
 | — (Pipeline Registry) | **Phase 46-PR** | Dynamic Pipeline Registry | ✅ Complete |
 | — (Skill Registry) | **Phase 48-SR** | CMS Skill Registry API | ✅ Complete |
-| — (Neo4j Backup) | **Phase 70** | Neo4j Backup (Full & Partial) with Scheduler | 📋 Planned |
-| — (LSP Enrichment) | **Phase 75** | LSP Enrichment Layer for Cross-File Semantic Edges | 📋 Planned |
+| — (Neo4j Backup) | **Phase 70** | Neo4j Backup (Full & Partial) with Scheduler | ✅ Complete |
+| — (Relationship Extraction) | **Phase 75** | Cross-File Relationship Extraction & Graph Topology Hardening | 📋 Planned |
 
 ---
 
@@ -326,13 +328,13 @@ Phases are organized into **numbered series** to group related work:
 | 48 | Query Optimization | ✅ | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 10 |
 | 49 | LLM Plugin SDK | 🔄 | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 11 |
 | 50 | Public Readiness | 📋 | `docs/development/repo-to-public-roadmap.md` |
-| 51 | Web Scraper Ingestion | 📋 | `docs/specs/phase51-web-scraper-ingestion.md` |
+| 51 | Web Scraper Ingestion | ✅ | `docs/specs/phase51-web-scraper-ingestion.md` |
 | 60 | CMS Advanced II | ✅ | `docs/specs/phase60-cms-advanced-ii.md` |
 | 60b | Recursive Self-Improvement Cycle (RSIC) | ✅ | `docs/specs/phase60b-rsic.md` |
 | 45.5 | Constraint Detection & Consolidation | ✅ | `internal/hidden/constraint_nodes.go`, `internal/conversation/constraint_detector.go` |
 | 46-PR | Dynamic Pipeline Registry | ✅ | `docs/development/REGISTRY.md` |
-| 70 | Neo4j Backup (Full & Partial) with Scheduler | 📋 | `docs/specs/phase70-neo4j-backup.md` |
-| 75 | LSP Enrichment Layer for Cross-File Semantic Edges | 📋 | `docs/specs/phase75-lsp-enrichment.md` |
+| 70 | Neo4j Backup (Full & Partial) with Scheduler | ✅ | `docs/specs/phase70-neo4j-backup.md` |
+| 75 | Cross-File Relationship Extraction & Graph Topology Hardening | 📋 | `docs/specs/phase75-relationship-extraction.md` |
 
 ---
 
@@ -1042,329 +1044,268 @@ Manages the lifecycle of volatile observations — reinforcement, stability deca
 
 ---
 
-### Phase 51: Web Scraper Ingestion Module 📋
+### Phase 51: Web Scraper Ingestion Module ✅
 
-**Status:** Approved
-**Priority:** Medium
+**Completed:** 2026-02-07
 **Spec:** `docs/specs/phase51-web-scraper-ingestion.md`
+**Guide:** `docs/development/SCRAPER.md`
 
-**What it does:** Asynchronous web scraping module for discovering and ingesting web content. Supports topic-based discovery or user-provided URLs, with authenticated scraping for internal documentation.
+**What it does:** Asynchronous web scraping module for discovering and ingesting web content. Plugin-based architecture with gRPC binary, section chunking for large pages, and user review workflow.
 
-**Key Features:**
-- Topic-based URL discovery or direct URL scraping
-- Asynchronous job execution with status polling
-- Authenticated scraping (cookies, headers, basic auth)
-- Content extraction profiles (documentation, forum, blog, news)
-- Quality scoring and deduplication
-- User review workflow before ingestion
-- Configurable target space_id (defaults to `web-scraper`)
-
-**Deliverables:**
-- `internal/scraper/` — Core scraping service
-- `internal/api/handlers_scraper.go` — REST handlers
-- Job tracking via existing `internal/jobs/`
-- UATS specs for scraper endpoints
-
----
-
-### Phase 70: Neo4j Backup (Full & Partial) with Scheduler 📋
-
-**Status:** Planned
-**Priority:** High
-**Spec:** [`docs/specs/phase70-neo4j-backup.md`](docs/specs/phase70-neo4j-backup.md)
-**Dependencies:** Phase 41 (Space Cleanup), Phase 42 (Self-Ingest), Phase 34 (Incremental Sync/Delta Export)
-
-**What it does:** Provides automated and on-demand backup of the Neo4j database, supporting both full database dumps and partial (space-level) exports. Includes a configurable scheduler for recurring backups, retention policies, and restore capabilities. Ensures disaster recovery for all MDEMG memory graphs.
-
-**Design Goals:**
-- Full database dump via `neo4j-admin database dump` (cold or online depending on Neo4j edition)
-- Partial (space-level) backup leveraging the existing Space Transfer exporter (`.mdemg` format)
-- Configurable scheduler (cron-style) with APE integration for orchestration
-- Retention policy (keep N backups, age-based expiry, storage quota)
-- Restore from full dump or partial `.mdemg` file
-- Protected space awareness (`mdemg-dev` always included in full backups)
-
-#### Tasks
-
-- [ ] **70.1 — Backup Service Core** (`internal/backup/service.go`)
-  - BackupService struct with Neo4j driver, config, and job tracker
-  - `BackupType` enum: `full`, `partial_space`, `partial_delta`
-  - `BackupManifest` type: backup ID, type, timestamp, size, spaces included, checksum
-  - Backup storage abstraction (local filesystem initially; interface for future S3/GCS)
-  - Manifest persistence (JSON sidecar per backup file)
-
-- [ ] **70.2 — Full Database Backup** (`internal/backup/full.go`)
-  - Execute `neo4j-admin database dump` via `os/exec` against the Neo4j container
-  - Support both Docker exec path (`docker exec mdemg-neo4j neo4j-admin ...`) and local binary path
-  - Configurable output directory with timestamped filenames (`mdemg-full-20260207T030000.dump`)
-  - SHA256 checksum calculation and manifest generation
-  - Pre-backup validation: check Neo4j is running, sufficient disk space
-  - Post-backup validation: verify dump file exists and checksum matches
-
-- [ ] **70.3 — Partial Space Backup** (`internal/backup/partial.go`)
-  - Leverage existing `internal/transfer/exporter.go` to export individual spaces
-  - Support single space or multi-space backup in one operation
-  - Output as `.mdemg` files (existing format) with backup manifest wrapper
-  - Delta backup mode: export only changes since last backup using `since_timestamp` (Phase 34)
-  - Automatically include `mdemg-dev` in all partial backups (protected space)
-
-- [ ] **70.4 — Backup Scheduler** (`internal/backup/scheduler.go`)
-  - Cron-expression scheduler for recurring backups (e.g., `"0 3 * * *"` for daily at 3 AM)
-  - Support separate schedules for full vs. partial backups
-  - Integration with APE scheduler for dispatch and monitoring
-  - Missed-schedule detection: if a scheduled backup was missed (server down), run on next startup
-  - Concurrency guard: only one backup of each type can run at a time (mutex + job tracking)
-
-- [ ] **70.5 — Retention Policy Engine** (`internal/backup/retention.go`)
-  - Configurable retention: keep last N backups, max age (days), max total storage (GB)
-  - Separate retention rules for full vs. partial backups
-  - Automatic cleanup after each successful backup
-  - Dry-run mode: report what would be deleted without deleting
-  - Protected backups: manual backups can be marked "keep forever"
-
-- [ ] **70.6 — Restore Service** (`internal/backup/restore.go`)
-  - Full restore from `.dump` file via `neo4j-admin database load`
-  - Partial restore from `.mdemg` file via existing `internal/transfer/importer.go`
-  - Pre-restore safety: snapshot current state, warn if target space has data
-  - Conflict modes for partial restore: `skip`, `overwrite`, `error` (reuse Phase 31 importer)
-  - Post-restore validation: schema version check, node/edge count verification
-
-- [ ] **70.7 — API Endpoints** (`internal/api/handlers_backup.go`)
-  - `POST /v1/backup/trigger` — Trigger on-demand backup (full or partial)
-  - `GET /v1/backup/status/{id}` — Check backup job progress
-  - `GET /v1/backup/list` — List available backups with metadata
-  - `GET /v1/backup/manifest/{id}` — Get backup manifest details
-  - `DELETE /v1/backup/{id}` — Delete a backup (respects "keep forever" flag)
-  - `POST /v1/backup/restore` — Trigger restore from backup
-  - `GET /v1/backup/restore/status/{id}` — Check restore job progress
-  - `GET /v1/backup/schedules` — List configured backup schedules
-  - `POST /v1/backup/schedules` — Create or update backup schedule
-  - `DELETE /v1/backup/schedules/{id}` — Delete a backup schedule
-  - `GET /v1/backup/retention/preview` — Preview retention cleanup (dry run)
-
-- [ ] **70.8 — Cypher Migration** (`migrations/V0012__backup_metadata.cypher`)
-  - `:BackupMeta` node label for tracking backup history in-graph
-  - Properties: `backup_id`, `type`, `status`, `started_at`, `completed_at`, `size_bytes`, `checksum`, `spaces`, `path`
-  - Index on `backup_id` and `started_at`
-  - Relationship: `(:TapRoot)-[:HAS_BACKUP]->(:BackupMeta)`
-
-- [ ] **70.9 — UATS Specs & Tests**
-  - UATS specs for all 11 API endpoints
-  - Unit tests for scheduler, retention, manifest
-  - Integration test: full backup → restore → verify data
-  - Integration test: partial space backup → restore → verify nodes
-
-- [ ] **70.10 — Configuration & Documentation**
-  - Environment variables documented in `.env.example` and `CLAUDE.md`
-  - Phase spec: `docs/specs/phase70-neo4j-backup.md`
-  - Update `CONTRIBUTING.md` API Endpoints section
-  - Update `docs/gMEM-API.md` with backup endpoints
-
-**Planned Key Files:**
+**Key files:**
 
 | File | Purpose |
 |------|---------|
-| `internal/backup/service.go` | Core backup service, types, manifest |
-| `internal/backup/full.go` | Full database dump via neo4j-admin |
-| `internal/backup/partial.go` | Space-level backup via Space Transfer exporter |
-| `internal/backup/scheduler.go` | Cron scheduler with APE integration |
-| `internal/backup/retention.go` | Retention policy engine and cleanup |
-| `internal/backup/restore.go` | Restore from full dump or partial .mdemg |
-| `internal/api/handlers_backup.go` | HTTP handlers for 11 backup endpoints |
-| `migrations/V0012__backup_metadata.cypher` | BackupMeta node label and indexes |
-| `docs/specs/phase70-neo4j-backup.md` | Phase specification |
-| `docs/api/api-spec/uats/specs/backup_*.uats.json` | UATS specs for backup endpoints |
+| `plugins/docs-scraper/` | Standalone gRPC plugin (fetcher, extractor, quality, tagger) |
+| `internal/scraper/` | Core service (types, service, store, orchestrator, dedup, reviewer, summarizer, parser) |
+| `internal/api/handlers_scraper.go` | 6 REST endpoints under `/v1/scraper/` |
+| `internal/api/scraper_adapters.go` | conversation.Service adapter |
+| `internal/scraper/parser.go` | UPTS-validated MarkdownParser (15 unit tests) |
 
-**Planned API Endpoints (11):**
+**Config:** 8 `SCRAPER_*` env vars (default: `SCRAPER_ENABLED=false`). 6 UATS specs, 11 plugin unit tests.
+
+---
+
+### Phase 70: Neo4j Backup & Restore ✅
+
+**Completed:** 2026-02-07
+**Spec:** [`docs/specs/phase70-neo4j-backup.md`](docs/specs/phase70-neo4j-backup.md)
+**Guide:** [`docs/development/NEO4J_BACKUP.md`](docs/development/NEO4J_BACKUP.md)
+
+**What it does:** Automated and on-demand backup of the Neo4j database, supporting full database dumps (via Docker exec) and partial space-level exports (via existing `.mdemg` format). Simple ticker scheduler for recurring backups, retention engine for cleanup, restore from full dump.
+
+**All tasks complete:**
+- [x] Backup service core with manifest I/O and job tracking
+- [x] Full database dump via `docker exec neo4j-admin database dump`
+- [x] Partial space backup via `transfer.Exporter` → `.mdemg` file
+- [x] Ticker-based scheduler (full weekly, partial daily — configurable)
+- [x] Retention engine: count + age + storage-based cleanup; `keep_forever` exempt
+- [x] Restore from full dump via `neo4j-admin database load`
+- [x] 7 API endpoints (all return 503 when disabled)
+- [x] Migration: V0013 BackupMeta constraint + index
+- [x] 7 UATS specs, all passing
+- [x] E2E verified: 101MB partial backup of mdemg-dev (21,033 nodes, 232,434 edges)
+
+**Key files:**
+
+| File | Purpose |
+|------|---------|
+| `internal/backup/types.go` | Config, BackupRecord, BackupManifest, request/response types |
+| `internal/backup/service.go` | Core orchestrator: Trigger, Get, List, Delete, manifest I/O |
+| `internal/backup/full.go` | Full database dump + restore via Docker exec |
+| `internal/backup/partial.go` | Space-level backup via transfer.Exporter |
+| `internal/backup/retention.go` | Count/age/storage-based cleanup engine |
+| `internal/backup/scheduler.go` | Ticker-based automatic backup scheduler |
+| `internal/api/handlers_backup.go` | 7 HTTP handlers for backup endpoints |
+| `migrations/V0013__backup_metadata.cypher` | BackupMeta constraint + index |
+
+**API Endpoints (7 for P0):**
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/v1/backup/trigger` | Trigger backup (type: full, partial_space, partial_delta) |
+| `POST` | `/v1/backup/trigger` | Trigger backup (type: full or partial_space) |
 | `GET` | `/v1/backup/status/{id}` | Backup job progress |
 | `GET` | `/v1/backup/list` | List available backups |
 | `GET` | `/v1/backup/manifest/{id}` | Backup manifest details |
 | `DELETE` | `/v1/backup/{id}` | Delete backup |
-| `POST` | `/v1/backup/restore` | Trigger restore |
+| `POST` | `/v1/backup/restore` | Trigger restore (full dump only) |
 | `GET` | `/v1/backup/restore/status/{id}` | Restore job progress |
-| `GET` | `/v1/backup/schedules` | List backup schedules |
-| `POST` | `/v1/backup/schedules` | Create/update schedule |
-| `DELETE` | `/v1/backup/schedules/{id}` | Delete schedule |
-| `GET` | `/v1/backup/retention/preview` | Preview retention cleanup |
 
-**Planned Configuration:**
-
-```bash
-# Backup Storage
-BACKUP_STORAGE_DIR=/var/mdemg/backups       # Local backup directory
-BACKUP_FULL_CMD=docker                       # "docker" (exec into container) or "local" (neo4j-admin on PATH)
-BACKUP_NEO4J_CONTAINER=mdemg-neo4j          # Docker container name for neo4j-admin exec
-
-# Scheduler
-BACKUP_FULL_SCHEDULE="0 3 * * 0"            # Full backup weekly at 3 AM Sunday
-BACKUP_PARTIAL_SCHEDULE="0 3 * * 1-6"       # Partial backup daily at 3 AM Mon-Sat
-BACKUP_DELTA_ENABLED=true                    # Use delta export for partial backups
-BACKUP_MISSED_SCHEDULE_RUN=true             # Run missed backups on startup
-
-# Retention
-BACKUP_RETENTION_FULL_COUNT=4               # Keep last 4 full backups
-BACKUP_RETENTION_PARTIAL_COUNT=14           # Keep last 14 partial backups
-BACKUP_RETENTION_MAX_AGE_DAYS=90            # Delete backups older than 90 days
-BACKUP_RETENTION_MAX_STORAGE_GB=50          # Max total backup storage
-BACKUP_RETENTION_RUN_AFTER_BACKUP=true      # Auto-cleanup after each backup
-
-# Restore Safety
-BACKUP_RESTORE_SNAPSHOT_BEFORE=true         # Snapshot current state before restore
-BACKUP_RESTORE_DEFAULT_CONFLICT=skip        # Default conflict mode for partial restore
-```
+**Configuration:** 11 `BACKUP_*` env vars (default: `BACKUP_ENABLED=false`). See `.env.example` and `docs/development/NEO4J_BACKUP.md`.
 
 ---
 
-### Phase 75: LSP Enrichment Layer for Cross-File Semantic Edges 📋
+### Phase 75: Cross-File Relationship Extraction & Graph Topology Hardening 📋
 
 **Status:** Planned
-**Priority:** Medium
-**Spec:** [`docs/specs/phase75-lsp-enrichment.md`](docs/specs/phase75-lsp-enrichment.md)
+**Priority:** High
+**Spec:** [`docs/specs/phase75-relationship-extraction.md`](docs/specs/phase75-relationship-extraction.md)
+**Research:** [`docs/research/lsp-vs-upts-analysis.md`](docs/research/lsp-vs-upts-analysis.md)
 **Dependencies:** Phase 46 (Symbol Indexing), Phase 42 (Self-Ingest), Phase 47 (Incremental Updates)
 
-**What it does:** Adds an optional Language Server Protocol (LSP) enrichment layer that runs alongside the existing UPTS regex-based parser framework. While UPTS extracts per-file symbol declarations (27 languages, 100% pass rate), LSP provides cross-file semantic intelligence — producing `CALLS`, `IMPORTS`, `IMPLEMENTS`, and `REFERENCES` edges between existing `:SymbolNode` entities. Language servers run in Docker containers and process files in batch mode after UPTS ingestion completes.
+**What it does:** Two parallel tracks:
 
-**Design Goals:**
-- Additive enrichment — UPTS remains the fast, zero-dependency primary parser; LSP is optional
-- Start with 3 high-value languages: Go (gopls), Python (pyright), TypeScript (tsserver)
-- Containerized language servers — no host toolchain pollution
-- Batch processing — runs as post-ingestion enrichment, not inline with UPTS
-- Idempotent — safe to re-run without duplicating edges
-- New edge types carry provenance metadata (`source: "lsp"`, server version, confidence)
+**A. Relationship Extraction** — Extends existing UPTS parsers (tree-sitter queries + regex + `go/ast`) to extract **relationships** between symbols — not just declarations. Currently, parsers identify "what exists" (`func Retrieve()` in `service.go`) but not "how things connect" (`Retrieve()` calls `ComputeActivation()` in `activation.go`). Adds `IMPORTS`, `EXTENDS`, `IMPLEMENTS`, and `CALLS` edges between `:SymbolNode` entities using a tiered approach — zero new external dependencies.
 
-#### Tasks
+**B. Graph Topology Hardening** — A codebase audit revealed six structural issues:
 
-- [ ] **75.1 — LSP Client** (`internal/enrichment/lsp_client.go`)
-  - JSON-RPC client implementing LSP `initialize`, `shutdown`, `textDocument/references`, `textDocument/definition`, `textDocument/implementation`
-  - Stdio transport to communicate with language server processes
-  - Timeout and error recovery per-file (skip on failure, don't abort run)
-  - Request batching for efficiency
+| # | Issue | Fix |
+|---|-------|-----|
+| 1 | `:MemoryNode` overloaded (18+ role_types on one label) | Add secondary Neo4j labels (`:HiddenPattern`, `:Concept`, etc.) |
+| 2 | `GENERALIZES` semantically overloaded (code + conversation) | Split: keep `GENERALIZES` for code, add `THEME_OF` for conversation |
+| 3 | `:SymbolNode` disconnected from activation | Bring into `CO_ACTIVATED_WITH` loop via Hebbian learning |
+| 4 | Tree-sitter underutilized (manual `walkTree` + `switch`) | Tree-sitter query patterns (`.scm` files) via existing `sitter.NewQuery()` API |
+| 5 | Edge properties inconsistent across types | Common `BaseEdgeProperties()` builder for all new/audited edges |
+| 6 | Upper-layer dynamic edges (L4+) defined in Go but not indexed | Either implement fully (migration + config) or remove unused constants |
 
-- [ ] **75.2 — Container Manager** (`internal/enrichment/container.go`)
-  - Docker container lifecycle for language servers (start, health check, stop)
-  - Volume mount source code directory read-only into container
-  - Memory limit enforcement (default 2 GB per server)
-  - On-demand start/stop — no long-running server processes
+**Why not LSP:** Research showed existing parsers already encounter relationship data during AST walks but drop it. AST-native extraction covers 9+ languages at <1ms/file vs LSP's 3 languages at 50-100ms/file with Docker overhead. See [research analysis](docs/research/lsp-vs-upts-analysis.md).
 
-- [ ] **75.3 — Edge Mapper** (`internal/enrichment/mapper.go`)
-  - Map LSP `references` response → `REFERENCES` edges
-  - Map LSP `definition` response → `CALLS` edges (resolving call sites to targets)
-  - Map LSP `implementation` response → `IMPLEMENTS` edges
-  - Extract `IMPORTS` from Go imports, Python imports, TypeScript imports
-  - Resolve LSP file:line locations to existing `:SymbolNode` entities in Neo4j
-  - Confidence scoring based on LSP result quality
+**Design Goals (10):**
+1. Zero new dependencies — uses existing `go/ast`, tree-sitter, and regex
+2. Incremental — each tier is independently valuable and shippable
+3. Backward compatible — `Relationship` is an additive field on `CodeElement`
+4. UPTS-aligned — uses the `Relationship` type already defined in `upts.schema.json`
+5. Performance neutral — <5ms per file overhead
+6. Idempotent — MERGE operations, safe to re-run
+7. Configurable — each relationship type can be enabled/disabled
+8. Query-driven — tree-sitter queries (`.scm` files) replace hard-coded switch patterns
+9. Property-consistent — all new edges use a common property builder
+10. Topology-correct — secondary labels and split edges fix structural issues
 
-- [ ] **75.4 — Neo4j Edge Writer** (`internal/enrichment/writer.go`)
-  - Batch upsert for `CALLS`, `IMPORTS`, `IMPLEMENTS`, `REFERENCES` edges
-  - Idempotent MERGE operations — safe to re-run
-  - All edges carry provenance: `source`, `lsp_server`, `lsp_version`, `enriched_at`, `confidence`
-  - Edge-specific properties: `call_count`, `ref_count`
-  - Configurable batch size (default 500 edges per transaction)
+**Architecture — 5 Tiers + Topology Track:**
 
-- [ ] **75.5 — Enrichment Service** (`internal/enrichment/service.go`)
-  - Orchestrates: start container → open files → query LSP → map edges → write to Neo4j
-  - Per-language configuration (enable/disable, container image, capabilities)
-  - Job tracking via existing `internal/jobs/` framework
-  - Enrichment status tracked in Neo4j (`:EnrichmentMeta` nodes)
-  - Incremental mode: only process files changed since last enrichment run
+```mermaid
+flowchart TD
+    T1["**Tier 1: Import Extraction**\ntree-sitter queries + regex\n(all languages)"]
+    T2["**Tier 2: Inheritance/Implements**\ntree-sitter queries + go/ast"]
+    T3["**Tier 3: Call Expressions**\ntree-sitter queries + go/ast"]
+    T4["**Tier 4: Cross-File Resolution**\npost-ingestion join"]
+    T5["**Tier 5: go/types Deep Analysis**\nGo stdlib, Go only"]
+    TOPO["**Topology: Graph Schema Hardening**\nmigrations + code changes"]
 
-- [ ] **75.6 — API Endpoints** (`internal/api/handlers_enrichment.go`)
-  - `POST /v1/enrich/trigger` — Trigger LSP enrichment for a space
-  - `GET /v1/enrich/status/{id}` — Check enrichment job progress
-  - `GET /v1/enrich/history` — List enrichment runs for a space
-  - `GET /v1/enrich/languages` — List available LSP languages and status
+    T1 --> T2 --> T3 --> T4 --> T5
+    TOPO -. "parallel" .-> T1
+    TOPO -. "parallel" .-> T5
+```
 
-- [ ] **75.7 — Retrieval Integration** (`internal/retrieval/`)
-  - Include `CALLS`, `IMPORTS`, `IMPLEMENTS` in bounded expansion traversal
-  - Configurable activation decay weights per edge type
-  - `CALLS` (decay 0.7), `IMPORTS` (0.5), `IMPLEMENTS` (0.8), `REFERENCES` (0.3)
+#### Tasks (19)
+
+- [ ] **75.1 — Tree-sitter query engine** (`internal/symbols/query_engine.go`)
+  - Load `.scm` files from `internal/symbols/queries/` directory
+  - Compile queries per language via `sitter.NewQuery()`
+  - Execute queries and emit `[]Relationship`
+
+- [ ] **75.2 — Add `Relationship` type to parser interface** (`cmd/ingest-codebase/languages/interface.go`, `internal/symbols/types.go`)
+  - Add `Relationship` struct (source, relation, target, line, confidence, tier)
+  - Add `Relationships []Relationship` to `CodeElement` and `FileSymbols`
+  - Update UPTS schema to include `CALLS` relation enum value
+
+- [ ] **75.3 — Tier 1: Import query files** (`internal/symbols/queries/*/imports.scm`)
+  - Write `.scm` queries for Go, Python, TypeScript, Rust, Java, C/C++
+
+- [ ] **75.4 — Tier 1: Import extraction for regex parsers** (`cmd/ingest-codebase/languages/*.go`)
+  - Go: walk `file.Imports`, Python: convert existing regex, TypeScript: add import regex
+
+- [ ] **75.5 — Tier 2: Inheritance/implementation query files** (`internal/symbols/queries/*/inheritance.scm`)
+  - Python, TypeScript, Java, Rust, C++ `.scm` queries
+
+- [ ] **75.6 — Tier 3: Call expression query files** (`internal/symbols/queries/*/calls.scm`)
+  - Go, Python, TypeScript, Java, Rust `.scm` queries with scoping rules
+
+- [ ] **75.7 — Common edge property builder** (`internal/models/edge_properties.go`)
+  - `BaseEdgeProperties()` function ensuring schema compliance
+  - Audit all existing edge creation in `internal/hidden/service.go` (10+ CREATE statements)
+  - Fix `DEFINES_SYMBOL` to include base properties (currently bare edge)
+
+- [ ] **75.8 — Relationship Neo4j Writer** (`internal/symbols/relationships.go`)
+  - Batch MERGE for `IMPORTS`, `EXTENDS`, `IMPLEMENTS`, `CALLS`
+  - Uses `BaseEdgeProperties()` for all edges
+  - All edges carry provenance: `source`, `tier`, `confidence`, `extracted_at`
+
+- [ ] **75.9 — Tier 4: Cross-file resolution** (`internal/symbols/resolver.go`)
+  - Resolve local names → qualified SymbolNode IDs
+  - Strategy: same-file → same-package → imported-package → global
+
+- [ ] **75.10 — Tier 5: go/types analysis** (`internal/symbols/go_types.go`)
+  - `types.Implements()` for compiler-grade interface resolution (Go only)
+  - Optional: `GO_TYPES_ANALYSIS_ENABLED=false` by default
+
+- [ ] **75.11 — Secondary labels migration** (`migrations/V0014__secondary_labels.cypher`)
+  - Apply secondary labels to all existing MemoryNodes based on `role_type`
+  - Create indexes on new labels (`:HiddenPattern`, `:Concept`, `:Concern`, `:ConfigPattern`, etc.)
+  - Update node creation code to add labels on creation
+
+- [ ] **75.12 — Split GENERALIZES for conversation edges**
+  - New `THEME_OF` edge for conversation observation → theme
+  - Migration to convert existing conversation `GENERALIZES` to `THEME_OF`
+  - Update all conversation queries in `internal/conversation/service.go` and `internal/hidden/service.go`
+
+- [ ] **75.13 — SymbolNode activation integration** (`internal/retrieval/service.go`, `internal/learning/`)
+  - Include symbol IDs in co-activation candidate set during retrieval
+  - Create `CO_ACTIVATED_WITH` edges between co-retrieved symbols
+  - Add `space_id` property to `DEFINES_SYMBOL` edges
+
+- [ ] **75.14 — Cypher migration: relationship edges** (`migrations/V0013__relationship_edges.cypher`)
+  - Indexes for `CALLS`, `IMPORTS`, `IMPLEMENTS`, `EXTENDS`, `THEME_OF`
+
+- [ ] **75.15 — Retrieval integration** (`internal/retrieval/`)
+  - Include new edges in bounded expansion (graph traversal)
+  - Note: new edges participate in expansion only — activation still propagates through `CO_ACTIVATED_WITH` only (design invariant)
   - Per-node degree caps for new edge types
 
-- [ ] **75.8 — Cypher Migration** (`migrations/V0013__enrichment_edges.cypher`)
-  - `:EnrichmentMeta` node label for tracking enrichment history
-  - Indexes on `CALLS`, `IMPORTS`, `IMPLEMENTS`, `REFERENCES` edges
-  - Properties: `enrichment_id`, `space_id`, `status`, `started_at`, `completed_at`, `files_processed`, `edges_created`
+- [ ] **75.16 — API: Relationship Stats** (`internal/api/`)
+  - `GET /v1/symbols/relationships` — counts by type
+  - `GET /v1/symbols/{id}/relationships` — edges for a symbol
 
-- [ ] **75.9 — Docker Images** (`docker/lsp-*/Dockerfile`)
-  - `docker/lsp-gopls/Dockerfile` — Go language server
-  - `docker/lsp-pyright/Dockerfile` — Python language server
-  - `docker/lsp-tsserver/Dockerfile` — TypeScript language server
-  - All images based on minimal base images with only the language server installed
+- [ ] **75.17 — Dynamic edge type resolution** (decision point)
+  - Option A: Add migration + config for `ANALOGOUS_TO`, `CONTRASTS_WITH`, `COMPOSES_WITH`, `BRIDGES`
+  - Option B: Remove unused `DynamicEdgeType` constants from `internal/hidden/types.go`
 
-- [ ] **75.10 — UATS Specs & Tests**
-  - UATS specs for all 4 API endpoints
-  - Unit tests for LSP client, edge mapper, writer, container manager
-  - Integration test: Go enrichment → verify CALLS/IMPORTS edges in graph
-  - Integration test: verify LSP edges participate in retrieval scoring
-  - Regression test: UPTS parsing unaffected by enrichment
+- [ ] **75.18 — Tests & UATS**
+  - Unit tests for query engine and each tier per language
+  - Integration tests: MDEMG self-ingest, secondary labels, THEME_OF edges
+  - Regression: existing symbol extraction unaffected
 
-- [ ] **75.11 — Configuration & Documentation**
-  - Environment variables documented in `.env.example` and `CLAUDE.md`
-  - Phase spec: `docs/specs/phase75-lsp-enrichment.md`
-  - Update `CONTRIBUTING.md` API Endpoints section
-  - Update `docs/gMEM-API.md` with enrichment endpoints
+- [ ] **75.19 — Documentation**
+  - Update `CLAUDE.md`, `docs/architecture/02_Graph_Schema.md`, `gMEM-API.md`, UPTS schema docs
+  - Document `.scm` query file format for adding new patterns
 
 **Planned Key Files:**
 
 | File | Purpose |
 |------|---------|
-| `internal/enrichment/service.go` | Enrichment orchestrator, job management |
-| `internal/enrichment/lsp_client.go` | LSP JSON-RPC client |
-| `internal/enrichment/mapper.go` | LSP response → Neo4j edge mapping |
-| `internal/enrichment/writer.go` | Batch Neo4j edge writer (upsert) |
-| `internal/enrichment/container.go` | Docker container lifecycle |
-| `internal/enrichment/config.go` | Per-language configuration |
-| `internal/api/handlers_enrichment.go` | HTTP handlers for 4 endpoints |
-| `migrations/V0013__enrichment_edges.cypher` | EnrichmentMeta node, edge indexes |
-| `docker/lsp-gopls/Dockerfile` | gopls language server container |
-| `docker/lsp-pyright/Dockerfile` | pyright language server container |
-| `docker/lsp-tsserver/Dockerfile` | TypeScript language server container |
-| `docs/specs/phase75-lsp-enrichment.md` | Phase specification |
-
-**Planned API Endpoints (4):**
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/v1/enrich/trigger` | Trigger LSP enrichment for a space |
-| `GET` | `/v1/enrich/status/{id}` | Enrichment job progress |
-| `GET` | `/v1/enrich/history` | List enrichment runs |
-| `GET` | `/v1/enrich/languages` | List available LSP languages |
+| `internal/symbols/query_engine.go` | Tree-sitter query engine (loads `.scm` files) |
+| `internal/symbols/queries/*/imports.scm` | Import extraction queries per language |
+| `internal/symbols/queries/*/inheritance.scm` | Inheritance/implementation queries per language |
+| `internal/symbols/queries/*/calls.scm` | Call expression queries per language |
+| `internal/symbols/relationships.go` | Relationship Neo4j writer (batch MERGE) |
+| `internal/symbols/resolver.go` | Cross-file name resolution (Tier 4) |
+| `internal/symbols/go_types.go` | go/types interface resolution (Tier 5) |
+| `internal/models/edge_properties.go` | Common edge property builder |
+| `migrations/V0013__relationship_edges.cypher` | Indexes for relationship edges |
+| `migrations/V0014__secondary_labels.cypher` | Secondary labels + THEME_OF migration |
+| `docs/specs/phase75-relationship-extraction.md` | Phase specification |
 
 **New Graph Edge Types:**
 
 | Type | From → To | Description |
 |------|-----------|-------------|
-| `CALLS` | `:SymbolNode` → `:SymbolNode` | Function A calls function B |
-| `IMPORTS` | `:SymbolNode` → `:SymbolNode` | File A imports module B |
+| `IMPORTS` | `:SymbolNode` → `:SymbolNode` | File/module A imports module B |
+| `EXTENDS` | `:SymbolNode` → `:SymbolNode` | Class A extends class B |
 | `IMPLEMENTS` | `:SymbolNode` → `:SymbolNode` | Type A implements interface B |
-| `REFERENCES` | `:SymbolNode` → `:SymbolNode` | Symbol A references symbol B |
+| `CALLS` | `:SymbolNode` → `:SymbolNode` | Function A calls function B |
+| `THEME_OF` | `:ConversationObs` → `:ConversationTheme` | Observation clusters into theme (replaces conversation `GENERALIZES`) |
+
+**Planned API Endpoints (2):**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/symbols/relationships` | Relationship edge counts by type |
+| `GET` | `/v1/symbols/{id}/relationships` | Edges for a specific symbol |
 
 **Planned Configuration:**
 
 ```bash
-# Feature toggle
-LSP_ENRICHMENT_ENABLED=false               # Master switch (default: off)
+# Relationship extraction toggles
+REL_EXTRACT_IMPORTS=true         # Tier 1 (default: on)
+REL_EXTRACT_INHERITANCE=true     # Tier 2 (default: on)
+REL_EXTRACT_CALLS=true           # Tier 3 (default: on)
+REL_CROSS_FILE_RESOLVE=true      # Tier 4 (default: on)
+GO_TYPES_ANALYSIS_ENABLED=false  # Tier 5 (default: off)
 
-# Language servers
-LSP_GO_ENABLED=true                        # Enable Go (gopls)
-LSP_PYTHON_ENABLED=true                    # Enable Python (pyright)
-LSP_TYPESCRIPT_ENABLED=false               # Enable TypeScript (tsserver)
+# Query engine
+REL_QUERIES_DIR=internal/symbols/queries  # Path to .scm query files
 
-# Container settings
-LSP_CONTAINER_MEMORY_LIMIT=2g              # RAM limit per server
-LSP_CONTAINER_TIMEOUT_MINUTES=30           # Max time per enrichment run
+# Limits
+REL_MAX_CALLS_PER_FUNCTION=50   # Cap outgoing CALLS per function
+REL_BATCH_SIZE=500              # Edges per Neo4j transaction
+REL_RESOLUTION_TIMEOUT_SEC=60   # Max time for cross-file resolution
 
-# Edge creation
-LSP_EDGE_BATCH_SIZE=500                    # Edges per Neo4j transaction
-LSP_EDGE_CONFIDENCE_THRESHOLD=0.5          # Min confidence to create edge
-LSP_MAX_REFERENCES_PER_SYMBOL=100          # Cap references to prevent fan-out
+# Topology hardening
+SECONDARY_LABELS_ENABLED=true    # Apply secondary labels to MemoryNodes (default: on)
+SYMBOL_ACTIVATION_ENABLED=true   # Include SymbolNodes in Hebbian learning (default: on)
+THEME_OF_EDGE_ENABLED=true       # Use THEME_OF instead of GENERALIZES for conversation (default: on)
 ```
-
----
 
 ---
 
@@ -1742,6 +1683,7 @@ Located at `docs/lang-parser/lang-parse-spec/upts/` — 27 language parser specs
 | `migrations/V0007__symbol_nodes.cypher` | SymbolNode label, indexes, constraints, vector index |
 | `migrations/V0008-V0010` | (Various incremental improvements) |
 | `migrations/V0011__agent_identity.cypher` | Agent_id indexes for multi-agent CMS |
+| `migrations/V0013__backup_metadata.cypher` | BackupMeta unique constraint + started_at index |
 
 ### Integration Tests
 
@@ -1760,7 +1702,7 @@ Located at `docs/lang-parser/lang-parse-spec/upts/` — 27 language parser specs
 | Path | Contents |
 |------|----------|
 | `docs/architecture/` | 24 files: Architecture (01), Graph Schema (02), Embeddings (03), Activation (04), Ingestion (05), Retrieval (06), Consolidation (07), Config (08), Testing (09), Ops (10), Migrations (11), Scoring Examples (12), Go Framework (13), Runbook (14), plus Hidden Layer, Hybrid Rerank, Interceptor, Learning Edges, Modular Intelligence, Recursive Consolidation, Temporal Decay specs |
-| `docs/development/` | API Reference, CI/CD, Dev Roadmap, Linear Guide, Module Dev Guide, Public Roadmap, Research Roadmap, SDK Plugin Guide |
+| `docs/development/` | API Reference, CI/CD, Dev Roadmap, Linear Guide, Module Dev Guide, Neo4j Backup Guide, Public Roadmap, Research Roadmap, Scraper Guide, SDK Plugin Guide |
 | `docs/specs/` | Phase specs (31-50 mapping), Framework Governance, UNTS spec, manifest, template |
 | `docs/research/` | Edge Type Attention, GAT, Hybrid Edge Strategy, Enhancement Research, Query-Aware Expansion, Temporal Decay Results |
 | `docs/benchmarks/` | Benchmark results, scripts, analysis (43 files) |
@@ -1845,7 +1787,7 @@ python3 docs/tests/uobs/runners/uobs_runner.py --spec "docs/tests/uobs/specs/*.u
 python3 docs/tests/uobs/runners/uobs_runner.py --spec docs/tests/uobs/specs/embedding_health.uobs.json
 
 # === UATS Tests ===
-make test-api                                         # Run all 79 UATS specs
+make test-api                                         # Run all 92 UATS specs
 python3 docs/api/api-spec/uats/runners/uats_runner.py add-hashes --spec-dir docs/api/api-spec/uats/specs/
 python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir docs/api/api-spec/uats/specs/
 
@@ -1877,4 +1819,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-07 — 85 UATS specs (6 new scraper specs), 140 variants. Phase 51 (Web Scraper Ingestion Module) complete: 10 plugin files, 9 core files, 6 UATS specs, 11 plugin unit tests passing. Scraper disabled by default (SCRAPER_ENABLED=false).*
+*Last updated: 2026-02-07 — 92 UATS specs, 147 variants, 146 passing (99.3%). Phase 70 (Neo4j Backup & Restore) complete: 6 backup files, 1 handler file, 7 UATS specs, migration V0013. Backup disabled by default (BACKUP_ENABLED=false). Phase 51 (Web Scraper) also complete.*

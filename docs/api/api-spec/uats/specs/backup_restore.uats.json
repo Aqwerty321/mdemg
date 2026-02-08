@@ -1,0 +1,45 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Trigger Restore",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "backup",
+      "restore",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates POST /v1/backup/restore returns 503 when backup not enabled",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "0420e80363a13ca5f61e3164a2c5046a1939a95ba098a1f2e6bd32039cb25191"
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/backup/restore",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "backup_id": "nonexistent-backup-id"
+    }
+  },
+  "expected": {
+    "status": 503,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  }
+}

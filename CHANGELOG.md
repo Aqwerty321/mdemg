@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 70: Neo4j Backup & Restore**: Full database dump via `docker exec neo4j-admin` and partial space-level export via `.mdemg` format. Ticker-based scheduler (full weekly, partial daily), retention engine (count/age/storage-based cleanup), restore from full dump. 7 API endpoints under `/v1/backup/`, 7 UATS specs, migration V0013. Config: 11 `BACKUP_*` env vars (default: `BACKUP_ENABLED=false`). E2E verified against live mdemg-dev space (21,033 nodes, 232,434 edges, 101MB backup).
+- **Phase 51: Web Scraper Ingestion Module**: Plugin-based web scraping with section chunking, quality scoring, dedup, and user review workflow. 6 API endpoints under `/v1/scraper/`, 6 UATS specs, UPTS-validated MarkdownParser. Config: 8 `SCRAPER_*` env vars (default: `SCRAPER_ENABLED=false`).
 - **Diagnostics Framework**: Structured `Diagnostic` struct with severity, code, message, parser, and context fields; `DiagnosticSummary` for aggregate reporting; `TruncateContentWithInfo()` and `NewDiagnostic()` helpers; wired into `walkCodebase` with summary logging
 - **9 New Language Parsers**: C# (.cs), Kotlin (.kt, .kts), Terraform/HCL (.tf, .tfvars), Makefile (.mk, Makefile), Protocol Buffers (.proto), GraphQL (.graphql, .gql), OpenAPI (via content detection), Markdown (.md), XML (.xml, .csproj) — all with UPTS specs, test fixtures, and diagnostics support
 - **UPTS Evidence Validation**: Structural consistency checks in the Go-native test harness — validates LineEnd consistency, CodeElement ranges, symbol containment, and LineEnd matching against specs; enabled for Go and Rust parsers

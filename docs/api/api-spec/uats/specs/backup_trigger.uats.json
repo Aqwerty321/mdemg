@@ -1,0 +1,49 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Trigger Backup",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "backup",
+      "trigger",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates POST /v1/backup/trigger returns 503 when backup not enabled",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "b06a5b2ea3ca34203c7e8d3a497afabcbfe9e5ac1b65b1da0a78b66b3f23036c"
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/backup/trigger",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "type": "partial_space",
+      "space_ids": [
+        "uats-backup-test"
+      ],
+      "label": "uats-test"
+    }
+  },
+  "expected": {
+    "status": 503,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Get Restore Status",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "backup",
+      "restore",
+      "status",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-07",
+    "description": "Validates GET /v1/backup/restore/status/{id} returns 503 when backup not enabled",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "ec2a07208618f40255869243d1eb0a18b97cc83bb07982a91f93157c9ce5e3bb"
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/backup/restore/status/nonexistent-restore-id",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 503,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  }
+}

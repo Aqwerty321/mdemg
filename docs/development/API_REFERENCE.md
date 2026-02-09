@@ -19,6 +19,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Plugins & Modules](#plugins--modules)
 - [System & Monitoring](#system--monitoring)
 - [Backup & Restore](#backup--restore-phase-70)
+- [Neo4j State Monitor](#neo4j-state-monitor-phase-76)
 - [Meta-Cognition & Self-Improvement](#meta-cognition--self-improvement-phase-80)
 
 ---
@@ -1866,6 +1867,67 @@ Check restore job progress.
   }
 }
 ```
+
+---
+
+## Neo4j State Monitor (Phase 76)
+
+Consolidated view of database health, all spaces, and backup status in a single endpoint.
+
+### GET /v1/neo4j/overview
+
+Returns aggregated database statistics, per-space summaries, and backup overview.
+
+**Response**:
+```json
+{
+  "database": {
+    "status": "healthy",
+    "version": "0.6.0",
+    "schema_version": 10,
+    "total_nodes": 33329,
+    "total_edges": 401908,
+    "total_spaces": 85
+  },
+  "spaces": [
+    {
+      "space_id": "mdemg-dev",
+      "node_count": 8689,
+      "edge_count": 1631,
+      "nodes_by_layer": { "0": 3995, "1": 3594, "2": 778, "3": 224, "4": 64, "5": 34 },
+      "observation_count": 277,
+      "health_score": 0.67,
+      "last_consolidation": "2026-02-09T21:00:00Z",
+      "last_ingest": "",
+      "last_ingest_type": "",
+      "ingest_count": 0,
+      "is_stale": false,
+      "learning_edges": 1631,
+      "orphan_count": 92
+    }
+  ],
+  "backups": {
+    "last_full": null,
+    "last_partial": null,
+    "total_count": 0
+  },
+  "computed_at": "2026-02-09T21:59:14Z"
+}
+```
+
+**Response Fields**:
+
+| Section | Field | Description |
+|---------|-------|-------------|
+| `database` | `status` | `healthy`, `degraded`, or `unavailable` |
+| `database` | `version` | MDEMG server version |
+| `database` | `schema_version` | Neo4j migration schema version |
+| `database` | `total_nodes` / `total_edges` | Global counts across all spaces |
+| `database` | `total_spaces` | Number of distinct space_ids |
+| `spaces[]` | `health_score` | 0.0-1.0 based on orphan ratio (60%) + edge density (40%) |
+| `spaces[]` | `is_stale` | True if >10 observations and no consolidation in 7 days |
+| `spaces[]` | `nodes_by_layer` | Node counts per layer (0-5) |
+| `backups` | `last_full` / `last_partial` | Most recent backup summary (null if none) |
 
 ---
 

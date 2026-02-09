@@ -147,6 +147,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Orphan detection**: Timestamp-based detection of nodes missing from re-ingestion with archive/delete/list actions
 - **Edge consistency**: Automatic staleness tracking and edge weight refresh during consolidation
 - **Backup & restore**: Automated full database dumps and partial space exports with retention policies and scheduler
+- **Neo4j state monitoring**: Single endpoint for consolidated database health, per-space statistics (nodes, edges, layers, health score, staleness), and backup overview
 - **Meta-cognition enforcement**: Server-side anomaly detection (empty-resume, empty-recall), hook circuit breakers with CRITICAL warnings, multi-dimensional watchdog monitoring, Hebbian signal learning for adaptive enforcement
 - **Space Transfer & DevSpace**: Export/import space graphs as `.mdemg` files or via gRPC; optional DevSpace hub for agent registration, publish/pull exports, and inter-agent messaging (see `cmd/space-transfer/README.md` and `docs/specs/development-space-collaboration.md`)
 

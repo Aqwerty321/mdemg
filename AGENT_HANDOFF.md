@@ -291,7 +291,7 @@ Phases are organized into **numbered series** to group related work:
 | — (Skill Registry) | **Phase 48-SR** | CMS Skill Registry API | ✅ Complete |
 | — (Neo4j Backup) | **Phase 70** | Neo4j Backup (Full & Partial) with Scheduler | ✅ Complete |
 | — (Relationship Extraction) | **Phase 75** | Cross-File Relationship Extraction & Graph Topology Hardening | ✅ Complete |
-| — (Neo4j Monitor) | **Phase 76** | Neo4j State Monitor & Space Overview | 📋 Planned |
+| — (Neo4j Monitor) | **Phase 76** | Neo4j State Monitor & Space Overview | ✅ Complete |
 | — (CMS Meta-Cognition) | **Phase 80** | CMS ANN Meta-Cognition & Self-Improvement Enforcement | ✅ Complete |
 
 ---
@@ -1771,58 +1771,37 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 
 ---
 
-### Phase 76: Neo4j State Monitor & Space Overview
+### Phase 76: Neo4j State Monitor & Space Overview ✅
 
-**Status:** Planned (no spec)
-**Dependencies:** None
+**Status:** Complete (2026-02-09)
+**Dependencies:** Phase 70 (Backup), Phase 75C (L5 Emergent Layer)
+**Commit:** `9eb72ce`
 
-**What it does:** Provides a consolidated Neo4j state monitoring tool with a single endpoint that returns all space_ids, per-space statistics (nodes, edges, summaries, health), and last backup timestamps.
+**What it does:** Single `GET /v1/neo4j/overview` endpoint that aggregates database health, per-space summaries, and backup status. Replaces calling 4+ endpoints to understand system state.
 
-**Gap Analysis — What already exists:**
+**Endpoint:** `GET /v1/neo4j/overview`
 
-| Capability | Endpoint | Status |
-|-----------|----------|--------|
-| Per-space node/edge/health stats | `GET /v1/memory/stats` | Exists |
-| Learning phase/edges | `GET /v1/learning/stats` | Exists |
-| Backup list with timestamps | `GET /v1/backup/list` | Exists |
-| Cache/query metrics | `GET /v1/memory/cache/stats` | Exists |
-| Space freshness | `GET /v1/memory/spaces/{id}/freshness` | Exists |
-| **List all space_ids** | — | **MISSING** |
-| **Aggregated cross-space overview** | — | **MISSING** |
-| **Last full/incremental backup per space** | — | **MISSING** (backup/list has timestamps but no per-space filter) |
-| **Consolidated dashboard endpoint** | — | **MISSING** |
+**Response sections:**
+- **database**: status (healthy/degraded), version, schema_version, total_nodes, total_edges, total_spaces
+- **spaces[]**: per-space node_count, edge_count, nodes_by_layer, observation_count, health_score, staleness, orphan_count, learning_edges, last_consolidation, last_ingest timestamps
+- **backups**: last_full, last_partial (BackupSummary), total_count
+- **computed_at**: ISO8601 timestamp
 
-**Proposed Endpoint:** `GET /v1/neo4j/overview`
+**Key Implementation Details:**
+- 6 batched Cypher queries (not N*4 per-space) for efficiency
+- Health score per space: orphan ratio (60%) + edge density (40%)
+- Staleness detection: >10 observations + no consolidation in 7 days
+- Graceful degradation: failed queries set status to "degraded" but response still returns
+- Backup section populated from `backup.Service.ListBackups()` when enabled
 
-**Response shape:**
-```json
-{
-  "database": {
-    "status": "healthy",
-    "version": "5.15",
-    "total_nodes": 12345,
-    "total_edges": 67890
-  },
-  "spaces": [
-    {
-      "space_id": "mdemg-dev",
-      "node_count": 2789,
-      "edge_count": 8500,
-      "nodes_by_layer": { "0": 1500, "1": 800, "2": 300, "3": 100, "4": 50, "5": 4 },
-      "observation_count": 120,
-      "health_score": 0.92,
-      "last_consolidation": "2026-02-08T15:30:00Z",
-      "last_ingest": "2026-02-08T18:00:00Z"
-    }
-  ],
-  "backups": {
-    "last_full": { "backup_id": "...", "created_at": "2026-02-07T00:00:00Z", "size_bytes": 12345678 },
-    "last_partial": { "backup_id": "...", "created_at": "2026-02-08T12:00:00Z", "spaces": ["mdemg-dev"] }
-  }
-}
-```
+**Files Changed:**
 
-**Implementation:** Single handler in `internal/api/handlers_monitor.go`, Cypher query for space listing + per-space stats, backup metadata from existing `BackupService`.
+| File | Change |
+|------|--------|
+| `internal/models/models.go` | +5 types (Neo4jOverviewResponse, DatabaseOverview, SpaceOverview, BackupOverview, BackupSummary) |
+| `internal/api/handlers.go` | +handleNeo4jOverview (~250 lines) |
+| `internal/api/server.go` | +1 route registration |
+| `docs/api/api-spec/uats/specs/neo4j_overview.uats.json` | 1 UATS spec with 7 body assertions |
 
 ---
 
@@ -1958,4 +1937,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-08 — 97 UATS specs, 154 variants, 154 passing (100%). Phase 80 (CMS ANN Meta-Cognition) complete: server-side anomaly detection, hook circuit breakers, multi-dimensional watchdog, Hebbian signal learner. 21 files changed (+2997 lines). Phase 75C, 75, 70, 51 also complete.*
+*Last updated: 2026-02-09 — 98 UATS specs, 155 variants, 155 passing (100%). Phase 76 (Neo4j State Monitor) complete: consolidated GET /v1/neo4j/overview endpoint with batched queries. Phase 80, 75C, 75, 70, 51 also complete.*

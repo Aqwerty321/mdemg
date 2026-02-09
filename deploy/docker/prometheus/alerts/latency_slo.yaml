@@ -71,7 +71,7 @@ groups:
 
       # Health Check Failing
       - alert: MDEMGHealthCheckFailing
-        expr: up{job="mdemg"} == 0
+        expr: up{job="mdemg-api"} == 0
         for: 1m
         labels:
           severity: critical

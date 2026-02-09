@@ -256,7 +256,8 @@ Phases are organized into **numbered series** to group related work:
 | **30s** | 31-40 | **Space Transfer & DevSpace Collaboration** — The multi-agent collaboration pipeline |
 | **40s** | 41-43 | **Core Engine** — Original infrastructure phases (cleanup, self-ingest, CMS) |
 | **50s** | 44-52 | **Advanced Features** — Modular intelligence, symbols, incremental updates, caching, LLM SDK, public readiness |
-| **70s** | 70+ | **Operations & Reliability** — Backup, restore, disaster recovery, operational tooling |
+| **70s** | 70-79 | **Operations & Reliability** — Backup, restore, disaster recovery, monitoring, operational tooling |
+| **80s** | 80-89 | **Meta-Cognition & Self-Improvement** — ANN meta-cognition, self-assessment enforcement, adaptive learning |
 
 ### Mapping from Old to New
 
@@ -269,7 +270,7 @@ Phases are organized into **numbered series** to group related work:
 | Phase 5 (CRDT + Lineage) | **Phase 35** | CRDT for Learned Edges + Space Lineage | ✅ Complete |
 | Phase 7 (Observation Forwarding) | **Phase 36** | Selective Observation Forwarding (CMS) | 📋 Planned |
 | Phase 8 (Agent Health) | **Phase 37** | Agent Health / Heartbeat / Presence | ✅ Complete |
-| — (UNTS) | **Phase 38** | Hash Verification (UNTS / Nash Verification) | ✅ Complete |
+| — (UNTS) | **Phase 38** | Hash Verification (UNTS / Nash Verification) | 📋 Spec Complete |
 | Phase 1 (Cleanup) | **Phase 41** | Space Cleanup | ✅ Complete |
 | Phase 2 (Self-Ingest) | **Phase 42** | Self-Ingest MDEMG Codebase | ✅ Complete |
 | Phase 3A (CMS Enforcement) | **Phase 43A** | CMS Agent Enforcement | ✅ Complete |
@@ -289,7 +290,9 @@ Phases are organized into **numbered series** to group related work:
 | — (Pipeline Registry) | **Phase 46-PR** | Dynamic Pipeline Registry | ✅ Complete |
 | — (Skill Registry) | **Phase 48-SR** | CMS Skill Registry API | ✅ Complete |
 | — (Neo4j Backup) | **Phase 70** | Neo4j Backup (Full & Partial) with Scheduler | ✅ Complete |
-| — (Relationship Extraction) | **Phase 75** | Cross-File Relationship Extraction & Graph Topology Hardening | 📋 Planned |
+| — (Relationship Extraction) | **Phase 75** | Cross-File Relationship Extraction & Graph Topology Hardening | ✅ Complete |
+| — (Neo4j Monitor) | **Phase 76** | Neo4j State Monitor & Space Overview | 📋 Planned |
+| — (CMS Meta-Cognition) | **Phase 80** | CMS ANN Meta-Cognition & Self-Improvement Enforcement | 📋 Planned |
 
 ---
 
@@ -315,7 +318,7 @@ Phases are organized into **numbered series** to group related work:
 | 35 | CRDT + Lineage | ✅ | `docs/specs/development-space-collaboration.md` §Phase 5 |
 | 36 | Observation Forwarding | 📋 | `docs/specs/development-space-collaboration.md` §Phase 7 |
 | 37 | Agent Health / Presence | ✅ | `docs/specs/development-space-collaboration.md` §Phase 8 |
-| 38 | UNTS Hash Verification | ✅ | `docs/specs/unts-hash-verification.md` |
+| 38 | UNTS Hash Verification | 📋 | `docs/specs/unts-hash-verification.md` (spec complete, implementation not started) |
 | 41 | Space Cleanup | ✅ | `docs/specs/phase1-space-cleanup.md` |
 | 42 | Self-Ingest | ✅ | `docs/specs/phase2-self-ingest.md` |
 | 43A | CMS Enforcement | ✅ | `docs/specs/phase3a-cms-enforcement.md` |
@@ -334,7 +337,10 @@ Phases are organized into **numbered series** to group related work:
 | 45.5 | Constraint Detection & Consolidation | ✅ | `internal/hidden/constraint_nodes.go`, `internal/conversation/constraint_detector.go` |
 | 46-PR | Dynamic Pipeline Registry | ✅ | `docs/development/REGISTRY.md` |
 | 70 | Neo4j Backup (Full & Partial) with Scheduler | ✅ | `docs/specs/phase70-neo4j-backup.md` |
-| 75 | Cross-File Relationship Extraction & Graph Topology Hardening | 📋 | `docs/specs/phase75-relationship-extraction.md` |
+| 75 | Cross-File Relationship Extraction & Graph Topology Hardening | ✅ | `docs/specs/phase75-relationship-extraction.md` |
+| 75C | L5 Emergent Layer — Unblock Emergence | ✅ | `docs/features/l5-emergent-layer.md` |
+| 76 | Neo4j State Monitor & Space Overview | 📋 | Planned |
+| 80 | CMS ANN Meta-Cognition & Self-Improvement Enforcement | 📋 | Planned |
 
 ---
 
@@ -1716,7 +1722,168 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 
 ---
 
-## 13. Known Issues & Technical Debt
+## 13. Planned Phases
+
+### Phase 38: UNTS Hash Verification — Registry, Monitoring & Configuration
+
+**Status:** Spec complete (`docs/specs/unts-hash-verification.md`), implementation not started
+**Spec Date:** 2026-01-22
+**Dependencies:** None
+
+**What it does:** Maintains a current and historical record of hash verification for all MDEMG files protected by hash verification across frameworks (UPTS, UATS, UBTS, USTS, UOTS, UAMS, UDTS).
+
+**Data Model:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `path` | string | Repo-relative path |
+| `framework` | string | manifest, udts, uats, ubts, usts, uots, uams, upts |
+| `current_hash` | string | SHA-256 hex (64 chars) |
+| `status` | enum | verified, mismatch, unknown, reverted |
+| `history` | array | Last 3 hash values with timestamps and source |
+| `source_ref` | string | Where hash is enforced |
+
+**API Surface (7 endpoints):**
+
+| Endpoint | Description |
+|----------|-------------|
+| `ListVerifiedFiles` | List all tracked files with status |
+| `GetFileStatus` | Single file status |
+| `GetHashHistory` | Full history for revert UI |
+| `RevertToPreviousHash` | Set expected hash to a previous value |
+| `UpdateHash` | Manual/CI update of expected hash |
+| `VerifyNow` | Recompute hashes, compare, update status |
+| `RegisterTrackedFile` | Add new path to registry |
+
+**Implementation Order:** Registry format → Scanners (manifest.sha256, UDTS) → Core logic → API service → UATS specs → Observability
+
+**Open Design Questions:**
+1. REST (consistent with all other MDEMG endpoints) vs gRPC (as specced)? REST recommended for consistency.
+2. MVP file-based storage (`unts-registry.json`) vs Neo4j? Neo4j avoids adding a new storage layer.
+3. UPTS hash plan has 3 unresolved questions (hard error vs warning, in-place vs new dir, default behavior)
+4. UATS specs needed but not yet defined in the spec
+
+**Key Files:**
+- `docs/specs/unts-hash-verification.md` — Primary spec
+- `docs/lang-parser/lang-parse-spec/upts-hash-plan/` — UPTS-specific hash verification (v1.1)
+- `docs/specs/FRAMEWORK_GOVERNANCE.md` — Governance context
+- `docs/specs/manifest.sha256` — Existing manifest (22 entries)
+
+---
+
+### Phase 76: Neo4j State Monitor & Space Overview
+
+**Status:** Planned (no spec)
+**Dependencies:** None
+
+**What it does:** Provides a consolidated Neo4j state monitoring tool with a single endpoint that returns all space_ids, per-space statistics (nodes, edges, summaries, health), and last backup timestamps.
+
+**Gap Analysis — What already exists:**
+
+| Capability | Endpoint | Status |
+|-----------|----------|--------|
+| Per-space node/edge/health stats | `GET /v1/memory/stats` | Exists |
+| Learning phase/edges | `GET /v1/learning/stats` | Exists |
+| Backup list with timestamps | `GET /v1/backup/list` | Exists |
+| Cache/query metrics | `GET /v1/memory/cache/stats` | Exists |
+| Space freshness | `GET /v1/memory/spaces/{id}/freshness` | Exists |
+| **List all space_ids** | — | **MISSING** |
+| **Aggregated cross-space overview** | — | **MISSING** |
+| **Last full/incremental backup per space** | — | **MISSING** (backup/list has timestamps but no per-space filter) |
+| **Consolidated dashboard endpoint** | — | **MISSING** |
+
+**Proposed Endpoint:** `GET /v1/neo4j/overview`
+
+**Response shape:**
+```json
+{
+  "database": {
+    "status": "healthy",
+    "version": "5.15",
+    "total_nodes": 12345,
+    "total_edges": 67890
+  },
+  "spaces": [
+    {
+      "space_id": "mdemg-dev",
+      "node_count": 2789,
+      "edge_count": 8500,
+      "nodes_by_layer": { "0": 1500, "1": 800, "2": 300, "3": 100, "4": 50, "5": 4 },
+      "observation_count": 120,
+      "health_score": 0.92,
+      "last_consolidation": "2026-02-08T15:30:00Z",
+      "last_ingest": "2026-02-08T18:00:00Z"
+    }
+  ],
+  "backups": {
+    "last_full": { "backup_id": "...", "created_at": "2026-02-07T00:00:00Z", "size_bytes": 12345678 },
+    "last_partial": { "backup_id": "...", "created_at": "2026-02-08T12:00:00Z", "spaces": ["mdemg-dev"] }
+  }
+}
+```
+
+**Implementation:** Single handler in `internal/api/handlers_monitor.go`, Cypher query for space listing + per-space stats, backup metadata from existing `BackupService`.
+
+---
+
+### Phase 80: CMS ANN Meta-Cognition & Self-Improvement Enforcement
+
+**Status:** Research complete, implementation planned
+**Dependencies:** Phase 60b (RSIC), Phase 43A (CMS Enforcement)
+
+**Problem:** LLM coding agents consistently fail to use the CMS framework. The RSIC self-improvement cycle is ignored. When `/v1/conversation/resume` returns 0 observations (indicating memory disconnection), agents proceed without investigating. The root cause: MDEMG relies on extrinsic metacognition (prompt instructions) which research shows is unreliable.
+
+**Research basis:** 20+ papers including MUSE (competence-aware agents), SOFAI-LM (IBM cognitive architecture, AAAI 2026), AgentSpec (runtime enforcement, >90% compliance), ReMA (hierarchical meta-thinking, NeurIPS 2025). See full report in CMS observations.
+
+**Proposed 4-Layer Meta-Cognitive Architecture:**
+
+```
+Layer 1: Server-Side Anomaly Signals
+  Resume/Recall endpoints add anomaly headers to responses
+  X-MDEMG-Memory-State: degraded|nominal|healthy
+  X-MDEMG-Anomaly: empty-resume|low-retrieval|stale-consolidation
+
+Layer 2: Hook-Level Circuit Breakers
+  session-start.sh detects 0-observation resume for active space
+  Emits CRITICAL WARNING with mandatory investigation steps
+  Not a neutral status message — forces investigation
+
+Layer 3: Structured Assessment Protocol
+  Auto-triggered RSIC micro assessment on every session start
+  Health score visible in every session context
+  Degraded health → mandatory investigation checklist
+
+Layer 4: Behavioral Learning Loop
+  Track which signals agents respond to vs ignore
+  Strengthen effective signals (Hebbian pattern)
+  Prune ineffective signals — adaptive enforcement
+```
+
+**Metacognitive Trigger Categories:**
+
+| Category | Trigger | Severity |
+|----------|---------|----------|
+| State Anomaly | Resume returns 0 observations for active space | CRITICAL |
+| State Anomaly | Recall returns 0 for semantically rich query | HIGH |
+| State Anomaly | Zero learning edges in active space | HIGH |
+| Pattern Degradation | Correction rate > 15% in 24h | MEDIUM |
+| Pattern Degradation | Consolidation > 24h stale | LOW |
+| Agent Behavioral | Agent never calls RSIC endpoints in session | HIGH |
+| Agent Behavioral | Agent never calls observe endpoint | MEDIUM |
+| Surprise/Novelty | Cluster of high-surprise observations | HIGH |
+| Surprise/Novelty | Contradiction with pinned observation | CRITICAL |
+
+**Priority Implementation Order:**
+1. **Immediate:** Upgrade `session-start.sh` to detect 0-observation anomaly → emit strong warning
+2. **Short-term:** Add anomaly headers to resume/recall API responses; extend Watchdog beyond temporal decay
+3. **Medium-term:** Auto-triggered RSIC micro assessment on session start; Jiminy layer enhancement
+4. **Long-term:** Behavioral learning loop that adapts metacognitive signals based on agent response patterns
+
+**Key insight (from AgentSpec paper):** Runtime enforcement via hooks achieves >90% compliance. Prompt-based instructions achieve substantially less. The shift must be from "tell the agent to self-monitor" to "mechanically enforce self-monitoring."
+
+---
+
+## 14. Known Issues & Technical Debt
 
 | Issue | Severity | Location | Notes |
 |-------|----------|----------|-------|
@@ -1733,10 +1900,11 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 | ~~`internal/ape/` low coverage~~ | ✅ Fixed | `internal/ape/scheduler_test.go` | 1,477-line test file |
 | ~~`internal/consulting/` low coverage~~ | ✅ Fixed | `internal/consulting/service_test.go` | 3,788-line test file |
 | ~~CRDT merge semantics~~ | ✅ Fixed | Phase 35 | Implemented: max for weights, sum for evidence_count |
+| ~~Grafana dashboard not loading~~ | ✅ Fixed | `deploy/docker/` | Named volume `grafana-data` at `/var/lib/grafana` shadowed dashboard bind mount. Moved dashboards to `/etc/grafana/dashboards`. Also fixed alert rule job name `mdemg` → `mdemg-api`. |
 
 ---
 
-## 14. Quick Reference Commands
+## 15. Quick Reference Commands
 
 ```bash
 # === Build & Verify ===

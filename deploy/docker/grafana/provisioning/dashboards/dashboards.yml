@@ -1,6 +1,6 @@
 # Grafana Dashboard Provisioning
 # Phase 48.5 - Benchmarking & Monitoring
-# Auto-imports dashboards from /var/lib/grafana/dashboards on startup
+# Auto-imports dashboards from /etc/grafana/dashboards on startup
 
 apiVersion: 1
 
@@ -14,5 +14,5 @@ providers:
     updateIntervalSeconds: 30
     allowUiUpdates: true
     options:
-      path: /var/lib/grafana/dashboards
+      path: /etc/grafana/dashboards
       foldersFromFilesStructure: false

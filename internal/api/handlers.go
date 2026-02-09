@@ -3237,3 +3237,355 @@ RETURN count(r) AS edge_count`
 	}
 	return result.(int64), nil
 }
+
+// handleNeo4jOverview returns a consolidated view of all spaces, database health,
+// and backup status in a single response. Uses batched Cypher queries for efficiency.
+func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	ctx := r.Context()
+
+	resp := models.Neo4jOverviewResponse{
+		ComputedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// --- Database section ---
+	dbOverview := models.DatabaseOverview{
+		Status:  "healthy",
+		Version: s.cfg.MdemgVersion,
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Schema version
+	schemaVer, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `MATCH (s:SchemaMeta {key:'schema'}) RETURN coalesce(s.current_version,0) AS v`, nil)
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			v, _ := res.Record().Get("v")
+			if iv, ok := v.(int64); ok {
+				return int(iv), nil
+			}
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		dbOverview.Status = "degraded"
+		log.Printf("[neo4j-overview] schema version query failed: %v", err)
+	} else {
+		dbOverview.SchemaVersion = schemaVer.(int)
+	}
+
+	// Global node count
+	totalNodes, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `MATCH (n:MemoryNode) RETURN count(n) AS cnt`, nil)
+		if err != nil {
+			return int64(0), err
+		}
+		if res.Next(ctx) {
+			c, _ := res.Record().Get("cnt")
+			if iv, ok := c.(int64); ok {
+				return iv, nil
+			}
+		}
+		return int64(0), res.Err()
+	})
+	if err != nil {
+		dbOverview.Status = "degraded"
+		log.Printf("[neo4j-overview] total nodes query failed: %v", err)
+	} else {
+		dbOverview.TotalNodes = totalNodes.(int64)
+	}
+
+	// Global edge count
+	totalEdges, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `MATCH ()-[r]->() RETURN count(r) AS cnt`, nil)
+		if err != nil {
+			return int64(0), err
+		}
+		if res.Next(ctx) {
+			c, _ := res.Record().Get("cnt")
+			if iv, ok := c.(int64); ok {
+				return iv, nil
+			}
+		}
+		return int64(0), res.Err()
+	})
+	if err != nil {
+		dbOverview.Status = "degraded"
+		log.Printf("[neo4j-overview] total edges query failed: %v", err)
+	} else {
+		dbOverview.TotalEdges = totalEdges.(int64)
+	}
+
+	// --- Spaces section (batched queries) ---
+
+	// 1. Nodes per space, grouped by layer
+	type spaceLayerRow struct {
+		SpaceID     string
+		TotalNodes  int64
+		LayerCounts map[int]int64
+	}
+	spaceData := make(map[string]*spaceLayerRow)
+
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (n:MemoryNode)
+			WHERE n.space_id IS NOT NULL
+			WITH n.space_id AS sid, coalesce(n.layer, 0) AS layer, count(n) AS cnt
+			RETURN sid, layer, cnt
+			ORDER BY sid, layer`, nil)
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			sid, _ := rec.Get("sid")
+			layer, _ := rec.Get("layer")
+			cnt, _ := rec.Get("cnt")
+			spaceID := sid.(string)
+			layerInt := int(layer.(int64))
+			countInt := cnt.(int64)
+
+			row, ok := spaceData[spaceID]
+			if !ok {
+				row = &spaceLayerRow{SpaceID: spaceID, LayerCounts: make(map[int]int64)}
+				spaceData[spaceID] = row
+			}
+			row.TotalNodes += countInt
+			row.LayerCounts[layerInt] = countInt
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		dbOverview.Status = "degraded"
+		log.Printf("[neo4j-overview] space node counts query failed: %v", err)
+	}
+
+	dbOverview.TotalSpaces = len(spaceData)
+
+	// 2. Edges per space (CO_ACTIVATED_WITH)
+	edgeCounts := make(map[string]int64)
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (a:MemoryNode)-[r:CO_ACTIVATED_WITH]->(b:MemoryNode)
+			WHERE a.space_id IS NOT NULL AND a.space_id = b.space_id
+			RETURN a.space_id AS sid, count(r) AS edge_count`, nil)
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			sid, _ := rec.Get("sid")
+			ec, _ := rec.Get("edge_count")
+			edgeCounts[sid.(string)] = ec.(int64)
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		log.Printf("[neo4j-overview] space edge counts query failed: %v", err)
+	}
+
+	// 3. Observation counts per space
+	obsCounts := make(map[string]int64)
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (n:MemoryNode)
+			WHERE n.space_id IS NOT NULL AND n.role_type = 'conversation_observation'
+			RETURN n.space_id AS sid, count(n) AS obs_count`, nil)
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			sid, _ := rec.Get("sid")
+			oc, _ := rec.Get("obs_count")
+			obsCounts[sid.(string)] = oc.(int64)
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		log.Printf("[neo4j-overview] observation counts query failed: %v", err)
+	}
+
+	// 4. Orphan counts per space (nodes with no edges)
+	orphanCounts := make(map[string]int64)
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (n:MemoryNode)
+			WHERE n.space_id IS NOT NULL AND NOT (n)--()
+			RETURN n.space_id AS sid, count(n) AS orphan_count`, nil)
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			sid, _ := rec.Get("sid")
+			oc, _ := rec.Get("orphan_count")
+			orphanCounts[sid.(string)] = oc.(int64)
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		log.Printf("[neo4j-overview] orphan counts query failed: %v", err)
+	}
+
+	// 5. Last consolidation and ingest timestamps per space
+	type spaceTimestamps struct {
+		LastConsolidation string
+		LastIngest        string
+		LastIngestType    string
+		IngestCount       int
+	}
+	timestamps := make(map[string]*spaceTimestamps)
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (n:MemoryNode)
+			WHERE n.space_id IS NOT NULL AND n.layer > 0
+			WITH n.space_id AS sid, max(n.created_at) AS last_consolidation
+			RETURN sid, last_consolidation`, nil)
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			sid, _ := rec.Get("sid")
+			lc, _ := rec.Get("last_consolidation")
+			spaceID := sid.(string)
+			ts, ok := timestamps[spaceID]
+			if !ok {
+				ts = &spaceTimestamps{}
+				timestamps[spaceID] = ts
+			}
+			if s, ok := lc.(string); ok {
+				ts.LastConsolidation = s
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		log.Printf("[neo4j-overview] consolidation timestamps query failed: %v", err)
+	}
+
+	// Ingest timestamps (codebase nodes)
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (n:MemoryNode)
+			WHERE n.space_id IS NOT NULL AND n.role_type IN ['codebase_file','codebase_symbol']
+			WITH n.space_id AS sid, max(n.created_at) AS last_ingest, n.role_type AS rt, count(n) AS cnt
+			RETURN sid, last_ingest, rt, cnt
+			ORDER BY sid, last_ingest DESC`, nil)
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			sid, _ := rec.Get("sid")
+			li, _ := rec.Get("last_ingest")
+			rt, _ := rec.Get("rt")
+			cnt, _ := rec.Get("cnt")
+			spaceID := sid.(string)
+			ts, ok := timestamps[spaceID]
+			if !ok {
+				ts = &spaceTimestamps{}
+				timestamps[spaceID] = ts
+			}
+			if s, ok := li.(string); ok && (ts.LastIngest == "" || s > ts.LastIngest) {
+				ts.LastIngest = s
+				if rts, ok := rt.(string); ok {
+					ts.LastIngestType = rts
+				}
+			}
+			if c, ok := cnt.(int64); ok {
+				ts.IngestCount += int(c)
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		log.Printf("[neo4j-overview] ingest timestamps query failed: %v", err)
+	}
+
+	// Build space overview list
+	spaces := make([]models.SpaceOverview, 0, len(spaceData))
+	for spaceID, row := range spaceData {
+		so := models.SpaceOverview{
+			SpaceID:          spaceID,
+			NodeCount:        row.TotalNodes,
+			EdgeCount:        edgeCounts[spaceID],
+			NodesByLayer:     row.LayerCounts,
+			ObservationCount: obsCounts[spaceID],
+			LearningEdges:    edgeCounts[spaceID],
+			OrphanCount:      orphanCounts[spaceID],
+		}
+
+		// Health score: simple formula based on orphan ratio and edge density
+		if row.TotalNodes > 0 {
+			orphanRatio := float64(orphanCounts[spaceID]) / float64(row.TotalNodes)
+			connectScore := 1.0 - orphanRatio
+			edgeDensity := float64(edgeCounts[spaceID]) / float64(row.TotalNodes)
+			if edgeDensity > 1.0 {
+				edgeDensity = 1.0
+			}
+			so.HealthScore = connectScore*0.6 + edgeDensity*0.4
+			if so.HealthScore < 0 {
+				so.HealthScore = 0
+			}
+		}
+
+		// Staleness: no consolidation in the last 7 days for spaces with >10 observations
+		if ts, ok := timestamps[spaceID]; ok {
+			so.LastConsolidation = ts.LastConsolidation
+			so.LastIngest = ts.LastIngest
+			so.LastIngestType = ts.LastIngestType
+			so.IngestCount = ts.IngestCount
+			if ts.LastConsolidation != "" && obsCounts[spaceID] > 10 {
+				if t, err := time.Parse(time.RFC3339, ts.LastConsolidation); err == nil {
+					so.IsStale = time.Since(t) > 7*24*time.Hour
+				}
+			}
+		}
+
+		spaces = append(spaces, so)
+	}
+	resp.Spaces = spaces
+	resp.Database = dbOverview
+
+	// --- Backups section ---
+	backupOverview := models.BackupOverview{}
+	if s.backupSvc != nil {
+		manifests, err := s.backupSvc.ListBackups("", 0)
+		if err != nil {
+			log.Printf("[neo4j-overview] backup list failed: %v", err)
+		} else {
+			backupOverview.TotalCount = len(manifests)
+			for i := range manifests {
+				m := &manifests[i]
+				if m.Type == "full" && backupOverview.LastFull == nil {
+					backupOverview.LastFull = &models.BackupSummary{
+						BackupID:  m.BackupID,
+						CreatedAt: m.CreatedAt,
+						SizeBytes: m.SizeBytes,
+						Spaces:    m.Spaces,
+					}
+				}
+				if m.Type == "partial_space" && backupOverview.LastPartial == nil {
+					backupOverview.LastPartial = &models.BackupSummary{
+						BackupID:  m.BackupID,
+						CreatedAt: m.CreatedAt,
+						SizeBytes: m.SizeBytes,
+						Spaces:    m.Spaces,
+					}
+				}
+			}
+		}
+	}
+	resp.Backups = backupOverview
+
+	writeJSON(w, http.StatusOK, resp)
+}

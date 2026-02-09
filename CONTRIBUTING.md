@@ -507,6 +507,12 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | POST | `/v1/backup/restore` | Trigger restore from full backup |
 | GET | `/v1/backup/restore/status/{id}` | Restore job status |
 
+### Neo4j State Monitor (Phase 76)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/neo4j/overview` | Consolidated database health, space summaries, and backup status |
+
 ### Symbol Relationships (Phase 75)
 
 | Method | Endpoint | Description |

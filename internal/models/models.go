@@ -869,3 +869,53 @@ type ScheduleCleanupResponse struct {
 	Status        string `json:"status"` // "enabled", "disabled"
 	NextRunAt     string `json:"next_run_at,omitempty"`
 }
+
+// Neo4jOverviewResponse - response for GET /v1/neo4j/overview
+type Neo4jOverviewResponse struct {
+	Database   DatabaseOverview `json:"database"`
+	Spaces     []SpaceOverview  `json:"spaces"`
+	Backups    BackupOverview   `json:"backups"`
+	ComputedAt string           `json:"computed_at"`
+}
+
+// DatabaseOverview - aggregate database health and counts
+type DatabaseOverview struct {
+	Status        string `json:"status"`         // "healthy", "degraded", "unavailable"
+	Version       string `json:"version"`        // MDEMG version from config
+	SchemaVersion int    `json:"schema_version"` // migration schema version
+	TotalNodes    int64  `json:"total_nodes"`
+	TotalEdges    int64  `json:"total_edges"`
+	TotalSpaces   int    `json:"total_spaces"`
+}
+
+// SpaceOverview - per-space node/edge/health summary
+type SpaceOverview struct {
+	SpaceID           string        `json:"space_id"`
+	NodeCount         int64         `json:"node_count"`
+	EdgeCount         int64         `json:"edge_count"`
+	NodesByLayer      map[int]int64 `json:"nodes_by_layer"`
+	ObservationCount  int64         `json:"observation_count"`
+	HealthScore       float64       `json:"health_score"`
+	LastConsolidation string        `json:"last_consolidation,omitempty"`
+	LastIngest        string        `json:"last_ingest,omitempty"`
+	LastIngestType    string        `json:"last_ingest_type,omitempty"`
+	IngestCount       int           `json:"ingest_count"`
+	IsStale           bool          `json:"is_stale"`
+	LearningEdges     int64         `json:"learning_edges"`
+	OrphanCount       int64         `json:"orphan_count"`
+}
+
+// BackupOverview - backup status summary
+type BackupOverview struct {
+	LastFull    *BackupSummary `json:"last_full,omitempty"`
+	LastPartial *BackupSummary `json:"last_partial,omitempty"`
+	TotalCount  int            `json:"total_count"`
+}
+
+// BackupSummary - minimal backup info for overview
+type BackupSummary struct {
+	BackupID  string   `json:"backup_id"`
+	CreatedAt string   `json:"created_at"`
+	SizeBytes int64    `json:"size_bytes"`
+	Spaces    []string `json:"spaces,omitempty"`
+}

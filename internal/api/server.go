@@ -878,6 +878,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/edges/stale/stats", s.handleStaleEdgeStats)
 	mux.HandleFunc("/v1/memory/edges/stale/refresh", s.handleRefreshStaleEdges)
 
+	// Neo4j state monitor
+	mux.HandleFunc("/v1/neo4j/overview", s.handleNeo4jOverview)
+
 	// Ingestion job management endpoints
 	mux.HandleFunc("/v1/memory/ingest/trigger", s.handleIngestTrigger)
 	mux.HandleFunc("/v1/memory/ingest/status/", s.handleIngestStatus)

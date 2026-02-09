@@ -1,0 +1,63 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Neo4j Overview",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "neo4j",
+      "monitoring",
+      "overview",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-09",
+    "description": "Validates Neo4j state monitor overview endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "6f0df1ae9de4f0d21422f670fa0c51fcd1ffa94d13e8e28a727882357901d876"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/neo4j/overview"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.database",
+        "type": "object"
+      },
+      {
+        "path": "$.database.status",
+        "type": "string"
+      },
+      {
+        "path": "$.database.total_nodes",
+        "type": "number"
+      },
+      {
+        "path": "$.database.total_spaces",
+        "type": "number"
+      },
+      {
+        "path": "$.spaces",
+        "type": "array"
+      },
+      {
+        "path": "$.backups",
+        "type": "object"
+      },
+      {
+        "path": "$.computed_at",
+        "type": "string"
+      }
+    ]
+  }
+}

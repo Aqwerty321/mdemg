@@ -147,6 +147,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Orphan detection**: Timestamp-based detection of nodes missing from re-ingestion with archive/delete/list actions
 - **Edge consistency**: Automatic staleness tracking and edge weight refresh during consolidation
 - **Backup & restore**: Automated full database dumps and partial space exports with retention policies and scheduler
+- **Meta-cognition enforcement**: Server-side anomaly detection (empty-resume, empty-recall), hook circuit breakers with CRITICAL warnings, multi-dimensional watchdog monitoring, Hebbian signal learning for adaptive enforcement
 - **Space Transfer & DevSpace**: Export/import space graphs as `.mdemg` files or via gRPC; optional DevSpace hub for agent registration, publish/pull exports, and inter-agent messaging (see `cmd/space-transfer/README.md` and `docs/specs/development-space-collaboration.md`)
 
 ## Architecture
@@ -287,6 +288,7 @@ Install the post-commit hook to automatically ingest changes on every commit:
 | `/v1/conversation/correct` | POST | Record user corrections for learning |
 | `/v1/conversation/recall` | POST | Query conversation history |
 | `/v1/conversation/consolidate` | POST | Create themes from observations |
+| `/v1/conversation/session/anomalies` | GET | Aggregated session anomalies and health |
 | `/v1/conversation/templates` | GET/POST | List or create observation templates |
 | `/v1/conversation/templates/{id}` | GET/PUT/DELETE | CRUD for specific template |
 | `/v1/conversation/snapshot` | POST | Create session snapshot |
@@ -440,6 +442,7 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Phase | Name | Status |
 |-------|------|--------|
+| 80 | CMS ANN Meta-Cognition & Self-Improvement Enforcement | ✅ Complete |
 | 70 | Neo4j Backup & Restore (Full & Partial) with Scheduler | ✅ Complete |
 | 60 | CMS Advanced Functionality II (Templates, Snapshots, Relevance, Truncation, Org-Review) | ✅ Complete |
 | 49 | LLM Plugin SDK (Scaffolding, Validation, Gap Detection) | ✅ Complete |

@@ -1,0 +1,60 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Session Anomalies",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "session",
+      "anomaly",
+      "metacog"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-08",
+    "description": "Validates session anomaly summary endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "701a0d1420adfdad67a3f7a40b6252d83524e1d7f806212ca89b732607d10f6c"
+  },
+  "variables": {
+    "test_session": "uats-anomaly-session",
+    "test_space": "uats-anomaly-test"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/conversation/session/anomalies?session_id={{test_session}}&space_id={{test_space}}",
+    "headers": {}
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.session_id",
+        "type": "string"
+      },
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.health_score",
+        "type": "number"
+      },
+      {
+        "path": "$.observation_count",
+        "type": "number"
+      },
+      {
+        "path": "$.active_anomalies",
+        "type": "array"
+      }
+    ]
+  }
+}

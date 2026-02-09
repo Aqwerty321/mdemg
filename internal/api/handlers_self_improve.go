@@ -43,6 +43,15 @@ func (s *Server) handleSelfImproveAssess(w http.ResponseWriter, r *http.Request)
 		http.Error(w, sanitizeError(err, "self-improve assess"), http.StatusInternalServerError)
 		return
 	}
+
+	// Phase 80: Record RSIC call for signal tracking
+	if s.sessionTracker != nil {
+		s.sessionTracker.RecordRSICCall("claude-core")
+	}
+	if s.signalLearner != nil {
+		s.signalLearner.RecordResponse("rsic-assess-called")
+	}
+
 	writeJSON(w, http.StatusOK, report)
 }
 
@@ -124,6 +133,15 @@ func (s *Server) handleSelfImproveCycle(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, sanitizeError(err, "self-improve cycle"), http.StatusInternalServerError)
 		return
 	}
+
+	// Phase 80: Record RSIC cycle for signal tracking
+	if s.sessionTracker != nil {
+		s.sessionTracker.RecordRSICCall("claude-core")
+	}
+	if s.signalLearner != nil {
+		s.signalLearner.RecordResponse("rsic-cycle-called")
+	}
+
 	writeJSON(w, http.StatusOK, outcome)
 }
 
@@ -196,3 +214,28 @@ func (s *Server) handleSelfImproveHealth(w http.ResponseWriter, r *http.Request)
 
 	writeJSON(w, http.StatusOK, resp)
 }
+
+// ─── GET /v1/self-improve/signals ───
+
+func (s *Server) handleSelfImproveSignals(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.signalLearner == nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"signals": []any{},
+			"enabled": false,
+		})
+		return
+	}
+
+	signals := s.signalLearner.GetAllEffectiveness()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"signals": signals,
+		"enabled": true,
+		"count":   len(signals),
+	})
+}
+

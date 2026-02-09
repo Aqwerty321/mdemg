@@ -199,11 +199,15 @@ const (
 
 // WatchdogState tracks the decay watchdog's current state.
 type WatchdogState struct {
-	DecayScore      float64         `json:"decay_score"`
-	EscalationLevel EscalationLevel `json:"escalation_level"`
-	LastCycleTime   time.Time       `json:"last_cycle_time"`
-	NextDue         time.Time       `json:"next_due"`
-	SpaceID         string          `json:"space_id"`
+	DecayScore         float64         `json:"decay_score"`
+	EscalationLevel    EscalationLevel `json:"escalation_level"`
+	LastCycleTime      time.Time       `json:"last_cycle_time"`
+	NextDue            time.Time       `json:"next_due"`
+	SpaceID            string          `json:"space_id"`
+	SessionHealthScore float64         `json:"session_health_score"`
+	ObsRatePerHour     float64         `json:"obs_rate_per_hour"`
+	ActiveAnomalies    []string        `json:"active_anomalies,omitempty"`
+	ConsolidationAge   int64           `json:"consolidation_age_sec"`
 }
 
 // ───────────── Provider Interfaces ─────────────
@@ -231,4 +235,11 @@ type VolatileStatsResult struct {
 // HiddenLayerProvider exposes consolidation triggers.
 type HiddenLayerProvider interface {
 	RunFullConversationConsolidation(ctx context.Context, spaceID string) (any, error)
+}
+
+// WatchdogSignalProvider supplies additional monitoring signals for multi-dimensional watchdog.
+type WatchdogSignalProvider interface {
+	GetSessionHealthScore(sessionID string) float64
+	GetObservationRate(spaceID string) float64
+	GetConsolidationAgeSec(ctx context.Context, spaceID string) (int64, error)
 }

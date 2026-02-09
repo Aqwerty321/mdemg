@@ -248,10 +248,11 @@ The `.claude/` directory is gitignored and contains local-only configuration for
 
 | Hook | Trigger | Purpose |
 |------|---------|---------|
-| `post-tool-observe.py` | After tool use | Auto-captures CMS observations (build results, errors, config changes); triggers codebase re-ingest on `git push` |
+| `post-tool-observe.py` | After tool use | Auto-captures CMS observations (build results, errors, config changes); triggers codebase re-ingest on `git push`; detects degraded memory state in API responses |
 | `pre-bash-check.py` | Before Bash | Blocks destructive commands (reset-db, rm -rf, force push, DROP TABLE) |
-| `session-start.sh` | Session start | Restores CMS context via `/v1/conversation/resume` |
-| `pre-compact.sh` | Before compaction | Saves context snapshot to CMS before auto-compaction |
+| `session-start.sh` | Session start | Restores CMS context via `/v1/conversation/resume`; detects 0-observation anomaly with CRITICAL warning; auto-triggers RSIC micro assessment; displays RSIC health summary |
+| `prompt-context.sh` | Before prompt | Injects CMS recall context; warns on empty recall for non-trivial queries; displays session health ribbon |
+| `pre-compact.sh` | Before compaction | Saves context snapshot to CMS before auto-compaction; includes session health in snapshot |
 
 ### Re-Ingest on Push
 
@@ -418,6 +419,7 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | GET | `/v1/conversation/volatile/stats` | Volatile memory stats |
 | POST | `/v1/conversation/graduate` | Graduate volatile to permanent |
 | GET | `/v1/conversation/session/health` | Session health score |
+| GET | `/v1/conversation/session/anomalies` | Aggregated session anomalies and health (Phase 80) |
 
 ### CMS Templates (Phase 60)
 
@@ -455,6 +457,7 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | GET | `/v1/self-improve/history` | Cycle history with outcomes |
 | GET | `/v1/self-improve/calibration` | Calibration metrics and confidence scores |
 | GET | `/v1/self-improve/health` | Watchdog status and health score |
+| GET | `/v1/self-improve/signals` | Signal emission/response effectiveness stats (Phase 80) |
 
 ### Skill Registry (Phase 48)
 

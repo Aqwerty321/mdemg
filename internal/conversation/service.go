@@ -1567,9 +1567,16 @@ func (s *Service) generateResumeSummary(resp *ResumeResponse) string {
 // generateJiminyRationale creates the Jiminy explanation for why specific state was rehydrated.
 // It analyzes the returned observations, themes, and concepts to explain the rationale.
 func (s *Service) generateJiminyRationale(resp *ResumeResponse) *JiminyRationale {
-	// No content = no rationale needed
+	// Empty state = warning rationale (Phase 80: Meta-Cognition)
 	if len(resp.Observations) == 0 && len(resp.Themes) == 0 && len(resp.EmergentConcepts) == 0 {
-		return nil
+		return &JiminyRationale{
+			Rationale:  "WARNING: Memory returned empty for active space. Possible causes: database issue, embedder failure, or space has no data. Investigate with POST /v1/self-improve/assess.",
+			Confidence: 0.9,
+			Highlights: []string{"CRITICAL: 0 observations returned", "ACTION: Run self-assessment"},
+			ScoreBreakdown: map[string]float64{
+				"anomaly_empty_resume": 1.0,
+			},
+		}
 	}
 
 	// Calculate aggregate scores for the breakdown

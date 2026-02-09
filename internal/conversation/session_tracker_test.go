@@ -159,3 +159,347 @@ func TestSessionTracker_GetState_Unknown(t *testing.T) {
 		t.Error("expected nil for unknown session")
 	}
 }
+
+func TestSessionTracker_RecordRSICCall(t *testing.T) {
+	st := NewSessionTracker(1 * time.Hour)
+	defer st.Stop()
+
+	t.Run("creates session if not exists", func(t *testing.T) {
+		st.RecordRSICCall("sess-rsic-1")
+
+		state := st.GetState("sess-rsic-1")
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+		if state.RSICCallCount != 1 {
+			t.Errorf("expected RSICCallCount=1, got %d", state.RSICCallCount)
+		}
+		if state.LastActivityAt.IsZero() {
+			t.Error("expected LastActivityAt to be set")
+		}
+		if state.CreatedAt.IsZero() {
+			t.Error("expected CreatedAt to be set")
+		}
+	})
+
+	t.Run("increments RSICCallCount on existing session", func(t *testing.T) {
+		st.RecordRSICCall("sess-rsic-2")
+		st.RecordRSICCall("sess-rsic-2")
+		st.RecordRSICCall("sess-rsic-2")
+
+		state := st.GetState("sess-rsic-2")
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+		if state.RSICCallCount != 3 {
+			t.Errorf("expected RSICCallCount=3, got %d", state.RSICCallCount)
+		}
+	})
+}
+
+func TestSessionTracker_RecordSignalEmitted(t *testing.T) {
+	st := NewSessionTracker(1 * time.Hour)
+	defer st.Stop()
+
+	t.Run("creates session with signal", func(t *testing.T) {
+		st.RecordSignalEmitted("sess-signal-1", "WARN_NO_RESUME")
+
+		state := st.GetState("sess-signal-1")
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+		if len(state.SignalsEmitted) != 1 {
+			t.Fatalf("expected 1 signal, got %d", len(state.SignalsEmitted))
+		}
+		if state.SignalsEmitted[0] != "WARN_NO_RESUME" {
+			t.Errorf("expected signal=WARN_NO_RESUME, got %s", state.SignalsEmitted[0])
+		}
+		if state.LastActivityAt.IsZero() {
+			t.Error("expected LastActivityAt to be set")
+		}
+	})
+
+	t.Run("appends signals to existing session", func(t *testing.T) {
+		st.RecordSignalEmitted("sess-signal-2", "SIGNAL_A")
+		st.RecordSignalEmitted("sess-signal-2", "SIGNAL_B")
+		st.RecordSignalEmitted("sess-signal-2", "SIGNAL_C")
+
+		state := st.GetState("sess-signal-2")
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+		if len(state.SignalsEmitted) != 3 {
+			t.Fatalf("expected 3 signals, got %d", len(state.SignalsEmitted))
+		}
+		expected := []string{"SIGNAL_A", "SIGNAL_B", "SIGNAL_C"}
+		for i, exp := range expected {
+			if state.SignalsEmitted[i] != exp {
+				t.Errorf("signal[%d]: expected %s, got %s", i, exp, state.SignalsEmitted[i])
+			}
+		}
+	})
+}
+
+func TestSessionTracker_RecordObserveCall(t *testing.T) {
+	st := NewSessionTracker(1 * time.Hour)
+	defer st.Stop()
+
+	t.Run("creates session if not exists", func(t *testing.T) {
+		st.RecordObserveCall("sess-obs-1")
+
+		state := st.GetState("sess-obs-1")
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+		if state.ObserveCallCount != 1 {
+			t.Errorf("expected ObserveCallCount=1, got %d", state.ObserveCallCount)
+		}
+		if state.LastActivityAt.IsZero() {
+			t.Error("expected LastActivityAt to be set")
+		}
+	})
+
+	t.Run("increments ObserveCallCount on existing session", func(t *testing.T) {
+		st.RecordObserveCall("sess-obs-2")
+		st.RecordObserveCall("sess-obs-2")
+		st.RecordObserveCall("sess-obs-2")
+		st.RecordObserveCall("sess-obs-2")
+
+		state := st.GetState("sess-obs-2")
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+		if state.ObserveCallCount != 4 {
+			t.Errorf("expected ObserveCallCount=4, got %d", state.ObserveCallCount)
+		}
+	})
+
+	t.Run("ObserveCallCount is distinct from ObservationsSinceResume", func(t *testing.T) {
+		st.RecordObserveCall("sess-obs-3")
+		st.RecordObserve("sess-obs-3")
+
+		state := st.GetState("sess-obs-3")
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+		if state.ObserveCallCount != 1 {
+			t.Errorf("expected ObserveCallCount=1, got %d", state.ObserveCallCount)
+		}
+		if state.ObservationsSinceResume != 1 {
+			t.Errorf("expected ObservationsSinceResume=1, got %d", state.ObservationsSinceResume)
+		}
+	})
+}
+
+func TestSessionState_NewFields(t *testing.T) {
+	st := NewSessionTracker(1 * time.Hour)
+	defer st.Stop()
+
+	t.Run("RSICCallCount defaults to 0", func(t *testing.T) {
+		st.RecordResume("sess-fields-1", "test-space")
+
+		state := st.GetState("sess-fields-1")
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+		if state.RSICCallCount != 0 {
+			t.Errorf("expected RSICCallCount=0, got %d", state.RSICCallCount)
+		}
+	})
+
+	t.Run("ObserveCallCount defaults to 0", func(t *testing.T) {
+		st.RecordResume("sess-fields-2", "test-space")
+
+		state := st.GetState("sess-fields-2")
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+		if state.ObserveCallCount != 0 {
+			t.Errorf("expected ObserveCallCount=0, got %d", state.ObserveCallCount)
+		}
+	})
+
+	t.Run("SignalsEmitted defaults to nil", func(t *testing.T) {
+		st.RecordResume("sess-fields-3", "test-space")
+
+		state := st.GetState("sess-fields-3")
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+		if state.SignalsEmitted != nil {
+			t.Errorf("expected SignalsEmitted=nil, got %v", state.SignalsEmitted)
+		}
+	})
+
+	t.Run("all new fields set correctly", func(t *testing.T) {
+		st.RecordRSICCall("sess-fields-4")
+		st.RecordRSICCall("sess-fields-4")
+		st.RecordObserveCall("sess-fields-4")
+		st.RecordObserveCall("sess-fields-4")
+		st.RecordObserveCall("sess-fields-4")
+		st.RecordSignalEmitted("sess-fields-4", "TEST_SIGNAL")
+
+		state := st.GetState("sess-fields-4")
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+		if state.RSICCallCount != 2 {
+			t.Errorf("expected RSICCallCount=2, got %d", state.RSICCallCount)
+		}
+		if state.ObserveCallCount != 3 {
+			t.Errorf("expected ObserveCallCount=3, got %d", state.ObserveCallCount)
+		}
+		if len(state.SignalsEmitted) != 1 {
+			t.Errorf("expected 1 signal, got %d", len(state.SignalsEmitted))
+		}
+		if state.SignalsEmitted[0] != "TEST_SIGNAL" {
+			t.Errorf("expected TEST_SIGNAL, got %s", state.SignalsEmitted[0])
+		}
+	})
+}
+
+func TestSessionTracker_CombinedOperations(t *testing.T) {
+	st := NewSessionTracker(1 * time.Hour)
+	defer st.Stop()
+
+	t.Run("RecordResume + RecordRSICCall + RecordObserveCall", func(t *testing.T) {
+		sessionID := "sess-combined-1"
+
+		// Resume first
+		st.RecordResume(sessionID, "combined-space")
+
+		// Then RSIC calls
+		st.RecordRSICCall(sessionID)
+		st.RecordRSICCall(sessionID)
+
+		// Then observe calls
+		st.RecordObserveCall(sessionID)
+		st.RecordObserveCall(sessionID)
+		st.RecordObserveCall(sessionID)
+
+		state := st.GetState(sessionID)
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+
+		// Verify all fields
+		if !state.Resumed {
+			t.Error("expected Resumed=true")
+		}
+		if state.SpaceID != "combined-space" {
+			t.Errorf("expected SpaceID=combined-space, got %s", state.SpaceID)
+		}
+		if state.RSICCallCount != 2 {
+			t.Errorf("expected RSICCallCount=2, got %d", state.RSICCallCount)
+		}
+		if state.ObserveCallCount != 3 {
+			t.Errorf("expected ObserveCallCount=3, got %d", state.ObserveCallCount)
+		}
+		if state.LastResumeAt.IsZero() {
+			t.Error("expected LastResumeAt to be set")
+		}
+		if state.LastActivityAt.IsZero() {
+			t.Error("expected LastActivityAt to be set")
+		}
+	})
+
+	t.Run("all operations without resume", func(t *testing.T) {
+		sessionID := "sess-combined-2"
+
+		st.RecordRSICCall(sessionID)
+		st.RecordObserveCall(sessionID)
+		st.RecordSignalEmitted(sessionID, "NO_RESUME")
+		st.RecordObserve(sessionID) // Also test old observe method
+
+		state := st.GetState(sessionID)
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+
+		if state.Resumed {
+			t.Error("expected Resumed=false")
+		}
+		if state.RSICCallCount != 1 {
+			t.Errorf("expected RSICCallCount=1, got %d", state.RSICCallCount)
+		}
+		if state.ObserveCallCount != 1 {
+			t.Errorf("expected ObserveCallCount=1, got %d", state.ObserveCallCount)
+		}
+		if state.ObservationsSinceResume != 1 {
+			t.Errorf("expected ObservationsSinceResume=1, got %d", state.ObservationsSinceResume)
+		}
+		if len(state.SignalsEmitted) != 1 {
+			t.Fatalf("expected 1 signal, got %d", len(state.SignalsEmitted))
+		}
+		if state.SignalsEmitted[0] != "NO_RESUME" {
+			t.Errorf("expected NO_RESUME signal, got %s", state.SignalsEmitted[0])
+		}
+	})
+
+	t.Run("multiple signals with other operations", func(t *testing.T) {
+		sessionID := "sess-combined-3"
+
+		st.RecordResume(sessionID, "signal-space")
+		st.RecordSignalEmitted(sessionID, "SIG_1")
+		st.RecordRSICCall(sessionID)
+		st.RecordSignalEmitted(sessionID, "SIG_2")
+		st.RecordObserveCall(sessionID)
+		st.RecordSignalEmitted(sessionID, "SIG_3")
+
+		state := st.GetState(sessionID)
+		if state == nil {
+			t.Fatal("expected session state, got nil")
+		}
+
+		if !state.Resumed {
+			t.Error("expected Resumed=true")
+		}
+		if state.RSICCallCount != 1 {
+			t.Errorf("expected RSICCallCount=1, got %d", state.RSICCallCount)
+		}
+		if state.ObserveCallCount != 1 {
+			t.Errorf("expected ObserveCallCount=1, got %d", state.ObserveCallCount)
+		}
+		if len(state.SignalsEmitted) != 3 {
+			t.Fatalf("expected 3 signals, got %d", len(state.SignalsEmitted))
+		}
+
+		expectedSignals := []string{"SIG_1", "SIG_2", "SIG_3"}
+		for i, exp := range expectedSignals {
+			if state.SignalsEmitted[i] != exp {
+				t.Errorf("signal[%d]: expected %s, got %s", i, exp, state.SignalsEmitted[i])
+			}
+		}
+	})
+
+	t.Run("LastActivityAt updated by all operations", func(t *testing.T) {
+		sessionID := "sess-combined-4"
+
+		st.RecordResume(sessionID, "activity-space")
+		time1 := st.GetState(sessionID).GetLastActivityAt()
+
+		time.Sleep(10 * time.Millisecond)
+
+		st.RecordRSICCall(sessionID)
+		time2 := st.GetState(sessionID).GetLastActivityAt()
+		if !time2.After(time1) {
+			t.Error("expected LastActivityAt to be updated by RecordRSICCall")
+		}
+
+		time.Sleep(10 * time.Millisecond)
+
+		st.RecordObserveCall(sessionID)
+		time3 := st.GetState(sessionID).GetLastActivityAt()
+		if !time3.After(time2) {
+			t.Error("expected LastActivityAt to be updated by RecordObserveCall")
+		}
+
+		time.Sleep(10 * time.Millisecond)
+
+		st.RecordSignalEmitted(sessionID, "ACTIVITY_TEST")
+		time4 := st.GetState(sessionID).GetLastActivityAt()
+		if !time4.After(time3) {
+			t.Error("expected LastActivityAt to be updated by RecordSignalEmitted")
+		}
+	})
+}

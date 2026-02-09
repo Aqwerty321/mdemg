@@ -15,6 +15,9 @@ type SessionState struct {
 	ObservationsSinceResume int          `json:"observations_since_resume"`
 	LastObserveAt           time.Time    `json:"last_observe_at,omitempty"`
 	LastActivityAt          time.Time    `json:"last_activity_at"`
+	RSICCallCount           int          `json:"rsic_call_count"`
+	ObserveCallCount        int          `json:"observe_call_count"`
+	SignalsEmitted          []string     `json:"signals_emitted,omitempty"`
 	CreatedAt               time.Time    `json:"created_at"`
 }
 
@@ -143,6 +146,60 @@ func (st *SessionTracker) RecordActivity(sessionID string) {
 	if loaded {
 		state := val.(*SessionState)
 		state.mu.Lock()
+		state.LastActivityAt = now
+		state.mu.Unlock()
+	}
+}
+
+// RecordRSICCall records that a session called an RSIC endpoint.
+func (st *SessionTracker) RecordRSICCall(sessionID string) {
+	now := time.Now().UTC()
+	val, loaded := st.sessions.LoadOrStore(sessionID, &SessionState{
+		SessionID:      sessionID,
+		RSICCallCount:  1,
+		LastActivityAt: now,
+		CreatedAt:      now,
+	})
+	if loaded {
+		state := val.(*SessionState)
+		state.mu.Lock()
+		state.RSICCallCount++
+		state.LastActivityAt = now
+		state.mu.Unlock()
+	}
+}
+
+// RecordSignalEmitted records that a signal was emitted for this session.
+func (st *SessionTracker) RecordSignalEmitted(sessionID, code string) {
+	now := time.Now().UTC()
+	val, loaded := st.sessions.LoadOrStore(sessionID, &SessionState{
+		SessionID:      sessionID,
+		SignalsEmitted: []string{code},
+		LastActivityAt: now,
+		CreatedAt:      now,
+	})
+	if loaded {
+		state := val.(*SessionState)
+		state.mu.Lock()
+		state.SignalsEmitted = append(state.SignalsEmitted, code)
+		state.LastActivityAt = now
+		state.mu.Unlock()
+	}
+}
+
+// RecordObserveCall records that a session made an observe call (distinct from RecordObserve).
+func (st *SessionTracker) RecordObserveCall(sessionID string) {
+	now := time.Now().UTC()
+	val, loaded := st.sessions.LoadOrStore(sessionID, &SessionState{
+		SessionID:        sessionID,
+		ObserveCallCount: 1,
+		LastActivityAt:   now,
+		CreatedAt:        now,
+	})
+	if loaded {
+		state := val.(*SessionState)
+		state.mu.Lock()
+		state.ObserveCallCount++
 		state.LastActivityAt = now
 		state.mu.Unlock()
 	}

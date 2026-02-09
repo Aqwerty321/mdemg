@@ -1,0 +1,43 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Signal Effectiveness",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "self-improve",
+      "signals",
+      "metacog"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-08",
+    "description": "Validates signal effectiveness tracking endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "0f8e960091897632363009bf329e676f78c1c1d3cd477019f855620327ac3f36"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/self-improve/signals",
+    "headers": {}
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.signals",
+        "type": "array"
+      },
+      {
+        "path": "$.enabled",
+        "type": "boolean"
+      }
+    ]
+  }
+}

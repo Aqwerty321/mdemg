@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -207,6 +209,17 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		Debug:            resp.Debug,
 	}
 
+	// Phase 80: Meta-cognitive anomaly detection
+	if s.cfg.MetaCogEnabled {
+		apiResp.Anomalies, apiResp.MemoryState = s.detectResumeAnomalies(r.Context(), req.SpaceID, apiResp)
+		if apiResp.MemoryState == "degraded" {
+			w.Header().Set("X-MDEMG-Memory-State", "degraded")
+			if len(apiResp.Anomalies) > 0 {
+				w.Header().Set("X-MDEMG-Anomaly", apiResp.Anomalies[0].Code)
+			}
+		}
+	}
+
 	writeJSON(w, http.StatusOK, apiResp)
 }
 
@@ -262,6 +275,19 @@ func (s *Server) handleRecall(w http.ResponseWriter, r *http.Request) {
 		Query:   resp.Query,
 		Results: convertRecallResults(resp.Results),
 		Debug:   resp.Debug,
+	}
+
+	// Phase 80: Meta-cognitive anomaly detection for recall
+	if s.cfg.MetaCogEnabled && len(req.Query) > 20 && len(apiResp.Results) == 0 {
+		apiResp.Anomalies = []models.AnomalySignal{{
+			Code:     "empty-recall",
+			Severity: "high",
+			Message:  "Recall returned 0 results for non-trivial query. Consider observing this topic.",
+			Action:   fmt.Sprintf("POST /v1/conversation/observe {\"space_id\":\"%s\",\"content\":\"...\",\"obs_type\":\"learning\"}", req.SpaceID),
+		}}
+		apiResp.MemoryState = "nominal"
+		w.Header().Set("X-MDEMG-Memory-State", "nominal")
+		w.Header().Set("X-MDEMG-Anomaly", "empty-recall")
 	}
 
 	writeJSON(w, http.StatusOK, apiResp)
@@ -526,6 +552,66 @@ func (s *Server) handleSessionHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// handleSessionAnomalies returns aggregated anomaly summary for a session.
+// GET /v1/conversation/session/anomalies?session_id=X&space_id=Y
+func (s *Server) handleSessionAnomalies(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	sessionID := r.URL.Query().Get("session_id")
+	spaceID := r.URL.Query().Get("space_id")
+	if sessionID == "" || spaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "session_id and space_id query parameters are required"})
+		return
+	}
+
+	resp := map[string]any{
+		"session_id": sessionID,
+		"space_id":   spaceID,
+	}
+
+	// Session health from tracker
+	var healthScore float64
+	var obsCount int
+	if s.sessionTracker != nil {
+		state := s.sessionTracker.GetState(sessionID)
+		if state != nil {
+			healthScore = state.HealthScore()
+			obsCount = state.ObservationsSinceResume
+		}
+	}
+	resp["health_score"] = healthScore
+	resp["observation_count"] = obsCount
+
+	// Watchdog state
+	if s.rsicWatchdog != nil {
+		ws := s.rsicWatchdog.GetState()
+		resp["watchdog"] = map[string]any{
+			"decay_score":      ws.DecayScore,
+			"escalation_level": ws.EscalationLevel,
+		}
+	}
+
+	// Active anomalies — run a quick resume check
+	activeAnomalies := make([]models.AnomalySignal, 0)
+	if s.cfg.MetaCogEnabled {
+		nodeCount := s.countSpaceNodes(r.Context(), spaceID)
+		if nodeCount > 0 && obsCount == 0 && healthScore < 0.3 {
+			activeAnomalies = append(activeAnomalies, models.AnomalySignal{
+				Code:     "low-session-health",
+				Severity: "high",
+				Message:  fmt.Sprintf("Session health is %.2f with 0 observations. CMS may not be integrated.", healthScore),
+				Action:   "POST /v1/conversation/observe to begin recording",
+			})
+		}
+	}
+	resp["active_anomalies"] = activeAnomalies
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
 // handleConstraintsList lists constraint nodes for a space
 // GET /v1/constraints?space_id=...
 func (s *Server) handleConstraintsList(w http.ResponseWriter, r *http.Request) {
@@ -672,4 +758,68 @@ func (s *Server) handleConstraintStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+// detectResumeAnomalies checks for meta-cognitive anomalies in resume response.
+func (s *Server) detectResumeAnomalies(ctx context.Context, spaceID string, resp models.ResumeResponse) ([]models.AnomalySignal, string) {
+	var anomalies []models.AnomalySignal
+	memoryState := "healthy"
+
+	// Check for empty resume with existing data
+	if len(resp.Observations) == 0 {
+		// Query if space actually has data
+		nodeCount := s.countSpaceNodes(ctx, spaceID)
+		if nodeCount > 0 {
+			anomalies = append(anomalies, models.AnomalySignal{
+				Code:     "empty-resume",
+				Severity: "critical",
+				Message:  fmt.Sprintf("Resume returned 0 observations but space has %d nodes. Possible embedder failure or query issue.", nodeCount),
+				Action:   fmt.Sprintf("POST /v1/self-improve/assess {\"space_id\":\"%s\",\"tier\":\"micro\"}", spaceID),
+			})
+			memoryState = "degraded"
+		}
+	}
+
+	// Check for no themes when observations exist
+	if len(resp.Observations) > 0 && len(resp.Themes) == 0 {
+		anomalies = append(anomalies, models.AnomalySignal{
+			Code:     "no-themes",
+			Severity: "medium",
+			Message:  "Observations present but no themes detected. Consider running consolidation.",
+			Action:   fmt.Sprintf("POST /v1/conversation/consolidate {\"space_id\":\"%s\"}", spaceID),
+		})
+		if memoryState == "healthy" {
+			memoryState = "nominal"
+		}
+	}
+
+	if len(anomalies) == 0 {
+		memoryState = "healthy"
+	}
+
+	return anomalies, memoryState
+}
+
+// countSpaceNodes counts conversation observation nodes for a space (used for false-positive guard).
+// Only counts conversation_observation role types, not codebase or other node types.
+func (s *Server) countSpaceNodes(ctx context.Context, spaceID string) int64 {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, "MATCH (n:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'}) RETURN count(n) AS cnt", map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return int64(0), err
+		}
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("cnt"); ok {
+				return v.(int64), nil
+			}
+		}
+		return int64(0), res.Err()
+	})
+	if err != nil {
+		return 0
+	}
+	return result.(int64)
 }

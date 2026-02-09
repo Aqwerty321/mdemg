@@ -137,6 +137,15 @@ type Anomaly struct {
 	Confidence  float64     `json:"confidence"`             // 0.0 - 1.0
 }
 
+// AnomalySignal represents a meta-cognitive anomaly detected during CMS operations.
+// Used by resume/recall handlers to flag degraded memory states.
+type AnomalySignal struct {
+	Code     string `json:"code"`     // "empty-resume", "no-themes", "empty-recall"
+	Severity string `json:"severity"` // "critical", "high", "medium", "low"
+	Message  string `json:"message"`
+	Action   string `json:"action"`   // Recommended action (e.g., curl command)
+}
+
 // MetricsResponse - main response structure for GET /v1/metrics
 type MetricsResponse struct {
 	TotalNodes     int64            `json:"total_nodes"`
@@ -703,6 +712,8 @@ type ResumeResponse struct {
 	Summary          string                    `json:"summary"`          // Generated context summary
 	Jiminy           *JiminyRationale          `json:"jiminy,omitempty"` // Explains why state was rehydrated
 	Debug            map[string]any            `json:"debug,omitempty"`
+	Anomalies        []AnomalySignal           `json:"anomalies,omitempty"`
+	MemoryState      string                    `json:"memory_state"` // "degraded", "nominal", "healthy"
 }
 
 // ConversationObsResult represents a conversation observation in resume/recall responses
@@ -767,10 +778,12 @@ type RecallRequest struct {
 // RecallResponse - response from POST /v1/conversation/recall
 // Returns relevant conversation knowledge based on semantic query.
 type RecallResponse struct {
-	SpaceID string         `json:"space_id"`
-	Query   string         `json:"query"`
-	Results []RecallResult `json:"results"`
-	Debug   map[string]any `json:"debug,omitempty"`
+	SpaceID     string          `json:"space_id"`
+	Query       string          `json:"query"`
+	Results     []RecallResult  `json:"results"`
+	Debug       map[string]any  `json:"debug,omitempty"`
+	Anomalies   []AnomalySignal `json:"anomalies,omitempty"`
+	MemoryState string          `json:"memory_state,omitempty"`
 }
 
 // RecallResult represents a single result from conversation recall

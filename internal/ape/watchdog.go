@@ -11,8 +11,9 @@ import (
 
 // Watchdog monitors the time since the last RSIC cycle and escalates if overdue.
 type Watchdog struct {
-	cfg     config.Config
-	spaceID string
+	cfg            config.Config
+	spaceID        string
+	signalProvider WatchdogSignalProvider
 
 	mu            sync.RWMutex
 	state         WatchdogState
@@ -92,6 +93,13 @@ func (w *Watchdog) GetState() WatchdogState {
 	return w.state
 }
 
+// SetSignalProvider attaches a WatchdogSignalProvider for multi-dimensional monitoring.
+func (w *Watchdog) SetSignalProvider(sp WatchdogSignalProvider) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.signalProvider = sp
+}
+
 func (w *Watchdog) check() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -133,5 +141,37 @@ func (w *Watchdog) check() {
 		w.state.EscalationLevel = EscalationNominal
 
 		go w.cycleTrigger(context.Background(), w.spaceID)
+	}
+
+	// Phase 80: Multi-dimensional signal collection
+	if w.signalProvider != nil {
+		w.state.SessionHealthScore = w.signalProvider.GetSessionHealthScore("claude-core")
+		w.state.ObsRatePerHour = w.signalProvider.GetObservationRate(w.spaceID)
+
+		consolidationAge, err := w.signalProvider.GetConsolidationAgeSec(w.ctx, w.spaceID)
+		if err == nil {
+			w.state.ConsolidationAge = consolidationAge
+		}
+
+		// Build active anomalies list
+		var anomalies []string
+		if w.state.SessionHealthScore < 0.3 {
+			anomalies = append(anomalies, "low-session-health")
+		}
+		if consolidationAge > 48*3600 { // > 48 hours
+			anomalies = append(anomalies, "stale-consolidation")
+		}
+		if w.state.DecayScore >= w.cfg.RSICWarnThreshold {
+			anomalies = append(anomalies, "high-decay-score")
+		}
+		w.state.ActiveAnomalies = anomalies
+
+		// Additional escalation: force cycle if session health is critically low AND decay is moderate
+		if w.state.SessionHealthScore < 0.2 && w.state.DecayScore >= w.cfg.RSICNudgeThreshold && w.cycleTrigger != nil {
+			if prevLevel < EscalationWarn {
+				log.Printf("RSIC watchdog: session health critical (%.2f) — escalating to warn level", w.state.SessionHealthScore)
+				w.state.EscalationLevel = EscalationWarn
+			}
+		}
 	}
 }

@@ -363,6 +363,12 @@ type Config struct {
 	// Memory pressure monitoring (Phase 48.4.4)
 	MemoryPressureEnabled     bool // MEMORY_PRESSURE_ENABLED — enable memory backpressure (default: false)
 	MemoryPressureThresholdMB int  // MEMORY_PRESSURE_THRESHOLD_MB — heap threshold for rejection (default: 4096)
+
+	// ===== Phase 80: CMS Meta-Cognition =====
+	MetaCogEnabled          bool    // METACOG_ENABLED — master toggle for meta-cognitive anomaly detection (default: true)
+	MetaCogEmptyResumeCheck bool    // METACOG_EMPTY_RESUME_CHECK — check for empty resume anomaly (default: true)
+	MetaCogSignalDecayRate  float64 // METACOG_SIGNAL_DECAY_RATE — Hebbian decay per ignored signal emission (default: 0.05)
+	MetaCogSignalBoostRate  float64 // METACOG_SIGNAL_BOOST_RATE — Hebbian boost per signal response (default: 0.1)
 }
 
 func FromEnv() (Config, error) {
@@ -1360,6 +1366,18 @@ func FromEnv() (Config, error) {
 	secondaryLabelsEnabled := getBool("SECONDARY_LABELS_ENABLED", true)
 	themeOfEdgeEnabled := getBool("THEME_OF_EDGE_ENABLED", true)
 
+	// Phase 80: Meta-Cognition
+	metaCogEnabled := getBool("METACOG_ENABLED", true)
+	metaCogEmptyResumeCheck := getBool("METACOG_EMPTY_RESUME_CHECK", true)
+	metaCogSignalDecayRate, err := atof("METACOG_SIGNAL_DECAY_RATE", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	metaCogSignalBoostRate, err := atof("METACOG_SIGNAL_BOOST_RATE", 0.1)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// Deterministic consolidation trigger
 	consolidateOnWatchdog := getBool("CONSOLIDATE_ON_WATCHDOG_ENABLED", true)
 
@@ -1874,6 +1892,12 @@ func FromEnv() (Config, error) {
 		SymbolActivationEnabled:  symbolActivationEnabled,
 		SecondaryLabelsEnabled:   secondaryLabelsEnabled,
 		ThemeOfEdgeEnabled:       themeOfEdgeEnabled,
+
+		// Phase 80: Meta-Cognition
+		MetaCogEnabled:          metaCogEnabled,
+		MetaCogEmptyResumeCheck: metaCogEmptyResumeCheck,
+		MetaCogSignalDecayRate:  metaCogSignalDecayRate,
+		MetaCogSignalBoostRate:  metaCogSignalBoostRate,
 	}, nil
 }
 

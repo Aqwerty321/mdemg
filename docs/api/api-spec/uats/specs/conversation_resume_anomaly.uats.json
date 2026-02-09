@@ -1,0 +1,58 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Resume Anomaly Detection",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "resume",
+      "anomaly",
+      "metacog"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-08",
+    "description": "Validates anomaly detection fields in resume response",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "d9af550d87e9ceb89d7d72123de3e31596457f34e593d58d9d478b3ca986c486"
+  },
+  "variables": {
+    "test_space": "uats-anomaly-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/conversation/resume",
+    "body": {
+      "space_id": "{{test_space}}",
+      "session_id": "uats-anomaly-session",
+      "max_observations": 10
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.observations",
+        "type": "array"
+      },
+      {
+        "path": "$.memory_state",
+        "type": "string"
+      }
+    ]
+  }
+}

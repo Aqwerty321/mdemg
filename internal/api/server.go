@@ -91,6 +91,9 @@ type Server struct {
 	// Phase 75: Relationship extraction
 	symbolParser   *symbols.Parser
 	symbolResolver *symbols.Resolver
+
+	// Phase 80: Meta-Cognition
+	signalLearner *ape.SignalLearner
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -365,6 +368,16 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	rsicCycle = ape.NewCycleOrchestrator(cfg, rsicAssessor, rsicReflector, rsicPlanner, rsicDispatcher, rsicMonitor, rsicCalibrator, rsicWatchdog)
 	log.Printf("RSIC initialized (watchdog=%v, micro=%v)", cfg.RSICWatchdogEnabled, cfg.RSICMicroEnabled)
 
+	// Phase 80: Wire WatchdogSignalProvider for multi-dimensional monitoring
+	rsicWatchdog.SetSignalProvider(&rsicWatchdogSignalAdapter{
+		sessionTracker: sessTracker,
+		driver:         driver,
+	})
+
+	// Phase 80: Initialize signal learner
+	signalLearner := ape.NewSignalLearner(cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
+	log.Printf("Signal learner initialized (decay=%.2f, boost=%.2f)", cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
+
 	return &Server{
 		cfg:             cfg,
 		driver:          driver,
@@ -399,6 +412,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		scraperSvc:              scraperSvc,
 		backupSvc:               backupSvc,
 		backupScheduler:         backupSched,
+		signalLearner:           signalLearner,
 	}
 }
 
@@ -892,6 +906,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversation/volatile/stats", s.handleVolatileStats)
 	mux.HandleFunc("/v1/conversation/graduate", s.handleProcessGraduations)
 	mux.HandleFunc("/v1/conversation/session/health", s.handleSessionHealth)
+	mux.HandleFunc("/v1/conversation/session/anomalies", s.handleSessionAnomalies)
 
 	// Constraint Module (Phase 45.5)
 	mux.HandleFunc("/v1/constraints", s.handleConstraintsList)
@@ -921,6 +936,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/self-improve/history", s.handleSelfImproveHistory)
 	mux.HandleFunc("/v1/self-improve/calibration", s.handleSelfImproveCalibration)
 	mux.HandleFunc("/v1/self-improve/health", s.handleSelfImproveHealth)
+	mux.HandleFunc("/v1/self-improve/signals", s.handleSelfImproveSignals)
 
 	// Skill Registry (Phase 48)
 	mux.HandleFunc("/v1/skills", s.handleSkills)

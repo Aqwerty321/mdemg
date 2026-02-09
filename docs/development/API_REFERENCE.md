@@ -19,6 +19,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Plugins & Modules](#plugins--modules)
 - [System & Monitoring](#system--monitoring)
 - [Backup & Restore](#backup--restore-phase-70)
+- [Meta-Cognition & Self-Improvement](#meta-cognition--self-improvement-phase-80)
 
 ---
 
@@ -1865,6 +1866,84 @@ Check restore job progress.
   }
 }
 ```
+
+---
+
+## Meta-Cognition & Self-Improvement (Phase 80)
+
+Server-side anomaly detection and behavioral learning for CMS enforcement.
+
+### GET /v1/conversation/session/anomalies
+
+Aggregated session health: watchdog state, observation rate, active anomalies.
+
+**Query Parameters**:
+- `session_id` (required): Session identifier
+- `space_id` (required): Memory space identifier
+
+**Response**:
+```json
+{
+  "session_id": "claude-core",
+  "space_id": "mdemg-dev",
+  "health_score": 0.75,
+  "watchdog_state": {
+    "temporal_decay": 0.02,
+    "decay_rate": "normal",
+    "escalation_level": "none",
+    "session_health_score": 0.75,
+    "obs_rate_per_hour": 2.5,
+    "active_anomalies": [],
+    "consolidation_age_sec": 3600
+  },
+  "observation_rate": 2.5,
+  "active_anomalies": []
+}
+```
+
+### GET /v1/self-improve/signals
+
+Signal emission/response effectiveness stats (Hebbian learning).
+
+**Response**:
+```json
+{
+  "signals": [
+    {
+      "code": "empty-resume-warning",
+      "emissions": 5,
+      "responses": 3,
+      "strength": 0.65,
+      "response_rate": 0.6
+    }
+  ],
+  "count": 1
+}
+```
+
+### Response Extensions (Resume/Recall)
+
+Phase 80 adds `anomalies` and `memory_state` fields to existing resume and recall responses:
+
+```json
+{
+  "anomalies": [
+    {
+      "code": "empty-resume",
+      "severity": "critical",
+      "message": "Resume returned 0 observations but space has 258 nodes",
+      "action": "curl -X POST http://localhost:9999/v1/self-improve/assess -d '{\"space_id\":\"mdemg-dev\",\"tier\":\"micro\"}'"
+    }
+  ],
+  "memory_state": "degraded"
+}
+```
+
+**Memory States**: `healthy` (observations + themes), `nominal` (observations but no themes), `degraded` (empty resume for populated space)
+
+**Response Headers** (set on degraded state):
+- `X-MDEMG-Memory-State: degraded`
+- `X-MDEMG-Anomaly: empty-resume`
 
 ---
 

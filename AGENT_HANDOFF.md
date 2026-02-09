@@ -292,7 +292,7 @@ Phases are organized into **numbered series** to group related work:
 | — (Neo4j Backup) | **Phase 70** | Neo4j Backup (Full & Partial) with Scheduler | ✅ Complete |
 | — (Relationship Extraction) | **Phase 75** | Cross-File Relationship Extraction & Graph Topology Hardening | ✅ Complete |
 | — (Neo4j Monitor) | **Phase 76** | Neo4j State Monitor & Space Overview | 📋 Planned |
-| — (CMS Meta-Cognition) | **Phase 80** | CMS ANN Meta-Cognition & Self-Improvement Enforcement | 📋 Planned |
+| — (CMS Meta-Cognition) | **Phase 80** | CMS ANN Meta-Cognition & Self-Improvement Enforcement | ✅ Complete |
 
 ---
 
@@ -1826,60 +1826,56 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 
 ---
 
-### Phase 80: CMS ANN Meta-Cognition & Self-Improvement Enforcement
+### Phase 80: CMS ANN Meta-Cognition & Self-Improvement Enforcement ✅
 
-**Status:** Research complete, implementation planned
+**Status:** Complete (2026-02-08)
 **Dependencies:** Phase 60b (RSIC), Phase 43A (CMS Enforcement)
+**Commit:** `85617e8`
 
-**Problem:** LLM coding agents consistently fail to use the CMS framework. The RSIC self-improvement cycle is ignored. When `/v1/conversation/resume` returns 0 observations (indicating memory disconnection), agents proceed without investigating. The root cause: MDEMG relies on extrinsic metacognition (prompt instructions) which research shows is unreliable.
+**What it does:** Transforms MDEMG from passive memory retrieval to active anomaly detection and enforcement. Server-side anomaly signals detect empty-resume, empty-recall, and no-themes conditions. Hook circuit breakers emit CRITICAL warnings and auto-trigger RSIC assessments. Multi-dimensional watchdog monitoring extends beyond temporal decay. Hebbian signal learner tracks which signals agents respond to.
 
-**Research basis:** 20+ papers including MUSE (competence-aware agents), SOFAI-LM (IBM cognitive architecture, AAAI 2026), AgentSpec (runtime enforcement, >90% compliance), ReMA (hierarchical meta-thinking, NeurIPS 2025). See full report in CMS observations.
+**4 Sub-Phases Implemented:**
 
-**Proposed 4-Layer Meta-Cognitive Architecture:**
+| Sub-Phase | Focus | Key Changes |
+|-----------|-------|-------------|
+| 80.1 | Server-Side Anomaly Detection | `AnomalySignal` type, `anomalies`/`memory_state` in resume/recall responses, `X-MDEMG-Memory-State` headers, Jiminy nil-fix, session anomalies endpoint |
+| 80.2 | Hook Circuit Breakers | session-start.sh 0-obs CRITICAL warning + auto RSIC assess + health display, prompt-context.sh empty-recall warning + health ribbon, post-tool-observe.py degraded state detection, pre-compact.sh health snapshot |
+| 80.3 | Watchdog Multi-Dimensional Monitoring | `WatchdogSignalProvider` interface (session health, obs rate, consolidation age), extended `check()`, `rsicWatchdogSignalAdapter` |
+| 80.4 | Behavioral Learning Loop | `SignalLearner` (Hebbian in-memory tracker), session tracker extensions (RSICCallCount, ObserveCallCount, SignalsEmitted), signal effectiveness endpoint |
 
-```
-Layer 1: Server-Side Anomaly Signals
-  Resume/Recall endpoints add anomaly headers to responses
-  X-MDEMG-Memory-State: degraded|nominal|healthy
-  X-MDEMG-Anomaly: empty-resume|low-retrieval|stale-consolidation
+**New Endpoints:**
+- `GET /v1/conversation/session/anomalies?session_id=X&space_id=Y` — aggregated session health
+- `GET /v1/self-improve/signals` — signal emission/response effectiveness stats
 
-Layer 2: Hook-Level Circuit Breakers
-  session-start.sh detects 0-observation resume for active space
-  Emits CRITICAL WARNING with mandatory investigation steps
-  Not a neutral status message — forces investigation
+**Config (4 vars):**
+- `METACOG_ENABLED=true` — master toggle
+- `METACOG_EMPTY_RESUME_CHECK=true` — empty resume anomaly check
+- `METACOG_SIGNAL_DECAY_RATE=0.05` — Hebbian decay per ignored emission
+- `METACOG_SIGNAL_BOOST_RATE=0.1` — Hebbian boost per response
 
-Layer 3: Structured Assessment Protocol
-  Auto-triggered RSIC micro assessment on every session start
-  Health score visible in every session context
-  Degraded health → mandatory investigation checklist
+**Key Files:**
 
-Layer 4: Behavioral Learning Loop
-  Track which signals agents respond to vs ignore
-  Strengthen effective signals (Hebbian pattern)
-  Prune ineffective signals — adaptive enforcement
-```
+| File | Change |
+|------|--------|
+| `internal/models/models.go` | +AnomalySignal, extended ResumeResponse/RecallResponse |
+| `internal/api/handlers_conversation.go` | Anomaly detection in handleResume/handleRecall, handleSessionAnomalies, countSpaceNodes |
+| `internal/conversation/service.go` | Jiminy warning rationale on empty state |
+| `internal/ape/signal_learner.go` | NEW — Hebbian signal effectiveness tracker |
+| `internal/ape/watchdog.go` | Multi-dimensional monitoring via WatchdogSignalProvider |
+| `internal/ape/types_rsic.go` | WatchdogSignalProvider interface, extended WatchdogState |
+| `internal/api/handlers_self_improve.go` | Signal tracking + signals endpoint |
+| `internal/api/rsic_adapters.go` | rsicWatchdogSignalAdapter |
+| `internal/api/server.go` | Wire signal learner, register routes |
+| `internal/config/config.go` | 4 METACOG_* config vars |
+| `internal/conversation/session_tracker.go` | Signal tracking fields and methods |
+| `.claude/hooks/session-start.sh` | 0-obs detection, auto-assess, RSIC health display |
+| `.claude/hooks/prompt-context.sh` | Empty-recall warning, session health ribbon |
+| `.claude/hooks/post-tool-observe.py` | CMS anomaly detection in API responses |
+| `.claude/hooks/pre-compact.sh` | Health snapshot before compaction |
 
-**Metacognitive Trigger Categories:**
+**Tests:** 3 new test files (signal_learner_test.go, watchdog_test.go, session_tracker_test.go additions). 3 new UATS specs (conversation_resume_anomaly, session_anomalies, self_improve_signals). All 154/154 UATS passing.
 
-| Category | Trigger | Severity |
-|----------|---------|----------|
-| State Anomaly | Resume returns 0 observations for active space | CRITICAL |
-| State Anomaly | Recall returns 0 for semantically rich query | HIGH |
-| State Anomaly | Zero learning edges in active space | HIGH |
-| Pattern Degradation | Correction rate > 15% in 24h | MEDIUM |
-| Pattern Degradation | Consolidation > 24h stale | LOW |
-| Agent Behavioral | Agent never calls RSIC endpoints in session | HIGH |
-| Agent Behavioral | Agent never calls observe endpoint | MEDIUM |
-| Surprise/Novelty | Cluster of high-surprise observations | HIGH |
-| Surprise/Novelty | Contradiction with pinned observation | CRITICAL |
-
-**Priority Implementation Order:**
-1. **Immediate:** Upgrade `session-start.sh` to detect 0-observation anomaly → emit strong warning
-2. **Short-term:** Add anomaly headers to resume/recall API responses; extend Watchdog beyond temporal decay
-3. **Medium-term:** Auto-triggered RSIC micro assessment on session start; Jiminy layer enhancement
-4. **Long-term:** Behavioral learning loop that adapts metacognitive signals based on agent response patterns
-
-**Key insight (from AgentSpec paper):** Runtime enforcement via hooks achieves >90% compliance. Prompt-based instructions achieve substantially less. The shift must be from "tell the agent to self-monitor" to "mechanically enforce self-monitoring."
+**Key implementation detail:** `countSpaceNodes()` filters by `role_type='conversation_observation'` to avoid false positives from codebase nodes in the same space.
 
 ---
 
@@ -1962,4 +1958,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-08 — 94 UATS specs, 151 variants, 150 passing (99.3%). Phase 75C (L5 Emergent Layer — Unblock Emergence) complete: 6 bottleneck fixes, 50 dynamic edges + 4 L5 nodes, pipeline split execution (RunPhaseRange), 2 new pipeline steps (dynamic_edges phase 25, emergent_l5 phase 30). Phase 75, 70, 51 also complete.*
+*Last updated: 2026-02-08 — 97 UATS specs, 154 variants, 154 passing (100%). Phase 80 (CMS ANN Meta-Cognition) complete: server-side anomaly detection, hook circuit breakers, multi-dimensional watchdog, Hebbian signal learner. 21 files changed (+2997 lines). Phase 75C, 75, 70, 51 also complete.*

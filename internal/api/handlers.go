@@ -404,6 +404,24 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Normalize timestamp according to format enum
+	normalized, err := models.NormalizeTimestamp(req.Timestamp, req.TimestampFormat)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	req.Timestamp = normalized
+
+	// Normalize canonical_time if present
+	if req.CanonicalTime != "" {
+		normalizedCT, err := models.NormalizeTimestamp(req.CanonicalTime, req.TimestampFormat)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "canonical_time: " + err.Error()})
+			return
+		}
+		req.CanonicalTime = normalizedCT
+	}
+
 	// Generate embedding if not provided and embedder is available
 	if len(req.Embedding) == 0 && s.embedder != nil {
 		// Build text for embedding from content
@@ -475,6 +493,29 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 			"error": fmt.Sprintf("batch size %d exceeds maximum allowed %d items", len(req.Observations), s.cfg.BatchIngestMaxItems),
 		})
 		return
+	}
+
+	// Normalize timestamps according to format enum
+	for i := range req.Observations {
+		normalized, err := models.NormalizeTimestamp(req.Observations[i].Timestamp, req.Observations[i].TimestampFormat)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": fmt.Sprintf("observations[%d]: %s", i, err.Error()),
+			})
+			return
+		}
+		req.Observations[i].Timestamp = normalized
+
+		if req.Observations[i].CanonicalTime != "" {
+			normalizedCT, err := models.NormalizeTimestamp(req.Observations[i].CanonicalTime, req.Observations[i].TimestampFormat)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{
+					"error": fmt.Sprintf("observations[%d].canonical_time: %s", i, err.Error()),
+				})
+				return
+			}
+			req.Observations[i].CanonicalTime = normalizedCT
+		}
 	}
 
 	// Generate embeddings for items that don't have them
@@ -3197,18 +3238,16 @@ func (s *Server) handleDistributionStats(w http.ResponseWriter, r *http.Request)
 		"saturated": retrieval.PhaseThresholds.Saturated,
 	}
 
-	// Add history if requested
+	// Always include both stats and history for consistent response shape
 	history := monitor.GetHistory(spaceID, historyLimit)
-	if len(history) > 0 {
-		resp := map[string]any{
-			"stats":   stats,
-			"history": history,
-		}
-		writeJSON(w, http.StatusOK, resp)
-		return
+	if history == nil {
+		history = []retrieval.ScoreDistribution{}
 	}
-
-	writeJSON(w, http.StatusOK, stats)
+	resp := map[string]any{
+		"stats":   stats,
+		"history": history,
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // fetchLearningEdgeCount queries Neo4j for the count of CO_ACTIVATED_WITH edges in a space

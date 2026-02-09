@@ -106,8 +106,9 @@ type IngestRequest struct {
 	Summary     string    `json:"summary,omitempty" validate:"omitempty,max=1000"` // Brief summary for reranking (max 1000 chars)
 	Sensitivity string    `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
 	Confidence  *float64  `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
-	Embedding     []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"` // Optional: pre-computed embedding
-	CanonicalTime string    `json:"canonical_time,omitempty"` // ISO8601: content-relevant time (Phase 2 Temporal)
+	Embedding       []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"` // Optional: pre-computed embedding
+	CanonicalTime   string    `json:"canonical_time,omitempty"`                                // ISO8601: content-relevant time (Phase 2 Temporal)
+	TimestampFormat string    `json:"timestamp_format,omitempty" validate:"omitempty,oneof=rfc3339 unix unix_ms date_only"` // Timestamp format enum (default: rfc3339)
 }
 
 type IngestResponse struct {
@@ -235,8 +236,9 @@ type BatchIngestItem struct {
 	Symbols     []IngestSymbol `json:"symbols,omitempty"`                               // Extracted code symbols (Phase 8)
 	Sensitivity string         `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
 	Confidence  *float64       `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
-	Embedding     []float32      `json:"embedding,omitempty" validate:"omitempty,embedding_dims"`
-	CanonicalTime string         `json:"canonical_time,omitempty"` // ISO8601: content-relevant time (Phase 2 Temporal)
+	Embedding       []float32      `json:"embedding,omitempty" validate:"omitempty,embedding_dims"`
+	CanonicalTime   string         `json:"canonical_time,omitempty"`                                // ISO8601: content-relevant time (Phase 2 Temporal)
+	TimestampFormat string         `json:"timestamp_format,omitempty" validate:"omitempty,oneof=rfc3339 unix unix_ms date_only"` // Timestamp format enum (default: rfc3339)
 }
 
 // IngestSymbol represents an extracted code symbol (constant, function, class, etc.)

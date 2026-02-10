@@ -117,11 +117,6 @@ func cleanModuleName(name string) string {
 	return name
 }
 
-// isComparisonQuery checks if a query is asking for a comparison
-func isComparisonQuery(query string) bool {
-	return len(extractComparisonTargets(query)) >= 2
-}
-
 // comparisonMatchScore returns a boost for comparison nodes that match query targets
 func comparisonMatchScore(name, summary string, tags []string, comparisonTargets []string) float64 {
 	if len(comparisonTargets) == 0 {
@@ -156,21 +151,6 @@ func comparisonMatchScore(name, summary string, tags []string, comparisonTargets
 
 	// Regular nodes get a smaller boost (0.1-0.2) for being part of a comparison
 	return 0.1 + 0.1*matchRatio
-}
-
-// getLayerDecayRate returns the appropriate decay rate (rho) based on node layer.
-// Layer 0 (files): decays faster (default 0.05/day) - recent file edits are more relevant
-// Layer 1 (hidden/concepts): decays slower (default 0.02/day) - concepts persist longer
-// Layer 2+ (abstractions): decays slowest (default 0.01/day) - high-level patterns are stable
-func getLayerDecayRate(layer int, cfg config.Config) float64 {
-	switch {
-	case layer == 0:
-		return cfg.ScoringRhoL0
-	case layer == 1:
-		return cfg.ScoringRhoL1
-	default:
-		return cfg.ScoringRhoL2
-	}
 }
 
 // getDecayRate returns the appropriate decay rate (rho) with tag-awareness.

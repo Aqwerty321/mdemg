@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -286,38 +285,6 @@ func (s *Server) handleListCleanupSchedules(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-// handleDeleteCleanupSchedule handles DELETE /v1/memory/cleanup/schedule/{schedule_id}
-// Removes a cleanup schedule.
-func (s *Server) handleDeleteCleanupSchedule(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Extract schedule_id from path
-	scheduleID := r.URL.Query().Get("schedule_id")
-	if scheduleID == "" {
-		// Try to extract from path
-		path := r.URL.Path
-		if idx := len("/v1/memory/cleanup/schedule/"); idx < len(path) {
-			scheduleID = path[idx:]
-		}
-	}
-
-	if scheduleID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "schedule_id is required"})
-		return
-	}
-
-	// Note: In a full implementation, this would delete from a database.
-	log.Printf("orphan cleanup schedule deleted: id=%s", scheduleID)
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"schedule_id": scheduleID,
-		"deleted":     true,
-	})
-}
-
 // getCleanupStatsForSpace returns cleanup statistics for a space.
 func (s *Server) getCleanupStatsForSpace(ctx context.Context, spaceID string) (map[string]any, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
@@ -390,16 +357,4 @@ func (s *Server) handleCleanupStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, stats)
-}
-
-// parseIntQueryParam parses an integer query parameter with a default value.
-func parseIntQueryParam(r *http.Request, name string, defaultVal int) int {
-	val := r.URL.Query().Get(name)
-	if val == "" {
-		return defaultVal
-	}
-	if i, err := strconv.Atoi(val); err == nil {
-		return i
-	}
-	return defaultVal
 }

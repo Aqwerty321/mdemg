@@ -118,7 +118,7 @@ func ValidateManifest(path string) (*ManifestValidation, error) {
 	}
 
 	manifestPath := path
-	pluginDir := path
+	var pluginDir string
 	if info.IsDir() {
 		manifestPath = filepath.Join(path, "manifest.json")
 		pluginDir = path

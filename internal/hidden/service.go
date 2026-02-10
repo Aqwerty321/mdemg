@@ -734,50 +734,6 @@ func simplifyPrefix(prefix string) string {
 	return prefix
 }
 
-// fetchOrphanLayerNodes retrieves nodes from sourceLayer without ABSTRACTS_TO edge to targetLayer
-func (s *Service) fetchOrphanLayerNodes(ctx context.Context, spaceID string, sourceLayer, targetLayer int) ([]BaseNode, error) {
-	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	defer sess.Close(ctx)
-
-	cypher := `
-MATCH (n:MemoryNode {space_id: $spaceId, layer: $sourceLayer})
-WHERE NOT (n)-[:ABSTRACTS_TO]->(:MemoryNode {layer: $targetLayer})
-  AND (n.embedding IS NOT NULL OR n.message_pass_embedding IS NOT NULL)
-RETURN n.node_id AS nodeId, n.embedding AS embedding, n.message_pass_embedding AS messagePassEmbedding`
-
-	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, cypher, map[string]any{
-			"spaceId":     spaceID,
-			"sourceLayer": sourceLayer,
-			"targetLayer": targetLayer,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		var nodes []BaseNode
-		for res.Next(ctx) {
-			rec := res.Record()
-			nodeID, _ := rec.Get("nodeId")
-			embedding, _ := rec.Get("embedding")
-			msgPassEmb, _ := rec.Get("messagePassEmbedding")
-
-			nodes = append(nodes, BaseNode{
-				NodeID:               asString(nodeID),
-				SpaceID:              spaceID,
-				Embedding:            asFloat64Slice(embedding),
-				MessagePassEmbedding: asFloat64Slice(msgPassEmb),
-			})
-		}
-		return nodes, res.Err()
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	return result.([]BaseNode), nil
-}
-
 // fetchOrphanLayerNodesWithName retrieves nodes from sourceLayer with name for grouping
 func (s *Service) fetchOrphanLayerNodesWithName(ctx context.Context, spaceID string, sourceLayer, targetLayer int) ([]BaseNode, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
@@ -1802,19 +1758,6 @@ func (s *Service) groupSimilarModules(modules []ModuleNode) [][]ModuleNode {
 	return result
 }
 
-// extractParentDir extracts the parent directory from a file path
-func extractParentDir(path string) string {
-	if path == "" {
-		return ""
-	}
-	// Find last slash
-	lastSlash := strings.LastIndex(path, "/")
-	if lastSlash <= 0 {
-		return ""
-	}
-	return path[:lastSlash]
-}
-
 // extractModuleBaseName extracts the base name from a module name
 // e.g., "DeltaSyncModule" -> "sync", "UserService" -> "user"
 func extractModuleBaseName(name string) string {
@@ -1829,51 +1772,6 @@ func extractModuleBaseName(name string) string {
 	}
 	// Convert to lowercase for comparison
 	return strings.ToLower(base)
-}
-
-// sharesSimilarBase checks if two base names share a significant common substring
-func sharesSimilarBase(base1, base2 string) bool {
-	if base1 == "" || base2 == "" {
-		return false
-	}
-	// Check if one contains the other
-	if strings.Contains(base1, base2) || strings.Contains(base2, base1) {
-		return true
-	}
-	// Check for common prefix of at least 3 chars
-	minLen := len(base1)
-	if len(base2) < minLen {
-		minLen = len(base2)
-	}
-	if minLen >= 3 {
-		for i := 3; i <= minLen; i++ {
-			if base1[:i] == base2[:i] {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// commonBase returns the longest common substring between two base names
-func commonBase(base1, base2 string) string {
-	if strings.Contains(base1, base2) {
-		return base2
-	}
-	if strings.Contains(base2, base1) {
-		return base1
-	}
-	// Find longest common prefix
-	minLen := len(base1)
-	if len(base2) < minLen {
-		minLen = len(base2)
-	}
-	for i := minLen; i >= 3; i-- {
-		if base1[:i] == base2[:i] {
-			return base1[:i]
-		}
-	}
-	return ""
 }
 
 // comparisonNodeExists checks if a comparison node already exists for a group

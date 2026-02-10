@@ -21,8 +21,21 @@ linters:
         - fmt.Fprint
         - fmt.Fprintf
         - fmt.Fprintln
+        - fmt.Sscanf
         - (*encoding/json.Encoder).Encode
         - (*encoding/json.Decoder).Decode
+        - (github.com/neo4j/neo4j-go-driver/v5/neo4j.DriverWithContext).Close
+        - (github.com/neo4j/neo4j-go-driver/v5/neo4j.SessionWithContext).Close
+        - (*os.File).Close
+        - (*compress/gzip.Writer).Close
+        - os.Remove
+        - (*os.Process).Kill
+    staticcheck:
+      checks:
+        - "all"
+        - "-QF*"       # disable quickfix suggestions (style, not bugs)
+        - "-ST*"       # disable style enforcement
+        - "-S1*"       # disable simple suggestions
     govet:
       enable:
         - nilness
@@ -38,17 +51,22 @@ linters:
         linters:
           - errcheck
           - govet
+          - staticcheck
       # Exclude generated protobuf files
       - path: \.pb\.go
         linters:
           - all
-      # Exclude errcheck from CLI tools and plugins (fire-and-forget binaries)
+      # Exclude errcheck and staticcheck from CLI tools and plugins
       - path: ^cmd/
         linters:
           - errcheck
+          - staticcheck
+          - ineffassign
       - path: ^plugins/
         linters:
           - errcheck
+          - staticcheck
+          - ineffassign
 
 issues:
   max-issues-per-linter: 0

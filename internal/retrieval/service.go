@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -1597,12 +1596,6 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
-}
-
-// helpers used by scoring
-func expRecency(updatedAt time.Time, rho float64) float64 {
-	age := time.Since(updatedAt).Hours() / 24.0
-	return math.Exp(-rho * age)
 }
 
 // =============================================================================

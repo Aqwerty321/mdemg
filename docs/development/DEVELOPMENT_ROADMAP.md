@@ -1390,7 +1390,7 @@ MDEMG is being prepared for public release. This phase focuses on security, gove
 - [x] Set up GitHub Actions for automated linting and integration testing.
 - [x] CODEOWNERS, dependabot, auto-PR workflow, parser-tests workflow.
 - [x] SECURITY.md, CODE_OF_CONDUCT.md.
-- [x] Expanded `golangci-lint` config (staticcheck, errcheck, ineffassign, unused, gosimple).
+- [x] Expanded `golangci-lint` config (staticcheck, errcheck, ineffassign, unused).
 - [x] UATS contract tests added to CI pipeline.
 
 ### Deliverable 7.2: Security Hardening

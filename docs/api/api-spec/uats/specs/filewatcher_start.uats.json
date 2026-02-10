@@ -1,0 +1,98 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Start File Watcher",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "filewatcher",
+      "start",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-10",
+    "description": "Validates POST /v1/filewatcher/start creates a new file watcher (Phase 9.4)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "6d7fd5f8dc8356a53125e613d92c59c8924ef027a76b568a77e30e833bb3c549"
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/filewatcher/start",
+    "body": {
+      "space_id": "uats-filewatcher-test",
+      "path": "/tmp"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "operator": "eq",
+        "value": "uats-filewatcher-test"
+      },
+      {
+        "path": "$.status",
+        "operator": "eq",
+        "value": "watching"
+      },
+      {
+        "path": "$.path",
+        "type": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "request": {
+        "method": "POST",
+        "path": "/v1/filewatcher/start",
+        "body": {
+          "space_id": "",
+          "path": "/tmp"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_path",
+      "request": {
+        "method": "POST",
+        "path": "/v1/filewatcher/start",
+        "body": {
+          "space_id": "uats-filewatcher-test",
+          "path": "/nonexistent/path/that/does/not/exist"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

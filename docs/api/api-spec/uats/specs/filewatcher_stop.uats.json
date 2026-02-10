@@ -1,0 +1,72 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Stop File Watcher",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "filewatcher",
+      "stop",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-10",
+    "description": "Validates POST /v1/filewatcher/stop removes a file watcher (Phase 9.4)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "309cba8a70d419ffce61774b09f90b11719af4672e052455a5e665b9073a4c52"
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/filewatcher/stop",
+    "body": {
+      "space_id": "uats-filewatcher-test"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "operator": "eq",
+        "value": "uats-filewatcher-test"
+      },
+      {
+        "path": "$.status",
+        "operator": "eq",
+        "value": "stopped"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "request": {
+        "method": "POST",
+        "path": "/v1/filewatcher/stop",
+        "body": {
+          "space_id": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

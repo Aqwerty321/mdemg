@@ -969,49 +969,32 @@ POST /v1/memory/ingest/files
 ---
 
 ### Deliverable 9.4: Plugin-Specific Triggers
-**Priority**: P2 | **Effort**: 2 days | **Status**: ⏳ PENDING
+**Priority**: P2 | **Effort**: 2 days | **Status**: ✅ COMPLETE
 
-#### 9.4.1 Linear Webhook Integration
-```go
-// Linear module subscribes to Linear webhooks
-func (m *LinearModule) HandleWebhook(event WebhookEvent) {
-    switch event.Type {
-    case "Issue.created", "Issue.updated":
-        m.IngestIssue(event.Data)
-    case "Project.updated":
-        m.RefreshProject(event.Data.ProjectID)
-    }
-}
-```
+#### 9.4.1 Linear Webhook Integration — COMPLETE
+- [x] Webhook receiver: `internal/api/handle_webhooks.go` — HMAC-SHA256 verification, debouncing (10s)
+- [x] Real-time issue/project sync via gRPC dispatch to `linear-module`
+- [x] Batch ingest + APE `source_changed` event triggering
+- [x] Route: `POST /v1/webhooks/linear` (server.go)
+- [x] Config: `LinearWebhookSecret`, `LinearWebhookSpaceID` env vars
 
-- [ ] Add webhook receiver to Linear module
-- [ ] Real-time issue/project sync on Linear changes
-- [ ] Debounce rapid updates (10s window)
+#### 9.4.2 File Watcher REST API — COMPLETE
+- [x] Core: `internal/filewatcher/watcher.go` — Manager, debouncing, extension filtering, exclude patterns
+- [x] REST API: `internal/api/handlers_filewatcher.go` — 3 endpoints for runtime management
+  - `POST /v1/filewatcher/start` — start watcher for a space (validates path, resolves absolute)
+  - `GET /v1/filewatcher/status` — list all active watchers with count
+  - `POST /v1/filewatcher/stop` — stop watcher for a space
+- [x] Config-based startup: `FILE_WATCHER_ENABLED`, `FILE_WATCHER_CONFIGS`
+- [x] 3 UATS specs: filewatcher_start, filewatcher_status, filewatcher_stop
 
-#### 9.4.2 File Watcher Integration (IDE Mode)
-```bash
-# Start file watcher daemon
-mdemg-cli watch --space-id="my-project" --path="/path/to/repo"
-```
-
-- [ ] Use fsnotify for file system events
-- [ ] Debounce: batch changes over 500ms window
-- [ ] Filter: only watch configured extensions (`.ts`, `.go`, `.py`)
-- [ ] Exclude: `node_modules`, `.git`, `vendor`
-
-#### 9.4.3 Event-Driven Module Updates
-```protobuf
-// Extend APE events for modules
-message ModuleEvent {
-  string event_type = 1;  // "source_changed", "dependency_updated"
-  string module_id = 2;
-  map<string, string> metadata = 3;
-}
-```
-
-- [ ] Modules can subscribe to `source_changed` events
-- [ ] Trigger module-specific re-processing (e.g., re-parse symbols)
-- [ ] Support custom event types per module
+#### 9.4.3 Event-Driven Module Updates — COMPLETE
+- [x] `EventSubscriptions` field on manifest `Capabilities` (`internal/plugins/types.go`)
+- [x] `EventDispatcher` (`internal/plugins/events.go`) routes events to non-APE modules
+- [x] INGESTION modules: dispatched via `IngestionClient.Parse` with event metadata
+- [x] CRUD modules: logged (no OnEvent RPC yet)
+- [x] Server wiring: `TriggerAPEEventWithContext` now dispatches to both APE scheduler and EventDispatcher
+- [x] Wildcard subscription support (`*` matches all events)
+- [x] Unit tests: `internal/plugins/events_test.go`
 
 ---
 
@@ -1058,7 +1041,7 @@ RETURN m.node_id, m.file_path
 | 9.3 User-Triggered | HIGH | LOW | P0 |
 | 9.1 Git Hooks | HIGH | MEDIUM | P1 |
 | 9.2 Time-Based | MEDIUM | LOW | P2 |
-| 9.4 Plugin Triggers | MEDIUM | MEDIUM | P2 |
+| 9.4 Plugin Triggers | MEDIUM | MEDIUM | ✅ DONE |
 | 9.5 Conflict Resolution | MEDIUM | MEDIUM | P2 |
 
 ### Success Metrics

@@ -94,6 +94,9 @@ type Server struct {
 
 	// Phase 80: Meta-Cognition
 	signalLearner *ape.SignalLearner
+
+	// Phase 9.4: Event dispatch for non-APE modules
+	eventDispatcher *plugins.EventDispatcher
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -413,6 +416,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		backupSvc:               backupSvc,
 		backupScheduler:         backupSched,
 		signalLearner:           signalLearner,
+		eventDispatcher:         plugins.NewEventDispatcher(pluginMgr),
 	}
 }
 
@@ -836,9 +840,13 @@ func (s *Server) TriggerAPEEvent(event string) {
 
 // TriggerAPEEventWithContext triggers APE modules subscribed to the given event,
 // passing additional context (e.g., space_id, ingest_type) to module execution.
+// Also dispatches to non-APE modules that declared EventSubscriptions in their manifest.
 func (s *Server) TriggerAPEEventWithContext(event string, ctx map[string]string) {
 	if s.apeScheduler != nil {
 		s.apeScheduler.TriggerEventWithContext(event, ctx)
+	}
+	if s.eventDispatcher != nil {
+		s.eventDispatcher.DispatchEvent(event, ctx)
 	}
 }
 
@@ -979,6 +987,11 @@ func (s *Server) Routes() http.Handler {
 	// Webhook endpoints (Phase 9.4)
 	mux.HandleFunc("/v1/webhooks/linear", s.handleLinearWebhook)
 	mux.HandleFunc("/v1/webhooks/", s.handleGenericWebhook)
+
+	// File watcher management endpoints (Phase 9.4)
+	mux.HandleFunc("/v1/filewatcher/start", s.handleFileWatcherStart)
+	mux.HandleFunc("/v1/filewatcher/status", s.handleFileWatcherStatus)
+	mux.HandleFunc("/v1/filewatcher/stop", s.handleFileWatcherStop)
 
 	// Space freshness endpoints (Phase 9.2)
 	mux.HandleFunc("/v1/memory/spaces/", s.handleSpacesRoute)

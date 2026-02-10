@@ -264,6 +264,37 @@ RSIC tracks the historical success rate of each action type. Actions that consis
 - Protected spaces (`mdemg-dev`) never modified destructively
 - All actions bounded by configurable timeout per tier
 
+### Meta-Cognition & Self-Improvement Enforcement (Phase 80)
+
+Phase 80 transforms CMS from passive memory retrieval to active anomaly detection. When memory state is degraded, the system emits signals through API responses, HTTP headers, and hooks to force investigation.
+
+**Server-Side Anomaly Detection:**
+
+Resume and recall handlers check for anomalous states after computing results:
+- **Empty Resume** (CRITICAL): Space has conversation_observation nodes but resume returned 0 observations
+- **No Themes** (MEDIUM): Observations returned but 0 themes
+- **Empty Recall** (HIGH): Query >20 chars but 0 results
+
+Anomalies are embedded in both response body (`anomalies` array, `memory_state` field) and HTTP headers (`X-MDEMG-Memory-State`, `X-MDEMG-Anomaly`). A false-positive guard ensures genuinely empty spaces are not flagged.
+
+**Hook Circuit Breakers:**
+
+Hooks mechanically enforce investigation when degradation is detected:
+- **session-start.sh**: Detects 0-observation resume, emits CRITICAL warning, auto-fires RSIC micro assessment, displays health summary
+- **prompt-context.sh**: Detects empty recall for non-trivial queries, appends session health ribbon
+- **post-tool-observe.py**: Detects `X-MDEMG-Memory-State: degraded` in curl output, records error observations
+- **pre-compact.sh**: Queries session health before compaction, includes in context snapshot
+
+**Behavioral Learning Loop:**
+
+`SignalLearner` tracks signal effectiveness using Hebbian learning:
+- `RecordEmission(code)`: Signal emitted, strength decays (agent hasn't responded yet)
+- `RecordResponse(code)`: Agent acted on signal, strength boosts
+- Strength range: 0.1 (floor) to 1.0 (ceiling)
+- Configurable decay/boost rates via `METACOG_SIGNAL_DECAY_RATE` / `METACOG_SIGNAL_BOOST_RATE`
+
+See `docs/features/meta-cognition-enforcement.md` for full details.
+
 ## API Endpoints
 
 ### Core Operations
@@ -277,6 +308,7 @@ RSIC tracks the historical success rate of each action type. Actions that consis
 | GET | `/v1/conversation/volatile/stats` | Volatile observation statistics |
 | POST | `/v1/conversation/graduate` | Graduate volatile observations to permanent |
 | GET | `/v1/conversation/session/health` | Session health score |
+| GET | `/v1/conversation/session/anomalies` | Detected session anomalies |
 
 ### Templates
 | Method | Path | Description |
@@ -310,6 +342,7 @@ RSIC tracks the historical success rate of each action type. Actions that consis
 | GET | `/v1/self-improve/history` | Cycle history with outcomes |
 | GET | `/v1/self-improve/calibration` | Calibration metrics and confidence scores |
 | GET | `/v1/self-improve/health` | Watchdog status and health score |
+| GET | `/v1/self-improve/signals` | Signal effectiveness tracking (Phase 80) |
 
 ### Skill Registry (Phase 48)
 | Method | Path | Description |
@@ -326,6 +359,14 @@ Skills are CMS pinned observations with `skill:<name>` tags. Thin skill files in
 | POST | `/v1/conversation/observe` | With `pinned: true` — permanent, non-decaying observation |
 
 Pinned observations bypass volatile graduation: they start permanent with stability 1.0. Used by the Skill Registry to store skill instructions.
+
+### Constraint Nodes (Phase 45.5)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/v1/constraints?space_id=X` | List constraint nodes in a space |
+| GET | `/v1/constraints/stats?space_id=X` | Constraint type counts and confidence |
+
+Constraints are auto-detected from observation content (must/must_not/should/should_not/deadline patterns) and promoted to first-class nodes during consolidation. See `docs/features/constraint-nodes.md`.
 
 ## Architecture
 
@@ -396,6 +437,18 @@ timeline
         : Autonomous self-improvement cycles
         : Decay watchdog enforcement
         : Calibration meta-learning
+    Phase 45.5 — Constraints
+        : Auto-detection from content
+        : Constraint node promotion
+        : IMPLEMENTS_CONSTRAINT edges
+    Phase 48 — Skill Registry
+        : CMS-backed skill storage
+        : Tag-based recall
+        : Thin skill file pointers
+    Phase 80 — Meta-Cognition
+        : Server-side anomaly detection
+        : Hook circuit breakers
+        : Hebbian signal learning
 ```
 
 ## Configuration
@@ -447,4 +500,10 @@ RSIC_WATCHDOG_FORCE_THRESHOLD=0.9
 # RSIC — Calibration
 RSIC_CALIBRATION_WINDOW_DAYS=7
 RSIC_MIN_CONFIDENCE_THRESHOLD=0.3
+
+# Meta-Cognition (Phase 80)
+METACOG_ENABLED=true
+METACOG_EMPTY_RESUME_CHECK=true
+METACOG_SIGNAL_DECAY_RATE=0.05
+METACOG_SIGNAL_BOOST_RATE=0.1
 ```

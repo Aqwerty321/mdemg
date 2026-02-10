@@ -13,6 +13,16 @@ linters:
     - ineffassign
     - unused
   settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (*net/http.Response).Body.Close
+        - (net/http.ResponseWriter).Write
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*encoding/json.Encoder).Encode
+        - (*encoding/json.Decoder).Decode
     govet:
       enable:
         - nilness
@@ -32,6 +42,13 @@ linters:
       - path: \.pb\.go
         linters:
           - all
+      # Exclude errcheck from CLI tools and plugins (fire-and-forget binaries)
+      - path: ^cmd/
+        linters:
+          - errcheck
+      - path: ^plugins/
+        linters:
+          - errcheck
 
 issues:
   max-issues-per-linter: 0

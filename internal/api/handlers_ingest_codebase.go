@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -435,29 +437,33 @@ func (s *Server) buildIngestArgs(req *IngestCodebaseRequest) []string {
 	return args
 }
 
-// parseIngestOutput extracts stats from CLI output
+// Regex patterns for parsing CLI output (handles any log timestamp prefix)
+var (
+	reFound   = regexp.MustCompile(`Found (\d+) code elements`)
+	reTotal   = regexp.MustCompile(`Total: (\d+), Ingested: (\d+), Errors: (\d+)`)
+	reRate    = regexp.MustCompile(`Rate: ([\d.]+) elements/sec`)
+	reSymbols = regexp.MustCompile(`Symbols: (\d+)`)
+)
+
+// parseIngestOutput extracts stats from CLI output using regex.
+// The CLI uses log.Printf which prepends timestamps, so regex is used
+// to match patterns anywhere in each line regardless of prefix.
 func parseIngestOutput(output string) IngestCodebaseStats {
 	stats := IngestCodebaseStats{}
 
-	// Parse lines like:
-	// "Found 4522 code elements"
-	// "Total: 4522, Ingested: 4522, Errors: 0"
-	// "Time: 5m6.29s, Rate: 14.8 elements/sec"
-
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "Found") && strings.Contains(line, "code elements") {
-			fmt.Sscanf(line, "%*s %*s Found %d code elements", &stats.FilesFound)
-		}
-		if strings.Contains(line, "Total:") && strings.Contains(line, "Ingested:") {
-			fmt.Sscanf(line, "%*s %*s Total: %d, Ingested: %d, Errors: %d",
-				&stats.FilesFound, &stats.FilesProcessed, &stats.Errors)
-		}
-		if strings.Contains(line, "Rate:") {
-			var rate float64
-			fmt.Sscanf(line, "%*s %*s Time: %*s Rate: %f", &rate)
-			stats.Rate = rate
-		}
+	if m := reFound.FindStringSubmatch(output); len(m) == 2 {
+		stats.FilesFound, _ = strconv.ParseInt(m[1], 10, 64)
+	}
+	if m := reTotal.FindStringSubmatch(output); len(m) == 4 {
+		stats.FilesFound, _ = strconv.ParseInt(m[1], 10, 64)
+		stats.FilesProcessed, _ = strconv.ParseInt(m[2], 10, 64)
+		stats.Errors, _ = strconv.ParseInt(m[3], 10, 64)
+	}
+	if m := reRate.FindStringSubmatch(output); len(m) == 2 {
+		stats.Rate, _ = strconv.ParseFloat(m[1], 64)
+	}
+	if m := reSymbols.FindStringSubmatch(output); len(m) == 2 {
+		stats.SymbolsExtracted, _ = strconv.ParseInt(m[1], 10, 64)
 	}
 
 	return stats

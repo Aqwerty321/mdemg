@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "69506ff9748f06b948d6a61c6c1766cc58c21bdb9076a9d7dcb9c54e9f8b91fb"
+    "sha256": "be9d7c8eb58eebec060c2984ca76a853535813d5ac31909172b26c498da1b667"
   },
   "variables": {
     "unique_id": {
@@ -92,6 +92,80 @@
           "space_id": "{{test_space}}",
           "content": "test",
           "source": null
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unix_timestamp_format",
+      "description": "Ingest with unix seconds timestamp format",
+      "request": {
+        "body": {
+          "space_id": "{{test_space}}-{{unique_id}}",
+          "timestamp": "1739054400",
+          "timestamp_format": "unix",
+          "source": "uats-runner",
+          "content": "Test unix timestamp format"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.node_id",
+            "type": "string"
+          },
+          {
+            "path": "$.obs_id",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "date_only_timestamp_format",
+      "description": "Ingest with date-only timestamp format",
+      "request": {
+        "body": {
+          "space_id": "{{test_space}}-{{unique_id}}",
+          "timestamp": "2026-02-09",
+          "timestamp_format": "date_only",
+          "source": "uats-runner",
+          "content": "Test date_only timestamp format"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.node_id",
+            "type": "string"
+          },
+          {
+            "path": "$.obs_id",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_timestamp_format",
+      "description": "Reject invalid timestamp_format enum value",
+      "request": {
+        "body": {
+          "space_id": "{{test_space}}",
+          "timestamp": "2026-02-09T10:30:00Z",
+          "timestamp_format": "epoch_ns",
+          "source": "uats-runner",
+          "content": "Should be rejected"
         }
       },
       "expected": {

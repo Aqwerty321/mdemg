@@ -127,7 +127,7 @@ jobs:
           TEST_MDEMG_ENDPOINT: http://localhost:${{ env.MDEMG_PORT }}
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: coverage.out
           fail_ci_if_error: false

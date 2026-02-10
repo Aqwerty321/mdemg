@@ -8,6 +8,11 @@ linters:
   default: none
   enable:
     - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - gosimple
   settings:
     govet:
       enable:

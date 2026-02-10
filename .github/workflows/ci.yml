@@ -126,6 +126,20 @@ jobs:
         env:
           TEST_MDEMG_ENDPOINT: http://localhost:${{ env.MDEMG_PORT }}
 
+      - name: Setup Python for UATS
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install UATS dependencies
+        run: pip install requests jsonpath-ng
+
+      - name: Run UATS Contract Tests
+        run: |
+          python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+            --spec-dir docs/api/api-spec/uats/specs/ \
+            --base-url http://localhost:${{ env.MDEMG_PORT }}
+
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:

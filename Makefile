@@ -81,7 +81,7 @@ help:
 
 # Run all UATS API validation tests
 test-api:
-	@echo "Running UATS API validation (41 endpoints)..."
+	@echo "Running UATS API validation (101 specs)..."
 	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
 		--spec-dir docs/api/api-spec/uats/specs/ \
 		--base-url $(BASE_URL) \

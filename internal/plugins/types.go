@@ -35,11 +35,12 @@ type Manifest struct {
 
 // Capabilities defines what a module can do
 type Capabilities struct {
-	IngestionSources []string `json:"ingestion_sources,omitempty"` // For INGESTION modules
-	ContentTypes     []string `json:"content_types,omitempty"`     // File types this module can parse
-	PatternDetectors []string `json:"pattern_detectors,omitempty"` // For REASONING modules
-	EventTriggers    []string `json:"event_triggers,omitempty"`    // For APE modules
-	CRUDEntityTypes  []string `json:"crud_entity_types,omitempty"` // For CRUD-capable modules
+	IngestionSources   []string `json:"ingestion_sources,omitempty"`   // For INGESTION modules
+	ContentTypes       []string `json:"content_types,omitempty"`       // File types this module can parse
+	PatternDetectors   []string `json:"pattern_detectors,omitempty"`   // For REASONING modules
+	EventTriggers      []string `json:"event_triggers,omitempty"`      // For APE modules
+	CRUDEntityTypes    []string `json:"crud_entity_types,omitempty"`   // For CRUD-capable modules
+	EventSubscriptions []string `json:"event_subscriptions,omitempty"` // For any module type to subscribe to events
 }
 
 // ModuleInfo represents runtime information about a loaded module

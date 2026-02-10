@@ -1,0 +1,46 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "File Watcher Status",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "filewatcher",
+      "status",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-10",
+    "description": "Validates GET /v1/filewatcher/status returns active file watchers (Phase 9.4)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "8bdd410e84727736f7a0180b790e05d201f49c0ab071cd2a83cb9b5489bec63e"
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/filewatcher/status",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.watchers",
+        "type": "object"
+      },
+      {
+        "path": "$.count",
+        "type": "number"
+      }
+    ]
+  }
+}

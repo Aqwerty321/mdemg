@@ -139,7 +139,7 @@ func (w *Watcher) Start() error {
 // Stop stops the watcher and releases resources.
 func (w *Watcher) Stop() {
 	w.cancel()
-	w.watcher.Close()
+	_ = w.watcher.Close()
 	w.debouncer.flush()
 	w.wg.Wait()
 	log.Printf("[filewatcher] stopped watching %s", w.config.Path)

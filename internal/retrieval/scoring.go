@@ -762,14 +762,12 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 	// Debug: check if target term is in top results before truncation
 	if scoringDebugEnabled {
 		found := false
-		rank := -1
 		for i, item := range items {
 			if strings.Contains(strings.ToLower(item.Name), scoringDebugTerm) ||
 				strings.Contains(strings.ToLower(item.Path), scoringDebugTerm) {
 				found = true
-				rank = i + 1
 				log.Printf("[DEBUG Scoring] '%s' ranked #%d of %d (before truncation to topK=%d): Score=%.4f, Name=%s",
-					scoringDebugTerm, rank, len(items), topK, item.Score, item.Name)
+					scoringDebugTerm, i+1, len(items), topK, item.Score, item.Name)
 				break
 			}
 		}

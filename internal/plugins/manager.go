@@ -365,14 +365,14 @@ func (m *Manager) startModuleInstance(inst *moduleInstance, binaryPath string) e
 		Config:       info.Manifest.Config,
 	})
 	if err != nil {
-		conn.Close()
-		cmd.Process.Kill()
+		_ = conn.Close()
+		_ = cmd.Process.Kill()
 		return fmt.Errorf("handshake failed: %w", err)
 	}
 
 	if !resp.Ready {
-		conn.Close()
-		cmd.Process.Kill()
+		_ = conn.Close()
+		_ = cmd.Process.Kill()
 		return fmt.Errorf("module not ready: %s", resp.Error)
 	}
 
@@ -414,7 +414,7 @@ func (m *Manager) stopModuleInstance(inst *moduleInstance) error {
 
 	// Close gRPC connection
 	if inst.conn != nil {
-		inst.conn.Close()
+		_ = inst.conn.Close()
 	}
 
 	// Kill process if still running

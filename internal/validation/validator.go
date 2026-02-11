@@ -21,7 +21,7 @@ func GetValidator() *validator.Validate {
 		validate = validator.New(validator.WithRequiredStructEnabled())
 
 		// Register custom validators
-		validate.RegisterValidation("embedding_dims", validateEmbeddingDims)
+		_ = validate.RegisterValidation("embedding_dims", validateEmbeddingDims)
 
 		// Use JSON tag names in error messages
 		validate.RegisterTagNameFunc(func(fld reflect.StructField) string {

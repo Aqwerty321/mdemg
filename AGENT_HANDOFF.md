@@ -1,6 +1,6 @@
 # MDEMG Agent Handoff Document
 
-**Date:** 2026-02-06
+**Date:** 2026-02-16
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -293,6 +293,7 @@ Phases are organized into **numbered series** to group related work:
 | — (Relationship Extraction) | **Phase 75** | Cross-File Relationship Extraction & Graph Topology Hardening | ✅ Complete |
 | — (Neo4j Monitor) | **Phase 76** | Neo4j State Monitor & Space Overview | ✅ Complete |
 | — (CMS Meta-Cognition) | **Phase 80** | CMS ANN Meta-Cognition & Self-Improvement Enforcement | ✅ Complete |
+| — (Plugin Triggers) | **Phase 9.4** | Plugin-Specific Triggers (File Watcher + Events) | ✅ Complete |
 
 ---
 
@@ -339,8 +340,9 @@ Phases are organized into **numbered series** to group related work:
 | 70 | Neo4j Backup (Full & Partial) with Scheduler | ✅ | `docs/specs/phase70-neo4j-backup.md` |
 | 75 | Cross-File Relationship Extraction & Graph Topology Hardening | ✅ | `docs/specs/phase75-relationship-extraction.md` |
 | 75C | L5 Emergent Layer — Unblock Emergence | ✅ | `docs/features/l5-emergent-layer.md` |
-| 76 | Neo4j State Monitor & Space Overview | 📋 | Planned |
-| 80 | CMS ANN Meta-Cognition & Self-Improvement Enforcement | 📋 | Planned |
+| 76 | Neo4j State Monitor & Space Overview | ✅ | `docs/api/api-spec/uats/specs/neo4j_overview.uats.json` |
+| 80 | CMS ANN Meta-Cognition & Self-Improvement Enforcement | ✅ | `docs/specs/phase80-cms-metacognition.md` |
+| 9.4 | Plugin-Specific Triggers (File Watcher + Events) | ✅ | `internal/api/handlers_filewatcher.go`, `internal/plugins/events.go` |
 
 ---
 
@@ -654,7 +656,7 @@ Org Reviews:
 - `POST /v1/conversation/org-reviews/flag` — Flag for review
 - `POST /v1/conversation/org-reviews/decision` — Approve/reject decision
 
-**UATS Test Coverage:** 15/15 specs passing (100% conformance)
+**UATS Test Coverage:** 15/15 Phase 60 specs passing (100% conformance)
 
 **Relevance Scoring Formula:**
 ```
@@ -1087,7 +1089,7 @@ Manages the lifecycle of volatile observations — reinforcement, stability deca
 - [x] Ticker-based scheduler (full weekly, partial daily — configurable)
 - [x] Retention engine: count + age + storage-based cleanup; `keep_forever` exempt
 - [x] Restore from full dump via `neo4j-admin database load`
-- [x] 7 API endpoints (all return 503 when disabled)
+- [x] 7 API endpoints (return 503 when disabled; backup is now permanently enabled)
 - [x] Migration: V0013 BackupMeta constraint + index
 - [x] 7 UATS specs, all passing
 - [x] E2E verified: 101MB partial backup of mdemg-dev (21,033 nodes, 232,434 edges)
@@ -1117,7 +1119,9 @@ Manages the lifecycle of volatile observations — reinforcement, stability deca
 | `POST` | `/v1/backup/restore` | Trigger restore (full dump only) |
 | `GET` | `/v1/backup/restore/status/{id}` | Restore job progress |
 
-**Configuration:** 11 `BACKUP_*` env vars (default: `BACKUP_ENABLED=false`). See `.env.example` and `docs/development/NEO4J_BACKUP.md`.
+**Configuration:** 11 `BACKUP_*` env vars. **Backup is permanently enabled** (`BACKUP_ENABLED=true` in `.env`). See `.env.example` and `docs/development/NEO4J_BACKUP.md`.
+
+**Backup/Restore Guide:** `docs/development/BACKUP_RESTORE.md` — comprehensive step-by-step guide for dev teams covering space export, full backup, restore, importing shared `.mdemg` files, retention policies, and API reference.
 
 ---
 
@@ -1439,7 +1443,7 @@ relevanceScore = 0.40 * recencyScore + 0.25 * surpriseScore + 0.20 * typePriorit
 | 47.1 Git Commit Hooks | ✅ | `cmd/ingest-codebase/main.go` (`--incremental`, `--since`, `--archive-deleted`) |
 | 47.2 Time-Based Scheduled Sync | 🔄 | Freshness tracking done (TapRoot properties, `GET /v1/memory/spaces/{space_id}/freshness`); APE INGEST action pending |
 | 47.3 User-Triggered Updates | ✅ | `POST /v1/memory/ingest/trigger`, `/status/{job_id}`, `/cancel/{job_id}`, `/jobs`; file-level re-ingest at `POST /v1/memory/ingest/files` |
-| 47.4 Plugin-Specific Triggers | 📋 | Linear webhook, file watcher (fsnotify), event-driven module updates |
+| 47.4 Plugin-Specific Triggers | ✅ | Linear webhook ✅, file watcher REST API ✅ (Phase 9.4), event-driven module updates ✅ (Phase 9.4) |
 | 47.5 Conflict Resolution | ✅ | Optimistic locking with retry, edge consistency cascade |
 
 **47.5 Optimistic Lock Retry + Edge Consistency (Completed 2026-02-06):**
@@ -1495,6 +1499,18 @@ EDGE_STALENESS_RECLUSTER_THRESHOLD=0.3  # default: 0.3
 | Dashboard | `deploy/docker/grafana/dashboards/mdemg-overview.json` | 10-panel overview |
 
 **Dashboard Panels:** Request Rate, P95 Latency, Error Rate, Circuit Breakers, Request Latency Distribution, Requests by Status, Cache Hit Ratios, Retrieval Latency, Rate Limit Rejections, Embedding Latency.
+
+**Neo4j Graph Dashboard (Added 2026-02-16):**
+
+| Component | Path | Description |
+|-----------|------|-------------|
+| Dashboard | `deploy/docker/grafana/dashboards/neo4j-graph-health.json` | 12-panel Neo4j graph health dashboard |
+| Alert rules | `deploy/docker/prometheus/alerts/mdemg_neo4j_graph.yaml` | 7 graph health alert rules |
+| Prometheus config | `deploy/docker/prometheus.yml` | Updated scrape targets |
+
+**Neo4j Dashboard Panels:** Total Nodes, Total Edges, Orphan Ratio, Learning Edges, Edge Density, Nodes by Layer, L5 Emergent Nodes, Node Growth Rate, Edge Growth Rate, Space Health Scores, Consolidation Age, Learning Phase Gauge.
+
+**Alert Rules (7):** OrphanRatioHigh (>10%), EdgeDensityLow (<2.0), ConsolidationStale (>7d), LearningEdgeSaturated (>50k), L5EmergentMissing, SpaceHealthDegraded (<0.5), NodeGrowthStalled (0 for 24h).
 
 **Metrics Fixes:**
 - Fixed histogram bucket initialization (`server.go` - use `DefaultConfig()`)
@@ -1599,9 +1615,9 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 
 ### UATS (Active)
 
-Located at `docs/api/api-spec/uats/specs/` — 79 specs covering all HTTP endpoints. Runner: `docs/api/api-spec/uats/runners/uats_runner.py`.
+Located at `docs/api/api-spec/uats/specs/` — 102 specs covering all HTTP endpoints. Runner: `docs/api/api-spec/uats/runners/uats_runner.py`.
 
-**Current Status:** 79 specs, 133 variants, 133 passing (100%).
+**Current Status:** 102 specs, 172 variants, 172 passing (100%).
 
 **Hash Integrity:** All specs include SHA256 hashes (`config.sha256`). The runner verifies hashes on load (use `--skip-hash` to bypass during development).
 
@@ -1683,7 +1699,7 @@ Located at `docs/lang-parser/lang-parse-spec/upts/` — 27 language parser specs
 | Path | Contents |
 |------|----------|
 | `docs/architecture/` | 24 files: Architecture (01), Graph Schema (02), Embeddings (03), Activation (04), Ingestion (05), Retrieval (06), Consolidation (07), Config (08), Testing (09), Ops (10), Migrations (11), Scoring Examples (12), Go Framework (13), Runbook (14), plus Hidden Layer, Hybrid Rerank, Interceptor, Learning Edges, Modular Intelligence, Recursive Consolidation, Temporal Decay specs |
-| `docs/development/` | API Reference, CI/CD, Dev Roadmap, Linear Guide, Module Dev Guide, Neo4j Backup Guide, Public Roadmap, Research Roadmap, Scraper Guide, SDK Plugin Guide |
+| `docs/development/` | API Reference, Backup & Restore Guide, CI/CD, Dev Roadmap, Linear Guide, Module Dev Guide, Neo4j Backup Guide, Pipeline Registry, Public Roadmap, Relationship Extraction, Research Roadmap, Scraper Guide, SDK Plugin Guide |
 | `docs/specs/` | Phase specs (31-50 mapping), Framework Governance, UNTS spec, manifest, template |
 | `docs/research/` | Edge Type Attention, GAT, Hybrid Edge Strategy, Enhancement Research, Query-Aware Expansion, Temporal Decay Results |
 | `docs/benchmarks/` | Benchmark results, scripts, analysis (43 files) |
@@ -1858,13 +1874,68 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 
 ---
 
+### Phase 9.4: Plugin-Specific Triggers ✅
+
+**Completed:** 2026-02-10
+**Dependencies:** Phase 47 (Incremental Updates), Phase 45.5 (APE Scheduler)
+
+**What it does:** Three sub-phases completing the plugin-specific trigger pipeline (Phase 47.4):
+
+| Sub-Phase | Focus | Status |
+|-----------|-------|--------|
+| 9.4.1 | Linear Webhook Handler | ✅ Already complete (HMAC-SHA256, debounce, gRPC dispatch) |
+| 9.4.2 | File Watcher REST API | ✅ 3 endpoints (start/status/stop) |
+| 9.4.3 | Event-Driven Module Updates | ✅ EventDispatcher with wildcard subscriptions |
+
+**9.4.2 File Watcher REST API:**
+- `POST /v1/filewatcher/start` — Start watching a directory
+- `GET /v1/filewatcher/status` — Get watcher status
+- `POST /v1/filewatcher/stop` — Stop watching
+- Reuses existing `filewatcher.Manager` + `handleFileWatcherChange`
+
+**9.4.3 Event-Driven Module Updates:**
+- `EventDispatcher` in `internal/plugins/events.go`
+- `EventSubscriptions []string` added to plugin `Capabilities` in `types.go`
+- `TriggerAPEEventWithContext` now dispatches to both APE scheduler + EventDispatcher
+- INGESTION modules: Parse called with event metadata; CRUD: logged only
+- Wildcard `*` subscription support
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `internal/api/handlers_filewatcher.go` | File watcher REST endpoints (start/status/stop) |
+| `internal/plugins/events.go` | EventDispatcher — routes events to subscribed plugins |
+| `internal/plugins/types.go` | EventSubscriptions field on Capabilities |
+| `internal/api/handle_webhooks.go` | Linear webhook handler (9.4.1, pre-existing) |
+
+**UATS:** 3 specs (filewatcher_start, filewatcher_status, filewatcher_stop), 7 variants total.
+
+**Gotcha:** UATS deep merge: variant body merges with base — must explicitly set fields to `""` to override base values.
+
+---
+
+### Neo4j Space Cleanup (2026-02-16)
+
+Cleaned up Neo4j from 140 spaces (~37K nodes) to **2 spaces (20,041 nodes)**:
+- `whk-wms` — 7,649 nodes (primary domain knowledge space)
+- `mdemg-dev` — 12,392 nodes (protected CMS + codebase space)
+
+**Deleted:** 121 `uats-ingest-*` test fixtures, `lnl-demo-whk` (duplicate of whk-wms), `mdemg` and `mdemg-codebase` (superseded by mdemg-dev), `e2e-test`, `whk-wms-test`, `demo` (one-shot protobuf ingestion).
+
+**Backups created before cleanup:**
+- `backups/whk-wms+mdemg-dev-20260216.mdemg` (629 MB) — both spaces
+- `backups/mdemg-dev-only-20260216.mdemg` (438 MB) — CMS only
+
+---
+
 ## 14. Known Issues & Technical Debt
 
 | Issue | Severity | Location | Notes |
 |-------|----------|----------|-------|
 | ~~`TestScoringGolden`~~ | ✅ Fixed | `tests/integration/scoring_golden_test.go` | Updated target similarities to be above retrieval threshold |
 | ~~UOBS Prometheus metrics~~ | ✅ Fixed | `docs/tests/uobs/specs/prometheus_metrics.uobs.json` | All 10/10 metrics now passing |
-| ~~UATS specs not all verified~~ | ✅ Fixed | `docs/api/api-spec/uats/specs/` | 79 specs, 133 variants, 133 passing (100%). |
+| ~~UATS specs not all verified~~ | ✅ Fixed | `docs/api/api-spec/uats/specs/` | 102 specs, 172 variants, 172 passing (100%). |
 | ~~Phase 60b RSIC not started~~ | ✅ Complete | `internal/ape/` | Implemented: 10 new files (types, assess, reflect, plan, spec, dispatch, monitor, calibration, watchdog, cycle), 7 API endpoints, 6 UATS specs. |
 | ~~Phase 45.5 Constraint Nodes~~ | ✅ Complete | `internal/hidden/constraint_nodes.go` | Constraint detection + promotion during consolidation. 2 new UATS specs. |
 | ~~Phase 46-PR Pipeline Registry~~ | ✅ Complete | `internal/hidden/pipeline.go` | Dynamic pipeline replaces 4-file shotgun surgery. 8 unit tests. See `docs/development/REGISTRY.md`. |
@@ -1905,7 +1976,7 @@ python3 docs/tests/uobs/runners/uobs_runner.py --spec "docs/tests/uobs/specs/*.u
 python3 docs/tests/uobs/runners/uobs_runner.py --spec docs/tests/uobs/specs/embedding_health.uobs.json
 
 # === UATS Tests ===
-make test-api                                         # Run all 92 UATS specs
+make test-api                                         # Run all 102 UATS specs
 python3 docs/api/api-spec/uats/runners/uats_runner.py add-hashes --spec-dir docs/api/api-spec/uats/specs/
 python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir docs/api/api-spec/uats/specs/
 
@@ -1937,4 +2008,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-09 — 98 UATS specs, 155 variants, 155 passing (100%). Phase 76 (Neo4j State Monitor) complete: consolidated GET /v1/neo4j/overview endpoint with batched queries. Phase 80, 75C, 75, 70, 51 also complete.*
+*Last updated: 2026-02-16 — 102 UATS specs, 172 variants, 172 passing (100%). Neo4j: 2 spaces, 20,041 nodes (whk-wms + mdemg-dev). Backup permanently enabled. Grafana Neo4j dashboard + 7 alert rules deployed. Phase 9.4 (Plugin Triggers) complete. All phases through 80 complete.*

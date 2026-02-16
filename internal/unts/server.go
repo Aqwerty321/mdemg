@@ -78,7 +78,7 @@ func (s *Server) GetFileStatus(ctx context.Context, req *pb.GetFileStatusRequest
 		return nil, status.Error(codes.InvalidArgument, "path is required")
 	}
 
-	f, ok := s.registry.Get(req.Path)
+	_, ok := s.registry.Get(req.Path)
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "file not tracked: %s", req.Path)
 	}
@@ -91,7 +91,7 @@ func (s *Server) GetFileStatus(ctx context.Context, req *pb.GetFileStatusRequest
 	}
 
 	// Re-fetch after verify (it may have updated status)
-	f, _ = s.registry.Get(req.Path)
+	f, _ := s.registry.Get(req.Path)
 
 	return &pb.GetFileStatusResponse{
 		Record:     f.ToProto(),

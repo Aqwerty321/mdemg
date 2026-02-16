@@ -223,11 +223,7 @@ var gzipWriterPool = sync.Pool{
 
 // CompressionMiddleware adds gzip compression to responses when the client supports it.
 // Only compresses responses larger than minSize bytes.
-func CompressionMiddleware(next http.Handler, minSize int) http.Handler {
-	if minSize <= 0 {
-		minSize = 1024 // Default: compress responses > 1KB
-	}
-
+func CompressionMiddleware(next http.Handler, _ int) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check if client accepts gzip
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {

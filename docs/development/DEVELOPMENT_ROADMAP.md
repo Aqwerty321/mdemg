@@ -1383,11 +1383,15 @@ LLM_SUMMARY_CACHE_SIZE=1000        # LRU cache size
 
 ## Phase 7: Public Readiness & Open Source Hardening
 
-MDEMG is being prepared for public release. This phase focuses on security, governance, and the establishment of a collaboration framework to allow external contributors to build SME Modules. (See [Repo-to-Public Roadmap](docs/repo-to-public-roadmap.md) for detailed tasks).
+MDEMG is being prepared for public release. This phase focuses on security, governance, and the establishment of a collaboration framework to allow external contributors to build SME Modules.
 
-### Deliverable 7.1: Governance & CI/CD Guards
-- [ ] Implement Issue/PR templates and `CONTRIBUTING.md`.
-- [ ] Set up GitHub Actions for automated linting and integration testing.
+### Deliverable 7.1: Governance & CI/CD Guards ✅ COMPLETE
+- [x] Implement Issue/PR templates and `CONTRIBUTING.md`.
+- [x] Set up GitHub Actions for automated linting and integration testing.
+- [x] CODEOWNERS, dependabot, auto-PR workflow, parser-tests workflow.
+- [x] SECURITY.md, CODE_OF_CONDUCT.md.
+- [x] Expanded `golangci-lint` config (staticcheck, errcheck, ineffassign, unused).
+- [x] UATS contract tests added to CI pipeline.
 
 ### Deliverable 7.2: Security Hardening
 - [ ] Perform secret scrubbing and path normalization across scripts and API handlers.

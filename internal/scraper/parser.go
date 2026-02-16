@@ -70,7 +70,6 @@ func NewParser(cfg ParserConfig) *Parser {
 var (
 	headingPattern   = regexp.MustCompile(`(?m)^(#{1,6})\s+(.+)$`)
 	codeBlockPattern = regexp.MustCompile("(?m)^```(\\w*)\\s*$")
-	linkPattern      = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
 )
 
 // Parse chunks content into sections and extracts symbols via the UPTS markdown parser.
@@ -355,23 +354,4 @@ func extractKeyTerms(content string) []string {
 		}
 	}
 	return terms
-}
-
-// mergeTags combines two tag slices, deduplicating.
-func mergeTags(a, b []string) []string {
-	seen := make(map[string]bool)
-	var result []string
-	for _, t := range a {
-		if !seen[t] {
-			seen[t] = true
-			result = append(result, t)
-		}
-	}
-	for _, t := range b {
-		if !seen[t] {
-			seen[t] = true
-			result = append(result, t)
-		}
-	}
-	return result
 }

@@ -163,7 +163,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create neo4j driver: %v", err)
 	}
-	defer driver.Close(ctx)
+	defer func() { _ = driver.Close(ctx) }()
 
 	// Verify connectivity
 	if err := driver.VerifyConnectivity(ctx); err != nil {
@@ -343,7 +343,7 @@ func runDecayJob(ctx context.Context, driver neo4j.DriverWithContext, cfg decayC
 // updateEdgeWeight updates the weight of an edge in the database
 func updateEdgeWeight(ctx context.Context, driver neo4j.DriverWithContext, edgeID int64, newWeight float64) error {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer sess.Close(ctx)
+	defer func() { _ = sess.Close(ctx) }()
 
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		cypher := `
@@ -376,7 +376,7 @@ RETURN count(*) AS updated`
 // deleteEdge removes an edge from the database
 func deleteEdge(ctx context.Context, driver neo4j.DriverWithContext, edgeID int64) error {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer sess.Close(ctx)
+	defer func() { _ = sess.Close(ctx) }()
 
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		cypher := `
@@ -457,7 +457,7 @@ func printHeader(cfg decayConfig) {
 // It filters by space_id (optional) and age threshold (older than N days).
 func queryEdgeBatch(ctx context.Context, driver neo4j.DriverWithContext, cfg decayConfig, offset int) ([]edge, error) {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	defer sess.Close(ctx)
+	defer func() { _ = sess.Close(ctx) }()
 
 	// Build the Cypher query with optional space filtering
 	// Note: We use updated_at as fallback if last_activated_at is not present

@@ -69,7 +69,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create neo4j driver: %v", err)
 	}
-	defer driver.Close(ctx)
+	defer func() { _ = driver.Close(ctx) }()
 
 	// Verify connectivity
 	if err := driver.VerifyConnectivity(ctx); err != nil {
@@ -316,7 +316,7 @@ func runHiddenLayerJob(ctx context.Context, driver neo4j.DriverWithContext, cfg 
 // countOrphanBaseNodes counts base nodes without a GENERALIZES edge to hidden layer
 func countOrphanBaseNodes(ctx context.Context, driver neo4j.DriverWithContext, spaceID string) (int, error) {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	defer sess.Close(ctx)
+	defer func() { _ = sess.Close(ctx) }()
 
 	cypher := `
 MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})
@@ -344,7 +344,7 @@ RETURN count(b) AS cnt`
 // countLayerNodes counts hidden (layer 1) and concept (layer >= 2) nodes
 func countLayerNodes(ctx context.Context, driver neo4j.DriverWithContext, spaceID string) (int, int, error) {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	defer sess.Close(ctx)
+	defer func() { _ = sess.Close(ctx) }()
 
 	cypher := `
 MATCH (n:MemoryNode {space_id: $spaceId})
@@ -632,7 +632,7 @@ func truncateID(id string) string {
 // queryClusterCandidates fetches nodes with sufficient high-weight neighbors at the same layer.
 func queryClusterCandidates(ctx context.Context, driver neo4j.DriverWithContext, cfg consolidateConfig) ([]clusterCandidate, error) {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	defer sess.Close(ctx)
+	defer func() { _ = sess.Close(ctx) }()
 
 	cypher := `
 MATCH (a:MemoryNode)-[r:CO_ACTIVATED_WITH]-(b:MemoryNode)
@@ -840,7 +840,7 @@ type abstractionResult struct {
 // createAbstraction creates a new MemoryNode at layer+1 and ABSTRACTS_TO edges
 func createAbstraction(ctx context.Context, driver neo4j.DriverWithContext, cfg consolidateConfig, c cluster, embedding []float64) (*abstractionResult, error) {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer sess.Close(ctx)
+	defer func() { _ = sess.Close(ctx) }()
 
 	name := generateAbstractionName(c.Members)
 	summary := fmt.Sprintf("Cluster abstraction of %d nodes at layer %d", len(c.Members), c.Layer)

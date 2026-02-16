@@ -118,7 +118,7 @@ func ValidateManifest(path string) (*ManifestValidation, error) {
 	}
 
 	manifestPath := path
-	pluginDir := path
+	var pluginDir string
 	if info.IsDir() {
 		manifestPath = filepath.Join(path, "manifest.json")
 		pluginDir = path
@@ -301,8 +301,8 @@ func ValidateProtoCompliance(binaryPath string, moduleType string) (*ProtoValida
 	// Ensure process is killed on exit
 	defer func() {
 		if cmd.Process != nil {
-			cmd.Process.Kill()
-			cmd.Wait()
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
 		}
 	}()
 
@@ -331,7 +331,7 @@ func ValidateProtoCompliance(binaryPath string, moduleType string) (*ProtoValida
 		result.Errors = append(result.Errors, fmt.Sprintf("failed to connect to plugin: %v", err))
 		return result, nil
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Test ModuleLifecycle service (required for all modules)
 	lifecycleClient := pb.NewModuleLifecycleClient(conn)
@@ -529,7 +529,7 @@ func ValidateHealthCheck(socketPath string) (*HealthValidation, error) {
 		result.Errors = append(result.Errors, fmt.Sprintf("failed to connect: %v", err))
 		return result, nil
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	client := pb.NewModuleLifecycleClient(conn)
 
@@ -595,7 +595,7 @@ func ValidateLifecycle(socketPath string) (*LifecycleValidation, error) {
 		result.Errors = append(result.Errors, fmt.Sprintf("failed to connect: %v", err))
 		return result, nil
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	client := pb.NewModuleLifecycleClient(conn)
 

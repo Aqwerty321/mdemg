@@ -304,6 +304,7 @@ type IngestStats struct {
 	TotalElements int64
 	Ingested      int64
 	Errors        int64
+	Symbols       int64
 	StartTime     time.Time
 }
 
@@ -676,9 +677,10 @@ func main() {
 		go func(workerID int) {
 			defer wg.Done()
 			for batch := range batchChan {
-				ingested, errors := ingestBatch(client, batch)
+				ingested, errors, syms := ingestBatch(client, batch)
 				atomic.AddInt64(&stats.Ingested, int64(ingested))
 				atomic.AddInt64(&stats.Errors, int64(errors))
+				atomic.AddInt64(&stats.Symbols, int64(syms))
 
 				current := atomic.LoadInt64(&stats.Ingested)
 				errCount := atomic.LoadInt64(&stats.Errors)
@@ -712,6 +714,7 @@ func main() {
 	elapsed := time.Since(stats.StartTime)
 	log.Printf("=== Ingestion Complete ===")
 	log.Printf("Total: %d, Ingested: %d, Errors: %d", stats.TotalElements, stats.Ingested, stats.Errors)
+	log.Printf("Symbols: %d", stats.Symbols)
 	log.Printf("Time: %v, Rate: %.1f elements/sec", elapsed, float64(stats.Ingested)/elapsed.Seconds())
 
 	// Print LLM summary stats if service was used
@@ -1374,9 +1377,10 @@ func filterKeyMethods(names []string) []string {
 	return result
 }
 
-func ingestBatch(client *http.Client, elements []CodeElement) (int, int) {
+func ingestBatch(client *http.Client, elements []CodeElement) (int, int, int) {
 	items := make([]BatchIngestItem, 0, len(elements))
 	timestamp := time.Now().UTC().Format(time.RFC3339)
+	symbolCount := 0
 
 	// Generate LLM summaries in batch if service is available
 	var llmSummaries []string
@@ -1436,6 +1440,7 @@ func ingestBatch(client *http.Client, elements []CodeElement) (int, int) {
 		// Include symbols if extraction is enabled
 		if *extractSymbols && len(elem.Symbols) > 0 {
 			item.Symbols = elem.Symbols
+			symbolCount += len(elem.Symbols)
 			if *verbose {
 				log.Printf("  [symbols] %s: %d symbols extracted", elem.Name, len(elem.Symbols))
 			}
@@ -1477,7 +1482,7 @@ func ingestBatch(client *http.Client, elements []CodeElement) (int, int) {
 			}
 			json.NewDecoder(resp.Body).Decode(&result)
 			resp.Body.Close()
-			return result.SuccessCount, result.ErrorCount
+			return result.SuccessCount, result.ErrorCount, symbolCount
 		}
 
 		// Non-retryable error (bad request, etc.)
@@ -1485,7 +1490,7 @@ func ingestBatch(client *http.Client, elements []CodeElement) (int, int) {
 			bodyBytes, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
 			log.Printf("Batch rejected (non-retryable): status %d: %s", resp.StatusCode, string(bodyBytes))
-			return 0, len(elements)
+			return 0, len(elements), 0
 		}
 
 		// Retryable server error
@@ -1498,7 +1503,7 @@ func ingestBatch(client *http.Client, elements []CodeElement) (int, int) {
 	}
 
 	log.Printf("Batch failed after %d retries: %v", *maxRetries, lastErr)
-	return 0, len(elements)
+	return 0, len(elements), 0
 }
 
 func runConsolidation(client *http.Client) error {

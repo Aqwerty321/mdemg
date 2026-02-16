@@ -309,12 +309,7 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch symbol evidence for each result (default: true when symbol store available)
 	// Can be explicitly disabled with include_evidence=false in request
-	includeEvidence := true // Default to true
-	if req.IncludeEvidence == false && r.ContentLength > 0 {
-		// Check if explicitly set to false by looking for the field in raw JSON
-		// For now, always include evidence - users can filter on client side
-	}
-	if includeEvidence && s.symbolStore != nil && len(resp.Results) > 0 {
+	if s.symbolStore != nil && len(resp.Results) > 0 {
 		metrics := &models.EvidenceMetrics{
 			TotalResults: len(resp.Results),
 		}
@@ -3020,7 +3015,6 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 	job.SetTotal(len(files))
 	job.UpdateProgress(0, "ingesting")
 
-	results := make([]models.IngestFileResult, 0, len(files))
 	timestamp := time.Now().UTC().Format(time.RFC3339)
 	successCount := 0
 	errorCount := 0
@@ -3034,15 +3028,10 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 		default:
 		}
 
-		result := models.IngestFileResult{File: filePath}
-
 		content, err := readFileContent(filePath)
 		if err != nil {
 			log.Printf("ingestFilesJob %s: failed to read %s: %v", job.ID, filePath, err)
-			result.Status = "error"
-			result.Error = "failed to read file"
 			errorCount++
-			results = append(results, result)
 			job.UpdateProgress(i+1, "ingesting")
 			continue
 		}
@@ -3064,19 +3053,14 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 			Tags:      tags,
 		}
 
-		resp, err := s.retriever.IngestObservation(ctx, ingestReq)
+		_, err = s.retriever.IngestObservation(ctx, ingestReq)
 		if err != nil {
 			log.Printf("ingestFilesJob %s: ingest failed for %s: %v", job.ID, filePath, err)
-			result.Status = "error"
-			result.Error = "internal error during ingestion"
 			errorCount++
 		} else {
-			result.Status = "success"
-			result.NodeID = resp.NodeID
 			successCount++
 		}
 
-		results = append(results, result)
 		job.UpdateProgress(i+1, "ingesting")
 	}
 

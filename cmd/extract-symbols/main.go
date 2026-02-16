@@ -108,7 +108,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to create Neo4j driver: %v", err)
 		}
-		defer driver.Close(ctx)
+		defer func() { _ = driver.Close(ctx) }()
 		store = symbols.NewStore(driver)
 	}
 

@@ -79,7 +79,6 @@ type Server struct {
 	// Phase 60b: RSIC (Recursive Self-Improvement Cycle)
 	rsicCycle    *ape.CycleOrchestrator
 	rsicWatchdog *ape.Watchdog
-	stopRSIC     chan struct{}
 
 	// Phase 51: Web Scraper
 	scraperSvc *scraper.Service

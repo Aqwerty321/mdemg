@@ -14,13 +14,13 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-02-07",
-    "description": "Validates GET /v1/backup/list returns 503 when backup not enabled",
+    "description": "Validates GET /v1/backup/list returns backup list when enabled",
     "test_type": "contract",
     "priority": "medium"
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "4a66809ac088a81de98fad9271406f3d1568715be2fa9a47f991726d608090f6"
+    "sha256": "06d7bc8ca4ba5fadce23e3e1e404fc2e3870a1642065c9ba3464eb495208b756"
   },
   "variables": {},
   "request": {
@@ -31,11 +31,11 @@
     }
   },
   "expected": {
-    "status": 503,
+    "status": 200,
     "body_assertions": [
       {
-        "path": "$.error",
-        "type": "string"
+        "path": "$.count",
+        "type": "number"
       }
     ]
   }

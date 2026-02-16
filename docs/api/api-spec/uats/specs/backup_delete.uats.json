@@ -14,13 +14,13 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-02-07",
-    "description": "Validates DELETE /v1/backup/{id} returns 503 when backup not enabled",
+    "description": "Validates DELETE /v1/backup/{id} returns 404 for nonexistent backup",
     "test_type": "contract",
     "priority": "medium"
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "519873b924acaafdefad0103455020328d6310cb2f0d4f756e25c3360ec35a7a"
+    "sha256": "3bd9167e7c499e09b3f7de79b03803a621e7327694859b2aae25bd1ef3ca0132"
   },
   "variables": {},
   "request": {
@@ -31,7 +31,7 @@
     }
   },
   "expected": {
-    "status": 503,
+    "status": 404,
     "body_assertions": [
       {
         "path": "$.error",

@@ -14,13 +14,13 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-02-07",
-    "description": "Validates GET /v1/backup/status/{id} returns 503 when backup not enabled",
+    "description": "Validates GET /v1/backup/status/{id} returns 404 for nonexistent backup",
     "test_type": "contract",
     "priority": "medium"
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "e733363b3f7067b50e3aac2133282aaddd0379fc71e10ffd02ffa33c487d5767"
+    "sha256": "c52033b9a1dc48196797b28560c81925a9ce11e4e933b1fe15fdd0b7b0cc763e"
   },
   "variables": {},
   "request": {
@@ -31,7 +31,7 @@
     }
   },
   "expected": {
-    "status": 503,
+    "status": 404,
     "body_assertions": [
       {
         "path": "$.error",

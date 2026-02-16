@@ -214,6 +214,16 @@ func (st *SessionTracker) GetState(sessionID string) *SessionState {
 	return val.(*SessionState)
 }
 
+// GetAllStates returns all currently tracked session states.
+func (st *SessionTracker) GetAllStates() []*SessionState {
+	var states []*SessionState
+	st.sessions.Range(func(_, val any) bool {
+		states = append(states, val.(*SessionState))
+		return true
+	})
+	return states
+}
+
 // IsResumed returns whether the session has called /resume.
 func (st *SessionTracker) IsResumed(sessionID string) bool {
 	state := st.GetState(sessionID)

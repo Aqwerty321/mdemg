@@ -46,7 +46,7 @@ func (s *Server) handleSelfImproveAssess(w http.ResponseWriter, r *http.Request)
 
 	// Phase 80: Record RSIC call for signal tracking
 	if s.sessionTracker != nil {
-		s.sessionTracker.RecordRSICCall("claude-core")
+		s.sessionTracker.RecordRSICCall("")
 	}
 	if s.signalLearner != nil {
 		s.signalLearner.RecordResponse("rsic-assess-called")
@@ -182,7 +182,7 @@ func (s *Server) handleSelfImproveCycle(w http.ResponseWriter, r *http.Request) 
 
 		// Phase 80: Record RSIC cycle for signal tracking
 		if s.sessionTracker != nil {
-			s.sessionTracker.RecordRSICCall("claude-core")
+			s.sessionTracker.RecordRSICCall("")
 		}
 		if s.signalLearner != nil {
 			s.signalLearner.RecordResponse("rsic-cycle-called")
@@ -205,7 +205,7 @@ func (s *Server) handleSelfImproveCycle(w http.ResponseWriter, r *http.Request) 
 
 	// Phase 80: Record RSIC cycle for signal tracking
 	if s.sessionTracker != nil {
-		s.sessionTracker.RecordRSICCall("claude-core")
+		s.sessionTracker.RecordRSICCall("")
 	}
 	if s.signalLearner != nil {
 		s.signalLearner.RecordResponse("rsic-cycle-called")
@@ -322,6 +322,11 @@ func (s *Server) handleSelfImproveHealth(w http.ResponseWriter, r *http.Request)
 	// Phase 87: Orchestration status block
 	if s.orchestrationPolicy != nil {
 		resp["orchestration"] = s.orchestrationPolicy.GetOrchestrationStatus(s.macroNextRun)
+	}
+
+	// Phase 89: Persistence status block
+	if s.rsicStore != nil {
+		resp["persistence"] = s.rsicStore.GetStatus()
 	}
 
 	// Phase 88: Safety enforcement status block

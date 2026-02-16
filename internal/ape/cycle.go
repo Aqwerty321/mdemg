@@ -221,6 +221,9 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 
 	c.calibrator.UpdateCalibration(outcome, tasks, reports)
 
+	// Phase 89: Clean up stale dispatcher tasks
+	c.dispatcher.CleanupStaleTasks(10 * time.Minute)
+
 	log.Printf("RSIC %s: cycle complete (executed=%d, success=%d, failed=%d)",
 		cycleID, outcome.ActionsExecuted, outcome.SuccessCount, outcome.FailedCount)
 

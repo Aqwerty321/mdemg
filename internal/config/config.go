@@ -228,8 +228,10 @@ type Config struct {
 	RSICForceThreshold     float64 // RSIC_FORCE_THRESHOLD — decay score for force-trigger escalation (default: 0.9)
 	RSICCalibrationDays    int     // RSIC_CALIBRATION_DAYS — days of history for calibration (default: 30)
 	RSICMinConfidence      float64 // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
-	RSICTriggerCooldownSec int     // RSIC_TRIGGER_COOLDOWN_SEC — cooldown between triggers from same source (default: 300)
-	RSICTriggerDedupeSec   int     // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
+	RSICTriggerCooldownSec  int     // RSIC_TRIGGER_COOLDOWN_SEC — cooldown between triggers from same source (default: 300)
+	RSICTriggerDedupeSec    int     // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
+	RSICWatchdogSpaceID     string  // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
+	RSICPersistenceEnabled  bool    // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
 
 	// Context Cooler tuning (Phase 45.5)
 	CoolerReinforcementWindowHours  int     // COOLER_REINFORCEMENT_WINDOW_HOURS — reinforcement window (default: 2)
@@ -1234,6 +1236,8 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	rsicWatchdogSpaceID := get("RSIC_WATCHDOG_SPACE_ID", "mdemg-dev")
+	rsicPersistenceEnabled := getBool("RSIC_PERSISTENCE_ENABLED", true)
 
 	// Context Cooler tuning (Phase 45.5)
 	coolerReinfWindowHours, err := atoi("COOLER_REINFORCEMENT_WINDOW_HOURS", 2)
@@ -1872,8 +1876,10 @@ func FromEnv() (Config, error) {
 		RSICForceThreshold:     rsicForceThreshold,
 		RSICCalibrationDays:    rsicCalibrationDays,
 		RSICMinConfidence:      rsicMinConfidence,
-		RSICTriggerCooldownSec: rsicTriggerCooldownSec,
-		RSICTriggerDedupeSec:   rsicTriggerDedupeSec,
+		RSICTriggerCooldownSec:  rsicTriggerCooldownSec,
+		RSICTriggerDedupeSec:    rsicTriggerDedupeSec,
+		RSICWatchdogSpaceID:     rsicWatchdogSpaceID,
+		RSICPersistenceEnabled:  rsicPersistenceEnabled,
 
 		CoolerReinforcementWindowHours:  coolerReinfWindowHours,
 		CoolerStabilityIncreasePerReinf: coolerStabilityIncrease,

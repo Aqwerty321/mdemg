@@ -68,6 +68,18 @@ func (a *rsicWatchdogSignalAdapter) GetSessionHealthScore(sessionID string) floa
 	if a.sessionTracker == nil {
 		return 0
 	}
+	// Phase 89: Aggregate across all sessions when sessionID is empty
+	if sessionID == "" {
+		states := a.sessionTracker.GetAllStates()
+		if len(states) == 0 {
+			return 0
+		}
+		var total float64
+		for _, s := range states {
+			total += s.HealthScore()
+		}
+		return total / float64(len(states))
+	}
 	state := a.sessionTracker.GetState(sessionID)
 	if state == nil {
 		return 0
@@ -79,15 +91,21 @@ func (a *rsicWatchdogSignalAdapter) GetObservationRate(spaceID string) float64 {
 	if a.sessionTracker == nil {
 		return 0
 	}
-	state := a.sessionTracker.GetState("claude-core")
-	if state == nil {
+	// Phase 89: Aggregate across all active sessions instead of hard-coded "claude-core"
+	sessions := a.sessionTracker.GetAllStates()
+	var totalObs int
+	var maxElapsed float64
+	for _, state := range sessions {
+		totalObs += state.ObservationsSinceResume
+		elapsed := time.Since(state.CreatedAt).Hours()
+		if elapsed > maxElapsed {
+			maxElapsed = elapsed
+		}
+	}
+	if maxElapsed < 0.01 {
 		return 0
 	}
-	elapsed := time.Since(state.CreatedAt).Hours()
-	if elapsed < 0.01 {
-		return 0
-	}
-	return float64(state.ObservationsSinceResume) / elapsed
+	return float64(totalObs) / maxElapsed
 }
 
 func (a *rsicWatchdogSignalAdapter) GetConsolidationAgeSec(ctx context.Context, spaceID string) (int64, error) {
@@ -104,9 +122,16 @@ func (a *rsicWatchdogSignalAdapter) GetConsolidationAgeSec(ctx context.Context, 
 		}
 		if res.Next(ctx) {
 			if v, ok := res.Record().Get("last_consolidation"); ok && v != nil {
-				if ts, ok := v.(string); ok {
-					t, err := time.Parse(time.RFC3339, ts)
-					if err == nil {
+				// Phase 89: Handle all Neo4j datetime types
+				switch tv := v.(type) {
+				case time.Time:
+					return int64(time.Since(tv).Seconds()), nil
+				case int64:
+					return tv, nil
+				case float64:
+					return int64(tv), nil
+				case string:
+					if t, err := time.Parse(time.RFC3339, tv); err == nil {
 						return int64(time.Since(t).Seconds()), nil
 					}
 				}

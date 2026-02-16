@@ -6,26 +6,53 @@ import (
 	"time"
 )
 
-type actionOutcome struct {
-	ActionType string
-	Success    bool
-	Timestamp  time.Time
+// ActionOutcome records whether a single action succeeded or failed.
+type ActionOutcome struct {
+	ActionType string    `json:"action_type"`
+	Success    bool      `json:"success"`
+	Timestamp  time.Time `json:"timestamp"`
 }
 
 // Calibrator tracks per-action-type success rates and validates cycle outcomes.
 type Calibrator struct {
 	mu            sync.RWMutex
-	actionHistory map[string][]actionOutcome
+	actionHistory map[string][]ActionOutcome
 	cycleHistory  []CycleOutcome
 	convSvc       ConversationStatsProvider
+	store         *RSICStore
 }
 
 // NewCalibrator creates a Calibrator.
 func NewCalibrator(convSvc ConversationStatsProvider) *Calibrator {
 	return &Calibrator{
-		actionHistory: make(map[string][]actionOutcome),
+		actionHistory: make(map[string][]ActionOutcome),
 		convSvc:       convSvc,
 	}
+}
+
+// SetStore attaches a persistence store to the calibrator.
+func (c *Calibrator) SetStore(s *RSICStore) {
+	c.store = s
+}
+
+// Hydrate loads persisted calibration state from the store.
+func (c *Calibrator) Hydrate(spaceID string) error {
+	if c.store == nil {
+		return nil
+	}
+	history, actions, err := c.store.LoadCalibration(spaceID)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if history != nil {
+		c.cycleHistory = history
+	}
+	if actions != nil {
+		c.actionHistory = actions
+	}
+	return nil
 }
 
 // Validate checks success criteria for dispatched tasks and returns a CycleOutcome.
@@ -73,7 +100,7 @@ func (c *Calibrator) UpdateCalibration(outcome *CycleOutcome, tasks []RSICTaskSp
 
 	for _, t := range tasks {
 		success := taskFinal[t.TaskID] == "completed"
-		c.actionHistory[t.ActionType] = append(c.actionHistory[t.ActionType], actionOutcome{
+		c.actionHistory[t.ActionType] = append(c.actionHistory[t.ActionType], ActionOutcome{
 			ActionType: t.ActionType,
 			Success:    success,
 			Timestamp:  time.Now(),
@@ -90,6 +117,11 @@ func (c *Calibrator) UpdateCalibration(outcome *CycleOutcome, tasks []RSICTaskSp
 	}
 	if len(c.cycleHistory) > 100 {
 		c.cycleHistory = c.cycleHistory[len(c.cycleHistory)-100:]
+	}
+
+	// Phase 89: Persist calibration state
+	if c.store != nil && outcome != nil {
+		c.store.SaveCalibration(outcome.SpaceID, c.cycleHistory, c.actionHistory)
 	}
 }
 

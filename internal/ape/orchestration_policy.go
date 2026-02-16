@@ -26,15 +26,17 @@ type DedupeResult struct {
 
 // ───────────── Internal Records ─────────────
 
-type triggerRecord struct {
-	source    TriggerSource
-	spaceID   string
-	tier      CycleTier
-	cycleID   string
-	timestamp time.Time
+// TriggerRecord stores metadata about a single trigger event.
+type TriggerRecord struct {
+	Source    TriggerSource `json:"source"`
+	SpaceID  string        `json:"space_id"`
+	Tier     CycleTier     `json:"tier"`
+	CycleID  string        `json:"cycle_id"`
+	Timestamp time.Time    `json:"timestamp"`
 }
 
-type sessionCounter struct {
+// SessionCounter tracks session counts for meso periodic triggers.
+type SessionCounter struct {
 	Count       int       `json:"count"`
 	LastTrigger time.Time `json:"last_trigger"`
 }
@@ -49,18 +51,19 @@ type OrchestrationPolicy struct {
 	cooldownSec int
 	dedupeSec   int
 	cfg         config.Config
+	store       *RSICStore
 
 	// activeCycles tracks one active cycle per {spaceID, tier}
-	activeCycles map[string]triggerRecord // key: "space:tier"
+	activeCycles map[string]TriggerRecord // key: "space:tier"
 
 	// lastTrigger tracks the most recent trigger per source+space for cooldown
-	lastTrigger map[string]triggerRecord // key: "source:space"
+	lastTrigger map[string]TriggerRecord // key: "source:space"
 
 	// dedupeWindow tracks idempotency keys within the dedupe window
-	dedupeWindow map[string]triggerRecord // key: idempotency_key
+	dedupeWindow map[string]TriggerRecord // key: idempotency_key
 
 	// sessionCounters tracks session counts per space for meso periodic
-	sessionCounters map[string]*sessionCounter // key: spaceID
+	sessionCounters map[string]*SessionCounter // key: spaceID
 }
 
 // NewOrchestrationPolicy creates a new policy from config.
@@ -69,10 +72,38 @@ func NewOrchestrationPolicy(cfg config.Config) *OrchestrationPolicy {
 		cooldownSec:     cfg.RSICTriggerCooldownSec,
 		dedupeSec:       cfg.RSICTriggerDedupeSec,
 		cfg:             cfg,
-		activeCycles:    make(map[string]triggerRecord),
-		lastTrigger:     make(map[string]triggerRecord),
-		dedupeWindow:    make(map[string]triggerRecord),
-		sessionCounters: make(map[string]*sessionCounter),
+		activeCycles:    make(map[string]TriggerRecord),
+		lastTrigger:     make(map[string]TriggerRecord),
+		dedupeWindow:    make(map[string]TriggerRecord),
+		sessionCounters: make(map[string]*SessionCounter),
+	}
+}
+
+// SetStore attaches a persistence store to the orchestration policy.
+func (p *OrchestrationPolicy) SetStore(s *RSICStore) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.store = s
+}
+
+// Hydrate restores persisted orchestration state into in-memory maps.
+func (p *OrchestrationPolicy) Hydrate(triggers []TriggerRecord, counters map[string]*SessionCounter) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Rebuild lastTrigger map from persisted triggers
+	if triggers != nil {
+		for _, tr := range triggers {
+			key := fmt.Sprintf("%s:%s", tr.Source, tr.SpaceID)
+			p.lastTrigger[key] = tr
+		}
+	}
+
+	// Rebuild session counters
+	if counters != nil {
+		for k, v := range counters {
+			p.sessionCounters[k] = v
+		}
 	}
 }
 
@@ -102,10 +133,10 @@ func (p *OrchestrationPolicy) EvaluateTrigger(source TriggerSource, spaceID stri
 	// 2. Dedupe check (if idempotency key provided)
 	if idempotencyKey != "" {
 		if rec, ok := p.dedupeWindow[idempotencyKey]; ok {
-			if now.Sub(rec.timestamp).Seconds() < float64(p.dedupeSec) {
+			if now.Sub(rec.Timestamp).Seconds() < float64(p.dedupeSec) {
 				return TriggerDecision{
 					Allowed: false,
-					Reason:  fmt.Sprintf("duplicate trigger (key=%s, original_cycle=%s)", idempotencyKey, rec.cycleID),
+					Reason:  fmt.Sprintf("duplicate trigger (key=%s, original_cycle=%s)", idempotencyKey, rec.CycleID),
 					Meta:    meta,
 				}
 			}
@@ -116,12 +147,12 @@ func (p *OrchestrationPolicy) EvaluateTrigger(source TriggerSource, spaceID stri
 	activeKey := fmt.Sprintf("%s:%s", spaceID, tier)
 	if rec, ok := p.activeCycles[activeKey]; ok {
 		// Auto-cleanup stale entries (30 min)
-		if now.Sub(rec.timestamp) > 30*time.Minute {
+		if now.Sub(rec.Timestamp) > 30*time.Minute {
 			delete(p.activeCycles, activeKey)
 		} else {
 			return TriggerDecision{
 				Allowed: false,
-				Reason:  fmt.Sprintf("active cycle exists for space=%s tier=%s (cycle=%s)", spaceID, tier, rec.cycleID),
+				Reason:  fmt.Sprintf("active cycle exists for space=%s tier=%s (cycle=%s)", spaceID, tier, rec.CycleID),
 				Meta:    meta,
 			}
 		}
@@ -130,10 +161,10 @@ func (p *OrchestrationPolicy) EvaluateTrigger(source TriggerSource, spaceID stri
 	// 4. Cooldown check per source+space
 	cooldownKey := fmt.Sprintf("%s:%s", source, spaceID)
 	if rec, ok := p.lastTrigger[cooldownKey]; ok {
-		if now.Sub(rec.timestamp).Seconds() < float64(p.cooldownSec) {
+		if now.Sub(rec.Timestamp).Seconds() < float64(p.cooldownSec) {
 			return TriggerDecision{
 				Allowed: false,
-				Reason:  fmt.Sprintf("cooldown active for source=%s space=%s (%.0fs remaining)", source, spaceID, float64(p.cooldownSec)-now.Sub(rec.timestamp).Seconds()),
+				Reason:  fmt.Sprintf("cooldown active for source=%s space=%s (%.0fs remaining)", source, spaceID, float64(p.cooldownSec)-now.Sub(rec.Timestamp).Seconds()),
 				Meta:    meta,
 			}
 		}
@@ -142,11 +173,11 @@ func (p *OrchestrationPolicy) EvaluateTrigger(source TriggerSource, spaceID stri
 	// 5. Priority check — if a higher-priority cycle is active for this space
 	for key, rec := range p.activeCycles {
 		// Check same space, any tier
-		if rec.spaceID == spaceID && now.Sub(rec.timestamp) < 30*time.Minute {
-			if rec.source.Priority() < source.Priority() {
+		if rec.SpaceID == spaceID && now.Sub(rec.Timestamp) < 30*time.Minute {
+			if rec.Source.Priority() < source.Priority() {
 				return TriggerDecision{
 					Allowed: false,
-					Reason:  fmt.Sprintf("higher-priority source %s active (key=%s)", rec.source, key),
+					Reason:  fmt.Sprintf("higher-priority source %s active (key=%s)", rec.Source, key),
 					Meta:    meta,
 				}
 			}
@@ -164,12 +195,12 @@ func (p *OrchestrationPolicy) RecordTrigger(meta TriggerMetadata, spaceID string
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	rec := triggerRecord{
-		source:    meta.TriggerSource,
-		spaceID:   spaceID,
-		tier:      tier,
-		cycleID:   cycleID,
-		timestamp: meta.TriggeredAt,
+	rec := TriggerRecord{
+		Source:    meta.TriggerSource,
+		SpaceID:  spaceID,
+		Tier:     tier,
+		CycleID:  cycleID,
+		Timestamp: meta.TriggeredAt,
 	}
 
 	// Mark active
@@ -184,6 +215,9 @@ func (p *OrchestrationPolicy) RecordTrigger(meta TriggerMetadata, spaceID string
 	if meta.IdempotencyKey != "" {
 		p.dedupeWindow[meta.IdempotencyKey] = rec
 	}
+
+	// Phase 89: Persist orchestration state
+	p.persistOrchestrationLocked()
 }
 
 // CompleteCycle removes the active marker for a cycle.
@@ -209,7 +243,7 @@ func (p *OrchestrationPolicy) CheckDedupe(idempotencyKey string) *DedupeResult {
 		return nil
 	}
 
-	if time.Since(rec.timestamp).Seconds() >= float64(p.dedupeSec) {
+	if time.Since(rec.Timestamp).Seconds() >= float64(p.dedupeSec) {
 		delete(p.dedupeWindow, idempotencyKey)
 		return nil
 	}
@@ -217,7 +251,7 @@ func (p *OrchestrationPolicy) CheckDedupe(idempotencyKey string) *DedupeResult {
 	return &DedupeResult{
 		IsDuplicate:     true,
 		WindowSec:       p.dedupeSec,
-		OriginalCycleID: rec.cycleID,
+		OriginalCycleID: rec.CycleID,
 	}
 }
 
@@ -229,7 +263,7 @@ func (p *OrchestrationPolicy) IncrementSession(spaceID string) (count int, shoul
 
 	sc, ok := p.sessionCounters[spaceID]
 	if !ok {
-		sc = &sessionCounter{}
+		sc = &SessionCounter{}
 		p.sessionCounters[spaceID] = sc
 	}
 
@@ -238,15 +272,30 @@ func (p *OrchestrationPolicy) IncrementSession(spaceID string) (count int, shoul
 
 	period := p.cfg.RSICMesoPeriodSessions
 	if period <= 0 {
+		p.persistOrchestrationLocked()
 		return count, false
 	}
 
 	if sc.Count%period == 0 {
 		sc.LastTrigger = time.Now()
+		p.persistOrchestrationLocked()
 		return count, true
 	}
 
+	p.persistOrchestrationLocked()
 	return count, false
+}
+
+// persistOrchestrationLocked saves orchestration state to the store. Caller must hold p.mu.
+func (p *OrchestrationPolicy) persistOrchestrationLocked() {
+	if p.store == nil {
+		return
+	}
+	var triggers []TriggerRecord
+	for _, tr := range p.lastTrigger {
+		triggers = append(triggers, tr)
+	}
+	p.store.SaveOrchestrationState(triggers, p.sessionCounters)
 }
 
 // GetSessionCounters returns session counter state for the health payload.
@@ -278,10 +327,10 @@ func (p *OrchestrationPolicy) GetLastTriggers(limit int) []map[string]any {
 	var result []map[string]any
 	for _, rec := range p.lastTrigger {
 		result = append(result, map[string]any{
-			"space_id":       rec.spaceID,
-			"tier":           rec.tier,
-			"trigger_source": rec.source,
-			"triggered_at":   rec.timestamp.UTC().Format(time.RFC3339),
+			"space_id":       rec.SpaceID,
+			"tier":           rec.Tier,
+			"trigger_source": rec.Source,
+			"triggered_at":   rec.Timestamp.UTC().Format(time.RFC3339),
 		})
 		if limit > 0 && len(result) >= limit {
 			break
@@ -326,14 +375,14 @@ func (p *OrchestrationPolicy) CleanupExpired() {
 
 	// Clean stale active cycles (30 min timeout)
 	for key, rec := range p.activeCycles {
-		if now.Sub(rec.timestamp) > 30*time.Minute {
+		if now.Sub(rec.Timestamp) > 30*time.Minute {
 			delete(p.activeCycles, key)
 		}
 	}
 
 	// Clean expired dedupe entries
 	for key, rec := range p.dedupeWindow {
-		if now.Sub(rec.timestamp).Seconds() >= float64(p.dedupeSec) {
+		if now.Sub(rec.Timestamp).Seconds() >= float64(p.dedupeSec) {
 			delete(p.dedupeWindow, key)
 		}
 	}
@@ -341,7 +390,7 @@ func (p *OrchestrationPolicy) CleanupExpired() {
 	// Clean old cooldown entries (keep only within 2x cooldown window)
 	maxAge := time.Duration(p.cooldownSec*2) * time.Second
 	for key, rec := range p.lastTrigger {
-		if now.Sub(rec.timestamp) > maxAge {
+		if now.Sub(rec.Timestamp) > maxAge {
 			delete(p.lastTrigger, key)
 		}
 	}

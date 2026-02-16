@@ -370,6 +370,40 @@ func (d *Dispatcher) executeRefreshStaleEdges(ctx context.Context, spaceID strin
 	return map[string]any{"refreshed": result}, nil
 }
 
+// CleanupStaleTasks removes completed/failed tasks older than maxAge and caps total entries at 1000.
+func (d *Dispatcher) CleanupStaleTasks(maxAge time.Duration) int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	now := time.Now()
+	removed := 0
+	for id, at := range d.activeTasks {
+		if (at.Status == "completed" || at.Status == "failed") && now.Sub(at.StartedAt) > maxAge {
+			delete(d.activeTasks, id)
+			delete(d.reports, id)
+			removed++
+		}
+	}
+
+	// Cap at 1000 entries — evict oldest if over limit
+	for len(d.activeTasks) > 1000 {
+		var oldestID string
+		var oldestTime time.Time
+		for id, at := range d.activeTasks {
+			if oldestID == "" || at.StartedAt.Before(oldestTime) {
+				oldestID = id
+				oldestTime = at.StartedAt
+			}
+		}
+		if oldestID != "" {
+			delete(d.activeTasks, oldestID)
+			delete(d.reports, oldestID)
+			removed++
+		}
+	}
+	return removed
+}
+
 // ─── Report posting ───
 
 func (d *Dispatcher) postReport(taskID, status string, pct float64, milestone, summary string, deliverables map[string]any, errMsg string) {

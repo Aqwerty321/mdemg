@@ -11,6 +11,19 @@ import (
 	"mdemg/internal/config"
 )
 
+// RunCycleOpts carries optional parameters for RunCycle.
+type RunCycleOpts struct {
+	TriggerMeta    *TriggerMetadata
+	IdempotencyKey string
+}
+
+// HistoryFilter constrains which cycle outcomes are returned.
+type HistoryFilter struct {
+	TriggerSource TriggerSource
+	Tier          CycleTier
+	SpaceID       string
+}
+
 // CycleOrchestrator runs the full Assess → Reflect → Plan → Execute → Validate cycle.
 type CycleOrchestrator struct {
 	assessor   *Assessor
@@ -21,6 +34,7 @@ type CycleOrchestrator struct {
 	calibrator *Calibrator
 	watchdog   *Watchdog
 	cfg        config.Config
+	policy     *OrchestrationPolicy
 }
 
 // NewCycleOrchestrator wires together all RSIC components.
@@ -47,11 +61,25 @@ func NewCycleOrchestrator(
 }
 
 // RunCycle executes the full 5-stage RSIC cycle for the given space and tier.
-func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier CycleTier) (*CycleOutcome, error) {
+// opts may be nil for backward compatibility (defaults to manual_api source).
+func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier CycleTier, opts *RunCycleOpts) (*CycleOutcome, error) {
 	cycleID := fmt.Sprintf("rsic-%s-%s", tier, uuid.New().String()[:8])
 	startedAt := time.Now()
 
-	log.Printf("RSIC cycle %s started (tier=%s, space=%s)", cycleID, tier, spaceID)
+	// Build trigger metadata (default to manual_api)
+	var meta TriggerMetadata
+	if opts != nil && opts.TriggerMeta != nil {
+		meta = *opts.TriggerMeta
+	} else {
+		meta = TriggerMetadata{
+			TriggerSource: TriggerManualAPI,
+			TriggerID:     fmt.Sprintf("manual_api:%s:%s", spaceID, startedAt.Format("2006-01-02T15:04")),
+			TriggeredAt:   startedAt,
+			PolicyVersion: PolicyVersion,
+		}
+	}
+
+	log.Printf("RSIC cycle %s started (tier=%s, space=%s, source=%s)", cycleID, tier, spaceID, meta.TriggerSource)
 
 	// Stage 1: Assess
 	report, err := c.assessor.Assess(ctx, spaceID, tier)
@@ -63,12 +91,16 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	// Bail early if confidence is too low
 	if report.Confidence < c.cfg.RSICMinConfidence {
 		return &CycleOutcome{
-			CycleID:     cycleID,
-			Tier:        tier,
-			SpaceID:     spaceID,
-			StartedAt:   startedAt,
-			CompletedAt: time.Now(),
-			Error:       fmt.Sprintf("confidence %.2f below threshold %.2f", report.Confidence, c.cfg.RSICMinConfidence),
+			CycleID:       cycleID,
+			Tier:          tier,
+			SpaceID:       spaceID,
+			StartedAt:     startedAt,
+			CompletedAt:   time.Now(),
+			Error:         fmt.Sprintf("confidence %.2f below threshold %.2f", report.Confidence, c.cfg.RSICMinConfidence),
+			TriggerSource: meta.TriggerSource,
+			TriggerID:     meta.TriggerID,
+			TriggeredAt:   meta.TriggeredAt,
+			PolicyVersion: meta.PolicyVersion,
 		}, nil
 	}
 
@@ -89,6 +121,10 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			MetricsBefore: map[string]float64{
 				"overall_health": report.OverallHealth,
 			},
+			TriggerSource: meta.TriggerSource,
+			TriggerID:     meta.TriggerID,
+			TriggeredAt:   meta.TriggeredAt,
+			PolicyVersion: meta.PolicyVersion,
 		}
 		log.Printf("RSIC %s: no insights — system is healthy", cycleID)
 		if c.watchdog != nil {
@@ -136,6 +172,10 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	outcome := c.calibrator.Validate(ctx, cycleID, tier, spaceID, tasks, reports, baseline)
 	outcome.StartedAt = startedAt
 	outcome.Insights = insights
+	outcome.TriggerSource = meta.TriggerSource
+	outcome.TriggerID = meta.TriggerID
+	outcome.TriggeredAt = meta.TriggeredAt
+	outcome.PolicyVersion = meta.PolicyVersion
 
 	c.calibrator.UpdateCalibration(outcome, tasks, reports)
 
@@ -160,9 +200,19 @@ func (c *CycleOrchestrator) GetCalibration() map[string]float64 {
 	return c.calibrator.GetCalibration()
 }
 
+// SetOrchestrationPolicy attaches an orchestration policy to the orchestrator.
+func (c *CycleOrchestrator) SetOrchestrationPolicy(p *OrchestrationPolicy) {
+	c.policy = p
+}
+
 // GetHistory returns recent cycle outcomes.
 func (c *CycleOrchestrator) GetHistory(limit int) []CycleOutcome {
 	return c.calibrator.GetHistory(limit)
+}
+
+// GetHistoryFiltered returns recent cycle outcomes matching the filter.
+func (c *CycleOrchestrator) GetHistoryFiltered(limit int, filter *HistoryFilter) []CycleOutcome {
+	return c.calibrator.GetHistoryFiltered(limit, filter)
 }
 
 // GetWatchdogState returns the current watchdog state.

@@ -2,6 +2,7 @@ package ape
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -17,7 +18,7 @@ type Watchdog struct {
 
 	mu            sync.RWMutex
 	state         WatchdogState
-	cycleTrigger  func(ctx context.Context, spaceID string) // callback to auto-trigger meso cycle
+	cycleTrigger  func(ctx context.Context, spaceID string, meta TriggerMetadata) // callback to auto-trigger meso cycle
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -25,7 +26,7 @@ type Watchdog struct {
 }
 
 // NewWatchdog creates a Watchdog. cycleTrigger is called at EscalationForce level.
-func NewWatchdog(cfg config.Config, spaceID string, cycleTrigger func(ctx context.Context, spaceID string)) *Watchdog {
+func NewWatchdog(cfg config.Config, spaceID string, cycleTrigger func(ctx context.Context, spaceID string, meta TriggerMetadata)) *Watchdog {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Watchdog{
 		cfg:          cfg,
@@ -136,11 +137,20 @@ func (w *Watchdog) check() {
 	// Auto-trigger at force level
 	if w.state.EscalationLevel == EscalationForce && w.cycleTrigger != nil {
 		// Reset before triggering to avoid re-triggering
-		w.state.LastCycleTime = time.Now()
+		now := time.Now()
+		w.state.LastCycleTime = now
 		w.state.DecayScore = 0
 		w.state.EscalationLevel = EscalationNominal
+		w.state.LastTriggerSource = TriggerWatchdogForce
 
-		go w.cycleTrigger(context.Background(), w.spaceID)
+		meta := TriggerMetadata{
+			TriggerSource: TriggerWatchdogForce,
+			TriggerID:     fmt.Sprintf("watchdog_force:%s:%s", w.spaceID, now.Format("2006-01-02T15:04")),
+			TriggeredAt:   now,
+			PolicyVersion: PolicyVersion,
+		}
+
+		go w.cycleTrigger(context.Background(), w.spaceID, meta)
 	}
 
 	// Phase 80: Multi-dimensional signal collection

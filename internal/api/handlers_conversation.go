@@ -3,9 +3,12 @@ package api
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/ape"
 	"mdemg/internal/conversation"
 	"mdemg/internal/models"
 )
@@ -84,6 +87,24 @@ func (s *Server) handleObserve(w http.ResponseWriter, r *http.Request) {
 				Confidence:     dc.Confidence,
 			}
 		}
+	}
+
+	// Phase 87: Micro auto-trigger (behind RSIC_MICRO_ENABLED gate)
+	if s.cfg.RSICMicroEnabled && s.orchestrationPolicy != nil && s.rsicCycle != nil && req.SpaceID != "" {
+		go func() {
+			decision := s.orchestrationPolicy.EvaluateTrigger(ape.TriggerMicroAuto, req.SpaceID, ape.TierMicro, "")
+			if !decision.Allowed {
+				return
+			}
+			opts := &ape.RunCycleOpts{TriggerMeta: &decision.Meta}
+			outcome, err := s.rsicCycle.RunCycle(context.Background(), req.SpaceID, ape.TierMicro, opts)
+			if err != nil {
+				s.orchestrationPolicy.CompleteCycle(req.SpaceID, ape.TierMicro)
+				return
+			}
+			s.orchestrationPolicy.RecordTrigger(decision.Meta, req.SpaceID, ape.TierMicro, outcome.CycleID)
+			s.orchestrationPolicy.CompleteCycle(req.SpaceID, ape.TierMicro)
+		}()
 	}
 
 	writeJSON(w, http.StatusOK, apiResp)
@@ -195,6 +216,34 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 			sessionID = req.SpaceID // Fall back to space ID if no session
 		}
 		s.sessionTracker.RecordResume(sessionID, req.SpaceID)
+	}
+
+	// Phase 87: Session-periodic meso trigger
+	if s.orchestrationPolicy != nil && req.SpaceID != "" {
+		if _, shouldTrigger := s.orchestrationPolicy.IncrementSession(req.SpaceID); shouldTrigger {
+			go func() {
+				meta := ape.TriggerMetadata{
+					TriggerSource: ape.TriggerSessionPeriodic,
+					TriggerID:     fmt.Sprintf("session_periodic:%s:%s", req.SpaceID, time.Now().Format("2006-01-02T15:04")),
+					TriggeredAt:   time.Now(),
+					PolicyVersion: ape.PolicyVersion,
+				}
+				decision := s.orchestrationPolicy.EvaluateTrigger(ape.TriggerSessionPeriodic, req.SpaceID, ape.TierMeso, "")
+				if !decision.Allowed {
+					return
+				}
+				opts := &ape.RunCycleOpts{TriggerMeta: &meta}
+				outcome, err := s.rsicCycle.RunCycle(context.Background(), req.SpaceID, ape.TierMeso, opts)
+				if err != nil {
+					s.orchestrationPolicy.CompleteCycle(req.SpaceID, ape.TierMeso)
+					log.Printf("RSIC session-periodic meso cycle failed: %v", err)
+					return
+				}
+				s.orchestrationPolicy.RecordTrigger(meta, req.SpaceID, ape.TierMeso, outcome.CycleID)
+				s.orchestrationPolicy.CompleteCycle(req.SpaceID, ape.TierMeso)
+				log.Printf("RSIC session-periodic meso cycle complete: %s", outcome.CycleID)
+			}()
+		}
 	}
 
 	// Convert to API response type

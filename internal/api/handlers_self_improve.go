@@ -112,8 +112,10 @@ func (s *Server) handleSelfImproveCycle(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req struct {
-		SpaceID string `json:"space_id"`
-		Tier    string `json:"tier"`
+		SpaceID        string `json:"space_id"`
+		Tier           string `json:"tier"`
+		TriggerSource  string `json:"trigger_source,omitempty"`
+		IdempotencyKey string `json:"idempotency_key,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
@@ -128,7 +130,68 @@ func (s *Server) handleSelfImproveCycle(w http.ResponseWriter, r *http.Request) 
 		tier = ape.TierMeso
 	}
 
-	outcome, err := s.rsicCycle.RunCycle(r.Context(), req.SpaceID, tier)
+	// Resolve trigger source (default: manual_api)
+	triggerSource := ape.TriggerManualAPI
+	if req.TriggerSource != "" {
+		ts, ok := ape.ValidTriggerSources[req.TriggerSource]
+		if !ok {
+			http.Error(w, "invalid trigger_source: "+req.TriggerSource, http.StatusBadRequest)
+			return
+		}
+		triggerSource = ts
+	}
+
+	// Phase 87: Orchestration policy evaluation
+	if s.orchestrationPolicy != nil {
+		// Fast-path dedupe check
+		if dedupeResult := s.orchestrationPolicy.CheckDedupe(req.IdempotencyKey); dedupeResult != nil {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"cycle_id":       dedupeResult.OriginalCycleID,
+				"dedupe":         dedupeResult,
+				"policy_version": ape.PolicyVersion,
+			})
+			return
+		}
+
+		decision := s.orchestrationPolicy.EvaluateTrigger(triggerSource, req.SpaceID, tier, req.IdempotencyKey)
+		if !decision.Allowed {
+			writeJSON(w, http.StatusConflict, map[string]any{
+				"error":          "trigger rejected",
+				"reason":         decision.Reason,
+				"policy_version": ape.PolicyVersion,
+			})
+			return
+		}
+
+		opts := &ape.RunCycleOpts{
+			TriggerMeta:    &decision.Meta,
+			IdempotencyKey: req.IdempotencyKey,
+		}
+
+		outcome, err := s.rsicCycle.RunCycle(r.Context(), req.SpaceID, tier, opts)
+		if err != nil {
+			s.orchestrationPolicy.CompleteCycle(req.SpaceID, tier)
+			http.Error(w, sanitizeError(err, "self-improve cycle"), http.StatusInternalServerError)
+			return
+		}
+
+		s.orchestrationPolicy.RecordTrigger(decision.Meta, req.SpaceID, tier, outcome.CycleID)
+		s.orchestrationPolicy.CompleteCycle(req.SpaceID, tier)
+
+		// Phase 80: Record RSIC cycle for signal tracking
+		if s.sessionTracker != nil {
+			s.sessionTracker.RecordRSICCall("claude-core")
+		}
+		if s.signalLearner != nil {
+			s.signalLearner.RecordResponse("rsic-cycle-called")
+		}
+
+		writeJSON(w, http.StatusOK, outcome)
+		return
+	}
+
+	// Fallback path when orchestration policy is nil (backward compat)
+	outcome, err := s.rsicCycle.RunCycle(r.Context(), req.SpaceID, tier, nil)
 	if err != nil {
 		http.Error(w, sanitizeError(err, "self-improve cycle"), http.StatusInternalServerError)
 		return
@@ -164,11 +227,49 @@ func (s *Server) handleSelfImproveHistory(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	history := s.rsicCycle.GetHistory(limit)
-	writeJSON(w, http.StatusOK, map[string]any{
+	// Phase 87: Optional filters
+	qTriggerSource := r.URL.Query().Get("trigger_source")
+	qTier := r.URL.Query().Get("tier")
+	qSpaceID := r.URL.Query().Get("space_id")
+
+	var history []ape.CycleOutcome
+	hasFilter := qTriggerSource != "" || qTier != "" || qSpaceID != ""
+
+	if hasFilter {
+		filter := &ape.HistoryFilter{
+			TriggerSource: ape.TriggerSource(qTriggerSource),
+			Tier:          ape.CycleTier(qTier),
+			SpaceID:       qSpaceID,
+		}
+		history = s.rsicCycle.GetHistoryFiltered(limit, filter)
+	} else {
+		history = s.rsicCycle.GetHistory(limit)
+	}
+
+	if history == nil {
+		history = []ape.CycleOutcome{}
+	}
+
+	resp := map[string]any{
 		"history": history,
 		"count":   len(history),
-	})
+	}
+
+	if hasFilter {
+		filters := map[string]string{}
+		if qTriggerSource != "" {
+			filters["trigger_source"] = qTriggerSource
+		}
+		if qTier != "" {
+			filters["tier"] = qTier
+		}
+		if qSpaceID != "" {
+			filters["space_id"] = qSpaceID
+		}
+		resp["filters"] = filters
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // ─── GET /v1/self-improve/calibration ───
@@ -210,6 +311,11 @@ func (s *Server) handleSelfImproveHealth(w http.ResponseWriter, r *http.Request)
 	}
 	if watchdogState != nil {
 		resp["watchdog"] = watchdogState
+	}
+
+	// Phase 87: Orchestration status block
+	if s.orchestrationPolicy != nil {
+		resp["orchestration"] = s.orchestrationPolicy.GetOrchestrationStatus(s.macroNextRun)
 	}
 
 	writeJSON(w, http.StatusOK, resp)

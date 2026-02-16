@@ -1,5 +1,7 @@
 # MDEMG Agent Handoff Document
 
+<!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
+
 **Date:** 2026-02-16
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`

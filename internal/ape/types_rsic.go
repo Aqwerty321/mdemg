@@ -32,6 +32,21 @@ const (
 // PolicyVersion is the current orchestration policy version.
 const PolicyVersion = "phase87-v1"
 
+// SafetyVersion is the current safety enforcement version.
+const SafetyVersion = "phase88-v1"
+
+// DestructiveActions lists action types that delete or archive data.
+var DestructiveActions = map[string]bool{
+	"prune_decayed_edges": true,
+	"prune_excess_edges":  true,
+	"tombstone_stale":     true,
+}
+
+// IsDestructiveAction returns true if the action can delete or archive data.
+func IsDestructiveAction(actionType string) bool {
+	return DestructiveActions[actionType]
+}
+
 // ValidTriggerSources maps valid source strings for input validation.
 var ValidTriggerSources = map[string]TriggerSource{
 	"manual_api":        TriggerManualAPI,
@@ -260,6 +275,41 @@ type CycleOutcome struct {
 	TriggerID      string        `json:"trigger_id,omitempty"`
 	TriggeredAt    time.Time     `json:"triggered_at,omitempty"`
 	PolicyVersion  string        `json:"policy_version,omitempty"`
+
+	// Phase 88: Safety enforcement
+	DryRun         bool            `json:"dry_run,omitempty"`
+	SafetyVersion  string          `json:"safety_version,omitempty"`
+	SafetySummary  *SafetySummary  `json:"safety_summary,omitempty"`
+	Deltas         []ActionDelta   `json:"deltas,omitempty"`
+}
+
+// SafetySummary records safety enforcement results for a cycle.
+type SafetySummary struct {
+	ActionsChecked  int               `json:"actions_checked"`
+	ActionsAllowed  int               `json:"actions_allowed"`
+	ActionsRejected int               `json:"actions_rejected"`
+	Rejections      []SafetyRejection `json:"rejections,omitempty"`
+	SnapshotsCreated int              `json:"snapshots_created"`
+}
+
+// SafetyRejection records why an action was rejected by the safety validator.
+type SafetyRejection struct {
+	Action            string `json:"action"`
+	Reason            string `json:"reason"`
+	EstimatedAffected int    `json:"estimated_affected"`
+	Limit             int    `json:"limit"`
+}
+
+// ActionDelta describes what a dry-run action would do without executing.
+type ActionDelta struct {
+	Action               string `json:"action"`
+	WouldExecute         bool   `json:"would_execute"`
+	EstimatedAffected    int    `json:"estimated_affected"`
+	SafetyLimit          int    `json:"safety_limit"`
+	WithinBounds         bool   `json:"within_bounds"`
+	ProtectedSpaceBlocked bool  `json:"protected_space_blocked"`
+	RejectionReason      string `json:"rejection_reason,omitempty"`
+	Note                 string `json:"note,omitempty"`
 }
 
 // ───────────── Watchdog ─────────────

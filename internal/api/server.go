@@ -88,6 +88,9 @@ type Server struct {
 	macroNextRun        time.Time
 	macroCronCancel     context.CancelFunc
 
+	// Phase 88: RSIC Safety
+	snapshotStore *ape.SnapshotStore
+
 	// Phase 51: Web Scraper
 	scraperSvc *scraper.Service
 
@@ -410,6 +413,13 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	rsicCycle.SetOrchestrationPolicy(orchPolicy)
 	log.Printf("RSIC orchestration policy initialized (cooldown=%ds, dedupe=%ds)", cfg.RSICTriggerCooldownSec, cfg.RSICTriggerDedupeSec)
 
+	// Phase 88: Create safety validator and snapshot store, wire to dispatcher
+	safetyValidator := ape.NewSafetyValidator(driver)
+	snapshotStore := ape.NewSnapshotStore(driver, cfg.RSICRollbackWindow)
+	rsicDispatcher.SetSafetyValidator(safetyValidator)
+	rsicDispatcher.SetSnapshotStore(snapshotStore)
+	log.Printf("RSIC safety enforcement initialized (rollback_window=%ds)", cfg.RSICRollbackWindow)
+
 	// Phase 80: Initialize signal learner
 	signalLearner := ape.NewSignalLearner(cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
 	log.Printf("Signal learner initialized (decay=%.2f, boost=%.2f)", cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
@@ -446,6 +456,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		rsicCycle:               rsicCycle,
 		rsicWatchdog:            rsicWatchdog,
 		orchestrationPolicy:    orchPolicy,
+		snapshotStore:          snapshotStore,
 		scraperSvc:              scraperSvc,
 		backupSvc:               backupSvc,
 		backupScheduler:         backupSched,
@@ -1096,6 +1107,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/self-improve/calibration", s.handleSelfImproveCalibration)
 	mux.HandleFunc("/v1/self-improve/health", s.handleSelfImproveHealth)
 	mux.HandleFunc("/v1/self-improve/signals", s.handleSelfImproveSignals)
+	mux.HandleFunc("/v1/self-improve/rollback", s.handleSelfImproveRollback)
 
 	// Skill Registry (Phase 48)
 	mux.HandleFunc("/v1/skills", s.handleSkills)

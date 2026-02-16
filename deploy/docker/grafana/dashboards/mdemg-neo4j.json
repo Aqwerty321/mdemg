@@ -353,7 +353,7 @@
       "gridPos": { "h": 7, "w": 12, "x": 0, "y": 21 },
       "targets": [
         {
-          "expr": "mdemg_neo4j_graph_health_score",
+          "expr": "mdemg_neo4j_graph_health_score and on(space_id) (mdemg_neo4j_graph_nodes @ end())",
           "legendFormat": "{{space_id}}"
         }
       ],
@@ -379,7 +379,7 @@
       "gridPos": { "h": 7, "w": 12, "x": 12, "y": 21 },
       "targets": [
         {
-          "expr": "mdemg_neo4j_graph_orphans",
+          "expr": "mdemg_neo4j_graph_orphans and on(space_id) (mdemg_neo4j_graph_nodes @ end())",
           "legendFormat": "{{space_id}}"
         }
       ],
@@ -427,7 +427,7 @@
       "gridPos": { "h": 7, "w": 12, "x": 12, "y": 28 },
       "targets": [
         {
-          "expr": "mdemg_neo4j_graph_learning_edges",
+          "expr": "mdemg_neo4j_graph_learning_edges and on(space_id) (mdemg_neo4j_graph_nodes @ end())",
           "legendFormat": "{{space_id}}"
         }
       ],

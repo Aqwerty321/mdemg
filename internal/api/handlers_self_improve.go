@@ -116,6 +116,7 @@ func (s *Server) handleSelfImproveCycle(w http.ResponseWriter, r *http.Request) 
 		Tier           string `json:"tier"`
 		TriggerSource  string `json:"trigger_source,omitempty"`
 		IdempotencyKey string `json:"idempotency_key,omitempty"`
+		DryRun         bool   `json:"dry_run,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
@@ -166,6 +167,7 @@ func (s *Server) handleSelfImproveCycle(w http.ResponseWriter, r *http.Request) 
 		opts := &ape.RunCycleOpts{
 			TriggerMeta:    &decision.Meta,
 			IdempotencyKey: req.IdempotencyKey,
+			DryRun:         req.DryRun,
 		}
 
 		outcome, err := s.rsicCycle.RunCycle(r.Context(), req.SpaceID, tier, opts)
@@ -191,7 +193,11 @@ func (s *Server) handleSelfImproveCycle(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Fallback path when orchestration policy is nil (backward compat)
-	outcome, err := s.rsicCycle.RunCycle(r.Context(), req.SpaceID, tier, nil)
+	var fallbackOpts *ape.RunCycleOpts
+	if req.DryRun {
+		fallbackOpts = &ape.RunCycleOpts{DryRun: true}
+	}
+	outcome, err := s.rsicCycle.RunCycle(r.Context(), req.SpaceID, tier, fallbackOpts)
 	if err != nil {
 		http.Error(w, sanitizeError(err, "self-improve cycle"), http.StatusInternalServerError)
 		return
@@ -318,6 +324,25 @@ func (s *Server) handleSelfImproveHealth(w http.ResponseWriter, r *http.Request)
 		resp["orchestration"] = s.orchestrationPolicy.GetOrchestrationStatus(s.macroNextRun)
 	}
 
+	// Phase 88: Safety enforcement status block
+	if s.snapshotStore != nil {
+		safetyBlock := map[string]any{
+			"enforcement_active": true,
+			"safety_version":     ape.SafetyVersion,
+			"bounds": map[string]any{
+				"max_nodes_affected": int(float64(1000) * s.cfg.RSICMaxNodePrunePct),
+				"max_edges_affected": int(float64(1000) * s.cfg.RSICMaxEdgePrunePct),
+				"protected_spaces":   []string{"mdemg-dev"},
+			},
+			"rollback": map[string]any{
+				"window_sec":            s.cfg.RSICRollbackWindow,
+				"snapshots_held":        s.snapshotStore.GetSnapshotCount(),
+				"oldest_snapshot_age_sec": s.snapshotStore.GetOldestSnapshotAgeSec(),
+			},
+		}
+		resp["safety"] = safetyBlock
+	}
+
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -343,5 +368,57 @@ func (s *Server) handleSelfImproveSignals(w http.ResponseWriter, r *http.Request
 		"enabled": true,
 		"count":   len(signals),
 	})
+}
+
+// ─── POST/GET /v1/self-improve/rollback ───
+
+func (s *Server) handleSelfImproveRollback(w http.ResponseWriter, r *http.Request) {
+	if s.snapshotStore == nil {
+		http.Error(w, "rollback not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		// List available snapshots
+		snapshots := s.snapshotStore.ListSnapshots()
+		if snapshots == nil {
+			snapshots = []ape.ActionSnapshot{}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"snapshots":          snapshots,
+			"count":              len(snapshots),
+			"rollback_window_sec": s.cfg.RSICRollbackWindow,
+		})
+
+	case http.MethodPost:
+		// Execute rollback
+		var req struct {
+			SnapshotID string `json:"snapshot_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if req.SnapshotID == "" {
+			http.Error(w, "snapshot_id is required", http.StatusBadRequest)
+			return
+		}
+
+		result, err := s.snapshotStore.Rollback(r.Context(), req.SnapshotID)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]any{
+				"rolled_back":         false,
+				"error":               err.Error(),
+				"rollback_window_sec": s.cfg.RSICRollbackWindow,
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, result)
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 

@@ -20,6 +20,14 @@ type Dispatcher struct {
 	convSvc   ConversationStatsProvider
 	hiddenSvc HiddenLayerProvider
 	driver    neo4j.DriverWithContext
+
+	// Phase 88: Safety enforcement
+	safetyValidator *SafetyValidator
+	snapshotStore   *SnapshotStore
+	dryRun          bool
+	safetySummary   *SafetySummary
+	deltas          []ActionDelta
+	safetyMu        sync.Mutex
 }
 
 type activeTask struct {
@@ -39,6 +47,47 @@ func NewDispatcher(driver neo4j.DriverWithContext, learner LearningStatsProvider
 		hiddenSvc:   hiddenSvc,
 		driver:      driver,
 	}
+}
+
+// SetSafetyValidator attaches a safety validator to the dispatcher.
+func (d *Dispatcher) SetSafetyValidator(sv *SafetyValidator) {
+	d.safetyValidator = sv
+}
+
+// SetSnapshotStore attaches a snapshot store to the dispatcher.
+func (d *Dispatcher) SetSnapshotStore(ss *SnapshotStore) {
+	d.snapshotStore = ss
+}
+
+// SetDryRun puts the dispatcher in dry-run mode (estimate only, no mutations).
+func (d *Dispatcher) SetDryRun(dryRun bool) {
+	d.dryRun = dryRun
+}
+
+// ResetSafetySummary initializes a fresh safety summary for a cycle.
+func (d *Dispatcher) ResetSafetySummary() {
+	d.safetyMu.Lock()
+	defer d.safetyMu.Unlock()
+	d.safetySummary = &SafetySummary{}
+	d.deltas = nil
+}
+
+// GetSafetySummary returns the accumulated safety summary.
+func (d *Dispatcher) GetSafetySummary() *SafetySummary {
+	d.safetyMu.Lock()
+	defer d.safetyMu.Unlock()
+	if d.safetySummary == nil {
+		return nil
+	}
+	cpy := *d.safetySummary
+	return &cpy
+}
+
+// GetDeltas returns accumulated dry-run deltas.
+func (d *Dispatcher) GetDeltas() []ActionDelta {
+	d.safetyMu.Lock()
+	defer d.safetyMu.Unlock()
+	return d.deltas
 }
 
 // Dispatch launches all tasks as background goroutines and returns immediately.
@@ -68,15 +117,91 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	defer at.cancel()
 
 	taskID := at.Spec.TaskID
+	actionType := at.Spec.ActionType
+
+	// Phase 88: Dry-run mode — build delta, skip execution
+	if d.dryRun && d.safetyValidator != nil {
+		delta := d.safetyValidator.BuildDelta(ctx, &at.Spec, actionType)
+		d.safetyMu.Lock()
+		d.deltas = append(d.deltas, delta)
+		if d.safetySummary != nil {
+			d.safetySummary.ActionsChecked++
+			if delta.WouldExecute {
+				d.safetySummary.ActionsAllowed++
+			} else {
+				d.safetySummary.ActionsRejected++
+				d.safetySummary.Rejections = append(d.safetySummary.Rejections, SafetyRejection{
+					Action:            actionType,
+					Reason:            delta.RejectionReason,
+					EstimatedAffected: delta.EstimatedAffected,
+					Limit:             delta.SafetyLimit,
+				})
+			}
+		}
+		d.safetyMu.Unlock()
+
+		d.postReport(taskID, "completed", 100, "dry_run_complete",
+			fmt.Sprintf("Dry-run delta computed for %s", actionType), nil, "")
+		d.mu.Lock()
+		at.Status = "completed"
+		d.mu.Unlock()
+		return
+	}
+
+	// Phase 88: Safety validation before execution
+	if d.safetyValidator != nil {
+		decision := d.safetyValidator.ValidateAction(ctx, &at.Spec, actionType)
+		d.safetyMu.Lock()
+		if d.safetySummary != nil {
+			d.safetySummary.ActionsChecked++
+			if decision.Allowed {
+				d.safetySummary.ActionsAllowed++
+			} else {
+				d.safetySummary.ActionsRejected++
+				d.safetySummary.Rejections = append(d.safetySummary.Rejections, SafetyRejection{
+					Action:            actionType,
+					Reason:            decision.Reason,
+					EstimatedAffected: decision.EstimatedAffected,
+					Limit:             decision.Limit,
+				})
+			}
+		}
+		d.safetyMu.Unlock()
+
+		if !decision.Allowed {
+			log.Printf("RSIC safety: %s rejected — %s", actionType, decision.Reason)
+			d.postReport(taskID, "failed", 100, "safety_rejected",
+				fmt.Sprintf("Rejected by safety validator: %s", decision.Reason), nil, decision.Reason)
+			d.mu.Lock()
+			at.Status = "failed"
+			d.mu.Unlock()
+			return
+		}
+	}
 
 	// Milestone: snapshot_taken
 	d.postReport(taskID, "running", 10, "snapshot_taken", "Baseline metrics captured", nil, "")
+
+	// Phase 88: Capture pre-mutation snapshot
+	if d.snapshotStore != nil {
+		snap, err := d.snapshotStore.CaptureSnapshot(ctx, at.Spec.CycleID, actionType, at.Spec.TargetSpace)
+		if err != nil {
+			log.Printf("RSIC snapshot: capture failed for %s: %v (continuing)", actionType, err)
+		} else {
+			log.Printf("RSIC snapshot: captured %s (%d items, expires %s)", snap.SnapshotID, snap.AffectedCount, snap.ExpiresAt.Format("15:04:05"))
+			d.safetyMu.Lock()
+			if d.safetySummary != nil {
+				d.safetySummary.SnapshotsCreated++
+			}
+			d.safetyMu.Unlock()
+		}
+	}
 
 	// Execute based on action type
 	var execErr error
 	var deliverables map[string]any
 
-	switch at.Spec.ActionType {
+	switch actionType {
 	case "prune_decayed_edges":
 		deliverables, execErr = d.executePruneDecayed(ctx, at.Spec.TargetSpace)
 	case "prune_excess_edges":
@@ -90,7 +215,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	case "refresh_stale_edges":
 		deliverables, execErr = d.executeRefreshStaleEdges(ctx, at.Spec.TargetSpace)
 	default:
-		execErr = fmt.Errorf("unknown action type: %s", at.Spec.ActionType)
+		execErr = fmt.Errorf("unknown action type: %s", actionType)
 	}
 
 	if execErr != nil {

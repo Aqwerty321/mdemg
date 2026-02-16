@@ -58,6 +58,25 @@ type StandardMetrics struct {
 	CMSWriteJSONFails       *Counter
 	CMSLearningEdgeFails    *Counter
 	CMSStabilityUpdateFails *Counter
+
+	// Neo4j graph per-space metrics (Grafana Neo4j Dashboard)
+	Neo4jGraphNodes         func(spaceID string) *Gauge
+	Neo4jGraphEdges         func(spaceID string) *Gauge
+	Neo4jGraphObservations  func(spaceID string) *Gauge
+	Neo4jGraphOrphans       func(spaceID string) *Gauge
+	Neo4jGraphHealthScore   func(spaceID string) *Gauge
+	Neo4jGraphLearningEdges func(spaceID string) *Gauge
+
+	// Neo4j graph totals
+	Neo4jGraphTotalNodes  *Gauge
+	Neo4jGraphTotalEdges  *Gauge
+	Neo4jGraphTotalSpaces *Gauge
+
+	// Neo4j container resource metrics (via docker stats)
+	Neo4jContainerCPUPercent *Gauge
+	Neo4jContainerMemUsed   *Gauge
+	Neo4jContainerMemLimit  *Gauge
+	Neo4jContainerMemPercent *Gauge
 }
 
 // NewStandardMetrics creates and registers all standard MDEMG metrics.
@@ -134,6 +153,37 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	m.CMSLearningEdgeFails = r.NewCounter("cms_learning_edge_failures_total", "Learning edge creation failures", nil)
 	m.CMSStabilityUpdateFails = r.NewCounter("cms_stability_update_failures_total", "Stability reinforcement update failures", nil)
 
+	// Neo4j graph per-space metrics (Grafana Neo4j Dashboard)
+	m.Neo4jGraphNodes = func(spaceID string) *Gauge {
+		return r.NewGauge("neo4j_graph_nodes", "Total nodes per space", map[string]string{"space_id": spaceID})
+	}
+	m.Neo4jGraphEdges = func(spaceID string) *Gauge {
+		return r.NewGauge("neo4j_graph_edges", "Total edges per space", map[string]string{"space_id": spaceID})
+	}
+	m.Neo4jGraphObservations = func(spaceID string) *Gauge {
+		return r.NewGauge("neo4j_graph_observations", "Conversation observations per space", map[string]string{"space_id": spaceID})
+	}
+	m.Neo4jGraphOrphans = func(spaceID string) *Gauge {
+		return r.NewGauge("neo4j_graph_orphans", "Zero-edge (orphan) nodes per space", map[string]string{"space_id": spaceID})
+	}
+	m.Neo4jGraphHealthScore = func(spaceID string) *Gauge {
+		return r.NewGauge("neo4j_graph_health_score", "Graph health score per space (0-1)", map[string]string{"space_id": spaceID})
+	}
+	m.Neo4jGraphLearningEdges = func(spaceID string) *Gauge {
+		return r.NewGauge("neo4j_graph_learning_edges", "Learning (Hebbian) edges per space", map[string]string{"space_id": spaceID})
+	}
+
+	// Neo4j graph totals
+	m.Neo4jGraphTotalNodes = r.NewGauge("neo4j_graph_total_nodes", "Total nodes across all spaces", nil)
+	m.Neo4jGraphTotalEdges = r.NewGauge("neo4j_graph_total_edges", "Total edges across all spaces", nil)
+	m.Neo4jGraphTotalSpaces = r.NewGauge("neo4j_graph_total_spaces", "Total number of spaces", nil)
+
+	// Neo4j container resource metrics (via docker stats)
+	m.Neo4jContainerCPUPercent = r.NewGauge("neo4j_container_cpu_percent", "Neo4j container CPU usage percent", nil)
+	m.Neo4jContainerMemUsed = r.NewGauge("neo4j_container_mem_used_bytes", "Neo4j container memory used in bytes", nil)
+	m.Neo4jContainerMemLimit = r.NewGauge("neo4j_container_mem_limit_bytes", "Neo4j container memory limit in bytes", nil)
+	m.Neo4jContainerMemPercent = r.NewGauge("neo4j_container_mem_percent", "Neo4j container memory usage percent", nil)
+
 	return m
 }
 
@@ -197,6 +247,54 @@ func (m *StandardMetrics) CollectNeo4jPoolMetrics() {
 	m.Neo4jPoolCreated.Set(float64(poolMetrics.TotalCreated))
 	m.Neo4jPoolClosed.Set(float64(poolMetrics.TotalClosed))
 	m.Neo4jPoolFailed.Set(float64(poolMetrics.TotalFailedAcquire))
+}
+
+// SpaceGraphData holds per-space graph stats for Prometheus collection.
+type SpaceGraphData struct {
+	SpaceID       string
+	Nodes         int
+	Edges         int
+	Observations  int
+	Orphans       int
+	LearningEdges int
+	HealthScore   float64
+}
+
+// CollectNeo4jGraphMetrics updates Neo4j graph per-space metrics.
+func (m *StandardMetrics) CollectNeo4jGraphMetrics(spaces []SpaceGraphData) {
+	totalNodes, totalEdges := 0, 0
+	for _, s := range spaces {
+		m.Neo4jGraphNodes(s.SpaceID).Set(float64(s.Nodes))
+		m.Neo4jGraphEdges(s.SpaceID).Set(float64(s.Edges))
+		m.Neo4jGraphObservations(s.SpaceID).Set(float64(s.Observations))
+		m.Neo4jGraphOrphans(s.SpaceID).Set(float64(s.Orphans))
+		m.Neo4jGraphHealthScore(s.SpaceID).Set(s.HealthScore)
+		m.Neo4jGraphLearningEdges(s.SpaceID).Set(float64(s.LearningEdges))
+		totalNodes += s.Nodes
+		totalEdges += s.Edges
+	}
+	m.Neo4jGraphTotalNodes.Set(float64(totalNodes))
+	m.Neo4jGraphTotalEdges.Set(float64(totalEdges))
+	m.Neo4jGraphTotalSpaces.Set(float64(len(spaces)))
+}
+
+// ContainerStats holds resource metrics from docker stats.
+type ContainerStats struct {
+	CPUPercent float64
+	MemUsed    float64 // bytes
+	MemLimit   float64 // bytes
+	MemPercent float64
+}
+
+// CollectNeo4jContainerMetrics updates Neo4j container resource metrics.
+func (m *StandardMetrics) CollectNeo4jContainerMetrics(stats *ContainerStats) {
+	if stats == nil {
+		return
+	}
+	m.Neo4jContainerCPUPercent.Set(stats.CPUPercent)
+	m.Neo4jContainerMemUsed.Set(stats.MemUsed)
+	m.Neo4jContainerMemLimit.Set(stats.MemLimit)
+	m.Neo4jContainerMemPercent.Set(stats.MemPercent)
 }
 
 // CollectMemoryMetrics updates memory metrics from runtime stats.

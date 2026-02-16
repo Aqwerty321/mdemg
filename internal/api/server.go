@@ -7,8 +7,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -96,6 +99,20 @@ type Server struct {
 
 	// Phase 9.4: Event dispatch for non-APE modules
 	eventDispatcher *plugins.EventDispatcher
+
+	// Grafana Neo4j Dashboard: cached graph metrics (60s TTL)
+	graphMetricsCache struct {
+		sync.Mutex
+		data    []metrics.SpaceGraphData
+		updated time.Time
+	}
+
+	// Grafana Neo4j Dashboard: cached container stats (60s TTL)
+	containerStatsCache struct {
+		sync.Mutex
+		data    *metrics.ContainerStats
+		updated time.Time
+	}
 }
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
@@ -988,6 +1005,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/cleanup/schedule", s.handleScheduleCleanup)
 	mux.HandleFunc("/v1/memory/cleanup/schedules", s.handleListCleanupSchedules)
 	mux.HandleFunc("/v1/memory/cleanup/stats", s.handleCleanupStats)
+	mux.HandleFunc("/v1/memory/cleanup/graph-orphans", s.handleGraphOrphanCleanup)
 
 	// Webhook endpoints (Phase 9.4)
 	mux.HandleFunc("/v1/webhooks/linear", s.handleLinearWebhook)
@@ -1173,6 +1191,200 @@ func validateRequest(w http.ResponseWriter, v any) bool {
 	return true
 }
 
+// collectNeo4jGraphData queries Neo4j for per-space graph stats with 60s cache.
+func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
+	s.graphMetricsCache.Lock()
+	defer s.graphMetricsCache.Unlock()
+
+	if time.Since(s.graphMetricsCache.updated) < 60*time.Second && s.graphMetricsCache.data != nil {
+		return s.graphMetricsCache.data
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer session.Close(ctx)
+
+	// Query 1: Per-space node counts + observations
+	type spaceRow struct {
+		nodes, edges, observations, orphans, learningEdges int
+	}
+	spaces := make(map[string]*spaceRow)
+
+	result, err := session.Run(ctx,
+		`MATCH (n:MemoryNode)
+		 WHERE n.space_id IS NOT NULL
+		 WITH n.space_id AS sid,
+		      count(n) AS nodes,
+		      sum(CASE WHEN n.role_type = 'conversation_observation' THEN 1 ELSE 0 END) AS obs
+		 RETURN sid, nodes, obs
+		 ORDER BY sid`,
+		nil)
+	if err != nil {
+		log.Printf("[metrics] neo4j graph query (nodes) failed: %v", err)
+		return s.graphMetricsCache.data
+	}
+	for result.Next(ctx) {
+		rec := result.Record()
+		sid, _ := rec.Get("sid")
+		nodes, _ := rec.Get("nodes")
+		obs, _ := rec.Get("obs")
+		s := &spaceRow{nodes: int(nodes.(int64)), observations: int(obs.(int64))}
+		spaces[sid.(string)] = s
+	}
+
+	// Query 2: Per-space edge counts + learning edges
+	result2, err := session.Run(ctx,
+		`MATCH (a:MemoryNode)-[r]-(b:MemoryNode)
+		 WHERE a.space_id IS NOT NULL
+		 WITH a.space_id AS sid,
+		      count(DISTINCT r) AS edges,
+		      sum(CASE WHEN type(r) = 'LEARNING' THEN 1 ELSE 0 END) AS learning
+		 RETURN sid, edges, learning`,
+		nil)
+	if err != nil {
+		log.Printf("[metrics] neo4j graph query (edges) failed: %v", err)
+		return s.graphMetricsCache.data
+	}
+	for result2.Next(ctx) {
+		rec := result2.Record()
+		sid, _ := rec.Get("sid")
+		edges, _ := rec.Get("edges")
+		learning, _ := rec.Get("learning")
+		if row, ok := spaces[sid.(string)]; ok {
+			row.edges = int(edges.(int64))
+			row.learningEdges = int(learning.(int64))
+		}
+	}
+
+	// Query 3: Per-space orphan counts
+	result3, err := session.Run(ctx,
+		`MATCH (n:MemoryNode)
+		 WHERE n.space_id IS NOT NULL AND NOT (n)--()
+		   AND NOT coalesce(n.is_archived, false)
+		 WITH n.space_id AS sid, count(n) AS orphans
+		 RETURN sid, orphans`,
+		nil)
+	if err != nil {
+		log.Printf("[metrics] neo4j graph query (orphans) failed: %v", err)
+		return s.graphMetricsCache.data
+	}
+	for result3.Next(ctx) {
+		rec := result3.Record()
+		sid, _ := rec.Get("sid")
+		orphans, _ := rec.Get("orphans")
+		if row, ok := spaces[sid.(string)]; ok {
+			row.orphans = int(orphans.(int64))
+		}
+	}
+
+	// Build result with health scores
+	data := make([]metrics.SpaceGraphData, 0, len(spaces))
+	for sid, row := range spaces {
+		health := 1.0
+		if row.nodes > 0 {
+			orphanRatio := float64(row.orphans) / float64(row.nodes)
+			edgeDensity := 0.0
+			if row.nodes > 1 {
+				edgeDensity = float64(row.edges) / float64(row.nodes)
+				if edgeDensity > 1.0 {
+					edgeDensity = 1.0
+				}
+			}
+			health = (1.0-orphanRatio)*0.6 + edgeDensity*0.4
+		}
+		data = append(data, metrics.SpaceGraphData{
+			SpaceID:       sid,
+			Nodes:         row.nodes,
+			Edges:         row.edges,
+			Observations:  row.observations,
+			Orphans:       row.orphans,
+			LearningEdges: row.learningEdges,
+			HealthScore:   health,
+		})
+	}
+
+	s.graphMetricsCache.data = data
+	s.graphMetricsCache.updated = time.Now()
+	return data
+}
+
+// collectNeo4jContainerStats gets CPU/memory from docker stats with 60s cache.
+func (s *Server) collectNeo4jContainerStats() *metrics.ContainerStats {
+	s.containerStatsCache.Lock()
+	defer s.containerStatsCache.Unlock()
+
+	if time.Since(s.containerStatsCache.updated) < 60*time.Second && s.containerStatsCache.data != nil {
+		return s.containerStatsCache.data
+	}
+
+	containerName := s.cfg.BackupNeo4jContainer
+	if containerName == "" {
+		containerName = "mdemg-neo4j"
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// docker stats --no-stream --format '{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}'
+	out, err := exec.CommandContext(ctx, "docker", "stats", containerName,
+		"--no-stream", "--format", "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}").Output()
+	if err != nil {
+		log.Printf("[metrics] docker stats failed: %v", err)
+		return s.containerStatsCache.data
+	}
+
+	line := strings.TrimSpace(string(out))
+	parts := strings.Split(line, "\t")
+	if len(parts) < 3 {
+		return s.containerStatsCache.data
+	}
+
+	stats := &metrics.ContainerStats{}
+
+	// Parse CPU percent: "3.49%"
+	stats.CPUPercent, _ = strconv.ParseFloat(strings.TrimSuffix(parts[0], "%"), 64)
+
+	// Parse memory: "7.552GiB / 31.54GiB"
+	memParts := strings.Split(parts[1], " / ")
+	if len(memParts) == 2 {
+		stats.MemUsed = parseDockerSize(strings.TrimSpace(memParts[0]))
+		stats.MemLimit = parseDockerSize(strings.TrimSpace(memParts[1]))
+	}
+
+	// Parse memory percent: "23.94%"
+	stats.MemPercent, _ = strconv.ParseFloat(strings.TrimSuffix(parts[2], "%"), 64)
+
+	s.containerStatsCache.data = stats
+	s.containerStatsCache.updated = time.Now()
+	return stats
+}
+
+// parseDockerSize converts Docker size strings (e.g. "7.552GiB", "512MiB") to bytes.
+func parseDockerSize(s string) float64 {
+	s = strings.TrimSpace(s)
+	multipliers := map[string]float64{
+		"B":   1,
+		"KiB": 1024,
+		"MiB": 1024 * 1024,
+		"GiB": 1024 * 1024 * 1024,
+		"TiB": 1024 * 1024 * 1024 * 1024,
+		"kB":  1000,
+		"MB":  1000 * 1000,
+		"GB":  1000 * 1000 * 1000,
+	}
+	for suffix, mult := range multipliers {
+		if strings.HasSuffix(s, suffix) {
+			val, err := strconv.ParseFloat(strings.TrimSuffix(s, suffix), 64)
+			if err == nil {
+				return val * mult
+			}
+		}
+	}
+	return 0
+}
+
 // handlePrometheusMetrics serves Prometheus-format metrics.
 func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -1205,6 +1417,14 @@ func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request)
 
 		// Collect Neo4j pool metrics (Phase 48.4.1)
 		m.CollectNeo4jPoolMetrics()
+
+		// Collect Neo4j graph per-space metrics (Grafana Neo4j Dashboard)
+		graphData := s.collectNeo4jGraphData()
+		m.CollectNeo4jGraphMetrics(graphData)
+
+		// Collect Neo4j container resource metrics (Grafana Neo4j Dashboard)
+		containerStats := s.collectNeo4jContainerStats()
+		m.CollectNeo4jContainerMetrics(containerStats)
 
 		// Collect memory metrics (Phase 48.4.4)
 		if s.memoryPressure != nil {

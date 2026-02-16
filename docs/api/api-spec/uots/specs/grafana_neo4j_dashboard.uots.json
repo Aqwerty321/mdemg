@@ -1,0 +1,57 @@
+{
+  "uots_version": "1.0.0",
+  "observability": {
+    "name": "Grafana Neo4j Dashboard",
+    "type": "grafana_dashboard",
+    "tags": ["grafana", "neo4j", "dashboard"]
+  },
+  "target": {
+    "file": "deploy/docker/grafana/dashboards/mdemg-neo4j.json"
+  },
+  "expected": {
+    "dashboard": {
+      "uid": "mdemg-neo4j",
+      "title": "MDEMG Neo4j Graph",
+      "panel_count_min": 12,
+      "required_panel_titles": [
+        "Total Nodes",
+        "Total Edges",
+        "Total Spaces",
+        "Neo4j Pool Active",
+        "Heap Memory",
+        "Neo4j Container CPU Usage",
+        "Neo4j Container Memory Usage",
+        "Space Overview",
+        "Health Score Over Time",
+        "Orphans Per Space Over Time",
+        "Neo4j Connection Pool",
+        "Learning Edges Over Time"
+      ],
+      "required_queries": [
+        "mdemg_neo4j_graph_total_nodes",
+        "mdemg_neo4j_graph_total_edges",
+        "mdemg_neo4j_graph_total_spaces",
+        "mdemg_neo4j_graph_nodes",
+        "mdemg_neo4j_graph_edges",
+        "mdemg_neo4j_graph_observations",
+        "mdemg_neo4j_graph_orphans",
+        "mdemg_neo4j_graph_health_score",
+        "mdemg_neo4j_graph_learning_edges",
+        "mdemg_neo4j_pool_active_connections",
+        "mdemg_neo4j_container_cpu_percent",
+        "mdemg_neo4j_container_mem_used_bytes"
+      ],
+      "tags": ["mdemg", "neo4j", "graph"]
+    }
+  },
+  "config": {
+    "timeout_ms": 5000
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-16",
+    "description": "Validates the Grafana Neo4j dashboard JSON structure: correct UID, title, required panels with correct titles, required PromQL queries for all Neo4j graph and container metrics, and dashboard tags.",
+    "status": "active",
+    "tags": ["grafana", "neo4j", "phase-grafana"]
+  }
+}

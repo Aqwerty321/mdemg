@@ -281,7 +281,7 @@ Phases are organized into **numbered series** to group related work:
 | Phase 8 (Symbols) | **Phase 46** | Symbol-Level Indexing | ✅ Complete (8.5-8.6 archived) |
 | Phase 9 (Incremental Updates) | **Phase 47** | Incremental Update & Re-Ingestion | 🔄 Partial |
 | Phase 10 (Query Optimization) | **Phase 48** | Query Optimization & Caching | ✅ Complete (10.1-10.2) |
-| Phase 11 (LLM SDK) | **Phase 49** | LLM Plugin SDK & Self-Improvement | 🔄 Partial |
+| Phase 11 (LLM SDK) | **Phase 49** | LLM Plugin SDK & Self-Improvement | ✅ Complete |
 | Phase 7 (Public Readiness) | **Phase 50** | Public Readiness & Open Source Hardening | 📋 Planned |
 | — (Web Scraper) | **Phase 51** | Web Scraper Ingestion Module | ✅ Complete |
 | — (CMS Advanced II) | **Phase 60** | CMS Advanced Functionality II | ✅ Complete |
@@ -330,7 +330,7 @@ Phases are organized into **numbered series** to group related work:
 | 46 | Symbol Indexing | ✅ | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 8 |
 | 47 | Incremental Updates | 🔄 | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 9 |
 | 48 | Query Optimization | ✅ | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 10 |
-| 49 | LLM Plugin SDK | 🔄 | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 11 |
+| 49 | LLM Plugin SDK | ✅ | `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 11 |
 | 50 | Public Readiness | 📋 | `docs/development/repo-to-public-roadmap.md` |
 | 51 | Web Scraper Ingestion | ✅ | `docs/specs/phase51-web-scraper-ingestion.md` |
 | 60 | CMS Advanced II | ✅ | `docs/specs/phase60-cms-advanced-ii.md` |
@@ -343,6 +343,34 @@ Phases are organized into **numbered series** to group related work:
 | 76 | Neo4j State Monitor & Space Overview | ✅ | `docs/api/api-spec/uats/specs/neo4j_overview.uats.json` |
 | 80 | CMS ANN Meta-Cognition & Self-Improvement Enforcement | ✅ | `docs/specs/phase80-cms-metacognition.md` |
 | 9.4 | Plugin-Specific Triggers (File Watcher + Events) | ✅ | `internal/api/handlers_filewatcher.go`, `internal/plugins/events.go` |
+
+---
+
+## Phase Artifact Index (Docs + JSON)
+
+This index keeps phase plans formalized by linking each phase to the primary documentation and supporting JSON artifacts.
+
+- **Phase 31**: `docs/specs/space-transfer.md` | JSON: `docs/api/api-spec/udts/specs/space_transfer_list_spaces.udts.json`, `docs/api/api-spec/udts/specs/space_transfer_space_info.udts.json`.
+- **Phase 32**: `docs/specs/phase-devspace-hub.md` | JSON: `docs/api/api-spec/udts/specs/devspace_register_agent.udts.json`, `docs/api/api-spec/udts/specs/devspace_list_exports.udts.json`, `docs/api/api-spec/udts/specs/devspace_pull_export.udts.json`.
+- **Phase 33**: `docs/specs/phase3-inter-agent-comms.md` | JSON: `docs/api/api-spec/udts/specs/devspace_connect.udts.json`.
+- **Phase 34**: `docs/specs/phase4-incremental-sync.md` | JSON: `docs/api/api-spec/udts/specs/space_transfer_export_delta.udts.json`.
+- **Phase 35-37**: `docs/specs/development-space-collaboration.md` | JSON: `docs/api/api-spec/udts/specs/space_transfer_crdt.udts.json`, `docs/api/api-spec/udts/specs/devspace_presence.udts.json`.
+- **Phase 38**: `docs/specs/unts-hash-verification.md` | JSON: `docs/specs/unts-registry.json`, `docs/specs/manifest.sha256`, `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json`.
+- **Phase 41-42**: `docs/specs/phase1-space-cleanup.md`, `docs/specs/phase2-self-ingest.md` | JSON: `docs/api/api-spec/uats/specs/neo4j_overview.uats.json`, `docs/api/api-spec/uats/specs/ingest_codebase.uats.json`.
+- **Phase 43A-43C**: `docs/specs/phase3a-cms-enforcement.md`, `docs/specs/phase3b-cms-quality.md`, `docs/specs/phase3c-multi-agent.md` | JSON: `docs/api/api-spec/uats/specs/conversation_resume.uats.json`, `docs/api/api-spec/uats/specs/conversation_observe.uats.json`, `docs/api/api-spec/uats/specs/conversation_volatile_stats.uats.json`.
+- **Phase 44**: `docs/specs/phase4-linear-crud.md` | JSON: `docs/api/api-spec/uats/specs/webhooks_generic.uats.json`.
+- **Phase 45-49**: `docs/development/DEVELOPMENT_ROADMAP.md` | JSON: `docs/api/api-spec/uats/specs/ape_status.uats.json`, `docs/api/api-spec/uats/specs/symbols.uats.json`, `docs/api/api-spec/uats/specs/ingest_trigger.uats.json`, `docs/api/api-spec/uats/specs/cache_stats.uats.json`, `docs/api/api-spec/uats/specs/plugin_create.uats.json`.
+- **Phase 50**: `docs/development/repo-to-public-roadmap.md` | JSON: `docs/specs/manifest.sha256`.
+- **Phase 51**: `docs/specs/phase51-web-scraper-ingestion.md` | JSON: `docs/api/api-spec/uats/specs/scraper_create_job.uats.json`, `docs/api/api-spec/uats/specs/scraper_get_status.uats.json`.
+- **Phase 60**: `docs/specs/phase60-cms-advanced-ii.md` | JSON: `docs/api/api-spec/uats/specs/cms_templates_create.uats.json`, `docs/api/api-spec/uats/specs/cms_snapshot_create.uats.json`, `docs/api/api-spec/uats/specs/cms_org_decision.uats.json`.
+- **Phase 60b**: `docs/development/RSIC_GAP_ANALYSIS.md` | JSON: `docs/api/api-spec/uats/specs/self_improve_assess.uats.json`, `docs/api/api-spec/uats/specs/self_improve_cycle.uats.json`, `docs/api/api-spec/uats/specs/self_improve_health.uats.json`.
+- **Phase 70**: `docs/specs/phase70-neo4j-backup.md` | JSON: `docs/api/api-spec/uats/specs/backup_trigger.uats.json`, `docs/api/api-spec/uats/specs/backup_restore.uats.json`, `docs/api/api-spec/uats/specs/backup_status.uats.json`.
+- **Phase 75 / 75C**: `docs/specs/phase75-relationship-extraction.md`, `docs/features/l5-emergent-layer.md` | JSON: `docs/api/api-spec/uats/specs/relationship_stats.uats.json`, `docs/api/api-spec/uats/specs/symbol_relationships.uats.json`, `docs/api/api-spec/uats/specs/consolidate.uats.json`.
+- **Phase 76**: `docs/features/neo4j-state-monitor.md` | JSON: `docs/api/api-spec/uats/specs/neo4j_overview.uats.json`.
+- **Phase 80**: `docs/specs/phase80-cms-metacognition.md` | JSON: `docs/api/api-spec/uats/specs/session_anomalies.uats.json`, `docs/api/api-spec/uats/specs/self_improve_signals.uats.json`.
+- **Phase 81-86**: `docs/specs/FRAMEWORK_GOVERNANCE.md`, `docs/development/UXTS_FRAMEWORK_MATRIX.md` | JSON: `docs/tests/ubts/schema/ubts.schema.json`, `docs/tests/usts/schema/usts.schema.json`, `docs/tests/uams/schema/uams.schema.json`, `docs/tests/uvts/schema/uvts.schema.json`, `docs/api/api-spec/uots/schema/uots.schema.json`.
+- **Phase 87**: `docs/specs/phase87-rsic-orchestration-activation.md` | JSON: `docs/api/api-spec/uats/drafts/self_improve_cycle_trigger_metadata.phase87.uats.json`, `docs/api/api-spec/uats/drafts/self_improve_health_orchestration.phase87.uats.json`, `docs/api/api-spec/uats/drafts/self_improve_history_trigger_source_filter.phase87.uats.json`, `docs/api/api-spec/uats/drafts/self_improve_cycle_idempotency.phase87.uats.json`.
+- **Phase 88-91**: `docs/development/RSIC_GAP_ANALYSIS.md` | JSON: `docs/api/api-spec/uats/specs/self_improve_cycle.uats.json`, `docs/api/api-spec/uats/specs/self_improve_history.uats.json`, `docs/api/api-spec/uats/specs/self_improve_health.uats.json`, `docs/api/api-spec/uats/specs/self_improve_signals.uats.json`.
 
 ---
 
@@ -1552,7 +1580,7 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 
 ---
 
-### Phase 49: LLM Plugin SDK & Self-Improvement 🔄
+### Phase 49: LLM Plugin SDK & Self-Improvement ✅
 
 **Roadmap:** `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 11
 
@@ -1561,10 +1589,12 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 | 49.1 Plugin SDK Documentation | ✅ | `docs/development/SDK_PLUGIN_GUIDE.md` (1,582 lines) |
 | 49.2 LLM Semantic Summary Service | ✅ | `internal/summarize/service.go`, `internal/summarize/service_test.go` |
 | 49.3 Claude Plugin Creation Skill | ✅ | `.claude/skills/create-plugin.md` |
-| 49.4 Plugin Scaffolding Generator | 📋 | CLI `mdemg plugin new <name> --type=<TYPE>` |
-| 49.5 Plugin Validation & Testing | 📋 | Automated manifest validation, gRPC contract testing |
-| 49.6 Plugin Creation API | 📋 | `POST /v1/plugins/create` |
-| 49.7 Capability Gap Detection | 📋 | Query pattern analysis, plugin suggestions |
+| 49.4 Plugin Scaffolding Generator | ✅ | `cmd/plugin-scaffold/main.go`, `internal/plugins/scaffold/scaffold.go` |
+| 49.5 Plugin Validation & Testing | ✅ | `internal/plugins/validator.go`, `cmd/plugin-validate/main.go` |
+| 49.6 Plugin Creation API | ✅ | `internal/api/plugin_handlers.go` (POST /v1/plugins/create, GET /v1/plugins/{id}, POST /v1/plugins/{id}/validate) |
+| 49.7 Capability Gap Detection | ✅ | `internal/gaps/` (detector, store, interview), `internal/api/gaps_handlers.go` |
+
+**UATS:** `plugin_create.uats.json` (6 variants), `plugins.uats.json`, `capability_gaps.uats.json`, `capability_gaps_full.uats.json` (4 variants), `gap_interviews.uats.json`.
 
 ---
 
@@ -1587,17 +1617,216 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 ### Framework Inventory
 
 **Spec:** `docs/specs/FRAMEWORK_GOVERNANCE.md`
+**Operational Matrix:** `docs/development/UXTS_FRAMEWORK_MATRIX.md`
 
-| Framework | Name | Purpose | Location |
-|-----------|------|---------|----------|
-| **UNTS** | Hash Verification | Hash verification for all protected files | `docs/specs/unts-hash-verification.md` (spec only) |
-| **UDTS** | DevSpace Test Spec | gRPC contract/integration tests | `docs/api/api-spec/udts/` |
-| **UATS** | API Test Spec | HTTP API acceptance tests | `docs/api/api-spec/uats/` |
-| **UPTS** | Parser Test Spec | Language parser specs (27 languages) | `docs/lang-parser/lang-parse-spec/upts/` |
-| **UBTS** | Benchmark Test Spec | Performance/load testing | Not yet created |
-| **USTS** | Security Test Spec | Security hardening/vuln checks | Not yet created |
-| **UOTS** | Observability Test Spec | Metrics, tracing, logging | Not yet created |
-| **UAMS** | Auth Management Spec | Authentication/authorization | Not yet created |
+Current framework reality is broader than the original governance table. These are the active or partially-active UxTS tracks in repo now:
+
+- **UNTS** (hash verification): `docs/specs/unts-hash-verification.md`, `docs/specs/unts-registry.json`, `internal/unts/`, `api/proto/unts.proto`
+- **UDTS** (gRPC contract): `docs/api/api-spec/udts/`, `tests/udts/contract_test.go`
+- **UATS** (HTTP contract): `docs/api/api-spec/uats/` + runner + CI wiring
+- **UPTS** (parser contract): `docs/lang-parser/lang-parse-spec/upts/` + runner + CI wiring
+- **UBTS** (benchmark): `docs/tests/ubts/` (schema/specs/profiles/runner present)
+- **USTS** (security): `docs/tests/usts/` (schema/specs/payloads/runner present)
+- **UAMS** (auth method contracts): `docs/tests/uams/` + `internal/auth/uams_test.go`
+- **UOBS** (observability validation): `docs/tests/uobs/` (schema/specs/runner/alerts/dashboard)
+- **UOTS** (observability contract track): `docs/api/api-spec/uots/` (schema/specs present; runner missing)
+- **UVTS** (semantic validation): `docs/tests/uvts/schema/uvts.schema.json` (schema-only currently)
+
+### UxTS Gap Analysis (Codebase vs Intended Governance)
+
+Main issue sets identified after reviewing specs, runners, CI, and implementation:
+
+1. **Governance drift:** `FRAMEWORK_GOVERNANCE.md` and this handoff section no longer match repo reality (e.g., UBTS/USTS/UAMS/UOBS now exist; UNTS is implemented, not spec-only).
+2. **Observability split-brain:** both `UOBS` and `UOTS` exist with overlapping scope and different schemas/runners; this creates duplicated ownership and unclear source of truth.
+3. **Execution gap in automation:** CI and Make targets strongly cover UATS/UPTS, while UBTS/USTS/UOBS/UOTS/UAMS/UNTS are not consistently gated.
+4. **UNTS scope incomplete:** scanner currently ingests manifest + UDTS only; governance/spec intent covers UATS/UPTS/UBTS/USTS/UOTS/UAMS artifacts too.
+5. **UDTS format drift risk:** README describes one compact UDTS shape, while some UDTS specs (e.g., UNTS contract spec) use a different test-case structure; governance needs explicit versioned format policy.
+6. **UAMS artifact integrity gaps:** UAMS specs reference fixture files that are not present under `docs/tests/uams/fixtures/`; this weakens conformance confidence.
+7. **UVTS not operationalized:** schema exists, but no canonical specs/runner/CI path yet for semantic benchmark validation.
+
+### Development Plan: UxTS Hardening Phases
+
+The following named phases address each issue set directly.
+
+#### Phase 81: UxTS Governance Reconciliation
+
+- Update `docs/specs/FRAMEWORK_GOVERNANCE.md` and `AGENT_HANDOFF.md` to reflect actual framework inventory and status.
+- Define lifecycle state per framework: `active`, `pilot`, `spec-only`, `deprecated`.
+- Add single ownership map for each framework (spec path, runner path, CI job, maintainer).
+- Publish a canonical "framework matrix" doc linking schema -> specs -> runner -> CI target.
+
+**Supporting documentation for review:**
+- `docs/specs/FRAMEWORK_GOVERNANCE.md`
+- `docs/development/UXTS_FRAMEWORK_MATRIX.md`
+- `AGENT_HANDOFF.md` (this section)
+
+#### Phase 82: Observability Framework Convergence (UOBS/UOTS)
+
+- Choose one canonical observability framework name and schema (`UOBS` or `UOTS`), and formally deprecate the other.
+- Provide migration adapters for existing specs so no coverage is lost.
+- Implement/standardize one runner path and one CLI contract.
+- Align alert/dashboard/metrics checks under the unified schema.
+
+**Supporting artifacts (docs + JSON):**
+
+- `docs/tests/uobs/schema/uobs.schema.json`
+- `docs/tests/uobs/specs/health_endpoints.uobs.json`
+- `docs/tests/uobs/specs/prometheus_metrics.uobs.json`
+- `docs/tests/uobs/dashboards/overview.json`
+- `docs/api/api-spec/uots/schema/uots.schema.json`
+- `docs/api/api-spec/uots/specs/grafana_neo4j_dashboard.uots.json`
+- `docs/api/api-spec/uots/specs/alert_rules_neo4j.uots.json`
+
+#### Phase 83: UxTS Orchestration and CI Gate Expansion
+
+- Add Make targets for `test-udts`, `test-ubts`, `test-usts`, `test-uobs-or-uots`, `test-uams`, `test-unts`.
+- Add CI jobs (or one matrix job) for all active frameworks with clear pass/fail semantics.
+- Introduce tiered pipelines: `smoke` (fast), `contract` (merge gate), `extended` (nightly).
+- Ensure artifacts/reports are uploaded consistently for all framework runs.
+
+**Supporting artifacts (docs + JSON):**
+
+- `.github/workflows/ci.yml`
+- `.github/workflows/parser-tests.yml`
+- `Makefile`
+- `docs/tests/ubts/profiles/smoke.profile.json`
+- `docs/tests/ubts/profiles/load.profile.json`
+- `docs/tests/ubts/profiles/stress.profile.json`
+
+#### Phase 84: UNTS Full-Framework Coverage
+
+- Extend `internal/unts/scanner.go` to ingest hash-tracked artifacts across UATS/UPTS/UBTS/USTS/UAMS/UOBS(or UOTS).
+- Define per-framework hash source conventions and verify-now behavior.
+- Add regression tests proving registry/history/revert behavior for each framework family.
+- Add operational docs for registry bootstrap, backup, and incident response.
+
+**Supporting artifacts (docs + JSON):**
+
+- `docs/specs/unts-hash-verification.md`
+- `docs/specs/unts-registry.json`
+- `docs/specs/manifest.sha256`
+- `docs/api/api-spec/uats/schema/uats.schema.json`
+- `docs/lang-parser/lang-parse-spec/upts/schema/upts.schema.json`
+- `docs/tests/ubts/schema/ubts.schema.json`
+- `docs/tests/usts/schema/usts.schema.json`
+- `docs/tests/uams/schema/uams.schema.json`
+
+#### Phase 85: Auth/Security/Performance Conformance Stabilization
+
+- Add missing UAMS fixtures and enforce fixture existence checks in tests.
+- Wire USTS/UBTS/UAMS runners into repeatable local and CI execution.
+- Define minimum spec coverage targets (critical endpoints/auth flows/perf paths).
+- Add baseline thresholds and failure policy (blocker vs warning) per framework.
+
+**Supporting artifacts (docs + JSON):**
+
+- `docs/tests/uams/schema/uams.schema.json`
+- `docs/tests/uams/specs/apikey.uams.json`
+- `docs/tests/uams/specs/jwt.uams.json`
+- `docs/tests/uams/specs/saml.uams.json`
+- `docs/tests/usts/schema/usts.schema.json`
+- `docs/tests/usts/specs/auth_required.usts.json`
+- `docs/tests/ubts/schema/ubts.schema.json`
+- `docs/tests/ubts/specs/retrieve_latency.ubts.json`
+
+#### Phase 86: UVTS Activation (Semantic Validation)
+
+- Define UVTS v1 runner and canonical spec examples from existing benchmark assets.
+- Connect UVTS to MDEMG retrieval evaluation workflows and scoring baselines.
+- Add nightly UVTS validation profile with historical trend reporting.
+- Gate major retrieval/scoring changes on non-regression UVTS thresholds.
+
+**Supporting artifacts (docs + JSON):**
+
+- `docs/tests/uvts/schema/uvts.schema.json`
+- `docs/tests/uvts/specs/lnl_demo_validation.uvts.json`
+- `docs/tests/uvts/runners/uvts_runner.py`
+
+### RSIC Critical Infrastructure Gap Analysis (Addendum)
+
+Given RSIC is a critical control loop, it now has a dedicated gap-analysis track:
+
+- `docs/development/RSIC_GAP_ANALYSIS.md`
+
+Main RSIC gap sets identified:
+1. **Inactive scheduling knobs:** `RSIC_MESO_PERIOD_SESSIONS` and `RSIC_MACRO_CRON` are configured but not driving cycle scheduling.
+2. **Weak guardrail enforcement:** task safety bounds are defined but not consistently enforced before mutation paths.
+3. **Volatile learning state:** calibration and signal-effectiveness state are in-memory only and reset on process restart.
+4. **Hard-coded identity assumptions:** watchdog/signal paths rely on fixed session/space defaults, reducing multi-session correctness.
+5. **Adapter signal-quality risk:** consolidation-age adapter has type-handling risk that can suppress watchdog signal quality.
+6. **Lifecycle retention drift:** task state retention in dispatcher lacks explicit cleanup policy for long-running processes.
+7. **Spec/docs drift:** RSIC spec path references are inconsistent and API docs only partially describe the implemented RSIC surface.
+8. **Conformance depth gap:** UATS validates contracts but not full guardrail/behavior quality, and CI remains permissive for API specs.
+
+### Development Plan: RSIC Hardening Phases
+
+#### Phase 87: RSIC Orchestration Activation
+
+- **Status:** In Review (design package drafted, implementation not started)
+- **Spec:** `docs/specs/phase87-rsic-orchestration-activation.md`
+- **Draft UATS:** `docs/api/api-spec/uats/drafts/self_improve_*phase87*.uats.json`
+
+- Activate session-driven meso triggers and macro cron scheduling from existing config knobs.
+- Implement explicit micro-cycle auto-trigger policy behind `RSIC_MICRO_ENABLED` with backoff and auditability.
+- Expose trigger-source visibility (manual, watchdog, session, macro) in RSIC health/reporting outputs.
+
+#### Phase 88: RSIC Safety and Policy Enforcement
+
+- Enforce `SafetyBounds` (`max_nodes`, `max_edges`, `protected_spaces`) across all action executors.
+- Add deterministic dry-run mode with explicit mutation deltas before execution.
+- Connect rollback window policy to concrete snapshot/revert behavior for RSIC-initiated changes.
+
+**Supporting artifacts (docs + JSON):**
+
+- `docs/development/RSIC_GAP_ANALYSIS.md`
+- `docs/specs/phase87-rsic-orchestration-activation.md`
+- `docs/api/api-spec/uats/specs/self_improve_cycle.uats.json`
+- `docs/api/api-spec/uats/drafts/self_improve_cycle_idempotency.phase87.uats.json`
+
+#### Phase 89: RSIC Persistence and Multi-Space Correctness
+
+- Persist calibrator and signal learner state to durable storage.
+- Remove hard-coded session assumptions and pass session/space identity end-to-end.
+- Harden Neo4j datetime handling in watchdog adapter signal collection.
+
+**Supporting artifacts (docs + JSON):**
+
+- `docs/development/RSIC_GAP_ANALYSIS.md`
+- `docs/specs/phase87-rsic-orchestration-activation.md`
+- `docs/api/api-spec/uats/specs/self_improve_history.uats.json`
+- `docs/api/api-spec/uats/drafts/self_improve_history_trigger_source_filter.phase87.uats.json`
+
+#### Phase 90: RSIC Conformance and CI Gating
+
+- Add RSIC behavior tests for confidence gates, safety bounds, and forced-trigger paths.
+- Add Make/CI RSIC conformance targets and remove permissive CI handling for RSIC-critical specs.
+- Ensure contract + behavior tests both gate merge for RSIC-impacting changes.
+
+**Supporting artifacts (docs + JSON):**
+
+- `.github/workflows/ci.yml`
+- `Makefile`
+- `docs/api/api-spec/uats/specs/self_improve_assess.uats.json`
+- `docs/api/api-spec/uats/specs/self_improve_cycle.uats.json`
+- `docs/api/api-spec/uats/specs/self_improve_health.uats.json`
+- `docs/api/api-spec/uats/specs/self_improve_history.uats.json`
+- `docs/api/api-spec/uats/drafts/self_improve_cycle_trigger_metadata.phase87.uats.json`
+- `docs/api/api-spec/uats/drafts/self_improve_health_orchestration.phase87.uats.json`
+
+#### Phase 91: RSIC Observability and Operations
+
+- Add RSIC metrics for trigger source, action success/failure, guardrail rejections, and calibration drift.
+- Add dashboard + alert coverage for repeated force cycles and persistent failed action types.
+- Publish RSIC runbook for safe-mode operation, incident triage, and controlled recovery.
+
+**Supporting artifacts (docs + JSON):**
+
+- `docs/development/RSIC_GAP_ANALYSIS.md`
+- `docs/api/api-spec/uats/specs/self_improve_health.uats.json`
+- `docs/api/api-spec/uats/specs/self_improve_signals.uats.json`
+- `docs/tests/uobs/specs/prometheus_metrics.uobs.json`
+- `docs/tests/uobs/specs/embedding_health.uobs.json`
+- `docs/api/api-spec/uots/specs/prometheus_neo4j_graph.uots.json`
 
 ### UDTS (Active)
 
@@ -2008,4 +2237,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-16 — 102 UATS specs, 172 variants, 172 passing (100%). Neo4j: 2 spaces, 20,041 nodes (whk-wms + mdemg-dev). Backup permanently enabled. Grafana Neo4j dashboard + 7 alert rules deployed. Phase 9.4 (Plugin Triggers) complete. All phases through 80 complete.*
+*Last updated: 2026-02-16 — 102 UATS specs, 172 variants, 172 passing (100%). Neo4j: 2 spaces, 20,041 nodes (whk-wms + mdemg-dev). Backup permanently enabled. Grafana Neo4j dashboard + 7 alert rules deployed. Phase 49 (LLM Plugin SDK) complete. Cross-space graph orphan cleanup endpoint operational. All phases through 80 complete.*

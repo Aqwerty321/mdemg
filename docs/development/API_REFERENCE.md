@@ -17,6 +17,8 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Linear Integration](#linear-integration)
 - [Webhooks](#webhooks)
 - [Plugins & Modules](#plugins--modules)
+- [Cleanup & Orphan Management](#cleanup--orphan-management)
+- [File Watcher](#file-watcher-phase-94)
 - [System & Monitoring](#system--monitoring)
 - [Backup & Restore](#backup--restore-phase-70)
 - [Neo4j State Monitor](#neo4j-state-monitor-phase-76)
@@ -1726,6 +1728,96 @@ Returns freshness and staleness information for a space's TapRoot node.
 - `is_stale` - Whether the space is considered stale based on `SYNC_STALE_THRESHOLD_HOURS`
 - `stale_hours` - Hours since last ingest
 - `threshold_hours` - Configured staleness threshold in hours
+
+---
+
+## Cleanup & Orphan Management
+
+### POST /v1/memory/cleanup/orphans
+
+Detect and act on L0 nodes that were not included in the most recent re-ingestion (timestamp-based orphan detection).
+
+**Request Body**:
+```json
+{
+  "space_id": "my-project",
+  "action": "list",
+  "limit": 100,
+  "dry_run": false,
+  "older_than_days": 7,
+  "path_prefix": "src/"
+}
+```
+
+**Actions**: `list`, `count`, `archive`, `delete`
+
+### POST /v1/memory/cleanup/graph-orphans
+
+Cross-space zero-edge node scan and fix. Scans all (or specified) spaces for nodes with no edges.
+
+**Request Body**:
+```json
+{
+  "action": "scan",
+  "space_ids": ["optional-filter"],
+  "min_age_days": 0,
+  "layers": [0, 1],
+  "dry_run": true,
+  "limit": 100
+}
+```
+
+**Actions**: `scan` (read-only), `consolidate` (run consolidation), `archive` (set is_archived), `delete` (DETACH DELETE).
+
+**Protected spaces**: `archive` and `delete` are blocked on protected spaces (e.g., `mdemg-dev`) — returns `skipped: true`.
+
+**Response**:
+```json
+{
+  "action": "scan",
+  "dry_run": true,
+  "total_spaces": 2,
+  "total_orphans": 47,
+  "total_affected": 0,
+  "space_results": [
+    {
+      "space_id": "whk-wms",
+      "orphan_count": 42,
+      "affected_count": 0,
+      "layer_breakdown": {"L0": 38, "L1": 3, "L2": 1},
+      "nodes": [{"node_id": "...", "layer": 0, "role_type": "...", "created_at": "..."}]
+    }
+  ]
+}
+```
+
+### POST /v1/memory/cleanup/schedule
+
+Schedule automated orphan cleanup.
+
+### GET /v1/memory/cleanup/schedules
+
+List cleanup schedules.
+
+### GET /v1/memory/cleanup/stats
+
+Cleanup statistics for a space (`?space_id=X`).
+
+---
+
+## File Watcher (Phase 9.4)
+
+### POST /v1/filewatcher/start
+
+Start file watching for a directory.
+
+### GET /v1/filewatcher/status
+
+Get file watcher status.
+
+### POST /v1/filewatcher/stop
+
+Stop file watching.
 
 ---
 

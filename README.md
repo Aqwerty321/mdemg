@@ -145,6 +145,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Webhook integration**: Linear webhook endpoint with HMAC signature verification and debouncing
 - **File watcher**: Standalone `mdemg-watch` binary for automatic re-ingestion on file changes
 - **Orphan detection**: Timestamp-based detection of nodes missing from re-ingestion with archive/delete/list actions
+- **Graph orphan cleanup**: Cross-space zero-edge node scan with consolidate/archive/delete fix actions and protected space enforcement
 - **Edge consistency**: Automatic staleness tracking and edge weight refresh during consolidation
 - **Backup & restore**: Automated full database dumps and partial space exports with retention policies and scheduler
 - **Neo4j state monitoring**: Single endpoint for consolidated database health, per-space statistics (nodes, edges, layers, health score, staleness), and backup overview
@@ -443,34 +444,33 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Phase | Name | Status |
 |-------|------|--------|
+| 9.4 | Plugin-Specific Triggers (File Watcher + Events) | ✅ Complete |
 | 80 | CMS ANN Meta-Cognition & Self-Improvement Enforcement | ✅ Complete |
+| 76 | Neo4j State Monitor & Space Overview | ✅ Complete |
+| 75 | Cross-File Relationship Extraction & Graph Topology Hardening | ✅ Complete |
 | 70 | Neo4j Backup & Restore (Full & Partial) with Scheduler | ✅ Complete |
+| 60b | Recursive Self-Improvement Cycle (RSIC) | ✅ Complete |
 | 60 | CMS Advanced Functionality II (Templates, Snapshots, Relevance, Truncation, Org-Review) | ✅ Complete |
+| 51 | Web Scraper Ingestion Module | ✅ Complete |
 | 49 | LLM Plugin SDK (Scaffolding, Validation, Gap Detection) | ✅ Complete |
 | 48.3-48.4 | Data Transmission & Connection Pooling | ✅ Complete |
+| 48-SR | CMS Skill Registry API | ✅ Complete |
 | 47 | Optimistic Lock Retry + Edge Consistency | ✅ Complete |
-| 37 | Agent Health / Heartbeat / Presence | ✅ Complete |
-| 38 | UNTS Hash Verification (Nash Verification) | ✅ Complete |
-| 35 | CRDT for Learned Edges + Space Lineage | ✅ Complete |
-| 34 | Incremental Sync (Delta Export) | ✅ Complete |
-| 46 | Symbol Indexing | ✅ Complete |
-| 48.5 | Observability Stack (Prometheus/Grafana) | ✅ Complete |
+| 46-PR | Dynamic Pipeline Registry | ✅ Complete |
+| 45.5 | Constraint Detection & Consolidation | ✅ Complete |
 
 ### In Progress / Next Up
 
 | Priority | Phase | Task | Description |
 |----------|-------|------|-------------|
-| 1 | 45.5 | APE Context Cooler | Volatile → long-term memory graduation |
-| 2 | 45.5 | APE Constraint Module | Priority/deadline enforcement |
-| 3 | 51 | Web Scraper Ingestion | Web content ingestion with section chunking |
-| 4 | 50 | Public Readiness | Open source hardening |
+| 1 | 50 | Public Readiness | Security hardening, governance, CI/CD, onboarding |
+| 2 | D | Validation | 2nd codebase benchmark + scale test (10K→100K) |
 
 ### Planned
 
 | Phase | Name | Description |
 |-------|------|-------------|
 | 36 | Observation Forwarding | Team-visible observations via DevSpace |
-| 50 | Public Readiness | Governance, security, CI/CD, onboarding |
 
 See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for detailed phase specifications.
 

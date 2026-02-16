@@ -472,6 +472,7 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/v1/memory/cleanup/orphans` | Detect/archive/delete orphaned nodes |
+| POST | `/v1/memory/cleanup/graph-orphans` | Cross-space zero-edge orphan scan/fix (scan, consolidate, archive, delete) |
 | POST | `/v1/memory/cleanup/schedule` | Schedule automated cleanup |
 | GET | `/v1/memory/cleanup/schedules` | List cleanup schedules |
 | GET | `/v1/memory/cleanup/stats` | Cleanup statistics |

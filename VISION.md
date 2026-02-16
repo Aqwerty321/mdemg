@@ -117,7 +117,7 @@ MDEMG is evolving from a unified memory store into a **Modular Intelligence Engi
 
 ### Benchmarking & Performance Validation
 
-MDEMG's effectiveness is continuously validated through rigorous benchmarking against real-world industrial codebases. The system has demonstrated a **29.3% lift in retrieval quality** and a **7.5x increase in high-confidence reasoning** through its iterative development. For the complete performance trajectory, see the [Up-to-Date Benchmark Summary](docs/tests/UP_TO_DATE_BENCHMARK_SUMMARY.md).
+MDEMG's effectiveness is continuously validated through rigorous benchmarking against real-world industrial codebases. The system has demonstrated a **0.898 mean retrieval score** with **100% high-score rate** and **100% strong evidence rate** on the whk-wms benchmark (507K LOC TypeScript, 120 questions). For the complete performance trajectory, see the [Up-to-Date Benchmark Summary](docs/tests/UP_TO_DATE_BENCHMARK_SUMMARY.md).
 
 ### Public Repository Standards
 
@@ -337,31 +337,31 @@ The system tries **ALL 5 layers** even if intermediate layers produce no cluster
 - [x] Edge weight decay CLI (`cmd/decay`)
 - [x] Integration test suite
 
-### Phase 2: Emergence Mechanics (Current)
+### Phase 2: Emergence Mechanics ✅ COMPLETE
 - [x] Cluster detection for abstraction (`cmd/consolidate`)
 - [x] Layer promotion via CLI
-- [ ] Automatic layer promotion triggers
-- [ ] Dynamic node reorganization
-- [ ] Cross-layer relationship management
+- [x] Automatic layer promotion triggers (Dynamic Pipeline Registry — Phase 46-PR)
+- [x] Dynamic node reorganization (Pipeline split execution: RunPhaseRange)
+- [x] Cross-layer relationship management (Phase 75: Cross-File Relationship Extraction)
 
-### Phase 3: Active Participation (In Progress)
+### Phase 3: Active Participation ✅ COMPLETE
 - [x] Reflection endpoint (`POST /v1/memory/reflect`)
 - [x] Anomaly detection on ingest (duplicates, stale updates)
 - [x] Graph health metrics (`GET /v1/metrics`)
 - [x] Context-triggered suggestions (`POST /v1/memory/suggest`)
-- [ ] Periodic reflection summaries
+- [x] Periodic reflection summaries (RSIC Watchdog — Phase 60b)
 - [x] Agent consulting service API (`POST /v1/memory/consult`)
 
-### Phase 4: IDE Integration
+### Phase 4: IDE Integration (Partial)
+- [x] MCP server for IDE integration (`cmd/mcp-server/`)
 - [ ] VS Code extension
 - [ ] Cursor integration
 - [ ] Real-time memory sidebar
-- [ ] Inline suggestions
 
-### Phase 5: Multi-Agent Coordination
-- [ ] Agent workspace isolation
-- [ ] Shared memory protocols
-- [ ] Conflict resolution between agents
+### Phase 5: Multi-Agent Coordination (Partial)
+- [x] Agent workspace isolation (DevSpace Hub — Phase 32)
+- [x] Shared memory protocols (Space Transfer — Phase 31)
+- [x] Conflict resolution between agents (CRDT merge — Phase 35)
 - [ ] Collective learning aggregation
 
 ---
@@ -406,4 +406,4 @@ How we'll know MDEMG is working:
 
 ---
 
-*This document captures the vision as of January 2026. It should evolve as the system develops and our understanding deepens.*
+*This document captures the vision as of February 2026. It should evolve as the system develops and our understanding deepens.*

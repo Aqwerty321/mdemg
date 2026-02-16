@@ -14,13 +14,13 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-02-07",
-    "description": "Validates POST /v1/backup/restore returns 503 when backup not enabled",
+    "description": "Validates POST /v1/backup/restore returns 400 for nonexistent backup",
     "test_type": "contract",
     "priority": "high"
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "0420e80363a13ca5f61e3164a2c5046a1939a95ba098a1f2e6bd32039cb25191"
+    "sha256": "441d84e233728228826afedce494a02ce2b8a7144b114838b507b8d080e0674f"
   },
   "variables": {},
   "request": {
@@ -34,7 +34,7 @@
     }
   },
   "expected": {
-    "status": 503,
+    "status": 400,
     "body_assertions": [
       {
         "path": "$.error",

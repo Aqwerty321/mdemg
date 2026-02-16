@@ -14,13 +14,13 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-02-07",
-    "description": "Validates POST /v1/backup/trigger returns 503 when backup not enabled",
+    "description": "Validates POST /v1/backup/trigger accepts partial backup request",
     "test_type": "contract",
     "priority": "high"
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "b06a5b2ea3ca34203c7e8d3a497afabcbfe9e5ac1b65b1da0a78b66b3f23036c"
+    "sha256": "9b6d416868f0249f732af22983da702b3204fa5819763794be6af28044e21a51"
   },
   "variables": {},
   "request": {
@@ -38,12 +38,38 @@
     }
   },
   "expected": {
-    "status": 503,
+    "status": 202,
     "body_assertions": [
       {
-        "path": "$.error",
+        "path": "$.backup_id",
         "type": "string"
+      },
+      {
+        "path": "$.status",
+        "operator": "equals",
+        "value": "pending"
       }
     ]
-  }
+  },
+  "variants": [
+    {
+      "name": "missing_type",
+      "description": "Trigger with missing type returns 400",
+      "request": {
+        "body": {
+          "type": "",
+          "space_ids": []
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
 }

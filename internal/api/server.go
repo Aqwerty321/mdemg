@@ -358,13 +358,19 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	// Wire the watchdog's force-trigger to the cycle orchestrator
 	// When force-triggered, also run consolidation deterministically (Phase 45.5)
 	rsicWatchdog = ape.NewWatchdog(cfg, "mdemg-dev", func(ctx context.Context, spaceID string) {
-		_, _ = rsicCycle.RunCycle(ctx, spaceID, ape.TierMeso)
+		if _, err := rsicCycle.RunCycle(ctx, spaceID, ape.TierMeso); err != nil {
+			log.Printf("[WARN] RSIC watchdog meso cycle failed: %v", err)
+		}
 		if cfg.ConsolidateOnWatchdogEnabled && hid != nil {
 			if _, err := hid.RunConsolidation(ctx, spaceID); err != nil {
 				log.Printf("RSIC watchdog: consolidation failed: %v", err)
 			} else {
 				log.Printf("RSIC watchdog: consolidation triggered alongside meso cycle")
 			}
+		}
+		// Cleanup stale frozen-space entries
+		if removed := lea.CleanupStaleFreezes(map[string]bool{spaceID: true}); removed > 0 {
+			log.Printf("RSIC watchdog: cleaned up %d stale frozen-space entries", removed)
 		}
 	})
 	rsicCycle = ape.NewCycleOrchestrator(cfg, rsicAssessor, rsicReflector, rsicPlanner, rsicDispatcher, rsicMonitor, rsicCalibrator, rsicWatchdog)
@@ -1121,7 +1127,10 @@ func (s *Server) handleNodeOperation(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("[ERROR] writeJSON encoding failed: %v", err)
+		metrics.Metrics().CMSWriteJSONFails.Inc()
+	}
 }
 
 // sanitizeError logs the detailed error for debugging but returns a generic

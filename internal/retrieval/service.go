@@ -768,7 +768,11 @@ ORDER BY score DESC`
 	if err != nil {
 		return nil, err
 	}
-	return outAny.([]Candidate), nil
+	typed, ok := outAny.([]Candidate)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", outAny)
+	}
+	return typed, nil
 }
 
 // FindSimilarNodes queries the vector index for nodes similar to the provided embedding,
@@ -829,7 +833,11 @@ LIMIT $k`
 	if err != nil {
 		return nil, err
 	}
-	return outAny.([]SimilarNode), nil
+	typed, ok := outAny.([]SimilarNode)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", outAny)
+	}
+	return typed, nil
 }
 
 // CreateAssociatedWithEdge creates or updates an ASSOCIATED_WITH edge between two nodes.
@@ -884,6 +892,12 @@ type Edge struct {
 	DimTemporal float64
 	DimCoactivation float64
 	UpdatedAt time.Time
+}
+
+// edgeTraversalPack bundles edges and next-hop node IDs from graph traversal.
+type edgeTraversalPack struct {
+	Edges []Edge
+	Next  []string
 }
 
 // fetchOutgoingEdgesWithTypes is a variant that uses specific edge types instead of AllowedRelationshipTypes.
@@ -980,18 +994,15 @@ LIMIT $maxTotal`
 		if err := res.Err(); err != nil {
 			return nil, err
 		}
-		return struct {
-			Edges []Edge
-			Next  []string
-		}{Edges: edges, Next: next}, nil
+		return edgeTraversalPack{Edges: edges, Next: next}, nil
 	})
 	if err != nil {
 		return nil, nil, err
 	}
-	pack := outAny.(struct {
-		Edges []Edge
-		Next  []string
-	})
+	pack, ok := outAny.(edgeTraversalPack)
+	if !ok {
+		return nil, nil, fmt.Errorf("unexpected result type: %T", outAny)
+	}
 	return pack.Edges, pack.Next, nil
 }
 
@@ -1123,18 +1134,15 @@ LIMIT $maxTotal`
 		if err := res.Err(); err != nil {
 			return nil, err
 		}
-		return struct {
-			Edges []Edge
-			Next []string
-		}{Edges: edges, Next: next}, nil
+		return edgeTraversalPack{Edges: edges, Next: next}, nil
 	})
 	if err != nil {
 		return nil, nil, err
 	}
-	pack := outAny.(struct {
-		Edges []Edge
-		Next []string
-	})
+	pack, ok := outAny.(edgeTraversalPack)
+	if !ok {
+		return nil, nil, fmt.Errorf("unexpected result type: %T", outAny)
+	}
 	return pack.Edges, pack.Next, nil
 }
 
@@ -1721,7 +1729,11 @@ LIMIT $k`
 	if err != nil {
 		return nil, err
 	}
-	return result.([]ConversationContextResult), nil
+	typed, ok := result.([]ConversationContextResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // applyConversationBoost boosts retrieval results that are connected to conversation knowledge
@@ -1838,7 +1850,11 @@ LIMIT 100`
 	if err != nil {
 		return nil, err
 	}
-	return result.(map[string]float64), nil
+	typed, ok := result.(map[string]float64)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // sortResultsByScore sorts retrieval results by score in descending order

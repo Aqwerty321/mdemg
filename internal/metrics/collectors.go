@@ -43,6 +43,21 @@ type StandardMetrics struct {
 	// Memory pressure metrics (Phase 48.4.4)
 	MemoryPressureRejected *Gauge // Requests rejected due to memory pressure (cumulative)
 	MemoryHeapBytes        *Gauge // Current heap allocation in bytes
+
+	// CMS observation lifecycle metrics (CMS Hardening)
+	CMSObserveTotal      func(outcome string) *Counter // "success", "degraded", "deduplicated"
+	CMSEmbeddingFailures *Counter
+	CMSDedupSkips        *Counter
+	CMSDedupMergeFails   *Counter
+
+	// CMS retrieval metrics
+	CMSRecallTotal  *Counter
+	CMSResumeTotal  *Counter
+
+	// CMS error metrics
+	CMSWriteJSONFails       *Counter
+	CMSLearningEdgeFails    *Counter
+	CMSStabilityUpdateFails *Counter
 }
 
 // NewStandardMetrics creates and registers all standard MDEMG metrics.
@@ -100,6 +115,24 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	// Memory pressure metrics (Phase 48.4.4)
 	m.MemoryPressureRejected = r.NewGauge("memory_pressure_rejected_total", "Requests rejected due to memory pressure", nil)
 	m.MemoryHeapBytes = r.NewGauge("memory_heap_bytes", "Current heap allocation in bytes", nil)
+
+	// CMS observation lifecycle metrics (CMS Hardening)
+	m.CMSObserveTotal = func(outcome string) *Counter {
+		labels := map[string]string{"outcome": outcome}
+		return r.NewCounter("cms_observe_total", "Total CMS observe operations", labels)
+	}
+	m.CMSEmbeddingFailures = r.NewCounter("cms_embedding_failures_total", "CMS observations created with failed embeddings", nil)
+	m.CMSDedupSkips = r.NewCounter("cms_dedup_skips_total", "CMS dedup checks skipped (no embedding)", nil)
+	m.CMSDedupMergeFails = r.NewCounter("cms_dedup_merge_failures_total", "CMS dedup merge operation failures", nil)
+
+	// CMS retrieval metrics
+	m.CMSRecallTotal = r.NewCounter("cms_recall_total", "Total CMS recall operations", nil)
+	m.CMSResumeTotal = r.NewCounter("cms_resume_total", "Total CMS resume operations", nil)
+
+	// CMS error metrics
+	m.CMSWriteJSONFails = r.NewCounter("cms_writejson_failures_total", "JSON encoding failures in writeJSON", nil)
+	m.CMSLearningEdgeFails = r.NewCounter("cms_learning_edge_failures_total", "Learning edge creation failures", nil)
+	m.CMSStabilityUpdateFails = r.NewCounter("cms_stability_update_failures_total", "Stability reinforcement update failures", nil)
 
 	return m
 }

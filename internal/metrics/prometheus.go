@@ -132,6 +132,18 @@ func (r *Registry) NewGauge(name, help string, labels map[string]string) *Gauge 
 	return g
 }
 
+// RemoveGaugesByPrefix removes all gauges whose key starts with the given prefix.
+// Used to purge stale per-label gauges (e.g., deleted spaces).
+func (r *Registry) RemoveGaugesByPrefix(prefix string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for key := range r.gauges {
+		if strings.HasPrefix(key, prefix) {
+			delete(r.gauges, key)
+		}
+	}
+}
+
 // Set sets the gauge to the given value.
 func (g *Gauge) Set(v float64) {
 	atomic.StoreInt64(&g.value, int64(v*1000)) // Store as milli-units

@@ -88,6 +88,12 @@ type Server struct {
 	macroNextRun        time.Time
 	macroCronCancel     context.CancelFunc
 
+	// Phase 88: RSIC Safety
+	snapshotStore *ape.SnapshotStore
+
+	// Phase 89: RSIC Persistence
+	rsicStore *ape.RSICStore
+
 	// Phase 51: Web Scraper
 	scraperSvc *scraper.Service
 
@@ -375,11 +381,11 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	rsicCalibrator := ape.NewCalibrator(convAdapter)
 
 	// Watchdog and cycle orchestrator (watchdog trigger wired after cycle creation)
-	rsicWatchdog = ape.NewWatchdog(cfg, "mdemg-dev", nil)
+	rsicWatchdog = ape.NewWatchdog(cfg, cfg.RSICWatchdogSpaceID, nil)
 	rsicCycle = ape.NewCycleOrchestrator(cfg, rsicAssessor, rsicReflector, rsicPlanner, rsicDispatcher, rsicMonitor, rsicCalibrator, rsicWatchdog)
 	// Wire the watchdog's force-trigger to the cycle orchestrator
 	// When force-triggered, also run consolidation deterministically (Phase 45.5)
-	rsicWatchdog = ape.NewWatchdog(cfg, "mdemg-dev", func(ctx context.Context, spaceID string, meta ape.TriggerMetadata) {
+	rsicWatchdog = ape.NewWatchdog(cfg, cfg.RSICWatchdogSpaceID, func(ctx context.Context, spaceID string, meta ape.TriggerMetadata) {
 		opts := &ape.RunCycleOpts{TriggerMeta: &meta}
 		if _, err := rsicCycle.RunCycle(ctx, spaceID, ape.TierMeso, opts); err != nil {
 			log.Printf("[WARN] RSIC watchdog meso cycle failed: %v", err)
@@ -409,6 +415,44 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	orchPolicy := ape.NewOrchestrationPolicy(cfg)
 	rsicCycle.SetOrchestrationPolicy(orchPolicy)
 	log.Printf("RSIC orchestration policy initialized (cooldown=%ds, dedupe=%ds)", cfg.RSICTriggerCooldownSec, cfg.RSICTriggerDedupeSec)
+
+	// Phase 88: Create safety validator and snapshot store, wire to dispatcher
+	safetyValidator := ape.NewSafetyValidator(driver)
+	snapshotStore := ape.NewSnapshotStore(driver, cfg.RSICRollbackWindow)
+	rsicDispatcher.SetSafetyValidator(safetyValidator)
+	rsicDispatcher.SetSnapshotStore(snapshotStore)
+	log.Printf("RSIC safety enforcement initialized (rollback_window=%ds)", cfg.RSICRollbackWindow)
+
+	// Phase 89: Initialize RSIC persistence store
+	var rsicStore *ape.RSICStore
+	if cfg.RSICPersistenceEnabled {
+		rsicStore = ape.NewRSICStore(driver)
+		rsicStore.Start(context.Background())
+
+		// Wire store to components
+		rsicCalibrator.SetStore(rsicStore)
+		rsicWatchdog.SetStore(rsicStore)
+		orchPolicy.SetStore(rsicStore)
+
+		// Hydrate from persisted state
+		if err := rsicCalibrator.Hydrate(cfg.RSICWatchdogSpaceID); err != nil {
+			log.Printf("[WARN] RSIC calibration hydration failed: %v", err)
+		}
+		if ws, err := rsicStore.LoadWatchdogState(cfg.RSICWatchdogSpaceID); err == nil && ws != nil {
+			rsicWatchdog.Hydrate(ws)
+		} else if err != nil {
+			log.Printf("[WARN] RSIC watchdog hydration failed: %v", err)
+		}
+		if triggers, counters, err := rsicStore.LoadOrchestrationState(); err == nil {
+			orchPolicy.Hydrate(triggers, counters)
+		} else {
+			log.Printf("[WARN] RSIC orchestration hydration failed: %v", err)
+		}
+
+		log.Printf("RSIC persistence initialized (flush every 30s)")
+	} else {
+		log.Printf("RSIC persistence disabled")
+	}
 
 	// Phase 80: Initialize signal learner
 	signalLearner := ape.NewSignalLearner(cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
@@ -446,6 +490,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		rsicCycle:               rsicCycle,
 		rsicWatchdog:            rsicWatchdog,
 		orchestrationPolicy:    orchPolicy,
+		snapshotStore:          snapshotStore,
+		rsicStore:              rsicStore,
 		scraperSvc:              scraperSvc,
 		backupSvc:               backupSvc,
 		backupScheduler:         backupSched,
@@ -470,6 +516,9 @@ func (s *Server) Shutdown() {
 	s.StopWeeklyGapInterviews()
 	s.StopScheduledSync()
 	s.StopRSICWatchdog()
+	if s.rsicStore != nil {
+		s.rsicStore.Stop()
+	}
 	if s.macroCronCancel != nil {
 		s.macroCronCancel()
 	}
@@ -1096,6 +1145,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/self-improve/calibration", s.handleSelfImproveCalibration)
 	mux.HandleFunc("/v1/self-improve/health", s.handleSelfImproveHealth)
 	mux.HandleFunc("/v1/self-improve/signals", s.handleSelfImproveSignals)
+	mux.HandleFunc("/v1/self-improve/rollback", s.handleSelfImproveRollback)
 
 	// Skill Registry (Phase 48)
 	mux.HandleFunc("/v1/skills", s.handleSkills)

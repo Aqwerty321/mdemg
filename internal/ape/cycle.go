@@ -15,6 +15,7 @@ import (
 type RunCycleOpts struct {
 	TriggerMeta    *TriggerMetadata
 	IdempotencyKey string
+	DryRun         bool
 }
 
 // HistoryFilter constrains which cycle outcomes are returned.
@@ -79,6 +80,9 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		}
 	}
 
+	// Phase 88: Determine dry-run mode early (needed for all return paths)
+	isDryRun := opts != nil && opts.DryRun
+
 	log.Printf("RSIC cycle %s started (tier=%s, space=%s, source=%s)", cycleID, tier, spaceID, meta.TriggerSource)
 
 	// Stage 1: Assess
@@ -101,6 +105,8 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			TriggerID:     meta.TriggerID,
 			TriggeredAt:   meta.TriggeredAt,
 			PolicyVersion: meta.PolicyVersion,
+			DryRun:        isDryRun,
+			SafetyVersion: SafetyVersion,
 		}, nil
 	}
 
@@ -125,6 +131,8 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			TriggerID:     meta.TriggerID,
 			TriggeredAt:   meta.TriggeredAt,
 			PolicyVersion: meta.PolicyVersion,
+			DryRun:        isDryRun,
+			SafetyVersion: SafetyVersion,
 		}
 		log.Printf("RSIC %s: no insights — system is healthy", cycleID)
 		if c.watchdog != nil {
@@ -155,6 +163,10 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		tasks[i].TaskID = fmt.Sprintf("%s-task-%d", cycleID, i)
 	}
 
+	// Phase 88: Configure dispatcher safety mode
+	c.dispatcher.SetDryRun(isDryRun)
+	c.dispatcher.ResetSafetySummary()
+
 	// Stage 4: Execute (dispatch + wait)
 	if err := c.dispatcher.Dispatch(ctx, tasks); err != nil {
 		return nil, fmt.Errorf("dispatch failed: %w", err)
@@ -167,6 +179,32 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		log.Printf("RSIC %s: timed out after %s", cycleID, timeout)
 	}
 
+	// Reset dry-run after dispatch completes
+	c.dispatcher.SetDryRun(false)
+
+	// Phase 88: Dry-run early return with deltas
+	if isDryRun {
+		outcome := &CycleOutcome{
+			CycleID:       cycleID,
+			Tier:          tier,
+			SpaceID:       spaceID,
+			StartedAt:     startedAt,
+			CompletedAt:   time.Now(),
+			Insights:      insights,
+			DryRun:        true,
+			SafetyVersion: SafetyVersion,
+			SafetySummary: c.dispatcher.GetSafetySummary(),
+			Deltas:        c.dispatcher.GetDeltas(),
+			TriggerSource: meta.TriggerSource,
+			TriggerID:     meta.TriggerID,
+			TriggeredAt:   meta.TriggeredAt,
+			PolicyVersion: meta.PolicyVersion,
+			MetricsBefore: baseline,
+		}
+		log.Printf("RSIC %s: dry-run complete (%d deltas)", cycleID, len(outcome.Deltas))
+		return outcome, nil
+	}
+
 	// Stage 5: Validate + Calibrate
 	reports := c.monitor.CollectReportsForCycle(cycleID)
 	outcome := c.calibrator.Validate(ctx, cycleID, tier, spaceID, tasks, reports, baseline)
@@ -177,7 +215,14 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	outcome.TriggeredAt = meta.TriggeredAt
 	outcome.PolicyVersion = meta.PolicyVersion
 
+	// Phase 88: Attach safety metadata
+	outcome.SafetyVersion = SafetyVersion
+	outcome.SafetySummary = c.dispatcher.GetSafetySummary()
+
 	c.calibrator.UpdateCalibration(outcome, tasks, reports)
+
+	// Phase 89: Clean up stale dispatcher tasks
+	c.dispatcher.CleanupStaleTasks(10 * time.Minute)
 
 	log.Printf("RSIC %s: cycle complete (executed=%d, success=%d, failed=%d)",
 		cycleID, outcome.ActionsExecuted, outcome.SuccessCount, outcome.FailedCount)

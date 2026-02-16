@@ -8,6 +8,8 @@ import (
 
 // StandardMetrics holds pre-registered standard metrics.
 type StandardMetrics struct {
+	registry *Registry
+
 	// HTTP metrics
 	HTTPRequestsTotal   func(method, path, status string) *Counter
 	HTTPRequestDuration func(method, path string) *Histogram
@@ -81,7 +83,7 @@ type StandardMetrics struct {
 
 // NewStandardMetrics creates and registers all standard MDEMG metrics.
 func NewStandardMetrics(r *Registry) *StandardMetrics {
-	m := &StandardMetrics{}
+	m := &StandardMetrics{registry: r}
 
 	// HTTP metrics - use factory functions for labeled metrics
 	httpReqCounters := make(map[string]*Counter)
@@ -261,7 +263,19 @@ type SpaceGraphData struct {
 }
 
 // CollectNeo4jGraphMetrics updates Neo4j graph per-space metrics.
+// Purges stale space gauges before setting current values so deleted spaces
+// don't persist in Prometheus/Grafana.
 func (m *StandardMetrics) CollectNeo4jGraphMetrics(spaces []SpaceGraphData) {
+	// Remove all per-space graph gauges — they'll be recreated for current spaces
+	if m.registry != nil {
+		m.registry.RemoveGaugesByPrefix("neo4j_graph_nodes|")
+		m.registry.RemoveGaugesByPrefix("neo4j_graph_edges|")
+		m.registry.RemoveGaugesByPrefix("neo4j_graph_observations|")
+		m.registry.RemoveGaugesByPrefix("neo4j_graph_orphans|")
+		m.registry.RemoveGaugesByPrefix("neo4j_graph_health_score|")
+		m.registry.RemoveGaugesByPrefix("neo4j_graph_learning_edges|")
+	}
+
 	totalNodes, totalEdges := 0, 0
 	for _, s := range spaces {
 		m.Neo4jGraphNodes(s.SpaceID).Set(float64(s.Nodes))

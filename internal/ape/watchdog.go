@@ -15,6 +15,7 @@ type Watchdog struct {
 	cfg            config.Config
 	spaceID        string
 	signalProvider WatchdogSignalProvider
+	store          *RSICStore
 
 	mu            sync.RWMutex
 	state         WatchdogState
@@ -85,6 +86,11 @@ func (w *Watchdog) RecordCycle() {
 	w.state.LastCycleTime = time.Now()
 	w.state.DecayScore = 0
 	w.state.EscalationLevel = EscalationNominal
+
+	// Phase 89: Persist watchdog state
+	if w.store != nil {
+		w.store.SaveWatchdogState(w.spaceID, w.state)
+	}
 }
 
 // GetState returns the current watchdog state.
@@ -92,6 +98,25 @@ func (w *Watchdog) GetState() WatchdogState {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	return w.state
+}
+
+// SetStore attaches a persistence store to the watchdog.
+func (w *Watchdog) SetStore(s *RSICStore) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.store = s
+}
+
+// Hydrate overwrites the in-memory watchdog state with persisted values.
+func (w *Watchdog) Hydrate(state *WatchdogState) {
+	if state == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.state = *state
+	// Preserve the spaceID from constructor
+	w.state.SpaceID = w.spaceID
 }
 
 // SetSignalProvider attaches a WatchdogSignalProvider for multi-dimensional monitoring.
@@ -155,7 +180,7 @@ func (w *Watchdog) check() {
 
 	// Phase 80: Multi-dimensional signal collection
 	if w.signalProvider != nil {
-		w.state.SessionHealthScore = w.signalProvider.GetSessionHealthScore("claude-core")
+		w.state.SessionHealthScore = w.signalProvider.GetSessionHealthScore("")
 		w.state.ObsRatePerHour = w.signalProvider.GetObservationRate(w.spaceID)
 
 		consolidationAge, err := w.signalProvider.GetConsolidationAgeSec(w.ctx, w.spaceID)
@@ -183,5 +208,10 @@ func (w *Watchdog) check() {
 				w.state.EscalationLevel = EscalationWarn
 			}
 		}
+	}
+
+	// Phase 89: Persist watchdog state after check
+	if w.store != nil {
+		w.store.SaveWatchdogState(w.spaceID, w.state)
 	}
 }

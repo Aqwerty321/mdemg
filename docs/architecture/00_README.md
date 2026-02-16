@@ -1,21 +1,8 @@
 # Multi-Dimensional Emergent Memory Graph (MDEMG) — Documentation Index
 
-> ⚠️ **LEGACY DOCUMENTATION**
+> **Start Here:** For the architectural vision and design philosophy, see [VISION.md](../../VISION.md)
 >
-> This directory contains the **original FSD (Functional Specification Documents)** and may be outdated.
->
-> **For current documentation, see:** [`mdemg_build/docs/`](../mdemg_build/docs/00_README.md)
->
-> The `mdemg_build/docs/` directory contains:
-> - Updated technical docs (01-14)
-> - New features: batch ingest, reflection endpoint, anomaly detection, embedding cache
-> - Current configuration and environment variables
-
----
-
-> **Start Here:** For the architectural vision and design philosophy, see [VISION.md](../VISION.md)
->
-> **For Development:** See [HANDOFF.md](../HANDOFF.md) for current state and next tasks
+> **For Development:** See [AGENT_HANDOFF.md](../../AGENT_HANDOFF.md) for current state and next tasks
 
 ## What is MDEMG?
 
@@ -36,7 +23,7 @@ MDEMG is a **cognitive substrate** for AI coding agents where higher-level conce
 | Document | Purpose |
 |----------|---------|
 | [VISION.md](../../VISION.md) | Architectural philosophy, design principles, success metrics |
-| [HANDOFF.md](../../HANDOFF.md) | Development state, quick start, next tasks |
+| [AGENT_HANDOFF.md](../../AGENT_HANDOFF.md) | Development state, phase registry, next tasks |
 | [CLAUDE.md](../../CLAUDE.md) | AI assistant context for Claude Code |
 
 ### Technical Documentation (This Directory)
@@ -63,8 +50,8 @@ MDEMG is a **cognitive substrate** for AI coding agents where higher-level conce
 1. **Schema + constraints** — labels, relationship types, property conventions ✅
 2. **Ingestion** — append-only observations + embedding creation + basic edges ✅
 3. **Retrieval** — vector candidate recall + expansion + scoring ✅
-4. **Learning loop** — co-activation edge strengthening + decay job 🔄
-5. **Consolidation** — create abstraction nodes from stable clusters ⏳
+4. **Learning loop** — co-activation edge strengthening + decay job ✅
+5. **Consolidation** — create abstraction nodes from stable clusters ✅
 
 ## Design Principles
 

@@ -1,0 +1,94 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Phase 87 - Self-Improve Cycle Idempotency",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "phase87",
+      "idempotency",
+      "orchestration"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-22",
+    "description": "Validates idempotency key dedupe behavior for POST /v1/self-improve/cycle (Phase 87 design draft).",
+    "test_type": "contract-draft",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 30000,
+    "sha256": "702c223f6e96adb749b88bca74be4d7c93fda5a46a958752e602700bfc457e02"
+  },
+  "variables": {
+    "test_space": "uats-rsic-phase87",
+    "idempotency_key_fixed": "phase87-idem-fixed-key"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/self-improve/cycle",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{test_space}}",
+      "tier": "meso",
+      "trigger_source": "manual_api",
+      "idempotency_key": "{{idempotency_key_fixed}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.cycle_id",
+        "type": "string"
+      },
+      {
+        "path": "$.trigger_source",
+        "equals": "manual_api"
+      },
+      {
+        "path": "$.idempotency_key",
+        "equals": "{{idempotency_key_fixed}}"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "repeat_same_idempotency_key_returns_deduped_result",
+      "request": {
+        "body": {
+          "space_id": "{{test_space}}",
+          "tier": "meso",
+          "trigger_source": "manual_api",
+          "idempotency_key": "{{idempotency_key_fixed}}"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.cycle_id",
+            "type": "string"
+          },
+          {
+            "path": "$.idempotency_key",
+            "equals": "{{idempotency_key_fixed}}"
+          },
+          {
+            "path": "$.dedupe.is_duplicate",
+            "equals": true
+          },
+          {
+            "path": "$.dedupe.window_sec",
+            "type": "integer"
+          }
+        ]
+      }
+    }
+  ]
+}

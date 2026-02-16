@@ -82,6 +82,8 @@ help:
 # Run all UATS API validation tests
 test-api:
 	@echo "Running UATS API validation (101 specs)..."
+	@mkdir -p /tmp/uats-test-codebase
+	@echo 'package main' > /tmp/uats-test-codebase/main.go
 	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
 		--spec-dir docs/api/api-spec/uats/specs/ \
 		--base-url $(BASE_URL) \
@@ -92,6 +94,8 @@ test-api:
 # Usage: make test-api-health, test-api-retrieve, test-api-ingest
 test-api-%:
 	@echo "Validating $* API..."
+	@mkdir -p /tmp/uats-test-codebase
+	@echo 'package main' > /tmp/uats-test-codebase/main.go
 	python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
 		--spec docs/api/api-spec/uats/specs/$*.uats.json \
 		--base-url $(BASE_URL)

@@ -1,0 +1,225 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Graph Orphan Cleanup",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "cleanup",
+      "graph-orphans"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-16",
+    "description": "Validates cross-space graph orphan scan-and-fix endpoint",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 30000,
+    "sha256": "57f52ca7b9ce2d88b5a5ea96c8a74e55a8e6041b75b94f15bea14a1851b30282"
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/cleanup/graph-orphans",
+    "body": {
+      "action": "scan"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.action",
+        "operator": "eq",
+        "value": "scan"
+      },
+      {
+        "path": "$.total_spaces",
+        "type": "integer"
+      },
+      {
+        "path": "$.total_orphans",
+        "type": "integer"
+      },
+      {
+        "path": "$.space_results",
+        "type": "array"
+      },
+      {
+        "path": "$.dry_run",
+        "type": "boolean"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "scan_single_space",
+      "description": "Scan a single specified space for graph orphans",
+      "request": {
+        "body": {
+          "action": "scan",
+          "space_ids": [
+            "mdemg-dev"
+          ]
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.action",
+            "operator": "eq",
+            "value": "scan"
+          },
+          {
+            "path": "$.total_spaces",
+            "operator": "eq",
+            "value": 1
+          },
+          {
+            "path": "$.space_results",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "scan_with_filters",
+      "description": "Scan with age and layer filters",
+      "request": {
+        "body": {
+          "action": "scan",
+          "min_age_days": 7,
+          "layers": [
+            0
+          ]
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.action",
+            "operator": "eq",
+            "value": "scan"
+          },
+          {
+            "path": "$.total_spaces",
+            "type": "integer"
+          },
+          {
+            "path": "$.space_results",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "consolidate_dry_run",
+      "description": "Consolidate action with dry_run should return without modifying",
+      "request": {
+        "body": {
+          "action": "consolidate",
+          "dry_run": true
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.action",
+            "operator": "eq",
+            "value": "consolidate"
+          },
+          {
+            "path": "$.dry_run",
+            "operator": "eq",
+            "value": true
+          },
+          {
+            "path": "$.total_affected",
+            "operator": "eq",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "delete_protected_space",
+      "description": "Delete action on protected space should skip with reason",
+      "request": {
+        "body": {
+          "action": "delete",
+          "space_ids": [
+            "mdemg-dev"
+          ],
+          "dry_run": false
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.action",
+            "operator": "eq",
+            "value": "delete"
+          },
+          {
+            "path": "$.space_results[0].skipped",
+            "operator": "eq",
+            "value": true
+          },
+          {
+            "path": "$.space_results[0].skip_reason",
+            "operator": "eq",
+            "value": "protected space"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_action",
+      "description": "Missing action field should return 400",
+      "request": {
+        "body": {
+          "action": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_action",
+      "description": "Invalid action value should return 400",
+      "request": {
+        "body": {
+          "action": "purge"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

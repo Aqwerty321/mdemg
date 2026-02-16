@@ -369,6 +369,12 @@ type Config struct {
 	MetaCogEmptyResumeCheck bool    // METACOG_EMPTY_RESUME_CHECK — check for empty resume anomaly (default: true)
 	MetaCogSignalDecayRate  float64 // METACOG_SIGNAL_DECAY_RATE — Hebbian decay per ignored signal emission (default: 0.05)
 	MetaCogSignalBoostRate  float64 // METACOG_SIGNAL_BOOST_RATE — Hebbian boost per signal response (default: 0.1)
+
+	// ===== CMS Hardening: Configurable Defaults =====
+	CMSResumeMaxObs        int     // CMS_RESUME_MAX_OBS — default max observations on resume (default: 20)
+	CMSRecallTopK          int     // CMS_RECALL_TOP_K — default top-K for recall queries (default: 10)
+	CMSSummaryMaxChars     int     // CMS_SUMMARY_MAX_CHARS — max character length for generated summaries (default: 200)
+	CMSJiminyBaseConfidence float64 // CMS_JIMINY_BASE_CONFIDENCE — base confidence for Jiminy rationale (default: 0.5)
 }
 
 func FromEnv() (Config, error) {
@@ -1378,6 +1384,24 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// CMS Hardening: configurable defaults
+	cmsResumeMaxObs, err := atoi("CMS_RESUME_MAX_OBS", 20)
+	if err != nil {
+		return Config{}, err
+	}
+	cmsRecallTopK, err := atoi("CMS_RECALL_TOP_K", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	cmsSummaryMaxChars, err := atoi("CMS_SUMMARY_MAX_CHARS", 200)
+	if err != nil {
+		return Config{}, err
+	}
+	cmsJiminyBaseConfidence, err := atof("CMS_JIMINY_BASE_CONFIDENCE", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// Deterministic consolidation trigger
 	consolidateOnWatchdog := getBool("CONSOLIDATE_ON_WATCHDOG_ENABLED", true)
 
@@ -1898,6 +1922,12 @@ func FromEnv() (Config, error) {
 		MetaCogEmptyResumeCheck: metaCogEmptyResumeCheck,
 		MetaCogSignalDecayRate:  metaCogSignalDecayRate,
 		MetaCogSignalBoostRate:  metaCogSignalBoostRate,
+
+		// CMS Hardening
+		CMSResumeMaxObs:         cmsResumeMaxObs,
+		CMSRecallTopK:           cmsRecallTopK,
+		CMSSummaryMaxChars:      cmsSummaryMaxChars,
+		CMSJiminyBaseConfidence: cmsJiminyBaseConfidence,
 	}, nil
 }
 

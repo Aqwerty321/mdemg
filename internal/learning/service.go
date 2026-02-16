@@ -2,13 +2,17 @@ package learning
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"log"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
+	"mdemg/internal/metrics"
 	"mdemg/internal/models"
 )
 
@@ -122,6 +126,22 @@ func (s *Service) GetAllFreezeStates() map[string]FreezeState {
 	return result
 }
 
+// CleanupStaleFreezes removes frozen state entries for spaces that no longer exist.
+// Returns the number of stale entries removed.
+func (s *Service) CleanupStaleFreezes(validSpaces map[string]bool) int {
+	s.freezeMu.Lock()
+	defer s.freezeMu.Unlock()
+
+	removed := 0
+	for spaceID := range s.frozenSpaces {
+		if !validSpaces[spaceID] {
+			delete(s.frozenSpaces, spaceID)
+			removed++
+		}
+	}
+	return removed
+}
+
 // getEdgeCountUnlocked queries the edge count (caller must hold lock)
 func (s *Service) getEdgeCountUnlocked(ctx context.Context, spaceID string) (int64, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
@@ -146,7 +166,11 @@ RETURN count(r) AS edge_count`
 	if err != nil {
 		return 0, err
 	}
-	return result.(int64), nil
+	typed, ok := result.(int64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 type pair struct {
@@ -472,7 +496,9 @@ func (s *Service) reinforceConversationObservations(ctx context.Context, spaceID
 		for res.Next(ctx) {
 			rec := res.Record()
 			if id, ok := rec.Get("nodeId"); ok && id != nil {
-				obsNodeIDs = append(obsNodeIDs, id.(string))
+				if idStr, ok := id.(string); ok {
+				obsNodeIDs = append(obsNodeIDs, idStr)
+			}
 			}
 		}
 		return obsNodeIDs, res.Err()
@@ -482,10 +508,16 @@ func (s *Service) reinforceConversationObservations(ctx context.Context, spaceID
 		return // Silently fail - stability reinforcement is best-effort
 	}
 
-	obsNodeIDs := result.([]string)
+	obsNodeIDs, ok := result.([]string)
+	if !ok {
+		return // Unexpected result type - best-effort path
+	}
 	for _, nodeID := range obsNodeIDs {
 		// Best-effort reinforcement - don't fail the main operation
-		_ = s.stabilityReinforcer.UpdateStabilityOnReinforcement(ctx, spaceID, nodeID)
+		if err := s.stabilityReinforcer.UpdateStabilityOnReinforcement(ctx, spaceID, nodeID); err != nil {
+			log.Printf("[WARN] stability reinforcement failed for %s: %v", nodeID, err)
+			metrics.Metrics().CMSStabilityUpdateFails.Inc()
+		}
 	}
 }
 
@@ -769,7 +801,11 @@ RETURN count(*) AS deleted`
 	if err != nil {
 		return 0, err
 	}
-	return result.(int64), nil
+	typed, ok := result.(int64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // PruneExcessEdgesPerNode removes excess CO_ACTIVATED_WITH edges per node beyond the cap.
@@ -823,7 +859,11 @@ RETURN count(*) AS deleted`
 	if err != nil {
 		return 0, err
 	}
-	return result.(int64), nil
+	typed, ok := result.(int64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // GetLearningEdgeStats returns statistics about CO_ACTIVATED_WITH edges for a space.
@@ -897,5 +937,9 @@ RETURN count(r) AS total_edges,
 	if result == nil {
 		return map[string]any{}, nil
 	}
-	return result.(map[string]any), nil
+	typed, ok := result.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }

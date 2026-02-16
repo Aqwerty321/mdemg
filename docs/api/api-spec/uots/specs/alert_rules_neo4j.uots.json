@@ -1,0 +1,67 @@
+{
+  "uots_version": "1.0.0",
+  "observability": {
+    "name": "Neo4j Graph Alert Rules",
+    "type": "alert_rules",
+    "tags": ["prometheus", "alerts", "neo4j"]
+  },
+  "target": {
+    "file": "deploy/docker/prometheus/alerts/neo4j_graph.yaml"
+  },
+  "expected": {
+    "alerts": [
+      {
+        "name": "MDEMGLowGraphHealth",
+        "severity": "warning",
+        "expr_contains": "mdemg_neo4j_graph_health_score",
+        "for_duration": "10m"
+      },
+      {
+        "name": "MDEMGHighOrphanCount",
+        "severity": "warning",
+        "expr_contains": "mdemg_neo4j_graph_orphans",
+        "for_duration": "15m"
+      },
+      {
+        "name": "MDEMGHighOrphanRatio",
+        "severity": "warning",
+        "expr_contains": "mdemg_neo4j_graph_orphans",
+        "for_duration": "15m"
+      },
+      {
+        "name": "MDEMGNeo4jHighMemory",
+        "severity": "warning",
+        "expr_contains": "mdemg_neo4j_container_mem_percent",
+        "for_duration": "5m"
+      },
+      {
+        "name": "MDEMGNeo4jHighCPU",
+        "severity": "warning",
+        "expr_contains": "mdemg_neo4j_container_cpu_percent",
+        "for_duration": "5m"
+      },
+      {
+        "name": "MDEMGNeo4jPoolExhausted",
+        "severity": "critical",
+        "expr_contains": "mdemg_neo4j_pool_waiting_requests",
+        "for_duration": "2m"
+      },
+      {
+        "name": "MDEMGGraphNodeDrop",
+        "severity": "critical",
+        "expr_contains": "mdemg_neo4j_graph_nodes",
+        "for_duration": "5m"
+      }
+    ]
+  },
+  "config": {
+    "timeout_ms": 5000
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-16",
+    "description": "Validates Neo4j graph health Prometheus alert rules: correct alert names, severity levels, PromQL expressions, and 'for' durations. Covers graph health, orphans, container resources, pool exhaustion, and data loss detection.",
+    "status": "active",
+    "tags": ["prometheus", "alerts", "neo4j", "phase-grafana"]
+  }
+}

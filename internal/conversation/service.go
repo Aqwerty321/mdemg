@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
+	"mdemg/internal/metrics"
 )
 
 // LearningService defines the interface for the learning service
@@ -29,6 +30,7 @@ type Service struct {
 	vectorIndexName      string
 	constraintDetector   *ConstraintDetector
 	constraintDetEnabled bool
+	cfg                  config.Config
 }
 
 // NewService creates a new conversation service
@@ -56,9 +58,12 @@ func NewServiceWithConfig(driver neo4j.DriverWithContext, embedder Embedder, vec
 	}
 
 	// Initialize constraint detection if config is provided
-	if len(cfg) > 0 && cfg[0].ConstraintDetectionEnabled {
-		svc.constraintDetEnabled = true
-		svc.constraintDetector = NewConstraintDetector(cfg[0].ConstraintMinConfidence)
+	if len(cfg) > 0 {
+		svc.cfg = cfg[0]
+		if cfg[0].ConstraintDetectionEnabled {
+			svc.constraintDetEnabled = true
+			svc.constraintDetector = NewConstraintDetector(cfg[0].ConstraintMinConfidence)
+		}
 	}
 
 	return svc
@@ -196,9 +201,15 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 	if s.embedder != nil {
 		embedding, err = s.embedder.Embed(ctx, req.Content)
 		if err != nil {
-			log.Printf("WARNING: failed to generate embedding for observation: %v", err)
-			// Continue without embedding
+			log.Printf("[WARN] embedding generation failed: %v (dedup skipped)", err)
 			embedding = nil
+			if req.Metadata == nil {
+				req.Metadata = make(map[string]any)
+			}
+			req.Metadata["_embedding_degraded"] = true
+			req.Metadata["_embedding_error"] = err.Error()
+			metrics.Metrics().CMSEmbeddingFailures.Inc()
+			metrics.Metrics().CMSObserveTotal("degraded").Inc()
 		}
 	}
 
@@ -212,7 +223,10 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 			log.Printf("Skipping duplicate observation (similarity=%.3f to node=%s)",
 				dedupResult.Similarity, dedupResult.DuplicateOfID)
 			// Merge: increment duplicate_count on existing node
-			_ = MergeDuplicateObservation(ctx, s.driver, dedupResult.DuplicateOfID)
+			if mergeErr := MergeDuplicateObservation(ctx, s.driver, dedupResult.DuplicateOfID); mergeErr != nil {
+				log.Printf("[WARN] dedup merge failed for %s: %v", dedupResult.DuplicateOfID, mergeErr)
+				metrics.Metrics().CMSDedupMergeFails.Inc()
+			}
 			return &ObserveResponse{
 				ObsID:         dedupResult.DuplicateOfID,
 				NodeID:        dedupResult.DuplicateOfID,
@@ -261,8 +275,8 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 		OrgReviewStatus: "none",
 	}
 
-	// Generate summary (first 200 chars)
-	obs.Summary = generateSummary(req.Content)
+	// Generate summary
+	obs.Summary = generateSummary(req.Content, s.cfg.CMSSummaryMaxChars)
 
 	// Compute surprise score
 	var surpriseScore float64
@@ -570,7 +584,11 @@ func (s *Service) createRefersToEdges(ctx context.Context, spaceID, fromNodeID s
 
 		if res.Next(ctx) {
 			count, _ := res.Record().Get("edgesCreated")
-			return count.(int64), nil
+			typed, ok := count.(int64)
+			if !ok {
+				return int64(0), fmt.Errorf("unexpected edgesCreated type: %T", count)
+			}
+			return typed, nil
 		}
 
 		return int64(0), res.Err()
@@ -579,7 +597,11 @@ func (s *Service) createRefersToEdges(ctx context.Context, spaceID, fromNodeID s
 	if err != nil {
 		return 0, err
 	}
-	return int(result.(int64)), nil
+	typed, ok := result.(int64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return int(typed), nil
 }
 
 // GetReferencesFromObservation retrieves all nodes/symbols referenced by an observation.
@@ -622,7 +644,11 @@ func (s *Service) GetReferencesFromObservation(ctx context.Context, spaceID, obs
 	if err != nil {
 		return nil, err
 	}
-	return result.([]ReferenceResult), nil
+	typed, ok := result.([]ReferenceResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // GetObservationsReferencingNode retrieves observations that reference a specific node/symbol.
@@ -674,7 +700,11 @@ func (s *Service) GetObservationsReferencingNode(ctx context.Context, spaceID, t
 	if err != nil {
 		return nil, err
 	}
-	return result.([]ObservationResult), nil
+	typed, ok := result.([]ObservationResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // ReferenceResult represents a target of a REFERS_TO relationship
@@ -738,8 +768,11 @@ func pinnedStabilityScore(pinned bool) float64 {
 	return DefaultStabilityScore
 }
 
-func generateSummary(content string) string {
-	const maxLen = 200
+func generateSummary(content string, maxLenOverride ...int) string {
+	maxLen := 200
+	if len(maxLenOverride) > 0 && maxLenOverride[0] > 0 {
+		maxLen = maxLenOverride[0]
+	}
 
 	// Clean whitespace
 	content = strings.TrimSpace(content)
@@ -899,9 +932,13 @@ func (s *Service) Resume(ctx context.Context, req ResumeRequest) (*ResumeRespons
 		return nil, fmt.Errorf("space_id is required")
 	}
 
+	defaultMaxObs := s.cfg.CMSResumeMaxObs
+	if defaultMaxObs <= 0 {
+		defaultMaxObs = 20
+	}
 	maxObs := req.MaxObservations
 	if maxObs <= 0 {
-		maxObs = 20
+		maxObs = defaultMaxObs
 	}
 
 	resp := &ResumeResponse{
@@ -958,9 +995,13 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 		return nil, fmt.Errorf("query or query_embedding is required")
 	}
 
+	defaultTopK := s.cfg.CMSRecallTopK
+	if defaultTopK <= 0 {
+		defaultTopK = 10
+	}
 	topK := req.TopK
 	if topK <= 0 {
-		topK = 10
+		topK = defaultTopK
 	}
 
 	resp := &RecallResponse{
@@ -1179,7 +1220,11 @@ LIMIT $limit`, sessionFilter, typeFilter, visibilityFilter, agentFilter)
 	if err != nil {
 		return nil, err
 	}
-	return result.([]ObservationResult), nil
+	typed, ok := result.([]ObservationResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // resumeObsTypePriority returns a priority weight for each observation type.
@@ -1261,7 +1306,11 @@ LIMIT 10`, sessionFilter)
 	if err != nil {
 		return nil, err
 	}
-	return result.([]ThemeResult), nil
+	typed, ok := result.([]ThemeResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // fetchEmergentConcepts retrieves emergent concepts (higher-level abstractions)
@@ -1308,7 +1357,11 @@ LIMIT 10`
 	if err != nil {
 		return nil, err
 	}
-	return result.([]EmergentConceptResult), nil
+	typed, ok := result.([]EmergentConceptResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // findSimilarObservations finds observations similar to the query embedding
@@ -1397,7 +1450,11 @@ LIMIT $topK`, s.vectorIndexName, visibilityFilter, agentFilter, temporalFilter, 
 	if err != nil {
 		return nil, err
 	}
-	return result.([]RecallResult), nil
+	typed, ok := result.([]RecallResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // findSimilarThemes finds themes similar to the query embedding
@@ -1457,7 +1514,11 @@ LIMIT $topK`, s.vectorIndexName, temporalFilter)
 	if err != nil {
 		return nil, err
 	}
-	return result.([]RecallResult), nil
+	typed, ok := result.([]RecallResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // findSimilarConcepts finds emergent concepts similar to the query embedding
@@ -1516,7 +1577,11 @@ LIMIT $topK`, s.vectorIndexName, temporalFilter)
 	if err != nil {
 		return nil, err
 	}
-	return result.([]RecallResult), nil
+	typed, ok := result.([]RecallResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type: %T", result)
+	}
+	return typed, nil
 }
 
 // generateResumeSummary creates a human-readable summary of the resumed context
@@ -1705,7 +1770,10 @@ func (s *Service) buildJiminyRationale(resp *ResumeResponse, maxSurprise float64
 
 // calculateJiminyConfidence determines how confident we are in the rationale
 func (s *Service) calculateJiminyConfidence(resp *ResumeResponse, maxSurprise float64) float64 {
-	confidence := 0.5 // Base confidence
+	confidence := s.cfg.CMSJiminyBaseConfidence
+	if confidence <= 0 {
+		confidence = 0.5
+	}
 
 	// More observations = higher confidence in context
 	if len(resp.Observations) >= 5 {

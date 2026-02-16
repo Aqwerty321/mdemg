@@ -1,0 +1,87 @@
+{
+  "uots_version": "1.0.0",
+  "observability": {
+    "name": "Neo4j Graph Per-Space Metrics",
+    "type": "prometheus_metrics",
+    "tags": ["neo4j", "graph", "per-space", "grafana-dashboard"]
+  },
+  "target": {
+    "endpoint": "/v1/prometheus",
+    "method": "GET"
+  },
+  "expected": {
+    "metrics": [
+      {
+        "name": "mdemg_neo4j_graph_nodes",
+        "type": "gauge",
+        "labels": ["space_id"],
+        "help_contains": "nodes per space",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_graph_edges",
+        "type": "gauge",
+        "labels": ["space_id"],
+        "help_contains": "edges per space",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_graph_observations",
+        "type": "gauge",
+        "labels": ["space_id"],
+        "help_contains": "observations",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_graph_orphans",
+        "type": "gauge",
+        "labels": ["space_id"],
+        "help_contains": "orphan",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_graph_health_score",
+        "type": "gauge",
+        "labels": ["space_id"],
+        "help_contains": "health score",
+        "value_range": { "min": 0, "max": 1 }
+      },
+      {
+        "name": "mdemg_neo4j_graph_learning_edges",
+        "type": "gauge",
+        "labels": ["space_id"],
+        "help_contains": "learning",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_graph_total_nodes",
+        "type": "gauge",
+        "help_contains": "Total nodes",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_graph_total_edges",
+        "type": "gauge",
+        "help_contains": "Total edges",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_graph_total_spaces",
+        "type": "gauge",
+        "help_contains": "Total number",
+        "value_range": { "min": 0 }
+      }
+    ]
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "base_url": "${MDEMG_BASE_URL}"
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-16",
+    "description": "Validates that the Prometheus metrics endpoint exposes per-space Neo4j graph metrics with correct types, labels, and value ranges. These metrics power the Grafana Neo4j dashboard.",
+    "status": "active",
+    "tags": ["neo4j", "grafana-dashboard", "phase-grafana"]
+  }
+}

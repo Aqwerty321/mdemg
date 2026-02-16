@@ -358,3 +358,233 @@ func (s *Server) handleCleanupStats(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, stats)
 }
+
+// handleGraphOrphanCleanup handles POST /v1/memory/cleanup/graph-orphans
+// Scans all (or specified) spaces for zero-edge nodes and offers fix actions.
+func (s *Server) handleGraphOrphanCleanup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req models.GraphOrphanRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if !validateRequest(w, &req) {
+		return
+	}
+
+	// Enforce limit defaults and bounds
+	if req.Limit <= 0 {
+		req.Limit = 100
+	}
+	if req.Limit > 1000 {
+		req.Limit = 1000
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Step A: Discover spaces
+	spaceIDs := req.SpaceIDs
+	if len(spaceIDs) == 0 {
+		result, err := sess.Run(ctx, `
+MATCH (n:MemoryNode)
+WHERE n.space_id IS NOT NULL
+RETURN DISTINCT n.space_id AS sid
+ORDER BY sid`, nil)
+		if err != nil {
+			writeInternalError(w, err, "discover spaces")
+			return
+		}
+		for result.Next(ctx) {
+			if sid, ok := result.Record().Get("sid"); ok && sid != nil {
+				spaceIDs = append(spaceIDs, fmt.Sprint(sid))
+			}
+		}
+		if err := result.Err(); err != nil {
+			writeInternalError(w, err, "discover spaces query")
+			return
+		}
+	}
+
+	resp := models.GraphOrphanResponse{
+		Action:       req.Action,
+		DryRun:       req.DryRun,
+		TotalSpaces:  len(spaceIDs),
+		SpaceResults: make([]models.SpaceOrphanResult, 0, len(spaceIDs)),
+	}
+
+	// Step B+C: Scan and act per space
+	for _, spaceID := range spaceIDs {
+		spResult := models.SpaceOrphanResult{
+			SpaceID:        spaceID,
+			LayerBreakdown: make(map[string]int),
+		}
+
+		// Check protected space for destructive actions
+		if (req.Action == "archive" || req.Action == "delete") && IsProtectedSpace(spaceID) {
+			spResult.Skipped = true
+			spResult.SkipReason = "protected space"
+			resp.SpaceResults = append(resp.SpaceResults, spResult)
+			continue
+		}
+
+		// Build scan query with optional filters
+		var whereClauses []string
+		whereClauses = append(whereClauses, "NOT (n)--()")
+		whereClauses = append(whereClauses, "NOT coalesce(n.is_archived, false)")
+
+		params := map[string]any{
+			"spaceId": spaceID,
+			"limit":   req.Limit,
+		}
+
+		if req.MinAgeDays > 0 {
+			whereClauses = append(whereClauses, "n.created_at < datetime() - duration({days: $minAgeDays})")
+			params["minAgeDays"] = req.MinAgeDays
+		}
+
+		if len(req.Layers) > 0 {
+			whereClauses = append(whereClauses, "coalesce(n.layer, 0) IN $layers")
+			params["layers"] = req.Layers
+		}
+
+		scanCypher := fmt.Sprintf(`
+MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE %s
+RETURN n.node_id AS node_id, coalesce(n.layer, 0) AS layer,
+       coalesce(n.role_type, '') AS role_type,
+       toString(n.created_at) AS created_at
+ORDER BY n.layer, n.created_at
+LIMIT $limit`, joinWhereClauses(whereClauses))
+
+		result, err := sess.Run(ctx, scanCypher, params)
+		if err != nil {
+			log.Printf("warning: graph orphan scan failed for space %s: %v", spaceID, err)
+			resp.Warnings = append(resp.Warnings, fmt.Sprintf("scan failed for %s: %v", spaceID, err))
+			resp.SpaceResults = append(resp.SpaceResults, spResult)
+			continue
+		}
+
+		var nodes []models.GraphOrphanNode
+		for result.Next(ctx) {
+			rec := result.Record()
+			nid, _ := rec.Get("node_id")
+			layer, _ := rec.Get("layer")
+			roleType, _ := rec.Get("role_type")
+			createdAt, _ := rec.Get("created_at")
+
+			layerInt := int(layer.(int64))
+			layerKey := fmt.Sprintf("L%d", layerInt)
+			spResult.LayerBreakdown[layerKey]++
+
+			nodes = append(nodes, models.GraphOrphanNode{
+				NodeID:    fmt.Sprint(nid),
+				Layer:     layerInt,
+				RoleType:  fmt.Sprint(roleType),
+				CreatedAt: fmt.Sprint(createdAt),
+				Status:    "listed",
+			})
+		}
+		if err := result.Err(); err != nil {
+			log.Printf("warning: graph orphan scan query error for space %s: %v", spaceID, err)
+			resp.Warnings = append(resp.Warnings, fmt.Sprintf("scan query error for %s: %v", spaceID, err))
+		}
+
+		spResult.OrphanCount = len(nodes)
+		spResult.Nodes = nodes
+		resp.TotalOrphans += len(nodes)
+
+		// Execute action (if not scan and not dry_run)
+		if req.Action != "scan" && !req.DryRun {
+			switch req.Action {
+			case "consolidate":
+				affected := 0
+				if s.hiddenSvc != nil {
+					if _, err := s.hiddenSvc.RunConsolidation(ctx, spaceID); err != nil {
+						log.Printf("warning: consolidation failed for space %s: %v", spaceID, err)
+						resp.Warnings = append(resp.Warnings, fmt.Sprintf("consolidation failed for %s: %v", spaceID, err))
+					} else {
+						affected += len(nodes)
+					}
+					if _, err := s.hiddenSvc.RunFullConversationConsolidation(ctx, spaceID); err != nil {
+						log.Printf("warning: conversation consolidation failed for space %s: %v", spaceID, err)
+					}
+				} else {
+					resp.Warnings = append(resp.Warnings, "hidden service not available for consolidation")
+				}
+				spResult.AffectedCount = affected
+				for i := range nodes {
+					if affected > 0 {
+						nodes[i].Status = "consolidated"
+					}
+				}
+				spResult.Nodes = nodes
+
+			case "archive":
+				nodeIDs := make([]string, len(nodes))
+				for i, n := range nodes {
+					nodeIDs[i] = n.NodeID
+				}
+				archiveResult, err := sess.Run(ctx, `
+MATCH (n:MemoryNode)
+WHERE n.node_id IN $nodeIds AND n.space_id = $spaceId
+SET n.is_archived = true,
+    n.archived_at = datetime(),
+    n.archive_reason = 'graph-orphan-cleanup'
+RETURN count(n) AS affected`, map[string]any{
+					"nodeIds": nodeIDs,
+					"spaceId": spaceID,
+				})
+				if err != nil {
+					log.Printf("warning: archive failed for space %s: %v", spaceID, err)
+					resp.Warnings = append(resp.Warnings, fmt.Sprintf("archive failed for %s: %v", spaceID, err))
+				} else if archiveResult.Next(ctx) {
+					if a, ok := archiveResult.Record().Get("affected"); ok {
+						spResult.AffectedCount = int(a.(int64))
+					}
+				}
+				for i := range nodes {
+					nodes[i].Status = "archived"
+				}
+				spResult.Nodes = nodes
+
+			case "delete":
+				nodeIDs := make([]string, len(nodes))
+				for i, n := range nodes {
+					nodeIDs[i] = n.NodeID
+				}
+				deleteResult, err := sess.Run(ctx, `
+MATCH (n:MemoryNode)
+WHERE n.node_id IN $nodeIds AND n.space_id = $spaceId
+DETACH DELETE n
+RETURN count(*) AS affected`, map[string]any{
+					"nodeIds": nodeIDs,
+					"spaceId": spaceID,
+				})
+				if err != nil {
+					log.Printf("warning: delete failed for space %s: %v", spaceID, err)
+					resp.Warnings = append(resp.Warnings, fmt.Sprintf("delete failed for %s: %v", spaceID, err))
+				} else if deleteResult.Next(ctx) {
+					if a, ok := deleteResult.Record().Get("affected"); ok {
+						spResult.AffectedCount = int(a.(int64))
+					}
+				}
+				for i := range nodes {
+					nodes[i].Status = "deleted"
+				}
+				spResult.Nodes = nodes
+			}
+		}
+
+		resp.TotalAffected += spResult.AffectedCount
+		resp.SpaceResults = append(resp.SpaceResults, spResult)
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}

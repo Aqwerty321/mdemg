@@ -872,6 +872,47 @@ type ScheduleCleanupResponse struct {
 	NextRunAt     string `json:"next_run_at,omitempty"`
 }
 
+// GraphOrphanRequest — POST /v1/memory/cleanup/graph-orphans
+type GraphOrphanRequest struct {
+	Action     string   `json:"action" validate:"required,oneof=scan consolidate archive delete"`
+	SpaceIDs   []string `json:"space_ids,omitempty"`
+	MinAgeDays int      `json:"min_age_days,omitempty"`
+	Layers     []int    `json:"layers,omitempty"`
+	DryRun     bool     `json:"dry_run,omitempty"`
+	Limit      int      `json:"limit,omitempty"`
+}
+
+// GraphOrphanResponse — response from graph orphan cleanup
+type GraphOrphanResponse struct {
+	Action        string              `json:"action"`
+	DryRun        bool                `json:"dry_run"`
+	TotalSpaces   int                 `json:"total_spaces"`
+	TotalOrphans  int                 `json:"total_orphans"`
+	TotalAffected int                 `json:"total_affected"`
+	SpaceResults  []SpaceOrphanResult `json:"space_results"`
+	Warnings      []string            `json:"warnings,omitempty"`
+}
+
+// SpaceOrphanResult — per-space orphan scan/fix result
+type SpaceOrphanResult struct {
+	SpaceID        string            `json:"space_id"`
+	OrphanCount    int               `json:"orphan_count"`
+	AffectedCount  int               `json:"affected_count"`
+	LayerBreakdown map[string]int    `json:"layer_breakdown"`
+	Skipped        bool              `json:"skipped,omitempty"`
+	SkipReason     string            `json:"skip_reason,omitempty"`
+	Nodes          []GraphOrphanNode `json:"nodes,omitempty"`
+}
+
+// GraphOrphanNode — a single zero-edge node
+type GraphOrphanNode struct {
+	NodeID    string `json:"node_id"`
+	Layer     int    `json:"layer"`
+	RoleType  string `json:"role_type"`
+	CreatedAt string `json:"created_at"`
+	Status    string `json:"status,omitempty"`
+}
+
 // Neo4jOverviewResponse - response for GET /v1/neo4j/overview
 type Neo4jOverviewResponse struct {
 	Database   DatabaseOverview `json:"database"`

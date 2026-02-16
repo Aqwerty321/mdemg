@@ -1,0 +1,69 @@
+{
+  "uots_version": "1.0.0",
+  "observability": {
+    "name": "Neo4j Connection Pool Metrics",
+    "type": "prometheus_metrics",
+    "tags": ["neo4j", "pool", "connections"]
+  },
+  "target": {
+    "endpoint": "/v1/prometheus",
+    "method": "GET"
+  },
+  "expected": {
+    "metrics": [
+      {
+        "name": "mdemg_neo4j_pool_active_connections",
+        "type": "gauge",
+        "help_contains": "active",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_pool_idle_connections",
+        "type": "gauge",
+        "help_contains": "idle",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_pool_waiting_requests",
+        "type": "gauge",
+        "help_contains": "waiting",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_pool_acquired_total",
+        "type": "gauge",
+        "help_contains": "acquired",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_pool_created_total",
+        "type": "gauge",
+        "help_contains": "created",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_pool_closed_total",
+        "type": "gauge",
+        "help_contains": "closed",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_pool_failed_acquire_total",
+        "type": "gauge",
+        "help_contains": "failed",
+        "value_range": { "min": 0 }
+      }
+    ]
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "base_url": "${MDEMG_BASE_URL}"
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-16",
+    "description": "Validates that Neo4j connection pool metrics are exposed via the Prometheus endpoint. These metrics track connection lifecycle and pool utilization.",
+    "status": "active",
+    "tags": ["neo4j", "pool", "phase-48"]
+  }
+}

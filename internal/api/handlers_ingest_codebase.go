@@ -242,8 +242,36 @@ func (s *Server) handleIngestCodebase(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// runIngestionJob executes the ingestion using the CLI tool
+// ingestSemaphore limits concurrent ingestion jobs to prevent resource exhaustion.
+var ingestSemaphore = make(chan struct{}, 4)
+
+// runIngestionJob executes the ingestion using the CLI tool.
+// Wrapped in recover() so a panic in a background goroutine does not crash the server.
 func (s *Server) runIngestionJob(ctx context.Context, job *IngestJob, req *IngestCodebaseRequest) {
+	defer func() {
+		if r := recover(); r != nil {
+			job.mu.Lock()
+			job.Status = "failed"
+			job.Error = fmt.Sprintf("panic in ingestion job: %v", r)
+			job.EndTime = time.Now()
+			job.mu.Unlock()
+			log.Printf("[ingest-codebase] PANIC in job %s: %v", job.ID, r)
+		}
+	}()
+
+	// Acquire semaphore slot (or respect context cancellation)
+	select {
+	case ingestSemaphore <- struct{}{}:
+		defer func() { <-ingestSemaphore }()
+	case <-ctx.Done():
+		job.mu.Lock()
+		job.Status = "failed"
+		job.Error = "context cancelled while waiting for ingestion slot"
+		job.EndTime = time.Now()
+		job.mu.Unlock()
+		return
+	}
+
 	job.mu.Lock()
 	job.Status = "running"
 	job.mu.Unlock()
@@ -283,8 +311,10 @@ func (s *Server) runIngestionJob(ctx context.Context, job *IngestJob, req *Inges
 	// Update TapRoot freshness on completion
 	freshnessCtx, freshnessCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer freshnessCancel()
-	if err := s.retriever.UpdateTapRootFreshness(freshnessCtx, job.SpaceID, "codebase-ingest"); err != nil {
-		log.Printf("[ingest-codebase] Warning: failed to update TapRoot freshness for %s: %v", job.SpaceID, err)
+	if s.retriever != nil {
+		if err := s.retriever.UpdateTapRootFreshness(freshnessCtx, job.SpaceID, "codebase-ingest"); err != nil {
+			log.Printf("[ingest-codebase] Warning: failed to update TapRoot freshness for %s: %v", job.SpaceID, err)
+		}
 	}
 	s.TriggerAPEEventWithContext("source_changed", map[string]string{
 		"space_id":    job.SpaceID,

@@ -1,0 +1,51 @@
+{
+  "uots_version": "1.0.0",
+  "observability": {
+    "name": "Neo4j Container Resource Metrics",
+    "type": "prometheus_metrics",
+    "tags": ["neo4j", "container", "docker", "resources"]
+  },
+  "target": {
+    "endpoint": "/v1/prometheus",
+    "method": "GET"
+  },
+  "expected": {
+    "metrics": [
+      {
+        "name": "mdemg_neo4j_container_cpu_percent",
+        "type": "gauge",
+        "help_contains": "CPU usage percent",
+        "value_range": { "min": 0, "max": 100 }
+      },
+      {
+        "name": "mdemg_neo4j_container_mem_used_bytes",
+        "type": "gauge",
+        "help_contains": "memory used",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_container_mem_limit_bytes",
+        "type": "gauge",
+        "help_contains": "memory limit",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_neo4j_container_mem_percent",
+        "type": "gauge",
+        "help_contains": "memory usage percent",
+        "value_range": { "min": 0, "max": 100 }
+      }
+    ]
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "base_url": "${MDEMG_BASE_URL}"
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-02-16",
+    "description": "Validates Neo4j container resource metrics collected via docker stats. Exposes CPU percent, memory used/limit/percent for the Neo4j container through the MDEMG Prometheus endpoint.",
+    "status": "active",
+    "tags": ["neo4j", "container", "docker", "phase-grafana"]
+  }
+}

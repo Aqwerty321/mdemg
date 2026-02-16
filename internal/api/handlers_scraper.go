@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -178,7 +179,9 @@ func (s *Server) handleCancelScrapeJob(w http.ResponseWriter, r *http.Request, j
 
 	// Update Neo4j status
 	store := s.scraperSvc.GetStore()
-	_ = store.UpdateScrapeJobStatus(r.Context(), jobID, scraper.StatusCancelled, -1)
+	if err := store.UpdateScrapeJobStatus(r.Context(), jobID, scraper.StatusCancelled, -1); err != nil {
+		log.Printf("[WARN] scraper job %s status update failed: %v", jobID, err)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"job_id":  jobID,

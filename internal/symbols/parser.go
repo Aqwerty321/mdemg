@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	sitter "github.com/smacker/go-tree-sitter"
@@ -21,9 +22,11 @@ import (
 )
 
 // Parser extracts symbols from source code files using tree-sitter.
+// The tree-sitter C parser is not thread-safe, so all parse calls are serialized via mu.
 type Parser struct {
 	config      ParserConfig
 	tsParser    *sitter.Parser
+	mu          sync.Mutex
 	languages   map[Language]*sitter.Language
 	queryEngine *QueryEngine
 }
@@ -105,9 +108,11 @@ func (p *Parser) ParseContent(ctx context.Context, filePath string, lang Languag
 		return nil, fmt.Errorf("no grammar loaded for language: %s", lang)
 	}
 
-	// Parse the content
+	// Parse the content (tree-sitter is not thread-safe, serialize access)
+	p.mu.Lock()
 	p.tsParser.SetLanguage(tsLang)
 	tree, err := p.tsParser.ParseCtx(ctx, nil, content)
+	p.mu.Unlock()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse: %w", err)
 	}

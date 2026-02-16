@@ -119,7 +119,40 @@ func (c *Calibrator) GetCalibration() map[string]float64 {
 func (c *Calibrator) GetHistory(limit int) []CycleOutcome {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	return c.getHistoryLocked(limit)
+}
 
+// GetHistoryFiltered returns cycle outcomes matching the given filter.
+func (c *Calibrator) GetHistoryFiltered(limit int, filter *HistoryFilter) []CycleOutcome {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if filter == nil {
+		return c.getHistoryLocked(limit)
+	}
+
+	if limit <= 0 {
+		limit = len(c.cycleHistory)
+	}
+
+	var out []CycleOutcome
+	for i := len(c.cycleHistory) - 1; i >= 0 && len(out) < limit; i-- {
+		h := c.cycleHistory[i]
+		if filter.TriggerSource != "" && h.TriggerSource != filter.TriggerSource {
+			continue
+		}
+		if filter.Tier != "" && h.Tier != filter.Tier {
+			continue
+		}
+		if filter.SpaceID != "" && h.SpaceID != filter.SpaceID {
+			continue
+		}
+		out = append(out, h)
+	}
+	return out
+}
+
+func (c *Calibrator) getHistoryLocked(limit int) []CycleOutcome {
 	if limit <= 0 || limit > len(c.cycleHistory) {
 		limit = len(c.cycleHistory)
 	}

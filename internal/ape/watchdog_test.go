@@ -44,7 +44,7 @@ func TestNewWatchdog(t *testing.T) {
 	}
 
 	cycleTriggerCalled := false
-	cycleTrigger := func(ctx context.Context, spaceID string) {
+	cycleTrigger := func(ctx context.Context, spaceID string, meta TriggerMetadata) {
 		cycleTriggerCalled = true
 	}
 
@@ -184,7 +184,7 @@ func TestCheckWithoutSignalProvider(t *testing.T) {
 			}
 
 			cycleTriggerCalled := false
-			w := NewWatchdog(cfg, "test-space", func(ctx context.Context, spaceID string) {
+			w := NewWatchdog(cfg, "test-space", func(ctx context.Context, spaceID string, meta TriggerMetadata) {
 				cycleTriggerCalled = true
 			})
 			defer w.Stop()
@@ -470,7 +470,7 @@ func TestAdditionalEscalation(t *testing.T) {
 			}
 
 			cycleTriggerCalled := false
-			w := NewWatchdog(cfg, "test-space", func(ctx context.Context, spaceID string) {
+			w := NewWatchdog(cfg, "test-space", func(ctx context.Context, spaceID string, meta TriggerMetadata) {
 				cycleTriggerCalled = true
 			})
 			defer w.Stop()

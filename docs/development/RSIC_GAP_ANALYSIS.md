@@ -1,6 +1,6 @@
 # RSIC Gap Analysis and Hardening Plan
 
-Last updated: 2026-01-22
+Last updated: 2026-02-16
 
 ## Purpose
 

@@ -16,6 +16,77 @@ const (
 	TierMacro CycleTier = "macro" // cron-scheduled deep maintenance
 )
 
+// ───────────── Trigger Source (Phase 87) ─────────────
+
+// TriggerSource identifies what initiated an RSIC cycle.
+type TriggerSource string
+
+const (
+	TriggerManualAPI        TriggerSource = "manual_api"
+	TriggerMicroAuto        TriggerSource = "micro_auto"
+	TriggerSessionPeriodic  TriggerSource = "session_periodic"
+	TriggerMacroCron        TriggerSource = "macro_cron"
+	TriggerWatchdogForce    TriggerSource = "watchdog_force"
+)
+
+// PolicyVersion is the current orchestration policy version.
+const PolicyVersion = "phase87-v1"
+
+// ValidTriggerSources maps valid source strings for input validation.
+var ValidTriggerSources = map[string]TriggerSource{
+	"manual_api":        TriggerManualAPI,
+	"micro_auto":        TriggerMicroAuto,
+	"session_periodic":  TriggerSessionPeriodic,
+	"macro_cron":        TriggerMacroCron,
+	"watchdog_force":    TriggerWatchdogForce,
+}
+
+// Priority returns the trigger priority (lower = higher priority).
+// watchdog_force=0, manual_api=1, macro_cron=2, session_periodic=3, micro_auto=4.
+func (ts TriggerSource) Priority() int {
+	switch ts {
+	case TriggerWatchdogForce:
+		return 0
+	case TriggerManualAPI:
+		return 1
+	case TriggerMacroCron:
+		return 2
+	case TriggerSessionPeriodic:
+		return 3
+	case TriggerMicroAuto:
+		return 4
+	default:
+		return 99
+	}
+}
+
+// AllowedTiers returns the tiers this trigger source is allowed to initiate.
+func (ts TriggerSource) AllowedTiers() []CycleTier {
+	switch ts {
+	case TriggerManualAPI:
+		return []CycleTier{TierMicro, TierMeso, TierMacro}
+	case TriggerMicroAuto:
+		return []CycleTier{TierMicro}
+	case TriggerSessionPeriodic:
+		return []CycleTier{TierMeso}
+	case TriggerMacroCron:
+		return []CycleTier{TierMacro}
+	case TriggerWatchdogForce:
+		return []CycleTier{TierMeso}
+	default:
+		return nil
+	}
+}
+
+// TriggerMetadata carries provenance information for a cycle execution.
+type TriggerMetadata struct {
+	TriggerSource  TriggerSource `json:"trigger_source"`
+	TriggerID      string        `json:"trigger_id"`
+	TriggeredAt    time.Time     `json:"triggered_at"`
+	PolicyVersion  string        `json:"policy_version"`
+	IdempotencyKey string        `json:"idempotency_key,omitempty"`
+}
+
 // ───────────── Assessment ─────────────
 
 // SelfAssessmentReport contains the output of the Assess stage.
@@ -183,6 +254,12 @@ type CycleOutcome struct {
 	CalibrationDelta map[string]float64 `json:"calibration_delta,omitempty"`
 	Insights         []ReflectionInsight `json:"insights,omitempty"`
 	Error            string             `json:"error,omitempty"`
+
+	// Phase 87: Trigger provenance
+	TriggerSource  TriggerSource `json:"trigger_source,omitempty"`
+	TriggerID      string        `json:"trigger_id,omitempty"`
+	TriggeredAt    time.Time     `json:"triggered_at,omitempty"`
+	PolicyVersion  string        `json:"policy_version,omitempty"`
 }
 
 // ───────────── Watchdog ─────────────
@@ -208,6 +285,7 @@ type WatchdogState struct {
 	ObsRatePerHour     float64         `json:"obs_rate_per_hour"`
 	ActiveAnomalies    []string        `json:"active_anomalies,omitempty"`
 	ConsolidationAge   int64           `json:"consolidation_age_sec"`
+	LastTriggerSource  TriggerSource   `json:"last_trigger_source,omitempty"`
 }
 
 // ───────────── Provider Interfaces ─────────────

@@ -1,5 +1,7 @@
 # MDEMG Agent Handoff Document
 
+<!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
+
 **Date:** 2026-02-16
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
@@ -381,6 +383,8 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 **Spec:** `docs/specs/space-transfer.md`
 **Master Plan:** `docs/specs/development-space-collaboration.md` §Phase 1
 
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/udts/specs/space_transfer_list_spaces.udts.json`, `docs/api/api-spec/udts/specs/space_transfer_space_info.udts.json`
+
 **What it does:** Enables sharing mature MDEMG space_id graphs between developer environments via gRPC streaming or file export/import.
 
 **Key files:**
@@ -415,6 +419,8 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 **Spec:** `docs/specs/phase-devspace-hub.md`
 **Master Plan:** `docs/specs/development-space-collaboration.md` §Phase 2
 
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/udts/specs/devspace_register_agent.udts.json`, `docs/api/api-spec/udts/specs/devspace_list_exports.udts.json`, `docs/api/api-spec/udts/specs/devspace_pull_export.udts.json`
+
 **What it does:** Named collaboration groups ("DevSpaces") with registered agents. Agents publish exports to the hub; other members list and pull exports.
 
 **Key files:**
@@ -438,6 +444,8 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 **Spec:** `docs/specs/phase3-inter-agent-comms.md`
 **Master Plan:** `docs/specs/development-space-collaboration.md` §Phase 3
 
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/udts/specs/devspace_connect.udts.json`
+
 **What it does:** Bidirectional gRPC streaming for agent-to-agent messaging within a DevSpace. Agents connect to the hub and exchange `AgentMessage` payloads (context, bugs, notifications).
 
 **Key files:**
@@ -459,6 +467,8 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 **Completed:** 2026-02-06
 **Spec:** `docs/specs/phase4-incremental-sync.md`
 **Master Plan:** `docs/specs/development-space-collaboration.md` §Phase 4
+
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/udts/specs/space_transfer_export_delta.udts.json`
 
 **What it does:** Export/import only changes since a given timestamp or cursor, reducing payload for frequent syncs.
 
@@ -544,6 +554,8 @@ Returns embedding provider health status with active probe validation.
 **Completed:** 2026-02-06
 **Master Plan:** `docs/specs/development-space-collaboration.md` §Phase 5
 
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/udts/specs/space_transfer_crdt.udts.json`
+
 **What it does:** CO_ACTIVATED_WITH edges merge with CRDT semantics (max weight, sum evidence_count) so concurrent updates from multiple agents don't lose data. Space lineage tracks origin, merges, and who shared what.
 
 **Key Files:**
@@ -568,6 +580,8 @@ Returns embedding provider health status with active probe validation.
 
 **Master Plan:** `docs/specs/development-space-collaboration.md` §Phase 7
 
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/udts/specs/devspace_connect.udts.json`
+
 **Goal:** Agents mark observations as "team-visible" or forward selected observations into a shared DevSpace feed.
 
 **Deliverables:**
@@ -583,6 +597,8 @@ Returns embedding provider health status with active probe validation.
 
 **Completed:** 2026-02-06
 **Master Plan:** `docs/specs/development-space-collaboration.md` §Phase 8
+
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/udts/specs/devspace_presence.udts.json`
 
 **What it does:** Agents in a DevSpace have online/away/offline status via heartbeat. Bounded offline queue for disconnected agents.
 
@@ -609,6 +625,8 @@ Returns embedding provider health status with active probe validation.
 
 **Completed:** 2026-02-06
 **Spec:** `docs/specs/unts-hash-verification.md`
+
+**Supporting artifacts (docs + JSON):** `docs/specs/unts-registry.json`, `docs/specs/manifest.sha256`, `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json`
 
 **What it does:** Central registry + API for hash verification of all framework-protected files. Current + historical (last 3) hashes per file. Revert capability.
 
@@ -640,6 +658,8 @@ Returns embedding provider health status with active probe validation.
 
 **Completed:** 2026-02-07
 **Spec:** `docs/specs/phase60-cms-advanced-ii.md`
+
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/cms_templates_create.uats.json`, `docs/api/api-spec/uats/specs/cms_snapshot_create.uats.json`, `docs/api/api-spec/uats/specs/cms_org_decision.uats.json`
 
 **What it does:** Enhanced CMS with structured observations, intelligent resume, and context window optimization for LLM coding agents.
 
@@ -706,6 +726,8 @@ score = (recency_weight × recency_score) +
 **Priority:** Critical (Highest)
 **Spec:** `docs/specs/phase60b-rsic.md`
 **Dependencies:** Phase 60 (CMS Advanced II), Phase 43A (CMS Enforcement), Phase 45.5 (APE Scheduler)
+
+**Supporting artifacts (docs + JSON):** `docs/development/RSIC_GAP_ANALYSIS.md`, `docs/api/api-spec/uats/specs/self_improve_assess.uats.json`, `docs/api/api-spec/uats/specs/self_improve_cycle.uats.json`, `docs/api/api-spec/uats/specs/self_improve_health.uats.json`
 
 **What it does:** Forces LLM coding agents to run programmatically-defined recursive self-improvement cycles. The system assesses its own knowledge quality, reflects on gaps and degradation, plans remediation, delegates execution to background agents, and validates improvement — all autonomously within defined safety bounds. A decay watchdog enforces cycle compliance: if the agent fails to complete a cycle within the configured period, escalating pressure forces execution automatically.
 
@@ -1086,6 +1108,8 @@ Manages the lifecycle of volatile observations — reinforcement, stability deca
 **Spec:** `docs/specs/phase51-web-scraper-ingestion.md`
 **Guide:** `docs/development/SCRAPER.md`
 
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/scraper_create_job.uats.json`, `docs/api/api-spec/uats/specs/scraper_get_status.uats.json`
+
 **What it does:** Asynchronous web scraping module for discovering and ingesting web content. Plugin-based architecture with gRPC binary, section chunking for large pages, and user review workflow.
 
 **Key files:**
@@ -1107,6 +1131,8 @@ Manages the lifecycle of volatile observations — reinforcement, stability deca
 **Completed:** 2026-02-07
 **Spec:** [`docs/specs/phase70-neo4j-backup.md`](docs/specs/phase70-neo4j-backup.md)
 **Guide:** [`docs/development/NEO4J_BACKUP.md`](docs/development/NEO4J_BACKUP.md)
+
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/backup_trigger.uats.json`, `docs/api/api-spec/uats/specs/backup_restore.uats.json`, `docs/api/api-spec/uats/specs/backup_status.uats.json`
 
 **What it does:** Automated and on-demand backup of the Neo4j database, supporting full database dumps (via Docker exec) and partial space-level exports (via existing `.mdemg` format). Simple ticker scheduler for recurring backups, retention engine for cleanup, restore from full dump.
 
@@ -1160,6 +1186,8 @@ Manages the lifecycle of volatile observations — reinforcement, stability deca
 **Guide:** [`docs/development/RELATIONSHIP_EXTRACTION.md`](docs/development/RELATIONSHIP_EXTRACTION.md)
 **Research:** [`docs/research/lsp-vs-upts-analysis.md`](docs/research/lsp-vs-upts-analysis.md)
 **Dependencies:** Phase 46 (Symbol Indexing), Phase 42 (Self-Ingest), Phase 47 (Incremental Updates)
+
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/relationship_stats.uats.json`, `docs/api/api-spec/uats/specs/symbol_relationships.uats.json`
 
 **What it does:** Two parallel tracks:
 
@@ -1233,6 +1261,8 @@ flowchart TD
 
 **Completed:** 2026-02-08
 **Dependencies:** Phase 75B (L5 infrastructure), Phase 46 (Pipeline Registry)
+
+**Supporting artifacts (docs + JSON):** `docs/features/l5-emergent-layer.md`, `docs/api/api-spec/uats/specs/consolidate.uats.json`
 
 **What it does:** Fixed 6 bottlenecks preventing L5 emergent node creation:
 
@@ -1328,6 +1358,8 @@ THEME_OF_EDGE_ENABLED=true       # Use THEME_OF instead of GENERALIZES for conve
 
 **Spec:** `docs/specs/phase1-space-cleanup.md`
 
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/neo4j_overview.uats.json`
+
 Cleared 570,436 non-protected nodes from Neo4j, preserving only `mdemg-dev` (2,789 nodes). Used `go run ./cmd/reset-db --all --yes`.
 
 ---
@@ -1336,6 +1368,8 @@ Cleared 570,436 non-protected nodes from Neo4j, preserving only `mdemg-dev` (2,7
 
 **Spec:** `docs/specs/phase2-self-ingest.md`
 
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/ingest_codebase.uats.json`
+
 Ingested MDEMG codebase into `mdemg-codebase` space (1,561 elements, 0 errors, 100% embedding coverage). Added optional `space_id` parameter to all MCP tools in `cmd/mcp-server/main.go`.
 
 ---
@@ -1343,6 +1377,8 @@ Ingested MDEMG codebase into `mdemg-codebase` space (1,561 elements, 0 errors, 1
 ### Phase 43A: CMS Agent Enforcement ✅
 
 **Spec:** `docs/specs/phase3a-cms-enforcement.md`
+
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/conversation_resume.uats.json`, `docs/api/api-spec/uats/specs/conversation_recall.uats.json`
 
 **What it does:** Tracks per-session CMS usage, exposes session health scores, warns when agents skip resume.
 
@@ -1359,6 +1395,8 @@ Ingested MDEMG codebase into `mdemg-codebase` space (1,561 elements, 0 errors, 1
 ### Phase 43B: CMS Quality & Retrieval Improvements ✅
 
 **Spec:** `docs/specs/phase3b-cms-quality.md`
+
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/conversation_observe.uats.json`, `docs/api/api-spec/uats/specs/conversation_correct.uats.json`
 
 **What it does:** Multi-factor observation quality scoring, relevance-weighted resume ranking, near-duplicate detection (cosine similarity > 0.95).
 
@@ -1379,6 +1417,8 @@ relevanceScore = 0.40 * recencyScore + 0.25 * surpriseScore + 0.20 * typePriorit
 
 **Spec:** `docs/specs/phase3c-multi-agent.md`
 
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/conversation_volatile_stats.uats.json`
+
 **What it does:** Persistent `agent_id` on all CMS operations (survives across sessions). Agent isolation (private obs), team visibility, cross-session resume.
 
 **Key files:**
@@ -1393,6 +1433,8 @@ relevanceScore = 0.40 * recencyScore + 0.25 * surpriseScore + 0.20 * typePriorit
 
 **Completed:** 2026-02-04
 **Spec:** `docs/specs/phase4-linear-crud.md`
+
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/webhooks_generic.uats.json`
 
 **What it does:** Full CRUD operations for Linear (create/read/update/delete issues, projects, comments). Config-driven workflow engine. Generic CRUDModule protobuf service.
 
@@ -1433,6 +1475,8 @@ relevanceScore = 0.40 * recencyScore + 0.25 * surpriseScore + 0.20 * typePriorit
 
 **Roadmap:** `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 6
 
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/ape_status.uats.json`, `docs/api/api-spec/uats/specs/ape_trigger.uats.json`
+
 **What it does:** Plugin architecture, Jiminy explainable retrieval, APE scheduler.
 
 | Deliverable | Status | Key Files |
@@ -1448,6 +1492,8 @@ relevanceScore = 0.40 * recencyScore + 0.25 * surpriseScore + 0.20 * typePriorit
 ### Phase 46: Symbol-Level Indexing ✅
 
 **Roadmap:** `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 8
+
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/symbols.uats.json`, `docs/api/api-spec/uats/specs/symbol_relationships.uats.json`
 
 **What it does:** Tree-sitter symbol extraction (TS/JS/Go/Python), SymbolNode storage, symbol-aware retrieval.
 
@@ -1465,6 +1511,8 @@ relevanceScore = 0.40 * recencyScore + 0.25 * surpriseScore + 0.20 * typePriorit
 ### Phase 47: Incremental Update & Re-Ingestion 🔄
 
 **Roadmap:** `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 9
+
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/ingest_trigger.uats.json`, `docs/api/api-spec/uats/specs/ingest_status.uats.json`, `docs/api/api-spec/uats/specs/ingest_jobs.uats.json`
 
 | Deliverable | Status | Key Files |
 |-------------|--------|-----------|
@@ -1506,6 +1554,8 @@ EDGE_STALENESS_RECLUSTER_THRESHOLD=0.3  # default: 0.3
 ### Phase 48: Query Optimization & Caching ✅
 
 **Roadmap:** `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 10
+
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/cache_stats.uats.json`, `docs/api/api-spec/uats/specs/query_metrics.uats.json`
 
 | Deliverable | Status | Key Files |
 |-------------|--------|-----------|
@@ -1584,6 +1634,8 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 
 **Roadmap:** `docs/development/DEVELOPMENT_ROADMAP.md` §Phase 11
 
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/plugin_create.uats.json`, `docs/api/api-spec/uats/specs/capability_gaps.uats.json`, `docs/api/api-spec/uats/specs/gap_interviews.uats.json`
+
 | Deliverable | Status | Key Files |
 |-------------|--------|-----------|
 | 49.1 Plugin SDK Documentation | ✅ | `docs/development/SDK_PLUGIN_GUIDE.md` (1,582 lines) |
@@ -1601,6 +1653,8 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 ### Phase 50: Public Readiness & Open Source Hardening 📋
 
 **Spec:** `docs/development/repo-to-public-roadmap.md`
+
+**Supporting artifacts (docs + JSON):** `docs/specs/manifest.sha256`
 
 | Area | Status | Tasks |
 |------|--------|-------|
@@ -2022,6 +2076,8 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 **Dependencies:** Phase 70 (Backup), Phase 75C (L5 Emergent Layer)
 **Commit:** `9eb72ce`
 
+**Supporting artifacts (docs + JSON):** `docs/features/neo4j-state-monitor.md`, `docs/api/api-spec/uats/specs/neo4j_overview.uats.json`
+
 **What it does:** Single `GET /v1/neo4j/overview` endpoint that aggregates database health, per-space summaries, and backup status. Replaces calling 4+ endpoints to understand system state.
 
 **Endpoint:** `GET /v1/neo4j/overview`
@@ -2055,6 +2111,8 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 **Status:** Complete (2026-02-08)
 **Dependencies:** Phase 60b (RSIC), Phase 43A (CMS Enforcement)
 **Commit:** `85617e8`
+
+**Supporting artifacts (docs + JSON):** `docs/specs/phase80-cms-metacognition.md`, `docs/api/api-spec/uats/specs/session_anomalies.uats.json`, `docs/api/api-spec/uats/specs/self_improve_signals.uats.json`
 
 **What it does:** Transforms MDEMG from passive memory retrieval to active anomaly detection and enforcement. Server-side anomaly signals detect empty-resume, empty-recall, and no-themes conditions. Hook circuit breakers emit CRITICAL warnings and auto-trigger RSIC assessments. Multi-dimensional watchdog monitoring extends beyond temporal decay. Hebbian signal learner tracks which signals agents respond to.
 

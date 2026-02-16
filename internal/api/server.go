@@ -83,6 +83,11 @@ type Server struct {
 	rsicCycle    *ape.CycleOrchestrator
 	rsicWatchdog *ape.Watchdog
 
+	// Phase 87: RSIC Orchestration
+	orchestrationPolicy *ape.OrchestrationPolicy
+	macroNextRun        time.Time
+	macroCronCancel     context.CancelFunc
+
 	// Phase 51: Web Scraper
 	scraperSvc *scraper.Service
 
@@ -374,8 +379,9 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	rsicCycle = ape.NewCycleOrchestrator(cfg, rsicAssessor, rsicReflector, rsicPlanner, rsicDispatcher, rsicMonitor, rsicCalibrator, rsicWatchdog)
 	// Wire the watchdog's force-trigger to the cycle orchestrator
 	// When force-triggered, also run consolidation deterministically (Phase 45.5)
-	rsicWatchdog = ape.NewWatchdog(cfg, "mdemg-dev", func(ctx context.Context, spaceID string) {
-		if _, err := rsicCycle.RunCycle(ctx, spaceID, ape.TierMeso); err != nil {
+	rsicWatchdog = ape.NewWatchdog(cfg, "mdemg-dev", func(ctx context.Context, spaceID string, meta ape.TriggerMetadata) {
+		opts := &ape.RunCycleOpts{TriggerMeta: &meta}
+		if _, err := rsicCycle.RunCycle(ctx, spaceID, ape.TierMeso, opts); err != nil {
 			log.Printf("[WARN] RSIC watchdog meso cycle failed: %v", err)
 		}
 		if cfg.ConsolidateOnWatchdogEnabled && hid != nil {
@@ -398,6 +404,11 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		sessionTracker: sessTracker,
 		driver:         driver,
 	})
+
+	// Phase 87: Create orchestration policy
+	orchPolicy := ape.NewOrchestrationPolicy(cfg)
+	rsicCycle.SetOrchestrationPolicy(orchPolicy)
+	log.Printf("RSIC orchestration policy initialized (cooldown=%ds, dedupe=%ds)", cfg.RSICTriggerCooldownSec, cfg.RSICTriggerDedupeSec)
 
 	// Phase 80: Initialize signal learner
 	signalLearner := ape.NewSignalLearner(cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
@@ -434,6 +445,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		orgReviewService:        conversation.NewOrgReviewService(driver),
 		rsicCycle:               rsicCycle,
 		rsicWatchdog:            rsicWatchdog,
+		orchestrationPolicy:    orchPolicy,
 		scraperSvc:              scraperSvc,
 		backupSvc:               backupSvc,
 		backupScheduler:         backupSched,
@@ -458,9 +470,123 @@ func (s *Server) Shutdown() {
 	s.StopWeeklyGapInterviews()
 	s.StopScheduledSync()
 	s.StopRSICWatchdog()
+	if s.macroCronCancel != nil {
+		s.macroCronCancel()
+	}
 	if s.backupScheduler != nil {
 		s.backupScheduler.Stop()
 	}
+}
+
+// StartMacroCronScheduler starts the macro cron scheduler goroutine.
+// It parses RSIC_MACRO_CRON and fires macro cycles on schedule.
+func (s *Server) StartMacroCronScheduler() {
+	cronExpr := s.cfg.RSICMacroCron
+	if cronExpr == "" {
+		log.Println("RSIC macro cron disabled (RSIC_MACRO_CRON empty)")
+		return
+	}
+
+	interval := parseCronInterval(cronExpr)
+	if interval <= 0 {
+		log.Printf("RSIC macro cron: unrecognized expression %q, disabled", cronExpr)
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.macroCronCancel = cancel
+	s.macroNextRun = time.Now().Add(interval)
+
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		log.Printf("RSIC macro cron scheduler started (interval=%s, next=%s)", interval, s.macroNextRun.Format(time.RFC3339))
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case now := <-ticker.C:
+				if now.Before(s.macroNextRun) {
+					continue
+				}
+				s.macroNextRun = now.Add(interval)
+
+				if s.orchestrationPolicy == nil || s.rsicCycle == nil {
+					continue
+				}
+
+				// Fire macro cycle for mdemg-dev space
+				spaceID := "mdemg-dev"
+				decision := s.orchestrationPolicy.EvaluateTrigger(ape.TriggerMacroCron, spaceID, ape.TierMacro, "")
+				if !decision.Allowed {
+					log.Printf("RSIC macro cron: skipped for %s — %s", spaceID, decision.Reason)
+					continue
+				}
+
+				go func() {
+					opts := &ape.RunCycleOpts{TriggerMeta: &decision.Meta}
+					outcome, err := s.rsicCycle.RunCycle(context.Background(), spaceID, ape.TierMacro, opts)
+					if err != nil {
+						s.orchestrationPolicy.CompleteCycle(spaceID, ape.TierMacro)
+						log.Printf("RSIC macro cron cycle failed: %v", err)
+						return
+					}
+					s.orchestrationPolicy.RecordTrigger(decision.Meta, spaceID, ape.TierMacro, outcome.CycleID)
+					s.orchestrationPolicy.CompleteCycle(spaceID, ape.TierMacro)
+					log.Printf("RSIC macro cron cycle complete: %s", outcome.CycleID)
+				}()
+			}
+		}
+	}()
+}
+
+// parseCronInterval converts common cron expressions to intervals.
+func parseCronInterval(expr string) time.Duration {
+	expr = strings.TrimSpace(expr)
+	parts := strings.Fields(expr)
+	if len(parts) != 5 {
+		return 0
+	}
+
+	// Handle "*/N * * * *" (every N minutes)
+	if strings.HasPrefix(parts[0], "*/") && parts[1] == "*" && parts[2] == "*" && parts[3] == "*" && parts[4] == "*" {
+		n, err := strconv.Atoi(strings.TrimPrefix(parts[0], "*/"))
+		if err == nil && n > 0 {
+			return time.Duration(n) * time.Minute
+		}
+	}
+
+	// "0 * * * *" → every hour
+	if parts[0] == "0" && parts[1] == "*" && parts[2] == "*" && parts[3] == "*" && parts[4] == "*" {
+		return time.Hour
+	}
+
+	// "0 */N * * *" → every N hours
+	if parts[0] == "0" && strings.HasPrefix(parts[1], "*/") && parts[2] == "*" && parts[3] == "*" && parts[4] == "*" {
+		n, err := strconv.Atoi(strings.TrimPrefix(parts[1], "*/"))
+		if err == nil && n > 0 {
+			return time.Duration(n) * time.Hour
+		}
+	}
+
+	// "0 H * * *" → daily at hour H
+	if parts[0] == "0" && parts[2] == "*" && parts[3] == "*" && parts[4] == "*" {
+		if _, err := strconv.Atoi(parts[1]); err == nil {
+			return 24 * time.Hour
+		}
+	}
+
+	// "0 H * * D" → weekly
+	if parts[0] == "0" && parts[2] == "*" && parts[3] == "*" {
+		if _, err := strconv.Atoi(parts[1]); err == nil {
+			if _, err2 := strconv.Atoi(parts[4]); err2 == nil {
+				return 7 * 24 * time.Hour
+			}
+		}
+	}
+
+	return 0
 }
 
 // StartFileWatchers starts file watchers based on configuration.

@@ -1,0 +1,78 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Phase 87 - Self-Improve Cycle Trigger Metadata",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "phase87",
+      "orchestration",
+      "trigger-metadata"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-22",
+    "description": "Validates trigger metadata contract for POST /v1/self-improve/cycle (Phase 87 design draft).",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 30000,
+    "sha256": "c801a807f671a0e09609e39aea85f21f6f2fb89f18a5f24a1fd308d40f9b6b8d"
+  },
+  "variables": {
+    "test_space": "uats-rsic-phase87",
+    "idempotency_key": {
+      "generator": "uuid"
+    }
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/self-improve/cycle",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{test_space}}",
+      "tier": "meso",
+      "trigger_source": "manual_api",
+      "idempotency_key": "{{idempotency_key}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.cycle_id",
+        "type": "string"
+      },
+      {
+        "path": "$.tier",
+        "equals": "meso"
+      },
+      {
+        "path": "$.space_id",
+        "equals": "{{test_space}}"
+      },
+      {
+        "path": "$.trigger_source",
+        "equals": "manual_api"
+      },
+      {
+        "path": "$.trigger_id",
+        "type": "string"
+      },
+      {
+        "path": "$.triggered_at",
+        "type": "string"
+      },
+      {
+        "path": "$.policy_version",
+        "equals": "phase87-v1"
+      }
+    ]
+  }
+}

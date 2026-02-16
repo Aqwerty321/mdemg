@@ -66,6 +66,9 @@ func main() {
 	// Start RSIC decay watchdog (Phase 60b)
 	srv.StartRSICWatchdog()
 
+	// Start RSIC macro cron scheduler (Phase 87)
+	srv.StartMacroCronScheduler()
+
 	h := &http.Server{
 		Handler:           srv.Routes(),
 		ReadHeaderTimeout: 5 * time.Second,

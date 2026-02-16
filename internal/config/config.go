@@ -228,6 +228,8 @@ type Config struct {
 	RSICForceThreshold     float64 // RSIC_FORCE_THRESHOLD — decay score for force-trigger escalation (default: 0.9)
 	RSICCalibrationDays    int     // RSIC_CALIBRATION_DAYS — days of history for calibration (default: 30)
 	RSICMinConfidence      float64 // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
+	RSICTriggerCooldownSec int     // RSIC_TRIGGER_COOLDOWN_SEC — cooldown between triggers from same source (default: 300)
+	RSICTriggerDedupeSec   int     // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
 
 	// Context Cooler tuning (Phase 45.5)
 	CoolerReinforcementWindowHours  int     // COOLER_REINFORCEMENT_WINDOW_HOURS — reinforcement window (default: 2)
@@ -1224,6 +1226,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	rsicTriggerCooldownSec, err := atoi("RSIC_TRIGGER_COOLDOWN_SEC", 300)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicTriggerDedupeSec, err := atoi("RSIC_TRIGGER_DEDUPE_SEC", 600)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// Context Cooler tuning (Phase 45.5)
 	coolerReinfWindowHours, err := atoi("COOLER_REINFORCEMENT_WINDOW_HOURS", 2)
@@ -1862,6 +1872,8 @@ func FromEnv() (Config, error) {
 		RSICForceThreshold:     rsicForceThreshold,
 		RSICCalibrationDays:    rsicCalibrationDays,
 		RSICMinConfidence:      rsicMinConfidence,
+		RSICTriggerCooldownSec: rsicTriggerCooldownSec,
+		RSICTriggerDedupeSec:   rsicTriggerDedupeSec,
 
 		CoolerReinforcementWindowHours:  coolerReinfWindowHours,
 		CoolerStabilityIncreasePerReinf: coolerStabilityIncrease,

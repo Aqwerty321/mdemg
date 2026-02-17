@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Hook: SessionStart — restore CMS memory context on every session start
 # This runs automatically before Claude sees any user input.
+# Fixed: removed session-resume observe to avoid noise; removed unconditional RSIC assess call.
 
 set -euo pipefail
 
@@ -96,54 +97,7 @@ fi
 echo ""
 echo "═══ END CMS CONTEXT ═══"
 
-# Phase 80: Auto RSIC health display
-RSIC_HEALTH=$(curl -sf -X POST "${MDEMG_URL}/v1/self-improve/assess" \
-  -H "Content-Type: application/json" \
-  -d "{\"space_id\":\"${SPACE_ID}\",\"tier\":\"micro\"}" \
-  --connect-timeout 3 --max-time 8 2>/dev/null) || true
-
-if [ -n "$RSIC_HEALTH" ]; then
-  OVERALL=$(echo "$RSIC_HEALTH" | jq -r '.overall_health // "?"' 2>/dev/null || echo "?")
-  RETRIEVAL=$(echo "$RSIC_HEALTH" | jq -r '.retrieval_quality // "?"' 2>/dev/null || echo "?")
-  MEMORY=$(echo "$RSIC_HEALTH" | jq -r '.memory_health // "?"' 2>/dev/null || echo "?")
-  EDGE=$(echo "$RSIC_HEALTH" | jq -r '.edge_health // "?"' 2>/dev/null || echo "?")
-  LEARN_PHASE=$(echo "$RSIC_HEALTH" | jq -r '.learning_phase // "?"' 2>/dev/null || echo "?")
-  ORPHAN_RATIO=$(echo "$RSIC_HEALTH" | jq -r '.orphan_ratio // "?"' 2>/dev/null || echo "?")
-
-  echo ""
-  cat <<EOF
-═══ RSIC HEALTH ═══
-Overall: ${OVERALL} | Retrieval: ${RETRIEVAL} | Memory: ${MEMORY} | Edge: ${EDGE}
-Learning: ${LEARN_PHASE} | Orphan ratio: ${ORPHAN_RATIO}
-═══ END RSIC HEALTH ═══
-EOF
-
-  # If health is degraded, show investigation checklist
-  HEALTH_NUM=$(echo "$OVERALL" | grep -oE '^[0-9.]+' || echo "1")
-  if [ "$(echo "$HEALTH_NUM < 0.5" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
-    cat <<'DEGRADED'
-
-!! DEGRADED HEALTH DETECTED !!
-Investigation checklist:
-  1. GET /v1/memory/stats?space_id=mdemg-dev
-  2. GET /v1/learning/stats?space_id=mdemg-dev
-  3. POST /v1/self-improve/cycle {"space_id":"mdemg-dev","tier":"meso"}
-DEGRADED
-  fi
-fi
-
-# --- Self-improvement: reinforce recalled observations via co-activation ---
-# Each session start that recalls observations should strengthen them.
-# Fire-and-forget: create a session-resume observation that co-activates with
-# existing observations in the claude-core session, boosting their stability.
-if [ "$OBS_COUNT" -gt 0 ] 2>/dev/null; then
-  curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
-    -H "Content-Type: application/json" \
-    -d "{\"space_id\":\"${SPACE_ID}\",\"session_id\":\"${SESSION_ID}\",\"content\":\"Session resumed. ${OBS_COUNT} observations, ${THEME_COUNT} themes, ${CONCEPT_COUNT} concepts recalled. Memory continuity maintained.\",\"obs_type\":\"context\",\"tags\":[\"session-resume\",\"auto-reinforce\"]}" \
-    --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null &
-fi
-
-# Also trigger graduation check in background — graduated observations become permanent
+# --- Graduation check in background — promote stable volatiles to permanent (keeps CMS tidy)
 curl -sf -X POST "${MDEMG_URL}/v1/conversation/graduate" \
   -H "Content-Type: application/json" \
   -d "{\"space_id\":\"${SPACE_ID}\"}" \

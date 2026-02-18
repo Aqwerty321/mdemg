@@ -1,22 +1,18 @@
 # CLAUDE.MD — MDEMG Agent Contract
 
-> Purpose: single authoritative contract for the agent.
->
-> 1. CMS (Conversation Memory System) is the agent’s identity and MUST be used.
-> 2. Plan Mode (senior-engineer review / YC prompt) is a named cognitive routine used *before* code changes.
-> 3. Orchestration, hooks, and execution rules enforce safety and continuity.
+> **Purpose:** single authoritative contract for interacting with MDEMG.
+> The file is the agent's rulebook: CMS first, Plan Mode for architecture, strict execution rules for safety.
 
 ---
 
-## ⚠️ MANDATORY: Use MDEMG Conversation Memory System (CMS)
+## ⚠️ MANDATORY: Use CMS (Conversation Memory System)
 
-**FAILURE TO USE CMS = CONTEXT LOSS EVERY 20–30 MINUTES**
+**FAILURE TO USE CMS = CONTEXT LOSS EVERY 20–30 MINUTES.**
+Treat CMS as an identity service. If CMS is unavailable, act conservatively and **do not** make irreversible changes without explicit user confirmation.
 
-CMS is non-optional. Treat it as infrastructure. If CMS is unavailable, behave conservatively and do not make irreversible decisions without explicit user confirmation.
+### First action on every session — resume memory (MUST)
 
-### FIRST ACTION ON EVERY SESSION — RESUME MEMORY
-
-Do this immediately on session start (hooks will normally run it automatically):
+Run immediately at session start (hooks or MCP bridge should run automatically):
 
 ```bash
 curl -s -X POST http://localhost:9999/v1/conversation/resume \
@@ -24,170 +20,153 @@ curl -s -X POST http://localhost:9999/v1/conversation/resume \
   -d '{"space_id":"mdemg-dev","session_id":"claude-core","max_observations":10}'
 ```
 
-* If CMS returns observations, acknowledge briefly (one-line summary) before any reasoning or action.
-* If CMS is unreachable, announce: `CMS unavailable — memory disconnected` and require confirmation before irreversible actions.
-* Do not assume a missing resume is normal; create an anomaly observation if resume fails for a populated space.
+* If resume returns observations → ACK with a **one-line summary** before any new reasoning.
+* If CMS unreachable → announce: **`CMS unavailable — memory disconnected`** and require explicit confirmation for irreversible actions.
+* If resume returns 0 observations but the space has data → create an anomaly observation and trigger RSIC micro assessment.
 
 ---
 
-## DURING SESSION — ACTIVELY OBSERVE (MANDATORY)
+## DURING SESSION — Observe only high-signal events (MANDATORY)
 
-You **MUST** call `/v1/conversation/observe` to persist *only* high-signal items. Do **not** persist raw chain-of-thought.
+Call `/v1/conversation/observe` **silently** for **high-signal** items only. Do NOT store chain-of-thought or transient silly stuff.
 
-**What to persist (only):**
+**Allowed obs_types:**
 
-* `decision` — key architectural or irreversible choices
-* `correction` — user corrections, explicit rejections
-* `preference` — user style or tooling preferences
-* `learning` — new domain knowledge or conventions
-* `error` / `blocker` — build/test failures, unresolved blockers
-* `progress` — milestone or successful build/test (sparingly)
+* `decision` — architectural / irreversible choices (persist only when locked/approved)
+* `correction` — explicit user corrections or rejections
+* `preference` — user style/tool preferences
+* `learning` — durable new domain conventions or constraints
+* `error` / `blocker` — test/build failures, unresolved blockers
+* `progress` — milestone / successful builds (use sparingly)
 
-**Example:**
+**Observe example (decision):**
 
 ```bash
 curl -s -X POST http://localhost:9999/v1/conversation/observe \
   -H "Content-Type: application/json" \
-  -d '{"space_id":"mdemg-dev","session_id":"claude-core","content":"Chose event-driven design over polling due to O(n) tick cost","obs_type":"decision"}'
+  -d '{
+    "space_id":"mdemg-dev",
+    "session_id":"claude-core",
+    "content":"Decision: adopt event-driven architecture for ingestion pipeline due to O(N) polling cost",
+    "obs_type":"decision"
+  }'
 ```
 
 **Rules**
 
-* Do NOT announce that you are observing — observe silently.
-* Do NOT dump entire memory into the prompt; recall only what is necessary.
-* Novel observations (surprise) persist longer; co-activation increases stability.
-* Only *explicitly observed* locked decisions become durable memory.
+* Observe silently (no announcements like “I stored X” unless user requests).
+* Never dump CMS contents into the working prompt; only recall the minimal necessary items.
+* Only explicitly observed items become durable memory.
+* Novelty (surprise) makes observations persist longer; co-activation reinforces them.
 
 ---
 
 ## PROTECTED SPACE
 
-`mdemg-dev` is protected:
-
-* API refuses destructive operations on this space.
-* `reset-db` and destructive utilities skip this space.
-* Do not attempt to circumvent protections.
+* `mdemg-dev` is protected. The API and tools refuse destructive operations on this space. Do not attempt to bypass protections.
 
 ---
 
-## FIRST-CLASS HOOKS & ENFORCEMENT (overview)
+## HOOKS & ENFORCEMENT (they are enforced)
 
-These hooks exist and are enforced by the repo. They are not optional:
+These hooks are active and non-optional:
 
-* `session-start.sh` — calls `/v1/conversation/resume` at session start, prints a short summary, triggers anomaly checks.
-* `post-tool-observe.py` — auto-captures tool results, errors, and important edits as observations (configurable).
-* `pre-compact.sh` — snapshots context to CMS before auto-compaction.
-* `pre-bash-check` — prevents destructive shell operations.
+* `session-start.sh` — runs resume, prints short summary, triggers anomaly checks.
+* `pre-compact.sh` — snapshots current session into CMS before compaction.
+* `pre-bash-check.*` — blocks destructive shell commands until explicit confirmation.
+* `post-tool-observe.py` — auto-captures tool results and important edits (configurable).
 
-Do not remove, disable, or circumvent hooks without an organization-approved exception.
+Do not remove or disable hooks without documented, org-approved exception.
 
 ---
 
 ## RSIC — Recursive Self-Improvement Cycle (summary)
 
-CMS runs autonomous cycles that monitor and repair memory health:
+CMS runs autonomous maintenance cycles:
 
-* **Micro (per-session)** — quick health pulse
-* **Meso (every 6h / N sessions)** — retrieval & edge health remediation
-* **Macro (daily)** — topology optimization & hidden-layer consolidation
+* **Micro:** per-session quick health checks
+* **Meso:** every 6h or N sessions — edge & retrieval remediation
+* **Macro:** daily — topology + hidden layer reconsolidation
 
-RSIC automated actions include:
-
-* prune decayed edges
-* trigger consolidation
-* graduate stable volatiles to permanent
-* tombstone stale low-value observations
-
-If RSIC signals degrade, follow the investigation checklist shown by hooks.
+Actions include: prune decayed edges, trigger consolidation, graduate volatiles, tombstone stale low-value observations. If RSIC reports degradation, follow the investigation checklist surfaced by hooks.
 
 ---
 
-## PLAN MODE — SENIOR ENGINEER REVIEW (YC PROMPT as a Mode)
+## PLAN MODE — SENIOR ENGINEER REVIEW (YC-style super-prompt)
 
-**Plan Mode is a named thinking mode and must be invoked explicitly before any code changes.** This is *not* execution. No code changes while in Plan Mode.
+**Plan Mode is mandatory and must be invoked explicitly before any code changes** (activation: `@plan`, `@plan-mode`, or UI button). No code changes during Plan Mode.
 
-### Activation
+### Activation / Behavior
 
-* Enter Plan Mode by the user or orchestrator command (e.g., `@plan` or explicit UI action).
-* On activation: do not modify files. Only analyze and produce recommendations.
+* On activation: **do not modify files**; produce only analysis and recommendations.
+* Follow stages in order: **Architecture → Code Quality → Tests → Performance**.
+* For every issue: provide file:line evidence where possible, 2–3 options, trade-offs, and recommend one. **Pause for approval**.
+* Only after explicit user approval persist a recommendation as an `obs_type:"decision"`.
 
-### Plan Mode Rules (non-negotiable)
+### YC-style Plan Mode Super-Prompt (drop into agent system prompt)
 
-1. No code written during Plan Mode.
-2. Follow the review stages in order (Architecture → Code Quality → Tests → Performance).
-3. For every issue: cite file:line where possible, present 2–3 options, analyze tradeoffs, recommend one option, then **pause for approval**.
-4. Persist to CMS **only** when the user explicitly approves/locks a recommendation (use `obs_type:"decision"`).
+Use this exact block to force repeated review loops and rigorous decisions. Make the agent **repeat until approval**.
 
-### Engineering Preferences (guides)
+```
+PLAN MODE — SENIOR ENGINEER (YC PROMPT)
+You are now in Plan Mode. This is an analysis-only mode. DO NOT write or modify code.
+Follow these stages in strict order: Architecture → Code Quality → Tests → Performance.
+For each stage:
+  1) Identify the top 3 issues (if any). For each issue include exact file:line evidence.
+  2) For each issue, present 2–3 concrete options. Each option must include:
+     - Implementation steps (bullet list)
+     - Estimated effort (S/M/L: hours)
+     - Risk (brief)
+     - Maintenance cost (low/medium/high)
+  3) For each issue, recommend exactly one option and say why (one short sentence).
+  4) For each recommendation, show the exact command(s) or patch snippet required to implement it.
+  5) STOP and ask: "Approve recommendation X? (yes/no)". Wait for explicit user approval before proceeding to Execution Mode.
+Additional rules:
+  - If the analysis requires recalling prior decisions, call MEMORY.recall(query) first and include the relevant observation IDs in evidence.
+  - When you propose an irreversible action, explicitly verify with the user (no defaults).
+  - Do not perform any changes without the user's “yes” approval for that specific recommendation.
+  - If asked to re-run Plan Mode, incorporate new CMS observations since last run.
+  - Summarize the final plan in 4 lines: (what, why, risk, next step).
+End Plan Mode only when user approves a recommendation or explicitly cancels.
+```
 
-* DRY: flag repetition aggressively.
-* Well-tested code is non-negotiable.
-* “Engineered enough”: avoid premature abstraction or fragility.
-* Prefer explicitness and clarity over cleverness.
-* Favor correctness and maintainability over micro-optimization.
-
-### Plan Mode Review Stages (strict order)
-
-For each stage: identify, evidence, options, tradeoffs, recommendation, pause.
-
-1. **Architecture**
-
-   * component boundaries, dependency graph, data flow, SLOs, auth/data access boundaries
-
-2. **Code Quality**
-
-   * module organization, abstractions, DRY violations, technical debt, error handling
-
-3. **Tests**
-
-   * unit/integration/e2e coverage, test quality, untested failure paths
-
-4. **Performance**
-
-   * N+1 patterns, hot loops, memory use, caching opportunities, measurable perf targets
-
-### For every issue found
-
-* Describe concretely with file:line evidence.
-* Present 2–3 options (including “do nothing” when valid).
-* For each option: implementation effort, risk, impact, maintenance burden.
-* Recommend the best option and map to preferences.
-* Ask explicitly for the user’s adoption before proceeding.
+**Enforcement:** the agent must call CMS `recall` at the start of Plan Mode and before final recommendation if there are prior decisions related to the same scope.
 
 ---
 
-## PLAN MODE ↔ CMS BRIDGE (how conclusions persist)
+## PLAN MODE → CMS BRIDGE (persisting decisions)
 
-* After user approval of a Plan Mode recommendation, persist it:
+After the user approves a Plan Mode recommendation, persist it:
 
 ```bash
 curl -s -X POST http://localhost:9999/v1/conversation/observe \
   -H "Content-Type: application/json" \
-  -d '{"space_id":"mdemg-dev","session_id":"claude-core","content":"<concise decision>","obs_type":"decision"}'
+  -d '{"space_id":"mdemg-dev","session_id":"claude-core","content":"<Concise decision text>","obs_type":"decision"}'
 ```
 
-* Do not persist rejected alternatives unless the user explicitly requests them.
-* If a previously settled decision is questioned later, call `/v1/conversation/recall` to fetch the observed decision rather than re-arguing.
+*Do not persist rejected alternatives unless the user explicitly requests saving them as `learning`.*
+
+When re-litigated later, call `/v1/conversation/recall` to fetch the observed decision rather than re-arguing.
 
 ---
 
-## EXECUTION MODE (handoff rules)
+## EXECUTION MODE — rules & handoff
 
-Only enter Execution Mode after explicit approval of Plan Mode recommendations.
+Enter Execution Mode **only after** explicit approval of Plan Mode recommendations.
 
-In Execution Mode:
+Execution Mode rules:
 
 * Implement only the approved changes.
 * Do not introduce new abstractions without returning to Plan Mode.
-* Persist any new locked decisions immediately to CMS.
-* Respect the destructive operation blocklist and pre-bash checks.
-* Long-running commands must run in foreground and be visible to the user.
+* Persist new locked decisions immediately to CMS.
+* Respect pre-bash destructive checks. Any destructive operation must require explicit, inline confirmation.
+* Run long-running tasks in foreground and stream output to the user.
 
 ---
 
 ## SKILL REGISTRY (CMS-backed)
 
-* Skills are pinned observations in CMS; thin skill files in `.claude/skills/` are pointers that call CMS to recall content.
+* Skills are pinned observations. Thin skill files in `.claude/skills/` are pointers that call CMS to recall content.
 * Recall a skill:
 
 ```bash
@@ -196,7 +175,29 @@ curl -s -X POST http://localhost:9999/v1/skills/<name>/recall \
   -d '{"space_id":"mdemg-dev"}'
 ```
 
-* Pinned observations start permanent (stability = 1.0). Without CMS, skills are unavailable.
+Pinned observations start permanent (stability=1.0). Without CMS, skills are unavailable.
+
+---
+
+## TOOL USAGE: automatic recall triggers (make agent choose memory)
+
+The agent should automatically call `memory.recall(...)` when any of these occur in user input or internal reasoning:
+
+**Trigger words / contexts**
+
+* Architecture changes: `refactor`, `redesign`, `re-architect`, `restructure`
+* Irreversible operations: `drop`, `truncate`, `reset`, `migrate`, `destroy`
+* Preference-sensitive choices: `style`, `formatting`, `convention`, `preference`
+* High uncertainty / re-check: `not sure`, `I think`, `maybe`, `do we`
+* Cross-file edits or multi-module changes
+
+**Tool schema (short guidance for MCP tool definitions)**
+
+* `memory.recall({"space_id":"mdemg-dev","query":"...","top_k":N})` → returns observations + evidence (file:line)
+* `memory.observe({"space_id":"mdemg-dev","session_id":"...","content":"...","obs_type":"..."})` → returns obs_id
+* `memory.consolidate({"space_id":"mdemg-dev"})` → trigger hidden layer creation
+
+Agents should prefer recall **before** they finalize recommendations or take destructive actions.
 
 ---
 
@@ -211,57 +212,50 @@ curl -s -X POST http://localhost:9999/v1/skills/<name>/recall \
 * Self-improve assess: `POST /v1/self-improve/assess`
 * Skill recall: `POST /v1/skills/{name}/recall`
 
-(Use these endpoints via MCP tools or the provided internal hooks; expose only CMS tools to agents, not admin or ingestion APIs.)
+(Expose only CMS tools to agents; do not expose admin or ingestion endpoints.)
 
 ---
 
-## AUTOMATIC SAFETY: destructive-operation blocklist
+## DESTRUCTIVE-OPERATION BLOCKLIST (automatic pre-check)
 
-Before any destructive shell or DB operation, run pre-checks. Blocked categories include:
+Before running any shell/db command, run pre-checks. Block and require explicit approval for:
 
-* DB destruction (DROP/TRUNCATE, Neo4j destructive)
-* Forced recursive deletes (`rm -rf` patterns)
-* Git history rewrites & force pushes
-* Forced graph node mass deletions
+* DB destructive statements (DROP, TRUNCATE, full database restores)
+* `rm -rf` patterns and forced recursive deletes
+* Git history rewrites (`git push --force`, `git reset --hard` on main)
+* Bulk node deletions in the graph
 
-If a command matches a destructive pattern, require explicit user confirmation.
-
----
-
-## COMMUNICATION PROTOCOL (before every action)
-
-1. State what you are about to do.
-2. State why.
-3. If modifying persistent data (code, DB, CMS), ask for confirmation.
-4. For long-running tasks, run them visibly (foreground) and stream output.
+If a command matches the blocklist → refuse until user explicitly permits with exact confirmation text.
 
 ---
 
 ## SNAPSHOTS & PRE-COMPACTION
 
-* Before every auto-compaction, a pre-compact hook will snapshot session state to CMS to ensure continuity across context window boundaries.
-* Use snapshots to capture active files, blockers, and next steps.
+* `pre-compact.sh` will snapshot active session state to CMS before compaction.
+* Use snapshots to capture active files, blockers, and next steps. Snapshots must be small and focused (task context, not whole repo).
 
 ---
 
-## MEMORY SIGNALS & ANOMALIES (meta-cognition)
+## MEMORY SIGNALS & ANOMALIES
 
-* Hooks will surface warnings and anomalies in clear text if resume returns 0 observations when the space has data, or other abnormal states.
-* If anomaly occurs, follow the investigation checklist surfaced by the hook and trigger RSIC micro assessment when necessary.
+* Hooks will surface anomalies (e.g., empty resume when space has nodes).
+* If an anomaly occurs, follow the hook checklist and trigger RSIC micro assessment.
+* Record anomalies as `error` observations.
 
 ---
 
 ## QUALITY RULES — WHAT NOT TO STORE
 
-* Do NOT store raw chain-of-thought, token dumps, or transient alternatives as `decision`.
-* Do NOT store speculative brainstorming as `decision`. Use `learning` or `progress` if needed and only if user explicitly asks.
-* Only store what you would want read back verbatim in a future session.
+* Do NOT store chain-of-thought, token dumps, or transcript fragments as `decision`.
+* Do NOT store speculative brainstorming as durable `decision`.
+* Use `learning` for general knowledge and `progress` for milestones (sparingly).
+* Only store things you’d want verbatim in a future session.
 
 ---
 
 ## CONFIG & TUNING (examples)
 
-Use repository or environment configuration to tune behavior:
+Tune system behavior through env/config:
 
 ```bash
 CMS_RESUME_MAX_TOKENS=4000
@@ -275,30 +269,54 @@ TOMBSTONE_THRESHOLD=0.05
 GRADUATION_STABILITY_THRESHOLD=0.8
 ```
 
-Tune RSIC safety bounds conservatively in production (default prune caps: 5% nodes, 10% edges per cycle).
+Keep RSIC safety bounds conservative for production.
+
+---
+
+## VS CODE MCP HINT (how to wire agent → MDEMG)
+
+Use the MCP stdio bridge (bin/mdemg-mcp). Example workspace config:
+
+`.vscode/mcp.json`
+
+```json
+{
+  "servers": {
+    "mdemg": {
+      "command": "/home/<user>/mdemg/bin/mdemg-mcp",
+      "args": [],
+      "env": {
+        "MDEMG_ENDPOINT": "http://localhost:9999"
+      }
+    }
+  }
+}
+```
+
+**Note:** Pointing directly to `http://localhost:9999` as an HTTP MCP server will cause SSE/404 fallbacks; spawn the MCP bridge binary over stdio.
 
 ---
 
 ## GIT WORKFLOW & ORCHESTRATION (project defaults)
 
-* Development branch: `mdemg-dev01`. Never commit directly to `main`.
-* Use conventional commits; an auto-PR workflow updates `main`.
-* Use sub-agents for discrete tasks. Orchestrator coordinates; agents execute tasks.
+* Development branch: `mdemg-dev01`. Never commit directly to `main`. Use conventional commits.
+* Use sub-agents for discrete tasks; orchestrator coordinates.
 * Model selection guide: `haiku` for simple tasks, `sonnet` for analysis/tests, `opus` for architecture decisions.
 
 ---
 
-## BENCHMARKS & CODE INGESTION (operator notes)
+## BENCHMARKS & INGESTION (operator notes)
 
-* Full code ingestion and consolidation are heavy; do not run in interactive sessions unless performing benchmarks.
-* Use `/v1/memory/ingest-codebase` and consolidation for large-scale indexing workflows only.
+Full ingestion/consolidation is heavy; do not run in interactive sessions unless benchmarking. Use `/v1/memory/ingest-codebase` + consolidation for large scale indexing.
 
 ---
 
-## FINAL: Golden Rules (read this before acting)
+## FINAL: Golden Rules (read before acting)
 
 1. **CMS first** — resume on start, observe only high-signal events.
-2. **Plan Mode second** — think like a staff engineer before code. Pause. Ask. Lock decisions. Persist locks.
-3. **Execution third** — implement only approved decisions, and follow safety hooks.
+2. **Plan Mode second** — analyze like a staff engineer before code. Pause. Get approval. Lock decisions.
+3. **Execution third** — implement only approved decisions and persist locks.
 
-This file is the authoritative contract: follow it strictly. If you need to extend behavior, add documented operations and tests — do not silently change enforcement hooks or storage rules.
+This file is the authoritative contract. Changes must be documented, reviewed, and tested. If you extend behavior, add tests and update Plan Mode + hook expectations.
+
+---
